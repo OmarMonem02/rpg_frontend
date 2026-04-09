@@ -50,5 +50,28 @@
   .ghost-border {
     @apply border border-outline-variant/15;
   }
+
+  .animate-app-shell-enter {
+    animation: app-shell-enter 0.45s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  }
+
+  @keyframes app-shell-enter {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .animate-app-shell-enter {
+      animation: none;
+      opacity: 1;
+      transform: none;
+    }
+  }
 }
 

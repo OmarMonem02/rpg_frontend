@@ -6,6 +6,7 @@ import { getAuthToken } from "@/lib/auth-session";
 import { createUser, deleteUser, listUsers, updateUser, type UserRecord } from "@/lib/crud-api";
 
 const roleOptions = ["admin", "staff", "Technician"] as const;
+const EMAIL_DOMAIN = "@rpg.com";
 
 type UserFormState = {
   name: string;
@@ -22,6 +23,16 @@ const initialForm: UserFormState = {
   password: "",
   password_confirmation: "",
 };
+
+function getEmailLocalPart(value: string): string {
+  const noSpaces = value.replace(/\s+/g, "");
+  return noSpaces.split("@")[0] ?? "";
+}
+
+function buildRpgEmail(value: string): string {
+  const localPart = getEmailLocalPart(value);
+  return localPart ? `${localPart}${EMAIL_DOMAIN}` : "";
+}
 
 export default function UsersPage() {
   const [records, setRecords] = useState<UserRecord[]>([]);
@@ -97,7 +108,7 @@ export default function UsersPage() {
       } else {
         await createUser(token, {
           name: form.name.trim(),
-          email: form.email.trim(),
+          email: buildRpgEmail(form.email),
           role: form.role,
           password: form.password,
           password_confirmation: form.password_confirmation,
@@ -180,14 +191,32 @@ export default function UsersPage() {
 
           <label className="space-y-1 text-sm text-on-surface">
             <span className="font-medium">Email</span>
-            <input
-              type="email"
-              value={form.email}
-              onChange={(event) => setForm((prev) => ({ ...prev, email: event.target.value }))}
-              required
-              className="w-full rounded-md border border-outline-variant/40 bg-surface-container-lowest px-3 py-2 outline-none focus:border-primary"
-              placeholder="user@rpg.hub"
-            />
+            {editingId ? (
+              <input
+                type="email"
+                value={form.email}
+                onChange={(event) => setForm((prev) => ({ ...prev, email: event.target.value }))}
+                required
+                className="w-full rounded-md border border-outline-variant/40 bg-surface-container-lowest px-3 py-2 outline-none focus:border-primary"
+                placeholder={`user${EMAIL_DOMAIN}`}
+              />
+            ) : (
+              <div className="flex overflow-hidden rounded-md border border-outline-variant/40 bg-surface-container-lowest focus-within:border-primary">
+                <input
+                  type="text"
+                  value={getEmailLocalPart(form.email)}
+                  onChange={(event) =>
+                    setForm((prev) => ({ ...prev, email: buildRpgEmail(event.target.value) }))
+                  }
+                  required
+                  className="min-w-0 flex-1 px-3 py-2 outline-none"
+                  placeholder="username"
+                />
+                <span className="border-l border-outline-variant/30 bg-surface-container-low px-3 py-2 text-on-surface-variant">
+                  {EMAIL_DOMAIN}
+                </span>
+              </div>
+            )}
           </label>
 
           <label className="space-y-1 text-sm text-on-surface">
