@@ -276,27 +276,31 @@ export default function SparePartsPage() {
       label: "Part Name",
       type: "text",
       required: true,
-      section: "Basic Information",
-      description: "e.g., Front Brake Pad, Air Filter",
+      section: "Basic Info",
+      sectionDescription: "Start with the part identity your team uses every day.",
+      description: "Use the customer-facing or warehouse-recognized part name.",
       placeholder: "Enter part name",
       value: editingSparePart?.name,
+      helperTone: "featured",
+      summaryValue: ({ value }) => (value ? String(value) : undefined),
     },
     {
       name: "sku",
       label: "SKU",
       type: "text",
       required: true,
-      section: "Basic Information",
-      description: "Unique stock keeping unit identifier",
+      section: "Basic Info",
+      description: "Keep the SKU unique and easy to scan in inventory.",
       placeholder: "e.g., SKU-001",
       value: editingSparePart?.sku,
+      summaryValue: ({ value }) => (value ? `SKU ${String(value)}` : undefined),
     },
     {
       name: "part_number",
       label: "Part Number",
       type: "text",
-      section: "Basic Information",
-      description: "Manufacturer's part number (optional)",
+      section: "Basic Info",
+      description: "Add the maker reference if your team uses manufacturer numbers.",
       placeholder: "e.g., MPN-12345",
       value: editingSparePart?.part_number,
     },
@@ -306,7 +310,8 @@ export default function SparePartsPage() {
       type: "select",
       required: true,
       section: "Classification",
-      description: "Choose the category this part belongs to",
+      sectionDescription: "Place the part under the right shelf and supplier grouping.",
+      description: "Choose the main spare-parts category.",
       options: categories.map((c) => ({ value: c.id, label: c.name })),
       value: editingSparePart?.spare_parts_category_id,
     },
@@ -316,7 +321,7 @@ export default function SparePartsPage() {
       type: "select",
       required: true,
       section: "Classification",
-      description: "Select the manufacturer brand",
+      description: "Pick the source brand used in purchasing and reporting.",
       options: brands.map((b) => ({ value: b.id, label: b.name })),
       value: editingSparePart?.brand_id,
       disabled: brandsLoading,
@@ -326,17 +331,19 @@ export default function SparePartsPage() {
       label: "Stock Quantity",
       type: "number",
       section: "Inventory",
-      description: "Current number of units in stock",
+      sectionDescription: "Set the operational numbers that drive stock visibility.",
+      description: "Add the opening stock count for this part.",
       placeholder: "0",
       value: editingSparePart?.stock_quantity ?? 0,
       min: 0,
+      helperTone: "featured",
     },
     {
       name: "low_stock_alarm",
       label: "Low Stock Alarm",
       type: "number",
       section: "Inventory",
-      description: "Trigger alert when stock falls below this level",
+      description: "Set when the team should treat this part as low stock.",
       placeholder: "5",
       value: editingSparePart?.low_stock_alarm ?? 0,
       min: 0,
@@ -347,11 +354,14 @@ export default function SparePartsPage() {
       type: "number",
       required: true,
       section: "Pricing",
-      description: "Acquisition cost per unit",
+      sectionDescription: "Define the financial baseline before the part goes live.",
+      description: "Enter your landed or purchase cost per unit.",
       placeholder: "0.00",
       value: editingSparePart?.cost_price ?? 0,
       min: 0,
       step: "0.01",
+      summaryValue: ({ value, formData }) =>
+        value !== "" && value !== undefined ? `${String(value)} ${String(formData.currency_pricing ?? "EGP")}` : undefined,
     },
     {
       name: "sale_price",
@@ -359,11 +369,14 @@ export default function SparePartsPage() {
       type: "number",
       required: true,
       section: "Pricing",
-      description: "Selling price per unit",
+      description: "Set the selling price your staff should use.",
       placeholder: "0.00",
       value: editingSparePart?.sale_price ?? 0,
       min: 0,
       step: "0.01",
+      helperTone: "featured",
+      summaryValue: ({ value, formData }) =>
+        value !== "" && value !== undefined ? `${String(value)} ${String(formData.currency_pricing ?? "EGP")}` : undefined,
     },
     {
       name: "currency_pricing",
@@ -371,7 +384,7 @@ export default function SparePartsPage() {
       type: "select",
       required: true,
       section: "Pricing",
-      description: "Currency for pricing",
+      description: "Choose the currency shown in inventory and sales.",
       options: [
         { value: "EGP", label: "Egyptian Pound (EGP)" },
         { value: "USD", label: "US Dollar (USD)" },
@@ -383,8 +396,9 @@ export default function SparePartsPage() {
       label: "Discount Type",
       type: "select",
       required: true,
-      section: "Discount & Compatibility",
-      description: "How discounts are applied",
+      section: "Compatibility",
+      sectionDescription: "Control discount policy and where this part can be used.",
+      description: "Choose whether the discount cap is percentage-based or fixed.",
       options: [
         { value: "percentage", label: "Percentage (%)" },
         { value: "fixed", label: "Fixed Amount" },
@@ -395,27 +409,45 @@ export default function SparePartsPage() {
       name: "max_discount_value",
       label: "Max Discount Value",
       type: "number",
-      section: "Discount & Compatibility",
-      description: "Maximum discount allowed",
+      section: "Compatibility",
+      description: "Set the highest discount your team can apply.",
       placeholder: "0",
       value: editingSparePart?.max_discount_value ?? 0,
       min: 0,
       step: "0.01",
     },
     {
+      name: "blueprint_ids",
+      label: "Compatible Bike Blueprints",
+      type: "multiselect",
+      section: "Compatibility",
+      description: "Choose the bike blueprints this part fits when it is not universal.",
+      options: blueprints.map((bp) => ({
+        value: bp.id,
+        label: `${bp.model} ${bp.year}`,
+      })),
+      disabled: (formData) => formData.universal === true,
+      span: 2,
+      summaryValue: ({ value }) =>
+        Array.isArray(value) && value.length > 0 ? `${value.length} blueprint${value.length === 1 ? "" : "s"} linked` : undefined,
+    },
+    {
       name: "universal",
       label: "Universal Part",
       type: "toggle",
-      section: "Discount & Compatibility",
-      description: "Compatible with all bikes (no need to assign blueprints)",
+      section: "Compatibility",
+      description: "Enable this when the part fits all bikes and blueprint matching is not needed.",
       value: editingSparePart?.universal ?? false,
+      helperTone: "featured",
+      summaryValue: ({ value }) => (value === true ? "Universal compatibility" : "Blueprint-based compatibility"),
     },
     {
       name: "notes",
       label: "Notes",
       type: "textarea",
-      section: "Additional",
-      description: "Additional information about this part",
+      section: "Notes",
+      sectionDescription: "Add any extra context the team may need later.",
+      description: "Capture fitment notes, supplier remarks, or quality details.",
       placeholder: "e.g., OEM quality, compatible with...",
       value: editingSparePart?.notes,
       rows: 3,
@@ -649,25 +681,37 @@ export default function SparePartsPage() {
       {/* Spare Part Modal */}
       <EntityFormModal
         title={editingSparePart ? "Edit Spare Part" : "Create Spare Part"}
-        description={editingSparePart ? "Update spare part details and pricing" : "Add a new spare part to your inventory"}
+        description={
+          editingSparePart
+            ? "Refine stock, pricing, and compatibility details for this spare part."
+            : "Build a clean spare part entry with inventory, pricing, and compatibility details in one guided flow."
+        }
         fields={sparePartModalFields}
         isOpen={sparePartModalOpen}
         isLoading={isSubmitting}
         error={submitError || undefined}
         onClose={handleCloseSparePartModal}
         onSubmit={handleSubmitSparePart}
+        submitLabel={editingSparePart ? "Save Spare Part" : "Create Spare Part"}
+        heroLabel="Spare Parts"
       />
 
       {/* Category Modal */}
       <EntityFormModal
         title={editingCategory ? "Edit Category" : "Create Category"}
-        description={editingCategory ? "Update category information" : "Create a new spare parts category"}
+        description={
+          editingCategory
+            ? "Adjust the category details for better organization."
+            : "Create a new spare parts category so your inventory stays organized from the start."
+        }
         fields={categoryModalFields}
         isOpen={categoryModalOpen}
         isLoading={isSubmitting}
         error={submitError || undefined}
         onClose={handleCloseCategoryModal}
         onSubmit={handleSubmitCategory}
+        submitLabel={editingCategory ? "Save Category" : "Create Category"}
+        heroLabel="Category Setup"
       />
     </div>
   );

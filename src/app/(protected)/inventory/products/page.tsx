@@ -251,20 +251,24 @@ export default function ProductsPage() {
       label: "Product Name",
       type: "text",
       required: true,
-      section: "Basic Information",
-      description: "e.g., Mountain Bike, Pump, Lock",
+      section: "Basic Info",
+      sectionDescription: "Start with the core identity your sales and inventory teams will recognize.",
+      description: "Use the product name that should appear in your catalog and stock screens.",
       placeholder: "Enter product name",
       value: editingProduct?.name,
+      helperTone: "featured",
+      summaryValue: ({ value }) => (value ? String(value) : undefined),
     },
     {
       name: "sku",
       label: "SKU",
       type: "text",
       required: true,
-      section: "Basic Information",
-      description: "Unique stock keeping unit identifier",
+      section: "Basic Info",
+      description: "Keep the SKU short, unique, and easy to search.",
       placeholder: "e.g., PROD-001",
       value: editingProduct?.sku,
+      summaryValue: ({ value }) => (value ? `SKU ${String(value)}` : undefined),
     },
     {
       name: "products_category_id",
@@ -272,7 +276,8 @@ export default function ProductsPage() {
       type: "select",
       required: true,
       section: "Classification",
-      description: "Choose the category this product belongs to",
+      sectionDescription: "Group the product for clearer catalog browsing and reporting.",
+      description: "Choose the main product category.",
       options: categories.map((c) => ({ value: c.id, label: c.name })),
       value: editingProduct?.products_category_id,
     },
@@ -282,7 +287,7 @@ export default function ProductsPage() {
       type: "select",
       required: true,
       section: "Classification",
-      description: "Select the product manufacturer",
+      description: "Pick the brand your team uses for purchasing and display.",
       options: brands.map((b) => ({ value: b.id, label: b.name })),
       value: editingProduct?.brand_id,
       disabled: brandsLoading,
@@ -292,17 +297,19 @@ export default function ProductsPage() {
       label: "Stock Quantity",
       type: "number",
       section: "Inventory",
-      description: "Current number of units in stock",
+      sectionDescription: "Set the operating quantities that control stock health.",
+      description: "Enter the opening stock count for this product.",
       placeholder: "0",
       value: editingProduct?.stock_quantity ?? 0,
       min: 0,
+      helperTone: "featured",
     },
     {
       name: "low_stock_alarm",
       label: "Low Stock Alarm",
       type: "number",
       section: "Inventory",
-      description: "Trigger alert when stock falls below this level",
+      description: "Set the threshold where the product becomes low stock.",
       placeholder: "5",
       value: editingProduct?.low_stock_alarm ?? 0,
       min: 0,
@@ -313,11 +320,14 @@ export default function ProductsPage() {
       type: "number",
       required: true,
       section: "Pricing",
-      description: "Acquisition cost per unit",
+      sectionDescription: "Define the financial baseline before the product goes live.",
+      description: "Enter your purchase or landed cost per unit.",
       placeholder: "0.00",
       value: editingProduct?.cost_price ?? 0,
       min: 0,
       step: "0.01",
+      summaryValue: ({ value, formData }) =>
+        value !== "" && value !== undefined ? `${String(value)} ${String(formData.currency_pricing ?? "EGP")}` : undefined,
     },
     {
       name: "sale_price",
@@ -325,11 +335,14 @@ export default function ProductsPage() {
       type: "number",
       required: true,
       section: "Pricing",
-      description: "Selling price per unit",
+      description: "Set the standard selling price for this product.",
       placeholder: "0.00",
       value: editingProduct?.sale_price ?? 0,
       min: 0,
       step: "0.01",
+      helperTone: "featured",
+      summaryValue: ({ value, formData }) =>
+        value !== "" && value !== undefined ? `${String(value)} ${String(formData.currency_pricing ?? "EGP")}` : undefined,
     },
     {
       name: "currency_pricing",
@@ -337,7 +350,7 @@ export default function ProductsPage() {
       type: "select",
       required: true,
       section: "Pricing",
-      description: "Currency for pricing",
+      description: "Choose the currency shown across pricing surfaces.",
       options: [
         { value: "EGP", label: "Egyptian Pound (EGP)" },
         { value: "USD", label: "US Dollar (USD)" },
@@ -349,8 +362,9 @@ export default function ProductsPage() {
       label: "Discount Type",
       type: "select",
       required: true,
-      section: "Discount & Compatibility",
-      description: "How discounts are applied",
+      section: "Discount",
+      sectionDescription: "Control how much pricing flexibility the team has at sale time.",
+      description: "Choose whether the cap is percentage-based or a fixed value.",
       options: [
         { value: "percentage", label: "Percentage (%)" },
         { value: "fixed", label: "Fixed Amount" },
@@ -361,8 +375,8 @@ export default function ProductsPage() {
       name: "max_discount_value",
       label: "Max Discount Value",
       type: "number",
-      section: "Discount & Compatibility",
-      description: "Maximum discount allowed",
+      section: "Discount",
+      description: "Set the highest discount allowed for this product.",
       placeholder: "0",
       value: editingProduct?.max_discount_value ?? 0,
       min: 0,
@@ -372,16 +386,18 @@ export default function ProductsPage() {
       name: "universal",
       label: "Universal Product",
       type: "toggle",
-      section: "Discount & Compatibility",
-      description: "Compatible with all bikes (no need to assign blueprints)",
+      section: "Discount",
+      description: "Use this when the product should be treated as universally applicable.",
       value: editingProduct?.universal ?? false,
+      summaryValue: ({ value }) => (value === true ? "Universal product" : undefined),
     },
     {
       name: "notes",
       label: "Notes",
       type: "textarea",
-      section: "Additional",
-      description: "Additional information about this product",
+      section: "Notes",
+      sectionDescription: "Capture details that help sales or operations later.",
+      description: "Add specifications, selling points, or internal notes.",
       placeholder: "e.g., Material, specifications, compatibility...",
       value: editingProduct?.notes,
       rows: 3,
@@ -615,25 +631,37 @@ export default function ProductsPage() {
       {/* Product Modal */}
       <EntityFormModal
         title={editingProduct ? "Edit Product" : "Create Product"}
-        description={editingProduct ? "Update product details and pricing" : "Add a new product to your inventory"}
+        description={
+          editingProduct
+            ? "Update the product profile, stock settings, and pricing from one focused form."
+            : "Create a polished product entry with inventory, pricing, and sales settings clearly grouped together."
+        }
         fields={productModalFields}
         isOpen={productModalOpen}
         isLoading={isSubmitting}
         error={submitError || undefined}
         onClose={handleCloseProductModal}
         onSubmit={handleSubmitProduct}
+        submitLabel={editingProduct ? "Save Product" : "Create Product"}
+        heroLabel="Products"
       />
 
       {/* Category Modal */}
       <EntityFormModal
         title={editingCategory ? "Edit Category" : "Create Category"}
-        description={editingCategory ? "Update category information" : "Create a new product category"}
+        description={
+          editingCategory
+            ? "Update the category details used across your products."
+            : "Create a product category with a cleaner setup experience for your catalog."
+        }
         fields={categoryModalFields}
         isOpen={categoryModalOpen}
         isLoading={isSubmitting}
         error={submitError || undefined}
         onClose={handleCloseCategoryModal}
         onSubmit={handleSubmitCategory}
+        submitLabel={editingCategory ? "Save Category" : "Create Category"}
+        heroLabel="Category Setup"
       />
     </div>
   );

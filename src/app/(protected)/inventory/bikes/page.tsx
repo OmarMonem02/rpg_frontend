@@ -167,22 +167,27 @@ export default function BikesPage() {
       label: "Bike Blueprint",
       type: "select",
       required: true,
-      section: "Basic Information",
-      description: "Select the motorcycle model and year",
+      section: "Bike Identity",
+      sectionDescription: "Define the listing identity first so the rest of the form stays grounded.",
+      description: "Choose the model and production year for this bike.",
       options: blueprints.map((bp) => ({
         value: bp.id,
         label: `${bp.model} ${bp.year}`,
       })),
       disabled: blueprintsLoading,
+      value: editingBike?.bike_blueprint_id,
+      helperTone: "featured",
     },
     {
       name: "vin",
       label: "VIN (Vehicle Identification Number)",
       type: "text",
       required: true,
-      section: "Basic Information",
-      description: "Unique identifier for this motorcycle",
+      section: "Bike Identity",
+      description: "Add the vehicle identification number used for traceability.",
       placeholder: "e.g., VIN123456789",
+      value: editingBike?.vin,
+      summaryValue: ({ value }) => (value ? `VIN ${String(value)}` : undefined),
     },
     {
       name: "status",
@@ -190,17 +195,21 @@ export default function BikesPage() {
       type: "select",
       required: true,
       section: "Status",
-      description: "Current status of this bike",
+      sectionDescription: "Set the live sale state and the opening condition of the bike.",
+      description: "Choose where this bike currently sits in the sales lifecycle.",
       options: STATUSES,
+      value: editingBike?.status ?? "available",
+      helperTone: "featured",
     },
     {
       name: "mileage",
       label: "Initial Mileage (km)",
       type: "number",
       section: "Status",
-      description: "Odometer reading at entry",
+      description: "Record the mileage the moment this bike enters inventory.",
       placeholder: "0",
       min: 0,
+      value: editingBike?.mileage ?? 0,
     },
     {
       name: "cost_price",
@@ -208,10 +217,14 @@ export default function BikesPage() {
       type: "number",
       required: true,
       section: "Pricing",
-      description: "Acquisition cost for this bike",
+      sectionDescription: "Set the core financial position before publishing the listing.",
+      description: "Enter what this bike cost your business.",
       placeholder: "50000.00",
       min: 0,
       step: "0.01",
+      value: editingBike?.cost_price ?? 0,
+      summaryValue: ({ value, formData }) =>
+        value !== "" && value !== undefined ? `${String(value)} ${String(formData.currency_pricing ?? "EGP")}` : undefined,
     },
     {
       name: "sale_price",
@@ -219,10 +232,14 @@ export default function BikesPage() {
       type: "number",
       required: true,
       section: "Pricing",
-      description: "Selling price for this bike",
+      description: "Set the standard listed selling price.",
       placeholder: "75000.00",
       min: 0,
       step: "0.01",
+      value: editingBike?.sale_price ?? 0,
+      helperTone: "featured",
+      summaryValue: ({ value, formData }) =>
+        value !== "" && value !== undefined ? `${String(value)} ${String(formData.currency_pricing ?? "EGP")}` : undefined,
     },
     {
       name: "currency_pricing",
@@ -230,12 +247,12 @@ export default function BikesPage() {
       type: "select",
       required: true,
       section: "Pricing",
-      description: "Currency for pricing",
+      description: "Choose the pricing currency used in the listing.",
       options: [
         { value: "EGP", label: "EGP (Egyptian Pound)" },
         { value: "USD", label: "USD (US Dollar)" },
-        { value: "EUR", label: "EUR (Euro)" },
       ],
+      value: editingBike?.currency_pricing ?? "EGP",
     },
     {
       name: "max_discount_type",
@@ -243,8 +260,10 @@ export default function BikesPage() {
       type: "select",
       required: true,
       section: "Discount",
-      description: "How discounts are applied",
+      sectionDescription: "Control the sales flexibility allowed on this listing.",
+      description: "Choose whether the discount cap is fixed or percentage-based.",
       options: DISCOUNT_TYPES,
+      value: editingBike?.max_discount_type ?? "percentage",
     },
     {
       name: "max_discount_value",
@@ -252,19 +271,22 @@ export default function BikesPage() {
       type: "number",
       required: true,
       section: "Discount",
-      description: "Maximum discount allowed",
+      description: "Set the highest discount the sales team can approve.",
       placeholder: "5",
       min: 0,
       step: "0.01",
+      value: editingBike?.max_discount_value ?? 0,
     },
     {
       name: "notes",
       label: "Notes",
       type: "textarea",
-      section: "Additional",
-      description: "Additional information or special notes",
+      section: "Notes",
+      sectionDescription: "Capture anything important for the sales floor or future follow-up.",
+      description: "Add special features, condition notes, or internal remarks.",
       placeholder: "e.g., New bike, never used, special features...",
       rows: 3,
+      value: editingBike?.notes,
     },
   ];
 
@@ -393,16 +415,19 @@ export default function BikesPage() {
 
       <EntityFormModal
         title={editingBike ? "Edit Bike For Sale" : "Create Bike For Sale"}
-        description={editingBike ? "Update bike details, pricing, and status" : "Add a new motorcycle to your inventory"}
-        fields={modalFields.map((field) => ({
-          ...field,
-          value: editingBike ? (editingBike as Record<string, unknown>)[field.name] : undefined,
-        }))}
+        description={
+          editingBike
+            ? "Update the bike listing with pricing, mileage, and sale status in a cleaner layout."
+            : "Create a showroom-ready bike listing with blueprint, pricing, and status details grouped into an easier flow."
+        }
+        fields={modalFields}
         isOpen={isModalOpen}
         isLoading={isSubmitting}
         error={submitError || undefined}
         onClose={handleCloseModal}
         onSubmit={handleSubmit}
+        submitLabel={editingBike ? "Save Bike" : "Create Bike"}
+        heroLabel="Bikes For Sale"
       />
     </div>
   );
