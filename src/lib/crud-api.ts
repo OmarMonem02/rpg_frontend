@@ -226,3 +226,720 @@ export async function updateSeller(
 export async function deleteSeller(token: string, id: number): Promise<void> {
   await authorizedFetch<void>(`/sellers/${id}`, token, { method: "DELETE" });
 }
+
+// ============================================================================
+// BRANDS
+// ============================================================================
+
+export type BrandRecord = {
+  id: number;
+  name: string;
+  type: "spare_parts" | "products" | "bikes";
+  created_at?: string;
+};
+
+export type CreateBrandPayload = {
+  name: string;
+  type: "spare_parts" | "products" | "bikes";
+};
+
+function normalizeBrand(raw: unknown): BrandRecord {
+  const record = asRecord(raw);
+  return {
+    id: toNumber(record.id),
+    name: toText(record.name),
+    type: toText(record.type) as "spare_parts" | "products" | "bikes",
+    created_at: toText(record.created_at) || undefined,
+  };
+}
+
+export async function listBrands(
+  token: string,
+  page = 1,
+  type?: "spare_parts" | "products" | "bikes",
+): Promise<PaginatedResult<BrandRecord>> {
+  const query = new URLSearchParams({ page: String(page) });
+  if (type) query.append("type", type);
+  const payload = await authorizedFetch<unknown>(`/brands?${query}`, token);
+  const rows = pickArray(payload, ["data", "brands"]);
+  const meta = parsePagination(payload);
+  return {
+    items: rows.map(normalizeBrand).filter((item) => item.id > 0),
+    currentPage: meta.current_page ?? 1,
+    lastPage: meta.last_page ?? 1,
+  };
+}
+
+export async function createBrand(token: string, payload: CreateBrandPayload): Promise<BrandRecord> {
+  const data = await authorizedFetch<unknown>("/brands", token, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const record = asRecord(data);
+  return normalizeBrand(record.brand ?? record.data ?? record);
+}
+
+export async function updateBrand(
+  token: string,
+  id: number,
+  payload: CreateBrandPayload,
+): Promise<BrandRecord> {
+  const data = await authorizedFetch<unknown>(`/brands/${id}`, token, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const record = asRecord(data);
+  return normalizeBrand(record.brand ?? record.data ?? record);
+}
+
+export async function deleteBrand(token: string, id: number): Promise<void> {
+  await authorizedFetch<void>(`/brands/${id}`, token, { method: "DELETE" });
+}
+
+// ============================================================================
+// SPARE PART CATEGORIES
+// ============================================================================
+
+export type SparePartCategoryRecord = {
+  id: number;
+  name: string;
+  created_at?: string;
+};
+
+export type CreateCategoryPayload = {
+  name: string;
+};
+
+function normalizeSparePartCategory(raw: unknown): SparePartCategoryRecord {
+  const record = asRecord(raw);
+  return {
+    id: toNumber(record.id),
+    name: toText(record.name),
+    created_at: toText(record.created_at) || undefined,
+  };
+}
+
+export async function listSparePartCategories(
+  token: string,
+  page = 1,
+): Promise<PaginatedResult<SparePartCategoryRecord>> {
+  const payload = await authorizedFetch<unknown>(`/spare_part_categories?page=${page}`, token);
+  const rows = pickArray(payload, ["data", "spare_part_categories"]);
+  const meta = parsePagination(payload);
+  return {
+    items: rows.map(normalizeSparePartCategory).filter((item) => item.id > 0),
+    currentPage: meta.current_page ?? 1,
+    lastPage: meta.last_page ?? 1,
+  };
+}
+
+export async function createSparePartCategory(
+  token: string,
+  payload: CreateCategoryPayload,
+): Promise<SparePartCategoryRecord> {
+  const data = await authorizedFetch<unknown>("/spare_part_categories", token, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const record = asRecord(data);
+  return normalizeSparePartCategory(record.data ?? record);
+}
+
+export async function updateSparePartCategory(
+  token: string,
+  id: number,
+  payload: CreateCategoryPayload,
+): Promise<SparePartCategoryRecord> {
+  const data = await authorizedFetch<unknown>(`/spare_part_categories/${id}`, token, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const record = asRecord(data);
+  return normalizeSparePartCategory(record.data ?? record);
+}
+
+export async function deleteSparePartCategory(token: string, id: number): Promise<void> {
+  await authorizedFetch<void>(`/spare_part_categories/${id}`, token, { method: "DELETE" });
+}
+
+// ============================================================================
+// PRODUCT CATEGORIES
+// ============================================================================
+
+export type ProductCategoryRecord = {
+  id: number;
+  name: string;
+  created_at?: string;
+};
+
+function normalizeProductCategory(raw: unknown): ProductCategoryRecord {
+  const record = asRecord(raw);
+  return {
+    id: toNumber(record.id),
+    name: toText(record.name),
+    created_at: toText(record.created_at) || undefined,
+  };
+}
+
+export async function listProductCategories(
+  token: string,
+  page = 1,
+): Promise<PaginatedResult<ProductCategoryRecord>> {
+  const payload = await authorizedFetch<unknown>(`/product_categories?page=${page}`, token);
+  const rows = pickArray(payload, ["data", "product_categories"]);
+  const meta = parsePagination(payload);
+  return {
+    items: rows.map(normalizeProductCategory).filter((item) => item.id > 0),
+    currentPage: meta.current_page ?? 1,
+    lastPage: meta.last_page ?? 1,
+  };
+}
+
+export async function createProductCategory(
+  token: string,
+  payload: CreateCategoryPayload,
+): Promise<ProductCategoryRecord> {
+  const data = await authorizedFetch<unknown>("/product_categories", token, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const record = asRecord(data);
+  return normalizeProductCategory(record.data ?? record);
+}
+
+export async function updateProductCategory(
+  token: string,
+  id: number,
+  payload: CreateCategoryPayload,
+): Promise<ProductCategoryRecord> {
+  const data = await authorizedFetch<unknown>(`/product_categories/${id}`, token, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const record = asRecord(data);
+  return normalizeProductCategory(record.data ?? record);
+}
+
+export async function deleteProductCategory(token: string, id: number): Promise<void> {
+  await authorizedFetch<void>(`/product_categories/${id}`, token, { method: "DELETE" });
+}
+
+// ============================================================================
+// SPARE PARTS
+// ============================================================================
+
+export type SparePartRecord = {
+  id: number;
+  name: string;
+  sku: string;
+  part_number?: string;
+  stock_quantity: number;
+  low_stock_alarm: number;
+  spare_parts_category_id: number;
+  brand_id: number;
+  currency_pricing: "EGP" | "USD";
+  cost_price: number;
+  sale_price: number;
+  max_discount_type: "fixed" | "percentage";
+  max_discount_value: number;
+  universal: boolean;
+  notes?: string;
+  created_at?: string;
+};
+
+export type CreateSparePartPayload = {
+  name: string;
+  sku: string;
+  part_number?: string;
+  stock_quantity?: number;
+  low_stock_alarm?: number;
+  spare_parts_category_id: number;
+  brand_id: number;
+  currency_pricing: "EGP" | "USD";
+  cost_price: number;
+  sale_price: number;
+  max_discount_type: "fixed" | "percentage";
+  max_discount_value: number;
+  universal?: boolean;
+  notes?: string;
+};
+
+export type UpdateSparePartPayload = CreateSparePartPayload;
+
+function normalizeSparcePart(raw: unknown): SparePartRecord {
+  const record = asRecord(raw);
+  return {
+    id: toNumber(record.id),
+    name: toText(record.name),
+    sku: toText(record.sku),
+    part_number: toText(record.part_number) || undefined,
+    stock_quantity: toNumber(record.stock_quantity),
+    low_stock_alarm: toNumber(record.low_stock_alarm),
+    spare_parts_category_id: toNumber(record.spare_parts_category_id),
+    brand_id: toNumber(record.brand_id),
+    currency_pricing: toText(record.currency_pricing) as "EGP" | "USD",
+    cost_price: toNumber(record.cost_price),
+    sale_price: toNumber(record.sale_price),
+    max_discount_type: toText(record.max_discount_type) as "fixed" | "percentage",
+    max_discount_value: toNumber(record.max_discount_value),
+    universal: record.universal === true || record.universal === "true",
+    notes: toText(record.notes) || undefined,
+    created_at: toText(record.created_at) || undefined,
+  };
+}
+
+export async function listSpareParts(
+  token: string,
+  page = 1,
+  filters?: {
+    search?: string;
+    category_id?: number;
+    brand_id?: number;
+    in_stock?: boolean;
+    low_stock?: boolean;
+    universal?: boolean;
+  },
+): Promise<PaginatedResult<SparePartRecord>> {
+  const query = new URLSearchParams({ page: String(page) });
+  if (filters?.search) query.append("search", filters.search);
+  if (filters?.category_id) query.append("category_id", String(filters.category_id));
+  if (filters?.brand_id) query.append("brand_id", String(filters.brand_id));
+  if (filters?.in_stock) query.append("in_stock", "true");
+  if (filters?.low_stock) query.append("low_stock", "true");
+  if (filters?.universal) query.append("universal", "true");
+
+  const payload = await authorizedFetch<unknown>(`/spare_parts?${query}`, token);
+  const rows = pickArray(payload, ["data", "spare_parts"]);
+  const meta = parsePagination(payload);
+  return {
+    items: rows.map(normalizeSparcePart).filter((item) => item.id > 0),
+    currentPage: meta.current_page ?? 1,
+    lastPage: meta.last_page ?? 1,
+  };
+}
+
+export async function createSparePart(token: string, payload: CreateSparePartPayload): Promise<SparePartRecord> {
+  const data = await authorizedFetch<unknown>("/spare_parts", token, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const record = asRecord(data);
+  return normalizeSparcePart(record.data ?? record);
+}
+
+export async function updateSparePart(
+  token: string,
+  id: number,
+  payload: UpdateSparePartPayload,
+): Promise<SparePartRecord> {
+  const data = await authorizedFetch<unknown>(`/spare_parts/${id}`, token, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const record = asRecord(data);
+  return normalizeSparcePart(record.data ?? record);
+}
+
+export async function deleteSparePart(token: string, id: number): Promise<void> {
+  await authorizedFetch<void>(`/spare_parts/${id}`, token, { method: "DELETE" });
+}
+
+// ============================================================================
+// PRODUCTS
+// ============================================================================
+
+export type ProductRecord = {
+  id: number;
+  name: string;
+  sku: string;
+  stock_quantity: number;
+  low_stock_alarm: number;
+  products_category_id: number;
+  brand_id: number;
+  currency_pricing: "EGP" | "USD";
+  cost_price: number;
+  sale_price: number;
+  max_discount_type: "fixed" | "percentage";
+  max_discount_value: number;
+  universal: boolean;
+  notes?: string;
+  created_at?: string;
+};
+
+export type CreateProductPayload = {
+  name: string;
+  sku: string;
+  stock_quantity?: number;
+  low_stock_alarm?: number;
+  products_category_id: number;
+  brand_id: number;
+  currency_pricing: "EGP" | "USD";
+  cost_price: number;
+  sale_price: number;
+  max_discount_type: "fixed" | "percentage";
+  max_discount_value: number;
+  universal?: boolean;
+  notes?: string;
+};
+
+export type UpdateProductPayload = CreateProductPayload;
+
+function normalizeProduct(raw: unknown): ProductRecord {
+  const record = asRecord(raw);
+  return {
+    id: toNumber(record.id),
+    name: toText(record.name),
+    sku: toText(record.sku),
+    stock_quantity: toNumber(record.stock_quantity),
+    low_stock_alarm: toNumber(record.low_stock_alarm),
+    products_category_id: toNumber(record.products_category_id),
+    brand_id: toNumber(record.brand_id),
+    currency_pricing: toText(record.currency_pricing) as "EGP" | "USD",
+    cost_price: toNumber(record.cost_price),
+    sale_price: toNumber(record.sale_price),
+    max_discount_type: toText(record.max_discount_type) as "fixed" | "percentage",
+    max_discount_value: toNumber(record.max_discount_value),
+    universal: record.universal === true || record.universal === "true",
+    notes: toText(record.notes) || undefined,
+    created_at: toText(record.created_at) || undefined,
+  };
+}
+
+export async function listProducts(
+  token: string,
+  page = 1,
+  filters?: {
+    search?: string;
+    category_id?: number;
+    brand_id?: number;
+    in_stock?: boolean;
+    low_stock?: boolean;
+    universal?: boolean;
+  },
+): Promise<PaginatedResult<ProductRecord>> {
+  const query = new URLSearchParams({ page: String(page) });
+  if (filters?.search) query.append("search", filters.search);
+  if (filters?.category_id) query.append("category_id", String(filters.category_id));
+  if (filters?.brand_id) query.append("brand_id", String(filters.brand_id));
+  if (filters?.in_stock) query.append("in_stock", "true");
+  if (filters?.low_stock) query.append("low_stock", "true");
+  if (filters?.universal) query.append("universal", "true");
+
+  const payload = await authorizedFetch<unknown>(`/products?${query}`, token);
+  const rows = pickArray(payload, ["data", "products"]);
+  const meta = parsePagination(payload);
+  return {
+    items: rows.map(normalizeProduct).filter((item) => item.id > 0),
+    currentPage: meta.current_page ?? 1,
+    lastPage: meta.last_page ?? 1,
+  };
+}
+
+export async function createProduct(token: string, payload: CreateProductPayload): Promise<ProductRecord> {
+  const data = await authorizedFetch<unknown>("/products", token, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const record = asRecord(data);
+  return normalizeProduct(record.data ?? record);
+}
+
+export async function updateProduct(
+  token: string,
+  id: number,
+  payload: UpdateProductPayload,
+): Promise<ProductRecord> {
+  const data = await authorizedFetch<unknown>(`/products/${id}`, token, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const record = asRecord(data);
+  return normalizeProduct(record.data ?? record);
+}
+
+export async function deleteProduct(token: string, id: number): Promise<void> {
+  await authorizedFetch<void>(`/products/${id}`, token, { method: "DELETE" });
+}
+
+// ============================================================================
+// BIKE BLUEPRINTS
+// ============================================================================
+
+export type BikeBlueprintRecord = {
+  id: number;
+  brand_id: number;
+  model: string;
+  year: number;
+  created_at?: string;
+};
+
+export type CreateBikeBlueprintPayload = {
+  brand_id: number;
+  model: string;
+  year: number;
+};
+
+function normalizeBlueprint(raw: unknown): BikeBlueprintRecord {
+  const record = asRecord(raw);
+  return {
+    id: toNumber(record.id),
+    brand_id: toNumber(record.brand_id),
+    model: toText(record.model),
+    year: toNumber(record.year),
+    created_at: toText(record.created_at) || undefined,
+  };
+}
+
+export async function listBikeBlueprints(
+  token: string,
+  page = 1,
+  filters?: {
+    search?: string;
+    brand_id?: number;
+  },
+): Promise<PaginatedResult<BikeBlueprintRecord>> {
+  const query = new URLSearchParams({ page: String(page) });
+  if (filters?.search) query.append("search", filters.search);
+  if (filters?.brand_id) query.append("brand_id", String(filters.brand_id));
+
+  const payload = await authorizedFetch<unknown>(`/bike_blueprints?${query}`, token);
+  const rows = pickArray(payload, ["data", "bike_blueprints"]);
+  const meta = parsePagination(payload);
+  return {
+    items: rows.map(normalizeBlueprint).filter((item) => item.id > 0),
+    currentPage: meta.current_page ?? 1,
+    lastPage: meta.last_page ?? 1,
+  };
+}
+
+export async function createBikeBlueprint(
+  token: string,
+  payload: CreateBikeBlueprintPayload,
+): Promise<BikeBlueprintRecord> {
+  const data = await authorizedFetch<unknown>("/bike_blueprints", token, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const record = asRecord(data);
+  return normalizeBlueprint(record.data ?? record);
+}
+
+export async function updateBikeBlueprint(
+  token: string,
+  id: number,
+  payload: CreateBikeBlueprintPayload,
+): Promise<BikeBlueprintRecord> {
+  const data = await authorizedFetch<unknown>(`/bike_blueprints/${id}`, token, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const record = asRecord(data);
+  return normalizeBlueprint(record.data ?? record);
+}
+
+export async function deleteBikeBlueprint(token: string, id: number): Promise<void> {
+  await authorizedFetch<void>(`/bike_blueprints/${id}`, token, { method: "DELETE" });
+}
+
+// ============================================================================
+// PAYMENT METHODS
+// ============================================================================
+
+export type PaymentMethodRecord = {
+  id: number;
+  name: string;
+  created_at?: string;
+};
+
+export type CreatePaymentMethodPayload = {
+  name: string;
+};
+
+function normalizePaymentMethod(raw: unknown): PaymentMethodRecord {
+  const record = asRecord(raw);
+  return {
+    id: toNumber(record.id),
+    name: toText(record.name),
+    created_at: toText(record.created_at) || undefined,
+  };
+}
+
+export async function listPaymentMethods(token: string, page = 1): Promise<PaginatedResult<PaymentMethodRecord>> {
+  const payload = await authorizedFetch<unknown>(`/payment_methods?page=${page}`, token);
+  const rows = pickArray(payload, ["data", "payment_methods"]);
+  const meta = parsePagination(payload);
+  return {
+    items: rows.map(normalizePaymentMethod).filter((item) => item.id > 0),
+    currentPage: meta.current_page ?? 1,
+    lastPage: meta.last_page ?? 1,
+  };
+}
+
+export async function createPaymentMethod(
+  token: string,
+  payload: CreatePaymentMethodPayload,
+): Promise<PaymentMethodRecord> {
+  const data = await authorizedFetch<unknown>("/payment_methods", token, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const record = asRecord(data);
+  return normalizePaymentMethod(record.data ?? record);
+}
+
+export async function updatePaymentMethod(
+  token: string,
+  id: number,
+  payload: CreatePaymentMethodPayload,
+): Promise<PaymentMethodRecord> {
+  const data = await authorizedFetch<unknown>(`/payment_methods/${id}`, token, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const record = asRecord(data);
+  return normalizePaymentMethod(record.data ?? record);
+}
+
+export async function deletePaymentMethod(token: string, id: number): Promise<void> {
+  await authorizedFetch<void>(`/payment_methods/${id}`, token, { method: "DELETE" });
+}
+
+// ============================================================================
+// BIKES FOR SALE
+// ============================================================================
+
+export type BikeRecord = {
+  id: number;
+  bike_blueprint_id: number;
+  currency_pricing: string;
+  cost_price: number;
+  sale_price: number;
+  status: string;
+  max_discount_type: string;
+  max_discount_value: number;
+  vin: string;
+  mileage: number;
+  notes?: string;
+  created_at?: string;
+};
+
+export type CreateBikePayload = {
+  bike_blueprint_id: number;
+  currency_pricing: string;
+  cost_price: number;
+  sale_price: number;
+  status: string;
+  max_discount_type: string;
+  max_discount_value: number;
+  vin: string;
+  mileage?: number;
+  notes?: string;
+};
+
+export type UpdateBikePayload = CreateBikePayload;
+
+function normalizeBike(raw: unknown): BikeRecord {
+  const record = asRecord(raw);
+  return {
+    id: toNumber(record.id),
+    bike_blueprint_id: toNumber(record.bike_blueprint_id),
+    currency_pricing: toText(record.currency_pricing),
+    cost_price: toNumber(record.cost_price),
+    sale_price: toNumber(record.sale_price),
+    status: toText(record.status),
+    max_discount_type: toText(record.max_discount_type),
+    max_discount_value: toNumber(record.max_discount_value),
+    vin: toText(record.vin),
+    mileage: toNumber(record.mileage),
+    notes: toText(record.notes) || undefined,
+    created_at: toText(record.created_at) || undefined,
+  };
+}
+
+export async function listBikes(
+  token: string,
+  page = 1,
+  filters?: {
+    search?: string;
+    bike_blueprint_id?: number;
+    status?: string;
+  },
+): Promise<PaginatedResult<BikeRecord>> {
+  const query = new URLSearchParams({ page: String(page) });
+  if (filters?.search) query.append("search", filters.search);
+  if (filters?.bike_blueprint_id) query.append("bike_blueprint_id", String(filters.bike_blueprint_id));
+  if (filters?.status) query.append("status", filters.status);
+
+  const payload = await authorizedFetch<unknown>(`/bike_for_sale?${query}`, token);
+  const rows = pickArray(payload, ["data", "bike_for_sale"]);
+  const meta = parsePagination(payload);
+  return {
+    items: rows.map(normalizeBike).filter((item) => item.id > 0),
+    currentPage: meta.current_page ?? 1,
+    lastPage: meta.last_page ?? 1,
+  };
+}
+
+export async function createBike(token: string, payload: CreateBikePayload): Promise<BikeRecord> {
+  const data = await authorizedFetch<unknown>("/bike_for_sale", token, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const record = asRecord(data);
+  return normalizeBike(record.data ?? record);
+}
+
+export async function updateBike(token: string, id: number, payload: UpdateBikePayload): Promise<BikeRecord> {
+  const data = await authorizedFetch<unknown>(`/bike_for_sale/${id}`, token, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const record = asRecord(data);
+  return normalizeBike(record.data ?? record);
+}
+
+export async function deleteBike(token: string, id: number): Promise<void> {
+  await authorizedFetch<void>(`/bike_for_sale/${id}`, token, { method: "DELETE" });
+}
+
+// ============================================================================
+// BIKE BLUEPRINT SPARE PARTS (Relationship)
+// ============================================================================
+
+export async function assignBlueprintsToSparePart(
+  token: string,
+  sparePartId: number,
+  blueprintIds: number[],
+): Promise<void> {
+  await authorizedFetch<void>(`/spare_parts/${sparePartId}/blueprints`, token, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ blueprint_ids: blueprintIds }),
+  });
+}
+
+export async function removeBlueprintFromSparePart(
+  token: string,
+  sparePartId: number,
+  blueprintId: number,
+): Promise<void> {
+  await authorizedFetch<void>(`/spare_parts/${sparePartId}/blueprints/${blueprintId}`, token, {
+    method: "DELETE",
+  });
+}

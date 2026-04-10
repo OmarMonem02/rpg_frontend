@@ -1,10 +1,640 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { getAuthToken } from "@/lib/auth-session";
+import {
+  listProducts,
+  listProductCategories,
+  listBrands,
+  createProduct,
+  updateProduct,
+  deleteProduct,
+  createProductCategory,
+  updateProductCategory,
+  deleteProductCategory,
+  type ProductRecord,
+  type CreateProductPayload,
+  type ProductCategoryRecord,
+  type BrandRecord,
+  type CreateCategoryPayload,
+} from "@/lib/crud-api";
+import { EntityFormModal, type FieldConfig } from "@/components/entity-form-modal";
+import { TabsWrapper } from "@/components/tabs-wrapper";
+
 export default function ProductsPage() {
+  // Products State
+  const [products, setProducts] = useState<ProductRecord[]>([]);
+  const [categories, setCategories] = useState<ProductCategoryRecord[]>([]);
+  const [brands, setBrands] = useState<BrandRecord[]>([]);
+
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [loading, setLoading] = useState(true);
+  const [brandsLoading, setBrandsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Modal States
+  const [productModalOpen, setProductModalOpen] = useState(false);
+  const [categoryModalOpen, setCategoryModalOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<ProductRecord | null>(null);
+  const [editingCategory, setEditingCategory] = useState<ProductCategoryRecord | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Filters
+  const [searchFilter, setSearchFilter] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState<number | "">(
+    typeof window !== "undefined" && localStorage.getItem("p_cat_filter")
+      ? parseInt(localStorage.getItem("p_cat_filter")!)
+      : ""
+  );
+  const [brandFilter, setBrandFilter] = useState<number | "">(
+    typeof window !== "undefined" && localStorage.getItem("p_brand_filter")
+      ? parseInt(localStorage.getItem("p_brand_filter")!)
+      : ""
+  );
+
+  // Load products
+  const loadProducts = async () => {
+    try {
+      setLoading(true);
+      const token = getAuthToken();
+      if (!token) throw new Error("Authentication required");
+
+      const result = await listProducts(token, page, {
+        search: searchFilter || undefined,
+        category_id: categoryFilter ? Number(categoryFilter) : undefined,
+        brand_id: brandFilter ? Number(brandFilter) : undefined,
+      });
+      setProducts(result.items);
+      setTotalPages(result.lastPage);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load products");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Load categories
+  const loadCategories = async () => {
+    try {
+      const token = getAuthToken();
+      if (!token) return;
+      const result = await listProductCategories(token, 1);
+      setCategories(result.items);
+    } catch (err) {
+      console.error("Failed to load categories:", err);
+    }
+  };
+
+  // Load brands
+  const loadBrands = async () => {
+    try {
+      setBrandsLoading(true);
+      const token = getAuthToken();
+      if (!token) return;
+      const result = await listBrands(token, 1, "products");
+      setBrands(result.items);
+    } catch (err) {
+      console.error("Failed to load brands:", err);
+    } finally {
+      setBrandsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadBrands();
+    loadCategories();
+  }, []);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("p_cat_filter", String(categoryFilter));
+    }
+  }, [categoryFilter]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("p_brand_filter", String(brandFilter));
+    }
+  }, [brandFilter]);
+
+  useEffect(() => {
+    loadProducts();
+  }, [page, searchFilter, categoryFilter, brandFilter]);
+
+  // Products Modal Handlers
+  const handleOpenProductModal = (product?: ProductRecord) => {
+    setEditingProduct(product || null);
+    setSubmitError(null);
+    setProductModalOpen(true);
+  };
+
+  const handleCloseProductModal = () => {
+    setProductModalOpen(false);
+    setEditingProduct(null);
+  };
+
+  const handleSubmitProduct = async (formData: Record<string, unknown>) => {
+    try {
+      setIsSubmitting(true);
+      const token = getAuthToken();
+      if (!token) throw new Error("Authentication required");
+
+      const payload: CreateProductPayload = {
+        name: String(formData.name),
+        sku: String(formData.sku),
+        stock_quantity: formData.stock_quantity ? Number(formData.stock_quantity) : 0,
+        low_stock_alarm: formData.low_stock_alarm ? Number(formData.low_stock_alarm) : 0,
+        products_category_id: Number(formData.products_category_id),
+        brand_id: Number(formData.brand_id),
+        currency_pricing: String(formData.currency_pricing) as "EGP" | "USD",
+        cost_price: Number(formData.cost_price),
+        sale_price: Number(formData.sale_price),
+        max_discount_type: String(formData.max_discount_type) as "fixed" | "percentage",
+        max_discount_value: Number(formData.max_discount_value),
+        universal: formData.universal === true,
+        notes: formData.notes ? String(formData.notes) : undefined,
+      };
+
+      if (editingProduct) {
+        await updateProduct(token, editingProduct.id, payload);
+      } else {
+        await createProduct(token, payload);
+      }
+
+      await loadProducts();
+      handleCloseProductModal();
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : "Failed to save product");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteProduct = async (id: number) => {
+    if (!confirm("Are you sure you want to delete this product?")) return;
+    try {
+      const token = getAuthToken();
+      if (!token) throw new Error("Authentication required");
+      await deleteProduct(token, id);
+      await loadProducts();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete product");
+    }
+  };
+
+  // Category Modal Handlers
+  const handleOpenCategoryModal = (category?: ProductCategoryRecord) => {
+    setEditingCategory(category || null);
+    setSubmitError(null);
+    setCategoryModalOpen(true);
+  };
+
+  const handleCloseCategoryModal = () => {
+    setCategoryModalOpen(false);
+    setEditingCategory(null);
+  };
+
+  const handleSubmitCategory = async (formData: Record<string, unknown>) => {
+    try {
+      setIsSubmitting(true);
+      const token = getAuthToken();
+      if (!token) throw new Error("Authentication required");
+
+      const payload: CreateCategoryPayload = {
+        name: String(formData.name),
+      };
+
+      if (editingCategory) {
+        await updateProductCategory(token, editingCategory.id, payload);
+      } else {
+        await createProductCategory(token, payload);
+      }
+
+      await loadCategories();
+      handleCloseCategoryModal();
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : "Failed to save category");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteCategory = async (id: number) => {
+    if (!confirm("Are you sure you want to delete this category?")) return;
+    try {
+      const token = getAuthToken();
+      if (!token) throw new Error("Authentication required");
+      await deleteProductCategory(token, id);
+      await loadCategories();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete category");
+    }
+  };
+
+  // Helper function to get stock status badge
+  const getStockBadge = (product: ProductRecord) => {
+    if (product.stock_quantity === 0) {
+      return <span className="inline-block rounded bg-error/20 px-2 py-1 text-xs text-error">Out of Stock</span>;
+    }
+    if (product.stock_quantity <= product.low_stock_alarm) {
+      return <span className="inline-block rounded bg-yellow-500/20 px-2 py-1 text-xs text-yellow-700">Low Stock</span>;
+    }
+    return <span className="inline-block rounded bg-green-500/20 px-2 py-1 text-xs text-green-700">In Stock</span>;
+  };
+
+  const productModalFields: FieldConfig[] = [
+    {
+      name: "name",
+      label: "Product Name",
+      type: "text",
+      required: true,
+      section: "Basic Information",
+      description: "e.g., Mountain Bike, Pump, Lock",
+      placeholder: "Enter product name",
+      value: editingProduct?.name,
+    },
+    {
+      name: "sku",
+      label: "SKU",
+      type: "text",
+      required: true,
+      section: "Basic Information",
+      description: "Unique stock keeping unit identifier",
+      placeholder: "e.g., PROD-001",
+      value: editingProduct?.sku,
+    },
+    {
+      name: "products_category_id",
+      label: "Category",
+      type: "select",
+      required: true,
+      section: "Classification",
+      description: "Choose the category this product belongs to",
+      options: categories.map((c) => ({ value: c.id, label: c.name })),
+      value: editingProduct?.products_category_id,
+    },
+    {
+      name: "brand_id",
+      label: "Brand",
+      type: "select",
+      required: true,
+      section: "Classification",
+      description: "Select the product manufacturer",
+      options: brands.map((b) => ({ value: b.id, label: b.name })),
+      value: editingProduct?.brand_id,
+      disabled: brandsLoading,
+    },
+    {
+      name: "stock_quantity",
+      label: "Stock Quantity",
+      type: "number",
+      section: "Inventory",
+      description: "Current number of units in stock",
+      placeholder: "0",
+      value: editingProduct?.stock_quantity ?? 0,
+      min: 0,
+    },
+    {
+      name: "low_stock_alarm",
+      label: "Low Stock Alarm",
+      type: "number",
+      section: "Inventory",
+      description: "Trigger alert when stock falls below this level",
+      placeholder: "5",
+      value: editingProduct?.low_stock_alarm ?? 0,
+      min: 0,
+    },
+    {
+      name: "cost_price",
+      label: "Cost Price",
+      type: "number",
+      required: true,
+      section: "Pricing",
+      description: "Acquisition cost per unit",
+      placeholder: "0.00",
+      value: editingProduct?.cost_price ?? 0,
+      min: 0,
+      step: "0.01",
+    },
+    {
+      name: "sale_price",
+      label: "Sale Price",
+      type: "number",
+      required: true,
+      section: "Pricing",
+      description: "Selling price per unit",
+      placeholder: "0.00",
+      value: editingProduct?.sale_price ?? 0,
+      min: 0,
+      step: "0.01",
+    },
+    {
+      name: "currency_pricing",
+      label: "Currency",
+      type: "select",
+      required: true,
+      section: "Pricing",
+      description: "Currency for pricing",
+      options: [
+        { value: "EGP", label: "Egyptian Pound (EGP)" },
+        { value: "USD", label: "US Dollar (USD)" },
+      ],
+      value: editingProduct?.currency_pricing ?? "EGP",
+    },
+    {
+      name: "max_discount_type",
+      label: "Discount Type",
+      type: "select",
+      required: true,
+      section: "Discount & Compatibility",
+      description: "How discounts are applied",
+      options: [
+        { value: "percentage", label: "Percentage (%)" },
+        { value: "fixed", label: "Fixed Amount" },
+      ],
+      value: editingProduct?.max_discount_type ?? "percentage",
+    },
+    {
+      name: "max_discount_value",
+      label: "Max Discount Value",
+      type: "number",
+      section: "Discount & Compatibility",
+      description: "Maximum discount allowed",
+      placeholder: "0",
+      value: editingProduct?.max_discount_value ?? 0,
+      min: 0,
+      step: "0.01",
+    },
+    {
+      name: "universal",
+      label: "Universal Product",
+      type: "toggle",
+      section: "Discount & Compatibility",
+      description: "Compatible with all bikes (no need to assign blueprints)",
+      value: editingProduct?.universal ?? false,
+    },
+    {
+      name: "notes",
+      label: "Notes",
+      type: "textarea",
+      section: "Additional",
+      description: "Additional information about this product",
+      placeholder: "e.g., Material, specifications, compatibility...",
+      value: editingProduct?.notes,
+      rows: 3,
+    },
+  ];
+
+  const categoryModalFields: FieldConfig[] = [
+    {
+      name: "name",
+      label: "Category Name",
+      type: "text",
+      required: true,
+      section: "Basic Information",
+      description: "e.g., Accessories, Bikes, Parts",
+      placeholder: "Enter category name",
+      value: editingCategory?.name,
+    },
+  ];
+
+  // Render products tab content
+  const productsTabContent = (
+    <div className="space-y-4">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <h2 className="text-lg font-semibold text-on-surface">Products</h2>
+        <button
+          onClick={() => handleOpenProductModal()}
+          className="rounded bg-primary px-4 py-2 text-on-primary hover:opacity-90"
+        >
+          + Add Product
+        </button>
+      </div>
+
+      {error && <div className="rounded bg-error/20 p-4 text-error text-sm">{error}</div>}
+
+      <div className="grid gap-2 grid-cols-1 md:grid-cols-3">
+        <input
+          type="text"
+          placeholder="Search by name, SKU..."
+          value={searchFilter}
+          onChange={(e) => {
+            setSearchFilter(e.target.value);
+            setPage(1);
+          }}
+          className="rounded border border-outline-variant/30 bg-surface-container-lowest px-3 py-2 text-on-surface"
+        />
+        <select
+          value={categoryFilter}
+          onChange={(e) => {
+            setCategoryFilter(e.target.value ? parseInt(e.target.value) : "");
+            setPage(1);
+          }}
+          className="rounded border border-outline-variant/30 bg-surface-container-lowest px-3 py-2 text-on-surface"
+        >
+          <option value="">All Categories</option>
+          {categories.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+        </select>
+        <select
+          value={brandFilter}
+          onChange={(e) => {
+            setBrandFilter(e.target.value ? parseInt(e.target.value) : "");
+            setPage(1);
+          }}
+          className="rounded border border-outline-variant/30 bg-surface-container-lowest px-3 py-2 text-on-surface"
+        >
+          <option value="">All Brands</option>
+          {brands.map((b) => (
+            <option key={b.id} value={b.id}>
+              {b.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {loading ? (
+        <div className="flex justify-center py-12">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-outline-variant/30 border-t-primary"></div>
+        </div>
+      ) : products.length === 0 ? (
+        <div className="rounded border border-outline-variant/15 bg-surface-container p-8 text-center text-on-surface-variant">
+          No products found.
+        </div>
+      ) : (
+        <div className="overflow-x-auto rounded border border-ghost-border">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-outline-variant/15 bg-surface-container">
+                <th className="px-4 py-3 text-left font-semibold text-on-surface">SKU</th>
+                <th className="px-4 py-3 text-left font-semibold text-on-surface">Name</th>
+                <th className="px-4 py-3 text-center font-semibold text-on-surface">Stock</th>
+                <th className="px-4 py-3 text-left font-semibold text-on-surface">Price</th>
+                <th className="px-4 py-3 text-left font-semibold text-on-surface">Category</th>
+                <th className="px-4 py-3 text-left font-semibold text-on-surface">Brand</th>
+                <th className="px-4 py-3 text-right font-semibold text-on-surface">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {products.map((product) => (
+                <tr key={product.id} className="border-b border-outline-variant/10 hover:bg-surface-container-low">
+                  <td className="px-4 py-3 text-on-surface font-mono text-xs">{product.sku}</td>
+                  <td className="px-4 py-3 text-on-surface">{product.name}</td>
+                  <td className="px-4 py-3 text-center">{getStockBadge(product)}</td>
+                  <td className="px-4 py-3 text-on-surface">
+                    {product.sale_price} {product.currency_pricing}
+                  </td>
+                  <td className="px-4 py-3 text-on-surface-variant text-xs">
+                    {categories.find((c) => c.id === product.products_category_id)?.name}
+                  </td>
+                  <td className="px-4 py-3 text-on-surface-variant text-xs">
+                    {brands.find((b) => b.id === product.brand_id)?.name}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <button
+                      onClick={() => handleOpenProductModal(product)}
+                      className="text-primary hover:underline text-xs font-medium"
+                    >
+                      Edit
+                    </button>
+                    <span className="mx-2 text-on-surface-variant">•</span>
+                    <button
+                      onClick={() => handleDeleteProduct(product.id)}
+                      className="text-error hover:underline text-xs font-medium"
+                    >
+                      Delete
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {totalPages > 1 && (
+        <div className="mt-4 flex justify-center gap-2">
+          <button
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={page === 1}
+            className="rounded px-3 py-2 text-sm hover:bg-surface-container disabled:opacity-50"
+          >
+            Previous
+          </button>
+          <span className="px-3 py-2 text-sm text-on-surface-variant">
+            Page {page} of {totalPages}
+          </span>
+          <button
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            disabled={page === totalPages}
+            className="rounded px-3 py-2 text-sm hover:bg-surface-container disabled:opacity-50"
+          >
+            Next
+          </button>
+        </div>
+      )}
+    </div>
+  );
+
+  // Render categories tab content
+  const categoriesTabContent = (
+    <div className="space-y-4">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <h2 className="text-lg font-semibold text-on-surface">Categories</h2>
+        <button
+          onClick={() => handleOpenCategoryModal()}
+          className="rounded bg-primary px-4 py-2 text-on-primary hover:opacity-90"
+        >
+          + Add Category
+        </button>
+      </div>
+
+      {categories.length === 0 ? (
+        <div className="rounded border border-outline-variant/15 bg-surface-container p-8 text-center text-on-surface-variant">
+          No categories found.
+        </div>
+      ) : (
+        <div className="overflow-x-auto rounded border border-ghost-border">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-outline-variant/15 bg-surface-container">
+                <th className="px-4 py-3 text-left font-semibold text-on-surface">Name</th>
+                <th className="px-4 py-3 text-left font-semibold text-on-surface">Created</th>
+                <th className="px-4 py-3 text-right font-semibold text-on-surface">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {categories.map((cat) => (
+                <tr key={cat.id} className="border-b border-outline-variant/10 hover:bg-surface-container-low">
+                  <td className="px-4 py-3 text-on-surface">{cat.name}</td>
+                  <td className="px-4 py-3 text-on-surface-variant text-xs">
+                    {cat.created_at ? new Date(cat.created_at).toLocaleDateString() : "-"}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <button
+                      onClick={() => handleOpenCategoryModal(cat)}
+                      className="text-primary hover:underline text-xs font-medium"
+                    >
+                      Edit
+                    </button>
+                    <span className="mx-2 text-on-surface-variant">•</span>
+                    <button
+                      onClick={() => handleDeleteCategory(cat.id)}
+                      className="text-error hover:underline text-xs font-medium"
+                    >
+                      Delete
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+
   return (
-    <section className="space-y-4">
-      <h1 className="text-3xl font-bold text-on-surface">Products</h1>
-      <p className="max-w-2xl text-on-surface-variant">
-        Product catalog and inventory for finished goods. This is a placeholder until product endpoints are wired up.
-      </p>
-    </section>
+    <div className="max-w-7xl mx-auto p-4">
+      <h1 className="mb-6 font-display text-2xl font-semibold text-on-surface">Products Management</h1>
+
+      <TabsWrapper
+        tabs={[
+          { id: "products", label: "All Products", content: productsTabContent },
+          { id: "categories", label: "Categories", content: categoriesTabContent },
+        ]}
+        defaultTabId="products"
+      />
+
+      {/* Product Modal */}
+      <EntityFormModal
+        title={editingProduct ? "Edit Product" : "Create Product"}
+        description={editingProduct ? "Update product details and pricing" : "Add a new product to your inventory"}
+        fields={productModalFields}
+        isOpen={productModalOpen}
+        isLoading={isSubmitting}
+        error={submitError || undefined}
+        onClose={handleCloseProductModal}
+        onSubmit={handleSubmitProduct}
+      />
+
+      {/* Category Modal */}
+      <EntityFormModal
+        title={editingCategory ? "Edit Category" : "Create Category"}
+        description={editingCategory ? "Update category information" : "Create a new product category"}
+        fields={categoryModalFields}
+        isOpen={categoryModalOpen}
+        isLoading={isSubmitting}
+        error={submitError || undefined}
+        onClose={handleCloseCategoryModal}
+        onSubmit={handleSubmitCategory}
+      />
+    </div>
   );
 }

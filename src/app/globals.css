@@ -24,6 +24,7 @@
 
   --color-error: #ba1a1a;
   --color-error-container: #ffdad6;
+  --color-cancel-container: #ff3030
   --color-on-error-container: #410002;
 
   --shadow-ambient: 0px 12px 32px rgba(44, 52, 55, 0.06);
