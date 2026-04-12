@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AppSidebar } from "@/components/app-sidebar";
-import { SessionLoadingScreen } from "@/components/session-loading-screen";
+import { WorkspaceLoadingCard } from "@/components/workspace-loading-card";
 import { getMe, logout } from "@/lib/auth-api";
 import { clearAuthSession, getAuthToken, getAuthUser, setAuthSession } from "@/lib/auth-session";
 
@@ -77,11 +77,11 @@ export default function ProtectedLayout({
   }
 
   if (isCheckingAuth) {
-    return <SessionLoadingScreen />;
+    return <WorkspaceLoadingCard />;
   }
 
   return (
-    <div className="animate-app-shell-enter flex min-h-screen bg-background">
+    <div className="animate-app-shell-enter min-h-screen bg-background">
       <AppSidebar
         isCollapsed={isCollapsed}
         onToggleCollapse={() => setIsCollapsed((value) => !value)}
@@ -93,25 +93,36 @@ export default function ProtectedLayout({
 
       <div
         className={[
-          "flex min-w-0 flex-1 flex-col transition-[margin] duration-300 ease-out motion-reduce:transition-none",
+          "flex min-h-screen min-w-0 flex-1 flex-col transition-[margin] duration-300 ease-out motion-reduce:transition-none",
           isCollapsed ? "md:ml-20" : "md:ml-72",
         ].join(" ")}
       >
-        <header className="glass ghost-border sticky top-0 z-20 flex h-16 items-center justify-between border-b px-4">
-          <button
-            type="button"
-            className="rounded-md border border-outline-variant/30 bg-surface-container-low px-3 py-2 text-sm text-on-surface md:hidden"
-            onClick={() => setIsMobileOpen(true)}
-            aria-label="Open menu"
-          >
-            Menu
-          </button>
-          <p className="text-sm text-on-surface-variant">
-            Signed in as <span className="font-semibold text-on-surface">{userName}</span>
-          </p>
+        <header className="sticky top-0 z-20 border-b border-outline-variant/15 bg-background/90 px-4 py-4 backdrop-blur md:px-6">
+          <div className="glass ghost-border flex items-center justify-between rounded-[1.25rem] border px-4 py-3">
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                className="rounded-xl border border-outline-variant/30 bg-surface-container-low px-3 py-2 text-sm text-on-surface md:hidden"
+                onClick={() => setIsMobileOpen(true)}
+                aria-label="Open menu"
+              >
+                Menu
+              </button>
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-on-surface-variant">
+                  RPG Workshop Console
+                </p>
+                <p className="text-sm text-on-surface">Daily operations, inventory, and admin control.</p>
+              </div>
+            </div>
+            <div className="hidden text-right sm:block">
+              <p className="text-[11px] uppercase tracking-[0.2em] text-on-surface-variant">Active session</p>
+              <p className="text-sm font-semibold text-on-surface">{userName}</p>
+            </div>
+          </div>
         </header>
 
-        <main className="flex-1 p-4 md:p-6">{children}</main>
+        <main className="flex-1 px-4 pb-6 pt-4 md:px-6">{children}</main>
       </div>
     </div>
   );

@@ -1,10 +1,17 @@
+import { EmptyState, PageHero, PageShell } from "@/components/ops-ui";
+
 export default function MaintenanceServicesPage() {
   return (
-    <section className="space-y-4">
-      <h1 className="text-3xl font-bold text-on-surface">Maintenance services</h1>
-      <p className="max-w-2xl text-on-surface-variant">
-        Track maintenance service offerings and bookings. Extend this page when service data is available from the backend.
-      </p>
-    </section>
+    <PageShell>
+      <PageHero
+        eyebrow="Service Operations"
+        title="Maintenance Services"
+        description="This module is ready for the same rebuilt UI language and can be connected to service data once the backend endpoints are available."
+      />
+      <EmptyState
+        title="Service data is not available yet"
+        description="When maintenance-service endpoints are ready, this page can inherit the same dashboard, filter, table, and guided-form patterns used across the rest of the rebuilt frontend."
+      />
+    </PageShell>
   );
 }

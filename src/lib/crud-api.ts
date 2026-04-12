@@ -108,22 +108,49 @@ function normalizeSeller(raw: unknown): SellerRecord {
 
 async function parseErrorMessage(response: Response): Promise<string> {
   try {
-    const json = (await response.json()) as ValidationErrorResponse;
-    if (json.errors) {
-      const firstError = Object.values(json.errors)[0]?.[0];
-      if (firstError) return firstError;
+    const text = await response.text();
+    console.error(`[API Error ${response.status}] Response:`, text);
+    
+    // Try to parse as JSON
+    try {
+      const json = JSON.parse(text) as ValidationErrorResponse;
+      if (json.errors) {
+        const allErrors = Object.entries(json.errors)
+          .map(([field, messages]) => `${field}: ${Array.isArray(messages) ? messages.join(", ") : messages}`)
+          .join("; ");
+        if (allErrors) return allErrors;
+      }
+      if (json.message) return json.message;
+    } catch {
+      // Not valid JSON, will use text below
     }
-    if (json.message) return json.message;
+    
+    // If we got text but not JSON, return a snippet
+    if (text) {
+      return text.substring(0, 200);
+    }
   } catch {
     // Intentionally ignored; fallback message is used below.
   }
 
   if (response.status === 401) return "Your session expired. Please log in again.";
   if (response.status === 422) return "Please review your form inputs and try again.";
+  if (response.status === 500) return "Server error. Check browser console for details.";
   return "Request failed. Please try again.";
 }
 
 async function authorizedFetch<T>(path: string, token: string, init?: RequestInit): Promise<T> {
+  let requestBody: unknown = null;
+  try {
+    if (init?.body) {
+      requestBody = typeof init.body === "string" ? JSON.parse(init.body) : init.body;
+    }
+  } catch (e) {
+    console.warn("[API] Failed to parse request body:", e);
+  }
+  
+  console.log(`[API ${init?.method || "GET"}] ${path}`, requestBody);
+  
   const response = await fetch(getApiUrl(path), {
     ...init,
     headers: {
@@ -134,7 +161,9 @@ async function authorizedFetch<T>(path: string, token: string, init?: RequestIni
   });
 
   if (!response.ok) {
-    throw new ApiError(await parseErrorMessage(response), response.status);
+    const errorMsg = await parseErrorMessage(response);
+    console.error(`[API Error ${response.status}] ${path} - ${errorMsg}`, { requestBody });
+    throw new ApiError(errorMsg, response.status);
   }
 
   if (response.status === 204) {
@@ -468,9 +497,25 @@ export type CreateSparePartPayload = {
   max_discount_value: number;
   universal?: boolean;
   notes?: string;
+  bike_blueprint_ids?: number[];
 };
 
-export type UpdateSparePartPayload = CreateSparePartPayload;
+export type UpdateSparePartPayload = {
+  name: string;
+  sku: string;
+  part_number?: string;
+  stock_quantity?: number;
+  low_stock_alarm?: number;
+  spare_parts_category_id: number;
+  brand_id: number;
+  currency_pricing: "EGP" | "USD";
+  cost_price: number;
+  sale_price: number;
+  max_discount_type: "fixed" | "percentage";
+  max_discount_value: number;
+  universal?: boolean;
+  notes?: string;
+};
 
 function normalizeSparcePart(raw: unknown): SparePartRecord {
   const record = asRecord(raw);
@@ -683,6 +728,29 @@ export type BikeBlueprintRecord = {
   created_at?: string;
 };
 
+export type BlueprintSparePartRowRecord = {
+  id: number;
+  bike_blueprint_id: number;
+  spare_part_id: number;
+  created_at?: string;
+  spare_part?: {
+    id: number;
+    name: string;
+    sku: string;
+    stock_quantity: number;
+    sale_price: number;
+    currency_pricing?: string;
+    category?: {
+      id: number;
+      name: string;
+    };
+    brand?: {
+      id: number;
+      name: string;
+    };
+  };
+};
+
 export type CreateBikeBlueprintPayload = {
   brand_id: number;
   model: string;
@@ -697,6 +765,42 @@ function normalizeBlueprint(raw: unknown): BikeBlueprintRecord {
     model: toText(record.model),
     year: toNumber(record.year),
     created_at: toText(record.created_at) || undefined,
+  };
+}
+
+function normalizeBlueprintSparePartRow(raw: unknown): BlueprintSparePartRowRecord {
+  const record = asRecord(raw);
+  const sparePart = asRecord(record.spare_part);
+  const category = asRecord(sparePart.category);
+  const brand = asRecord(sparePart.brand);
+
+  return {
+    id: toNumber(record.id),
+    bike_blueprint_id: toNumber(record.bike_blueprint_id),
+    spare_part_id: toNumber(record.spare_part_id),
+    created_at: toText(record.created_at) || undefined,
+    spare_part: sparePart && Object.keys(sparePart).length > 0
+      ? {
+          id: toNumber(sparePart.id),
+          name: toText(sparePart.name),
+          sku: toText(sparePart.sku),
+          stock_quantity: toNumber(sparePart.stock_quantity),
+          sale_price: toNumber(sparePart.sale_price),
+          currency_pricing: toText(sparePart.currency_pricing) || undefined,
+          category: category && Object.keys(category).length > 0
+            ? {
+                id: toNumber(category.id),
+                name: toText(category.name),
+              }
+            : undefined,
+          brand: brand && Object.keys(brand).length > 0
+            ? {
+                id: toNumber(brand.id),
+                name: toText(brand.name),
+              }
+            : undefined,
+        }
+      : undefined,
   };
 }
 
@@ -720,6 +824,12 @@ export async function listBikeBlueprints(
     currentPage: meta.current_page ?? 1,
     lastPage: meta.last_page ?? 1,
   };
+}
+
+export async function getBikeBlueprint(token: string, id: number): Promise<BikeBlueprintRecord> {
+  const data = await authorizedFetch<unknown>(`/bike_blueprints/${id}`, token);
+  const record = asRecord(data);
+  return normalizeBlueprint(record.data ?? record.bike_blueprint ?? record);
 }
 
 export async function createBikeBlueprint(
@@ -922,16 +1032,100 @@ export async function deleteBike(token: string, id: number): Promise<void> {
 // BIKE BLUEPRINT SPARE PARTS (Relationship)
 // ============================================================================
 
+export async function listBikeBlueprintSpareParts(
+  token: string,
+  blueprintId: number,
+  page = 1,
+  filters?: {
+    per_page?: number;
+    category_id?: number;
+    brand_id?: number;
+    search?: string;
+  },
+): Promise<PaginatedResult<BlueprintSparePartRowRecord>> {
+  const query = new URLSearchParams({ page: String(page) });
+  if (filters?.per_page) query.append("per_page", String(filters.per_page));
+  if (filters?.category_id) query.append("category_id", String(filters.category_id));
+  if (filters?.brand_id) query.append("brand_id", String(filters.brand_id));
+  if (filters?.search) query.append("search", filters.search);
+
+  const payload = await authorizedFetch<unknown>(`/bike_blueprints/${blueprintId}/spare_parts?${query}`, token);
+  const rows = pickArray(payload, ["data", "spare_parts"]);
+  const meta = parsePagination(payload);
+  return {
+    items: rows.map(normalizeBlueprintSparePartRow).filter((item) => item.id > 0),
+    currentPage: meta.current_page ?? 1,
+    lastPage: meta.last_page ?? 1,
+  };
+}
+
+export async function assignSparePartToBikeBlueprint(
+  token: string,
+  blueprintId: number,
+  payload:
+    | { spare_part_id: number }
+    | { spare_part_ids: number[] }
+    | { spare_part_data: CreateSparePartPayload },
+): Promise<unknown> {
+  return authorizedFetch<unknown>(`/bike_blueprints/${blueprintId}/spare_parts`, token, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function removeSparePartFromBikeBlueprint(
+  token: string,
+  blueprintId: number,
+  sparePartId: number,
+): Promise<void> {
+  await authorizedFetch<void>(`/bike_blueprints/${blueprintId}/spare_parts/${sparePartId}`, token, {
+    method: "DELETE",
+  });
+}
+
+export async function getSparePartBlueprints(
+  token: string,
+  sparePartId: number,
+): Promise<number[]> {
+  try {
+    // Get all blueprints
+    const blueprintsResult = await listBikeBlueprints(token, 1);
+    const allBlueprints = blueprintsResult.items;
+
+    // Query each blueprint to see if it has this spare part
+    const linkedBlueprintIds: number[] = [];
+
+    for (const blueprint of allBlueprints) {
+      const sparePartsResult = await listBikeBlueprintSpareParts(token, blueprint.id, 1, {
+        per_page: 1000,
+      });
+
+      // Check if this spare part is in the blueprint's spare parts
+      if (sparePartsResult.items.some((item) => item.spare_part_id === sparePartId)) {
+        linkedBlueprintIds.push(blueprint.id);
+      }
+    }
+
+    return linkedBlueprintIds;
+  } catch (err) {
+    console.error("Failed to fetch spare part blueprints:", err);
+    return [];
+  }
+}
+
 export async function assignBlueprintsToSparePart(
   token: string,
   sparePartId: number,
   blueprintIds: number[],
 ): Promise<void> {
-  await authorizedFetch<void>(`/spare_parts/${sparePartId}/blueprints`, token, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ blueprint_ids: blueprintIds }),
-  });
+  // Link a spare part to multiple blueprints
+  // For each blueprint, call the blueprint's spare parts endpoint
+  for (const blueprintId of blueprintIds) {
+    await assignSparePartToBikeBlueprint(token, blueprintId, {
+      spare_part_id: sparePartId,
+    });
+  }
 }
 
 export async function removeBlueprintFromSparePart(
@@ -939,7 +1133,6 @@ export async function removeBlueprintFromSparePart(
   sparePartId: number,
   blueprintId: number,
 ): Promise<void> {
-  await authorizedFetch<void>(`/spare_parts/${sparePartId}/blueprints/${blueprintId}`, token, {
-    method: "DELETE",
-  });
+  // Unlink a spare part from a blueprint
+  await removeSparePartFromBikeBlueprint(token, blueprintId, sparePartId);
 }

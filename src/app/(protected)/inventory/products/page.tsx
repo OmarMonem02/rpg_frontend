@@ -20,6 +20,16 @@ import {
 } from "@/lib/crud-api";
 import { EntityFormModal, type FieldConfig } from "@/components/entity-form-modal";
 import { TabsWrapper } from "@/components/tabs-wrapper";
+import {
+  ActionButton,
+  EmptyState,
+  FilterBar,
+  InputGroup,
+  PageHero,
+  PageShell,
+  PaginationControls,
+  StatusBadge,
+} from "@/components/ops-ui";
 
 export default function ProductsPage() {
   // Products State
@@ -237,12 +247,12 @@ export default function ProductsPage() {
   // Helper function to get stock status badge
   const getStockBadge = (product: ProductRecord) => {
     if (product.stock_quantity === 0) {
-      return <span className="inline-block rounded bg-error/20 px-2 py-1 text-xs text-error">Out of Stock</span>;
+      return <StatusBadge tone="danger">Out of Stock</StatusBadge>;
     }
     if (product.stock_quantity <= product.low_stock_alarm) {
-      return <span className="inline-block rounded bg-yellow-500/20 px-2 py-1 text-xs text-yellow-700">Low Stock</span>;
+      return <StatusBadge tone="warning">Low Stock</StatusBadge>;
     }
-    return <span className="inline-block rounded bg-green-500/20 px-2 py-1 text-xs text-green-700">In Stock</span>;
+    return <StatusBadge tone="success">In Stock</StatusBadge>;
   };
 
   const productModalFields: FieldConfig[] = [
@@ -422,72 +432,73 @@ export default function ProductsPage() {
     <div className="space-y-4">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <h2 className="text-lg font-semibold text-on-surface">Products</h2>
-        <button
-          onClick={() => handleOpenProductModal()}
-          className="rounded bg-primary px-4 py-2 text-on-primary hover:opacity-90"
-        >
-          + Add Product
-        </button>
+        <ActionButton tone="primary" onClick={() => handleOpenProductModal()}>
+          Add Product
+        </ActionButton>
       </div>
 
-      {error && <div className="rounded bg-error/20 p-4 text-error text-sm">{error}</div>}
+      {error && <div className="rounded-2xl border border-error/20 bg-error/10 p-4 text-error text-sm">{error}</div>}
 
-      <div className="grid gap-2 grid-cols-1 md:grid-cols-3">
-        <input
-          type="text"
-          placeholder="Search by name, SKU..."
-          value={searchFilter}
-          onChange={(e) => {
-            setSearchFilter(e.target.value);
-            setPage(1);
-          }}
-          className="rounded border border-outline-variant/30 bg-surface-container-lowest px-3 py-2 text-on-surface"
-        />
-        <select
-          value={categoryFilter}
-          onChange={(e) => {
-            setCategoryFilter(e.target.value ? parseInt(e.target.value) : "");
-            setPage(1);
-          }}
-          className="rounded border border-outline-variant/30 bg-surface-container-lowest px-3 py-2 text-on-surface"
-        >
-          <option value="">All Categories</option>
-          {categories.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </select>
-        <select
-          value={brandFilter}
-          onChange={(e) => {
-            setBrandFilter(e.target.value ? parseInt(e.target.value) : "");
-            setPage(1);
-          }}
-          className="rounded border border-outline-variant/30 bg-surface-container-lowest px-3 py-2 text-on-surface"
-        >
-          <option value="">All Brands</option>
-          {brands.map((b) => (
-            <option key={b.id} value={b.id}>
-              {b.name}
-            </option>
-          ))}
-        </select>
-      </div>
+      <FilterBar>
+        <InputGroup label="Search" className="md:col-span-5">
+          <input
+            type="text"
+            placeholder="Search by name, SKU..."
+            value={searchFilter}
+            onChange={(e) => {
+              setSearchFilter(e.target.value);
+              setPage(1);
+            }}
+            className="form-input-base"
+          />
+        </InputGroup>
+        <InputGroup label="Category" className="md:col-span-3">
+          <select
+            value={categoryFilter}
+            onChange={(e) => {
+              setCategoryFilter(e.target.value ? parseInt(e.target.value) : "");
+              setPage(1);
+            }}
+            className="form-input-base"
+          >
+            <option value="">All Categories</option>
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        </InputGroup>
+        <InputGroup label="Brand" className="md:col-span-4">
+          <select
+            value={brandFilter}
+            onChange={(e) => {
+              setBrandFilter(e.target.value ? parseInt(e.target.value) : "");
+              setPage(1);
+            }}
+            className="form-input-base"
+          >
+            <option value="">All Brands</option>
+            {brands.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.name}
+              </option>
+            ))}
+          </select>
+        </InputGroup>
+      </FilterBar>
 
       {loading ? (
         <div className="flex justify-center py-12">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-outline-variant/30 border-t-primary"></div>
         </div>
       ) : products.length === 0 ? (
-        <div className="rounded border border-outline-variant/15 bg-surface-container p-8 text-center text-on-surface-variant">
-          No products found.
-        </div>
+        <EmptyState title="No products found" description="Adjust filters or create a product to start the catalog." />
       ) : (
-        <div className="overflow-x-auto rounded border border-ghost-border">
+        <div className="overflow-x-auto rounded-[1.5rem] border border-outline-variant/15 bg-surface-container-lowest">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-outline-variant/15 bg-surface-container">
+              <tr className="border-b border-outline-variant/15 bg-surface-container-low">
                 <th className="px-4 py-3 text-left font-semibold text-on-surface">SKU</th>
                 <th className="px-4 py-3 text-left font-semibold text-on-surface">Name</th>
                 <th className="px-4 py-3 text-center font-semibold text-on-surface">Stock</th>
@@ -534,27 +545,12 @@ export default function ProductsPage() {
         </div>
       )}
 
-      {totalPages > 1 && (
-        <div className="mt-4 flex justify-center gap-2">
-          <button
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-            disabled={page === 1}
-            className="rounded px-3 py-2 text-sm hover:bg-surface-container disabled:opacity-50"
-          >
-            Previous
-          </button>
-          <span className="px-3 py-2 text-sm text-on-surface-variant">
-            Page {page} of {totalPages}
-          </span>
-          <button
-            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-            disabled={page === totalPages}
-            className="rounded px-3 py-2 text-sm hover:bg-surface-container disabled:opacity-50"
-          >
-            Next
-          </button>
-        </div>
-      )}
+      <PaginationControls
+        page={page}
+        totalPages={totalPages}
+        onPrevious={() => setPage((p) => Math.max(1, p - 1))}
+        onNext={() => setPage((p) => Math.min(totalPages, p + 1))}
+      />
     </div>
   );
 
@@ -563,23 +559,18 @@ export default function ProductsPage() {
     <div className="space-y-4">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <h2 className="text-lg font-semibold text-on-surface">Categories</h2>
-        <button
-          onClick={() => handleOpenCategoryModal()}
-          className="rounded bg-primary px-4 py-2 text-on-primary hover:opacity-90"
-        >
-          + Add Category
-        </button>
+        <ActionButton tone="primary" onClick={() => handleOpenCategoryModal()}>
+          Add Category
+        </ActionButton>
       </div>
 
       {categories.length === 0 ? (
-        <div className="rounded border border-outline-variant/15 bg-surface-container p-8 text-center text-on-surface-variant">
-          No categories found.
-        </div>
+        <EmptyState title="No categories found" description="Create a category to structure the product catalog." />
       ) : (
-        <div className="overflow-x-auto rounded border border-ghost-border">
+        <div className="overflow-x-auto rounded-[1.5rem] border border-outline-variant/15 bg-surface-container-lowest">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-outline-variant/15 bg-surface-container">
+              <tr className="border-b border-outline-variant/15 bg-surface-container-low">
                 <th className="px-4 py-3 text-left font-semibold text-on-surface">Name</th>
                 <th className="px-4 py-3 text-left font-semibold text-on-surface">Created</th>
                 <th className="px-4 py-3 text-right font-semibold text-on-surface">Actions</th>
@@ -617,8 +608,12 @@ export default function ProductsPage() {
   );
 
   return (
-    <div className="max-w-7xl mx-auto p-4">
-      <h1 className="mb-6 font-display text-2xl font-semibold text-on-surface">Products Management</h1>
+    <PageShell>
+      <PageHero
+        eyebrow="Inventory Control"
+        title="Products Management"
+        description="Operate products with the same inventory-first system used for spare parts: clearer filters, cleaner stock status, and guided forms."
+      />
 
       <TabsWrapper
         tabs={[
@@ -663,6 +658,6 @@ export default function ProductsPage() {
         submitLabel={editingCategory ? "Save Category" : "Create Category"}
         heroLabel="Category Setup"
       />
-    </div>
+    </PageShell>
   );
 }

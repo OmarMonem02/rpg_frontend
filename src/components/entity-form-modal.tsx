@@ -358,7 +358,7 @@ export function EntityFormModal({
                 >
                   <div className="flex items-center gap-3">
                     <span className={`inline-flex h-8 w-8 items-center justify-center rounded-full border text-xs font-semibold ${chipClassName}`}>
-                      {status === "complete" ? "?" : String(index + 1).padStart(2, "0")}
+                      {status === "complete" ? "OK" : String(index + 1).padStart(2, "0")}
                     </span>
                     <div className="min-w-0">
                       <p className="truncate text-sm font-semibold text-on-surface">{section.name}</p>
@@ -646,4 +646,3 @@ export function EntityFormModal({
     </div>
   );
 }
-

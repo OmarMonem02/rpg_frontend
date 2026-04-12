@@ -11,6 +11,17 @@ import {
   type CreateBrandPayload,
 } from "@/lib/crud-api";
 import { EntityFormModal, type FieldConfig } from "@/components/entity-form-modal";
+import {
+  ActionButton,
+  EmptyState,
+  FilterBar,
+  InputGroup,
+  PageHero,
+  PageShell,
+  PaginationControls,
+  StatusBadge,
+  SurfaceCard,
+} from "@/components/ops-ui";
 
 export default function BrandsPage() {
   const [brands, setBrands] = useState<BrandRecord[]>([]);
@@ -119,51 +130,58 @@ export default function BrandsPage() {
   ];
 
   return (
-    <div className="max-w-6xl mx-auto p-4">
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-6">
-        <h1 className="font-display text-2xl font-semibold text-on-surface">Brands</h1>
-        <button
-          onClick={() => handleOpenModal()}
-          className="rounded bg-primary px-4 py-2 text-on-primary hover:opacity-90"
-        >
-          + Add Brand
-        </button>
-      </div>
+    <PageShell>
+      <PageHero
+        eyebrow="Master Data"
+        title="Brands"
+        description="Keep supplier and manufacturer brands clean across spare parts, products, and bike blueprints."
+        actions={
+          <ActionButton tone="primary" onClick={() => handleOpenModal()}>
+            Add Brand
+          </ActionButton>
+        }
+      />
 
-      {error && <div className="mb-4 rounded bg-error/20 p-4 text-error">{error}</div>}
+      {error && <div className="rounded-2xl border border-error/20 bg-error/10 p-4 text-sm text-error">{error}</div>}
 
-      <div className="mb-4 flex gap-2">
-        <label className="flex items-center gap-2 text-sm text-on-surface-variant">
-          Filter by Type:
-          <select
-            value={typeFilter}
-            onChange={(e) => {
-              setTypeFilter(e.target.value as "" | "spare_parts" | "products" | "bikes");
-              setPage(1);
-            }}
-            className="rounded border border-outline-variant/30 bg-surface-container-lowest px-2 py-1"
-          >
-            <option value="">All Types</option>
-            <option value="spare_parts">Spare Parts</option>
-            <option value="products">Products</option>
-            <option value="bikes">Bikes</option>
-          </select>
-        </label>
-      </div>
+      <SurfaceCard>
+        <FilterBar className="md:grid-cols-4">
+          <InputGroup label="Filter by Type" className="md:col-span-2">
+            <select
+              value={typeFilter}
+              onChange={(e) => {
+                setTypeFilter(e.target.value as "" | "spare_parts" | "products" | "bikes");
+                setPage(1);
+              }}
+              className="form-input-base"
+            >
+              <option value="">All Types</option>
+              <option value="spare_parts">Spare Parts</option>
+              <option value="products">Products</option>
+              <option value="bikes">Bikes</option>
+            </select>
+          </InputGroup>
+        </FilterBar>
 
       {loading ? (
         <div className="flex justify-center py-12">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-outline-variant/30 border-t-primary"></div>
         </div>
       ) : brands.length === 0 ? (
-        <div className="rounded border border-outline-variant/15 bg-surface-container p-8 text-center text-on-surface-variant">
-          No brands found. Create your first brand!
-        </div>
+        <EmptyState
+          title="No brands found"
+          description="Create your first brand so parts, products, and bikes can share the same catalog source."
+          action={
+            <ActionButton tone="primary" onClick={() => handleOpenModal()}>
+              Create Brand
+            </ActionButton>
+          }
+        />
       ) : (
-        <div className="overflow-x-auto rounded border border-ghost-border">
+        <div className="overflow-x-auto rounded-[1.5rem] border border-outline-variant/15 bg-surface-container-lowest">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-outline-variant/15 bg-surface-container">
+              <tr className="border-b border-outline-variant/15 bg-surface-container-low">
                 <th className="px-4 py-3 text-left font-semibold text-on-surface">Name</th>
                 <th className="px-4 py-3 text-left font-semibold text-on-surface">Type</th>
                 <th className="px-4 py-3 text-left font-semibold text-on-surface">Created</th>
@@ -175,9 +193,9 @@ export default function BrandsPage() {
                 <tr key={brand.id} className="border-b border-outline-variant/10 hover:bg-surface-container-low">
                   <td className="px-4 py-3 text-on-surface">{brand.name}</td>
                   <td className="px-4 py-3">
-                    <span className="inline-block rounded bg-primary-container px-2 py-1 text-xs text-on-primary-container">
+                    <StatusBadge tone="primary">
                       {brand.type.replace("_", " ")}
-                    </span>
+                    </StatusBadge>
                   </td>
                   <td className="px-4 py-3 text-on-surface-variant text-xs">
                     {brand.created_at ? new Date(brand.created_at).toLocaleDateString() : "-"}
@@ -203,28 +221,14 @@ export default function BrandsPage() {
           </table>
         </div>
       )}
+      </SurfaceCard>
 
-      {totalPages > 1 && (
-        <div className="mt-4 flex justify-center gap-2">
-          <button
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-            disabled={page === 1}
-            className="rounded px-3 py-2 text-sm hover:bg-surface-container disabled:opacity-50"
-          >
-            Previous
-          </button>
-          <span className="px-3 py-2 text-sm text-on-surface-variant">
-            Page {page} of {totalPages}
-          </span>
-          <button
-            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-            disabled={page === totalPages}
-            className="rounded px-3 py-2 text-sm hover:bg-surface-container disabled:opacity-50"
-          >
-            Next
-          </button>
-        </div>
-      )}
+      <PaginationControls
+        page={page}
+        totalPages={totalPages}
+        onPrevious={() => setPage((p) => Math.max(1, p - 1))}
+        onNext={() => setPage((p) => Math.min(totalPages, p + 1))}
+      />
 
       <EntityFormModal
         title={editingBrand ? "Edit Brand" : "Create Brand"}
@@ -235,6 +239,6 @@ export default function BrandsPage() {
         onClose={handleCloseModal}
         onSubmit={handleSubmit}
       />
-    </div>
+    </PageShell>
   );
 }

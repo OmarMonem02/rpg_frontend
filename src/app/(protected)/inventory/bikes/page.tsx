@@ -13,6 +13,17 @@ import {
   type BikeBlueprintRecord,
 } from "@/lib/crud-api";
 import { EntityFormModal, type FieldConfig } from "@/components/entity-form-modal";
+import {
+  ActionButton,
+  EmptyState,
+  FilterBar,
+  InputGroup,
+  PageHero,
+  PageShell,
+  PaginationControls,
+  StatusBadge,
+  SurfaceCard,
+} from "@/components/ops-ui";
 
 const STATUSES = [
   { value: "available", label: "Available" },
@@ -142,17 +153,16 @@ export default function BikesPage() {
   };
 
   const getStatusBadge = (status: string) => {
-    const statusConfig: Record<string, { bg: string; text: string }> = {
-      available: { bg: "bg-green-500/20", text: "text-green-700" },
-      sold: { bg: "bg-gray-500/20", text: "text-gray-700" },
-      maintenance: { bg: "bg-yellow-500/20", text: "text-yellow-700" },
-      reserved: { bg: "bg-blue-500/20", text: "text-blue-700" },
+    const statusConfig: Record<string, "success" | "default" | "warning" | "primary"> = {
+      available: "success",
+      sold: "default",
+      maintenance: "warning",
+      reserved: "primary",
     };
-    const config = statusConfig[status] || statusConfig.available;
     return (
-      <span className={`inline-block rounded ${config.bg} px-2 py-1 text-xs ${config.text}`}>
+      <StatusBadge tone={statusConfig[status] || "success"}>
         {STATUSES.find((s) => s.value === status)?.label || status}
-      </span>
+      </StatusBadge>
     );
   };
 
@@ -291,60 +301,72 @@ export default function BikesPage() {
   ];
 
   return (
-    <div className="max-w-7xl mx-auto p-4">
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-6">
-        <h1 className="font-display text-2xl font-semibold text-on-surface">Bikes For Sale</h1>
-        <button
-          onClick={() => handleOpenModal()}
-          className="rounded bg-primary px-4 py-2 text-on-primary hover:opacity-90"
-        >
-          + Add Bike
-        </button>
-      </div>
+    <PageShell>
+      <PageHero
+        eyebrow="Showroom Inventory"
+        title="Bikes For Sale"
+        description="Manage the live showroom catalog with blueprint identity, mileage, pricing, and sale status in one operational view."
+        actions={
+          <ActionButton tone="primary" onClick={() => handleOpenModal()}>
+            Add Bike
+          </ActionButton>
+        }
+      />
 
-      {error && <div className="mb-4 rounded bg-error/20 p-4 text-error">{error}</div>}
+      {error && <div className="rounded-2xl border border-error/20 bg-error/10 p-4 text-sm text-error">{error}</div>}
 
-      <div className="mb-4 grid gap-2 grid-cols-1 md:grid-cols-2">
-        <input
-          type="text"
-          placeholder="Search by model or VIN..."
-          value={searchFilter}
-          onChange={(e) => {
-            setSearchFilter(e.target.value);
-            setPage(1);
-          }}
-          className="rounded border border-outline-variant/30 bg-surface-container-lowest px-3 py-2 text-on-surface"
-        />
-        <select
-          value={statusFilter}
-          onChange={(e) => {
-            setStatusFilter(e.target.value);
-            setPage(1);
-          }}
-          className="rounded border border-outline-variant/30 bg-surface-container-lowest px-3 py-2 text-on-surface"
-        >
-          <option value="">All Statuses</option>
-          {STATUSES.map((s) => (
-            <option key={s.value} value={s.value}>
-              {s.label}
-            </option>
-          ))}
-        </select>
-      </div>
+      <SurfaceCard>
+        <FilterBar>
+          <InputGroup label="Search" className="md:col-span-7">
+            <input
+              type="text"
+              placeholder="Search by model or VIN..."
+              value={searchFilter}
+              onChange={(e) => {
+                setSearchFilter(e.target.value);
+                setPage(1);
+              }}
+              className="form-input-base"
+            />
+          </InputGroup>
+          <InputGroup label="Status" className="md:col-span-5">
+            <select
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(e.target.value);
+                setPage(1);
+              }}
+              className="form-input-base"
+            >
+              <option value="">All Statuses</option>
+              {STATUSES.map((s) => (
+                <option key={s.value} value={s.value}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+          </InputGroup>
+        </FilterBar>
 
       {loading ? (
         <div className="flex justify-center py-12">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-outline-variant/30 border-t-primary"></div>
         </div>
       ) : bikes.length === 0 ? (
-        <div className="rounded border border-outline-variant/15 bg-surface-container p-8 text-center text-on-surface-variant">
-          No bikes found. Add your first bike!
-        </div>
+        <EmptyState
+          title="No bikes found"
+          description="Create your first showroom bike entry to start tracking listings, pricing, and status."
+          action={
+            <ActionButton tone="primary" onClick={() => handleOpenModal()}>
+              Create Bike
+            </ActionButton>
+          }
+        />
       ) : (
-        <div className="overflow-x-auto rounded border border-ghost-border">
+        <div className="overflow-x-auto rounded-[1.5rem] border border-outline-variant/15 bg-surface-container-lowest">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-outline-variant/15 bg-surface-container">
+              <tr className="border-b border-outline-variant/15 bg-surface-container-low">
                 <th className="px-4 py-3 text-left font-semibold text-on-surface">Blueprint</th>
                 <th className="px-4 py-3 text-left font-semibold text-on-surface">VIN</th>
                 <th className="px-4 py-3 text-right font-semibold text-on-surface">Sale Price</th>
@@ -390,28 +412,14 @@ export default function BikesPage() {
           </table>
         </div>
       )}
+      </SurfaceCard>
 
-      {totalPages > 1 && (
-        <div className="mt-4 flex justify-center gap-2">
-          <button
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-            disabled={page === 1}
-            className="rounded px-3 py-2 text-sm hover:bg-surface-container disabled:opacity-50"
-          >
-            Previous
-          </button>
-          <span className="px-3 py-2 text-sm text-on-surface-variant">
-            Page {page} of {totalPages}
-          </span>
-          <button
-            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-            disabled={page === totalPages}
-            className="rounded px-3 py-2 text-sm hover:bg-surface-container disabled:opacity-50"
-          >
-            Next
-          </button>
-        </div>
-      )}
+      <PaginationControls
+        page={page}
+        totalPages={totalPages}
+        onPrevious={() => setPage((p) => Math.max(1, p - 1))}
+        onNext={() => setPage((p) => Math.min(totalPages, p + 1))}
+      />
 
       <EntityFormModal
         title={editingBike ? "Edit Bike For Sale" : "Create Bike For Sale"}
@@ -429,6 +437,6 @@ export default function BikesPage() {
         submitLabel={editingBike ? "Save Bike" : "Create Bike"}
         heroLabel="Bikes For Sale"
       />
-    </div>
+    </PageShell>
   );
 }

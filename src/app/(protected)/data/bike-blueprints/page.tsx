@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useCallback, useEffect, useState } from "react";
 import { getAuthToken } from "@/lib/auth-session";
 import {
   listBikeBlueprints,
@@ -13,6 +14,16 @@ import {
   type BrandRecord,
 } from "@/lib/crud-api";
 import { EntityFormModal, type FieldConfig } from "@/components/entity-form-modal";
+import {
+  ActionButton,
+  EmptyState,
+  FilterBar,
+  InputGroup,
+  PageHero,
+  PageShell,
+  PaginationControls,
+  SurfaceCard,
+} from "@/components/ops-ui";
 
 export default function BikeBlueprintsPage() {
   const [blueprints, setBlueprints] = useState<BikeBlueprintRecord[]>([]);
@@ -28,7 +39,7 @@ export default function BikeBlueprintsPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchFilter, setSearchFilter] = useState("");
 
-  const loadBlueprints = async () => {
+  const loadBlueprints = useCallback(async () => {
     try {
       setLoading(true);
       const token = getAuthToken();
@@ -43,7 +54,7 @@ export default function BikeBlueprintsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, searchFilter]);
 
   const loadBrands = async () => {
     try {
@@ -66,7 +77,7 @@ export default function BikeBlueprintsPage() {
 
   useEffect(() => {
     loadBlueprints();
-  }, [page, searchFilter]);
+  }, [loadBlueprints]);
 
   const handleOpenModal = (blueprint?: BikeBlueprintRecord) => {
     setEditingBlueprint(blueprint || null);
@@ -160,45 +171,55 @@ export default function BikeBlueprintsPage() {
   ];
 
   return (
-    <div className="max-w-6xl mx-auto p-4">
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-6">
-        <h1 className="font-display text-2xl font-semibold text-on-surface">Bike Blueprints</h1>
-        <button
-          onClick={() => handleOpenModal()}
-          className="rounded bg-primary px-4 py-2 text-on-primary hover:opacity-90"
-        >
-          + Add Blueprint
-        </button>
-      </div>
+    <PageShell>
+      <PageHero
+        eyebrow="Master Data"
+        title="Bike Blueprints"
+        description="Define models and years, then jump directly into linked spare-parts management for each blueprint."
+        actions={
+          <ActionButton tone="primary" onClick={() => handleOpenModal()}>
+            Add Blueprint
+          </ActionButton>
+        }
+      />
 
-      {error && <div className="mb-4 rounded bg-error/20 p-4 text-error">{error}</div>}
+      {error && <div className="rounded-2xl border border-error/20 bg-error/10 p-4 text-sm text-error">{error}</div>}
 
-      <div className="mb-4">
-        <input
-          type="text"
-          placeholder="Search by model..."
-          value={searchFilter}
-          onChange={(e) => {
-            setSearchFilter(e.target.value);
-            setPage(1);
-          }}
-          className="w-full rounded border border-outline-variant/30 bg-surface-container-lowest px-3 py-2 text-on-surface"
-        />
-      </div>
+      <SurfaceCard>
+        <FilterBar className="md:grid-cols-12">
+          <InputGroup label="Search by model" className="md:col-span-12">
+            <input
+              type="text"
+              placeholder="Search by model..."
+              value={searchFilter}
+              onChange={(e) => {
+                setSearchFilter(e.target.value);
+                setPage(1);
+              }}
+              className="form-input-base"
+            />
+          </InputGroup>
+        </FilterBar>
 
       {loading ? (
         <div className="flex justify-center py-12">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-outline-variant/30 border-t-primary"></div>
         </div>
       ) : blueprints.length === 0 ? (
-        <div className="rounded border border-outline-variant/15 bg-surface-container p-8 text-center text-on-surface-variant">
-          No blueprints found. Create your first blueprint!
-        </div>
+        <EmptyState
+          title="No blueprints found"
+          description="Create the first bike blueprint so parts and bikes can be grouped around a proper model definition."
+          action={
+            <ActionButton tone="primary" onClick={() => handleOpenModal()}>
+              Create Blueprint
+            </ActionButton>
+          }
+        />
       ) : (
-        <div className="overflow-x-auto rounded border border-ghost-border">
+        <div className="overflow-x-auto rounded-[1.5rem] border border-outline-variant/15 bg-surface-container-lowest">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-outline-variant/15 bg-surface-container">
+              <tr className="border-b border-outline-variant/15 bg-surface-container-low">
                 <th className="px-4 py-3 text-left font-semibold text-on-surface">Brand</th>
                 <th className="px-4 py-3 text-left font-semibold text-on-surface">Model</th>
                 <th className="px-4 py-3 text-left font-semibold text-on-surface">Year</th>
@@ -216,6 +237,13 @@ export default function BikeBlueprintsPage() {
                     {blueprint.created_at ? new Date(blueprint.created_at).toLocaleDateString() : "-"}
                   </td>
                   <td className="px-4 py-3 text-right">
+                    <Link
+                      href={`/data/bike-blueprints/${blueprint.id}/spare-parts`}
+                      className="text-primary hover:underline text-xs font-medium"
+                    >
+                      Manage Parts
+                    </Link>
+                    <span className="mx-2 text-on-surface-variant">•</span>
                     <button
                       onClick={() => handleOpenModal(blueprint)}
                       className="text-primary hover:underline text-xs font-medium"
@@ -236,28 +264,14 @@ export default function BikeBlueprintsPage() {
           </table>
         </div>
       )}
+      </SurfaceCard>
 
-      {totalPages > 1 && (
-        <div className="mt-4 flex justify-center gap-2">
-          <button
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-            disabled={page === 1}
-            className="rounded px-3 py-2 text-sm hover:bg-surface-container disabled:opacity-50"
-          >
-            Previous
-          </button>
-          <span className="px-3 py-2 text-sm text-on-surface-variant">
-            Page {page} of {totalPages}
-          </span>
-          <button
-            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-            disabled={page === totalPages}
-            className="rounded px-3 py-2 text-sm hover:bg-surface-container disabled:opacity-50"
-          >
-            Next
-          </button>
-        </div>
-      )}
+      <PaginationControls
+        page={page}
+        totalPages={totalPages}
+        onPrevious={() => setPage((p) => Math.max(1, p - 1))}
+        onNext={() => setPage((p) => Math.min(totalPages, p + 1))}
+      />
 
       <EntityFormModal
         title={editingBlueprint ? "Edit Blueprint" : "Create Blueprint"}
@@ -269,6 +283,6 @@ export default function BikeBlueprintsPage() {
         onClose={handleCloseModal}
         onSubmit={handleSubmit}
       />
-    </div>
+    </PageShell>
   );
 }

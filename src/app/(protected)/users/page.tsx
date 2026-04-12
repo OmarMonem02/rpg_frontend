@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { ApiError } from "@/lib/auth-api";
 import { getAuthToken } from "@/lib/auth-session";
 import { createUser, deleteUser, listUsers, updateUser, type UserRecord } from "@/lib/crud-api";
+import { ActionButton, InlineMessage, PageHero, PageShell, PaginationControls, SurfaceCard } from "@/components/ops-ui";
 
 const roleOptions = ["admin", "staff", "Technician"] as const;
 const EMAIL_DOMAIN = "@rpg.com";
@@ -166,15 +167,15 @@ export default function UsersPage() {
   }
 
   return (
-    <section className="space-y-6">
-      <div className="space-y-2">
-        <h1 className="text-3xl font-bold text-on-surface">Users</h1>
-        <p className="text-on-surface-variant">
-          Full CRUD connected to `/users` endpoint with create, list, edit, and delete actions.
-        </p>
-      </div>
+    <PageShell>
+      <PageHero
+        eyebrow="Admin"
+        title="Users"
+        description="Manage RPG user accounts and roles with the existing `/users` integration."
+      />
 
-      <form className="glass ghost-border space-y-4 rounded-md border p-4" onSubmit={onSubmit}>
+      <SurfaceCard>
+      <form className="space-y-4" onSubmit={onSubmit}>
         <h2 className="text-lg font-semibold text-on-surface">{editingId ? "Edit User" : "Create User"}</h2>
 
         <div className="grid gap-4 md:grid-cols-2">
@@ -260,31 +261,31 @@ export default function UsersPage() {
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <button
+          <ActionButton
             type="submit"
             disabled={isSubmitting}
-            className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-on-primary transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+            tone="primary"
           >
             {isSubmitting ? "Saving..." : editingId ? "Update User" : "Create User"}
-          </button>
+          </ActionButton>
           {editingId ? (
-            <button
+            <ActionButton
               type="button"
               onClick={resetForm}
-              className="rounded-md border border-outline-variant/40 bg-surface-container-low px-4 py-2 text-sm font-semibold text-on-surface"
             >
               Cancel Edit
-            </button>
+            </ActionButton>
           ) : null}
         </div>
       </form>
+      </SurfaceCard>
 
-      {error ? <p className="rounded-md bg-error-container px-3 py-2 text-sm text-on-error-container">{error}</p> : null}
+      {error ? <InlineMessage tone="danger">{error}</InlineMessage> : null}
       {message ? (
-        <p className="rounded-md bg-primary-container px-3 py-2 text-sm text-on-primary-container">{message}</p>
+        <InlineMessage tone="primary">{message}</InlineMessage>
       ) : null}
 
-      <div className="glass ghost-border rounded-md border">
+      <SurfaceCard className="p-0">
         <div className="border-b border-outline-variant/20 px-4 py-3">
           <h2 className="text-lg font-semibold text-on-surface">Users List</h2>
         </div>
@@ -335,30 +336,14 @@ export default function UsersPage() {
           </div>
         )}
 
-        <div className="flex items-center justify-between border-t border-outline-variant/20 px-4 py-3 text-sm">
-          <p className="text-on-surface-variant">
-            Page {page} of {lastPage}
-          </p>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              disabled={page <= 1}
-              onClick={() => loadUsers(page - 1)}
-              className="rounded-md border border-outline-variant/40 bg-surface-container-low px-3 py-1 text-on-surface disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              Previous
-            </button>
-            <button
-              type="button"
-              disabled={page >= lastPage}
-              onClick={() => loadUsers(page + 1)}
-              className="rounded-md border border-outline-variant/40 bg-surface-container-low px-3 py-1 text-on-surface disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              Next
-            </button>
-          </div>
-        </div>
-      </div>
-    </section>
+      </SurfaceCard>
+
+      <PaginationControls
+        page={page}
+        totalPages={lastPage}
+        onPrevious={() => loadUsers(page - 1)}
+        onNext={() => loadUsers(page + 1)}
+      />
+    </PageShell>
   );
 }

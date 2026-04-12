@@ -11,6 +11,14 @@ import {
   type CreatePaymentMethodPayload,
 } from "@/lib/crud-api";
 import { EntityFormModal, type FieldConfig } from "@/components/entity-form-modal";
+import {
+  ActionButton,
+  EmptyState,
+  PageHero,
+  PageShell,
+  PaginationControls,
+  SurfaceCard,
+} from "@/components/ops-ui";
 
 export default function PaymentMethodsPage() {
   const [methods, setMethods] = useState<PaymentMethodRecord[]>([]);
@@ -105,32 +113,40 @@ export default function PaymentMethodsPage() {
   ];
 
   return (
-    <div className="max-w-6xl mx-auto p-4">
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-6">
-        <h1 className="font-display text-2xl font-semibold text-on-surface">Payment Methods</h1>
-        <button
-          onClick={() => handleOpenModal()}
-          className="rounded bg-primary px-4 py-2 text-on-primary hover:opacity-90"
-        >
-          + Add Payment Method
-        </button>
-      </div>
+    <PageShell>
+      <PageHero
+        eyebrow="Master Data"
+        title="Payment Methods"
+        description="Maintain the accepted payment channels used by the RPG shop across sales and reporting."
+        actions={
+          <ActionButton tone="primary" onClick={() => handleOpenModal()}>
+            Add Payment Method
+          </ActionButton>
+        }
+      />
 
-      {error && <div className="mb-4 rounded bg-error/20 p-4 text-error">{error}</div>}
+      {error && <div className="rounded-2xl border border-error/20 bg-error/10 p-4 text-sm text-error">{error}</div>}
 
-      {loading ? (
-        <div className="flex justify-center py-12">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-outline-variant/30 border-t-primary"></div>
-        </div>
-      ) : methods.length === 0 ? (
-        <div className="rounded border border-outline-variant/15 bg-surface-container p-8 text-center text-on-surface-variant">
-          No payment methods found. Create your first payment method!
-        </div>
-      ) : (
-        <div className="overflow-x-auto rounded border border-ghost-border">
+      <SurfaceCard>
+        {loading ? (
+          <div className="flex justify-center py-12">
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-outline-variant/30 border-t-primary"></div>
+          </div>
+        ) : methods.length === 0 ? (
+          <EmptyState
+            title="No payment methods found"
+            description="Create the first payment method so the team can align transactions with your accepted payment channels."
+            action={
+              <ActionButton tone="primary" onClick={() => handleOpenModal()}>
+                Create Payment Method
+              </ActionButton>
+            }
+          />
+        ) : (
+        <div className="overflow-x-auto rounded-[1.5rem] border border-outline-variant/15 bg-surface-container-lowest">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-outline-variant/15 bg-surface-container">
+              <tr className="border-b border-outline-variant/15 bg-surface-container-low">
                 <th className="px-4 py-3 text-left font-semibold text-on-surface">Name</th>
                 <th className="px-4 py-3 text-left font-semibold text-on-surface">Created</th>
                 <th className="px-4 py-3 text-right font-semibold text-on-surface">Actions</th>
@@ -163,29 +179,15 @@ export default function PaymentMethodsPage() {
             </tbody>
           </table>
         </div>
-      )}
+        )}
+      </SurfaceCard>
 
-      {totalPages > 1 && (
-        <div className="mt-4 flex justify-center gap-2">
-          <button
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-            disabled={page === 1}
-            className="rounded px-3 py-2 text-sm hover:bg-surface-container disabled:opacity-50"
-          >
-            Previous
-          </button>
-          <span className="px-3 py-2 text-sm text-on-surface-variant">
-            Page {page} of {totalPages}
-          </span>
-          <button
-            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-            disabled={page === totalPages}
-            className="rounded px-3 py-2 text-sm hover:bg-surface-container disabled:opacity-50"
-          >
-            Next
-          </button>
-        </div>
-      )}
+      <PaginationControls
+        page={page}
+        totalPages={totalPages}
+        onPrevious={() => setPage((p) => Math.max(1, p - 1))}
+        onNext={() => setPage((p) => Math.min(totalPages, p + 1))}
+      />
 
       <EntityFormModal
         title={editingMethod ? "Edit Payment Method" : "Create Payment Method"}
@@ -196,6 +198,6 @@ export default function PaymentMethodsPage() {
         onClose={handleCloseModal}
         onSubmit={handleSubmit}
       />
-    </div>
+    </PageShell>
   );
 }

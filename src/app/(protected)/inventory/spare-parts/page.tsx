@@ -14,8 +14,11 @@ import {
   updateSparePartCategory,
   deleteSparePartCategory,
   assignBlueprintsToSparePart,
+  removeBlueprintFromSparePart,
+  getSparePartBlueprints,
   type SparePartRecord,
   type CreateSparePartPayload,
+  type UpdateSparePartPayload,
   type SparePartCategoryRecord,
   type BrandRecord,
   type BikeBlueprintRecord,
@@ -23,6 +26,16 @@ import {
 } from "@/lib/crud-api";
 import { EntityFormModal, type FieldConfig } from "@/components/entity-form-modal";
 import { TabsWrapper } from "@/components/tabs-wrapper";
+import {
+  ActionButton,
+  EmptyState,
+  FilterBar,
+  InputGroup,
+  PageHero,
+  PageShell,
+  PaginationControls,
+  StatusBadge,
+} from "@/components/ops-ui";
 
 export default function SparePartsPage() {
   // Spare Parts State
@@ -44,6 +57,9 @@ export default function SparePartsPage() {
   const [editingCategory, setEditingCategory] = useState<SparePartCategoryRecord | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Blueprint Assignment Tracking
+  const [currentBlueprintIds, setCurrentBlueprintIds] = useState<number[]>([]);
 
   // Filters
   const [searchFilter, setSearchFilter] = useState("");
@@ -142,15 +158,31 @@ export default function SparePartsPage() {
   }, [page, searchFilter, categoryFilter, brandFilter]);
 
   // Spare Parts Modal Handlers
-  const handleOpenSparePartModal = (part?: SparePartRecord) => {
+  const handleOpenSparePartModal = async (part?: SparePartRecord) => {
     setEditingSparePart(part || null);
     setSubmitError(null);
+    setCurrentBlueprintIds([]);
+
+    // If editing, fetch current blueprint assignments
+    if (part) {
+      try {
+        const token = getAuthToken();
+        if (!token) throw new Error("Authentication required");
+        const blueprintIds = await getSparePartBlueprints(token, part.id);
+        setCurrentBlueprintIds(blueprintIds);
+      } catch (err) {
+        console.error("Failed to load blueprint assignments:", err);
+        setCurrentBlueprintIds([]);
+      }
+    }
+
     setSparePartModalOpen(true);
   };
 
   const handleCloseSparePartModal = () => {
     setSparePartModalOpen(false);
     setEditingSparePart(null);
+    setCurrentBlueprintIds([]);
   };
 
   const handleSubmitSparePart = async (formData: Record<string, unknown>) => {
@@ -159,12 +191,29 @@ export default function SparePartsPage() {
       const token = getAuthToken();
       if (!token) throw new Error("Authentication required");
 
-      const payload: CreateSparePartPayload = {
+      // Helper to safely convert values
+      const toNumber = (v: unknown): number | undefined => {
+        const n = Number(v);
+        return Number.isFinite(n) ? n : undefined;
+      };
+
+      // Helper to clean payload of undefined values
+      const cleanPayload = <T extends Record<string, unknown>>(obj: T): Partial<T> => {
+        const cleaned: Partial<T> = {};
+        for (const [key, value] of Object.entries(obj)) {
+          if (value !== undefined) {
+            (cleaned as Record<string, unknown>)[key] = value;
+          }
+        }
+        return cleaned;
+      };
+
+      const basePayload = cleanPayload({
         name: String(formData.name),
         sku: String(formData.sku),
         part_number: formData.part_number ? String(formData.part_number) : undefined,
-        stock_quantity: formData.stock_quantity ? Number(formData.stock_quantity) : 0,
-        low_stock_alarm: formData.low_stock_alarm ? Number(formData.low_stock_alarm) : 0,
+        stock_quantity: toNumber(formData.stock_quantity),
+        low_stock_alarm: toNumber(formData.low_stock_alarm),
         spare_parts_category_id: Number(formData.spare_parts_category_id),
         brand_id: Number(formData.brand_id),
         currency_pricing: String(formData.currency_pricing) as "EGP" | "USD",
@@ -172,21 +221,46 @@ export default function SparePartsPage() {
         sale_price: Number(formData.sale_price),
         max_discount_type: String(formData.max_discount_type) as "fixed" | "percentage",
         max_discount_value: Number(formData.max_discount_value),
-        universal: formData.universal === true,
+        universal: Boolean(formData.universal),
         notes: formData.notes ? String(formData.notes) : undefined,
-      };
+      });
 
       let sparePart: SparePartRecord;
       if (editingSparePart) {
-        sparePart = await updateSparePart(token, editingSparePart.id, payload);
+        const updatePayload = basePayload as UpdateSparePartPayload;
+        console.log("Updating spare part with full payload:", updatePayload);
+        sparePart = await updateSparePart(token, editingSparePart.id, updatePayload);
       } else {
-        sparePart = await createSparePart(token, payload);
+        const createPayload = {
+          ...basePayload,
+          bike_blueprint_ids: (formData.blueprint_ids as number[]) || undefined,
+        } as CreateSparePartPayload;
+        console.log("Creating spare part with full payload:", createPayload);
+        sparePart = await createSparePart(token, createPayload);
       }
 
-      // Assign blueprints if selected
-      const selectedBlueprints = formData.blueprint_ids as number[];
-      if (selectedBlueprints && selectedBlueprints.length > 0) {
-        await assignBlueprintsToSparePart(token, sparePart.id, selectedBlueprints);
+      // Handle blueprint assignments
+      const selectedBlueprints = (formData.blueprint_ids as number[]) || [];
+
+      if (editingSparePart) {
+        // Differential update: only update what changed
+        const toAdd = selectedBlueprints.filter(id => !currentBlueprintIds.includes(id));
+        const toRemove = currentBlueprintIds.filter(id => !selectedBlueprints.includes(id));
+
+        // Remove blueprints that are no longer selected
+        for (const blueprintId of toRemove) {
+          await removeBlueprintFromSparePart(token, sparePart.id, blueprintId);
+        }
+
+        // Add newly selected blueprints
+        if (toAdd.length > 0) {
+          await assignBlueprintsToSparePart(token, sparePart.id, toAdd);
+        }
+      } else {
+        // Create mode: assign all selected blueprints
+        if (selectedBlueprints.length > 0) {
+          await assignBlueprintsToSparePart(token, sparePart.id, selectedBlueprints);
+        }
       }
 
       await loadSpareParts();
@@ -262,12 +336,12 @@ export default function SparePartsPage() {
   // Helper function to get stock status badge
   const getStockBadge = (part: SparePartRecord) => {
     if (part.stock_quantity === 0) {
-      return <span className="inline-block rounded bg-error/20 px-2 py-1 text-xs text-error">Out of Stock</span>;
+      return <StatusBadge tone="danger">Out of Stock</StatusBadge>;
     }
     if (part.stock_quantity <= part.low_stock_alarm) {
-      return <span className="inline-block rounded bg-yellow-500/20 px-2 py-1 text-xs text-yellow-700">Low Stock</span>;
+      return <StatusBadge tone="warning">Low Stock</StatusBadge>;
     }
-    return <span className="inline-block rounded bg-green-500/20 px-2 py-1 text-xs text-green-700">In Stock</span>;
+    return <StatusBadge tone="success">In Stock</StatusBadge>;
   };
 
   const sparePartModalFields: FieldConfig[] = [
@@ -428,6 +502,7 @@ export default function SparePartsPage() {
       })),
       disabled: (formData) => formData.universal === true,
       span: 2,
+      value: editingSparePart ? currentBlueprintIds : undefined,
       summaryValue: ({ value }) =>
         Array.isArray(value) && value.length > 0 ? `${value.length} blueprint${value.length === 1 ? "" : "s"} linked` : undefined,
     },
@@ -471,73 +546,85 @@ export default function SparePartsPage() {
   const sparePartsTabContent = (
     <div className="space-y-4">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <h2 className="text-lg font-semibold text-on-surface">Spare Parts</h2>
-        <button
-          onClick={() => handleOpenSparePartModal()}
-          className="rounded bg-primary px-4 py-2 text-on-primary hover:opacity-90"
-        >
-          + Add Spare Part
-        </button>
+        <div>
+          <h2 className="text-lg font-semibold text-on-surface">Spare Parts</h2>
+          <p className="mt-1 text-sm text-on-surface-variant">Search inventory, review stock health, and update compatibility details.</p>
+        </div>
+        <ActionButton tone="primary" onClick={() => handleOpenSparePartModal()}>
+          Add Spare Part
+        </ActionButton>
       </div>
 
-      {error && <div className="rounded bg-error/20 p-4 text-error text-sm">{error}</div>}
+      {error && <div className="rounded-2xl border border-error/20 bg-error/10 p-4 text-error text-sm">{error}</div>}
 
-      <div className="grid gap-2 grid-cols-1 md:grid-cols-3">
-        <input
-          type="text"
-          placeholder="Search by name, SKU..."
-          value={searchFilter}
-          onChange={(e) => {
-            setSearchFilter(e.target.value);
-            setPage(1);
-          }}
-          className="rounded border border-outline-variant/30 bg-surface-container-lowest px-3 py-2 text-on-surface"
-        />
-        <select
-          value={categoryFilter}
-          onChange={(e) => {
-            setCategoryFilter(e.target.value ? parseInt(e.target.value) : "");
-            setPage(1);
-          }}
-          className="rounded border border-outline-variant/30 bg-surface-container-lowest px-3 py-2 text-on-surface"
-        >
-          <option value="">All Categories</option>
-          {categories.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </select>
-        <select
-          value={brandFilter}
-          onChange={(e) => {
-            setBrandFilter(e.target.value ? parseInt(e.target.value) : "");
-            setPage(1);
-          }}
-          className="rounded border border-outline-variant/30 bg-surface-container-lowest px-3 py-2 text-on-surface"
-        >
-          <option value="">All Brands</option>
-          {brands.map((b) => (
-            <option key={b.id} value={b.id}>
-              {b.name}
-            </option>
-          ))}
-        </select>
-      </div>
+      <FilterBar>
+        <InputGroup label="Search" className="md:col-span-5">
+          <input
+            type="text"
+            placeholder="Search by name, SKU..."
+            value={searchFilter}
+            onChange={(e) => {
+              setSearchFilter(e.target.value);
+              setPage(1);
+            }}
+            className="form-input-base"
+          />
+        </InputGroup>
+        <InputGroup label="Category" className="md:col-span-3">
+          <select
+            value={categoryFilter}
+            onChange={(e) => {
+              setCategoryFilter(e.target.value ? parseInt(e.target.value) : "");
+              setPage(1);
+            }}
+            className="form-input-base"
+          >
+            <option value="">All Categories</option>
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        </InputGroup>
+        <InputGroup label="Brand" className="md:col-span-4">
+          <select
+            value={brandFilter}
+            onChange={(e) => {
+              setBrandFilter(e.target.value ? parseInt(e.target.value) : "");
+              setPage(1);
+            }}
+            className="form-input-base"
+          >
+            <option value="">All Brands</option>
+            {brands.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.name}
+              </option>
+            ))}
+          </select>
+        </InputGroup>
+      </FilterBar>
 
       {loading ? (
         <div className="flex justify-center py-12">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-outline-variant/30 border-t-primary"></div>
         </div>
       ) : spareParts.length === 0 ? (
-        <div className="rounded border border-outline-variant/15 bg-surface-container p-8 text-center text-on-surface-variant">
-          No spare parts found.
-        </div>
+        <EmptyState
+          title="No spare parts found"
+          description="Try adjusting your filters or create a new spare part to begin building the catalog."
+          action={
+            <ActionButton tone="primary" onClick={() => handleOpenSparePartModal()}>
+              Create Spare Part
+            </ActionButton>
+          }
+        />
       ) : (
-        <div className="overflow-x-auto rounded border border-ghost-border">
+        <div className="overflow-x-auto rounded-[1.5rem] border border-outline-variant/15 bg-surface-container-lowest">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-outline-variant/15 bg-surface-container">
+              <tr className="border-b border-outline-variant/15 bg-surface-container-low">
                 <th className="px-4 py-3 text-left font-semibold text-on-surface">SKU</th>
                 <th className="px-4 py-3 text-left font-semibold text-on-surface">Name</th>
                 <th className="px-4 py-3 text-center font-semibold text-on-surface">Stock</th>
@@ -584,27 +671,12 @@ export default function SparePartsPage() {
         </div>
       )}
 
-      {totalPages > 1 && (
-        <div className="mt-4 flex justify-center gap-2">
-          <button
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-            disabled={page === 1}
-            className="rounded px-3 py-2 text-sm hover:bg-surface-container disabled:opacity-50"
-          >
-            Previous
-          </button>
-          <span className="px-3 py-2 text-sm text-on-surface-variant">
-            Page {page} of {totalPages}
-          </span>
-          <button
-            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-            disabled={page === totalPages}
-            className="rounded px-3 py-2 text-sm hover:bg-surface-container disabled:opacity-50"
-          >
-            Next
-          </button>
-        </div>
-      )}
+      <PaginationControls
+        page={page}
+        totalPages={totalPages}
+        onPrevious={() => setPage((p) => Math.max(1, p - 1))}
+        onNext={() => setPage((p) => Math.min(totalPages, p + 1))}
+      />
     </div>
   );
 
@@ -612,24 +684,30 @@ export default function SparePartsPage() {
   const categoriesTabContent = (
     <div className="space-y-4">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <h2 className="text-lg font-semibold text-on-surface">Categories</h2>
-        <button
-          onClick={() => handleOpenCategoryModal()}
-          className="rounded bg-primary px-4 py-2 text-on-primary hover:opacity-90"
-        >
-          + Add Category
-        </button>
+        <div>
+          <h2 className="text-lg font-semibold text-on-surface">Categories</h2>
+          <p className="mt-1 text-sm text-on-surface-variant">Organize spare parts into cleaner catalog groups.</p>
+        </div>
+        <ActionButton tone="primary" onClick={() => handleOpenCategoryModal()}>
+          Add Category
+        </ActionButton>
       </div>
 
       {categories.length === 0 ? (
-        <div className="rounded border border-outline-variant/15 bg-surface-container p-8 text-center text-on-surface-variant">
-          No categories found.
-        </div>
+        <EmptyState
+          title="No categories found"
+          description="Create the first category to give your spare-parts inventory a stronger structure."
+          action={
+            <ActionButton tone="primary" onClick={() => handleOpenCategoryModal()}>
+              Create Category
+            </ActionButton>
+          }
+        />
       ) : (
-        <div className="overflow-x-auto rounded border border-ghost-border">
+        <div className="overflow-x-auto rounded-[1.5rem] border border-outline-variant/15 bg-surface-container-lowest">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-outline-variant/15 bg-surface-container">
+              <tr className="border-b border-outline-variant/15 bg-surface-container-low">
                 <th className="px-4 py-3 text-left font-semibold text-on-surface">Name</th>
                 <th className="px-4 py-3 text-left font-semibold text-on-surface">Created</th>
                 <th className="px-4 py-3 text-right font-semibold text-on-surface">Actions</th>
@@ -667,8 +745,12 @@ export default function SparePartsPage() {
   );
 
   return (
-    <div className="max-w-7xl mx-auto p-4">
-      <h1 className="mb-6 font-display text-2xl font-semibold text-on-surface">Spare Parts Management</h1>
+    <PageShell>
+      <PageHero
+        eyebrow="Inventory Control"
+        title="Spare Parts Management"
+        description="Operate parts inventory with stronger filtering, clearer stock signals, and guided create or edit flows."
+      />
 
       <TabsWrapper
         tabs={[
@@ -713,6 +795,6 @@ export default function SparePartsPage() {
         submitLabel={editingCategory ? "Save Category" : "Create Category"}
         heroLabel="Category Setup"
       />
-    </div>
+    </PageShell>
   );
 }
