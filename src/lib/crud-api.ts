@@ -597,6 +597,12 @@ export async function deleteSparePart(token: string, id: number): Promise<void> 
   await authorizedFetch<void>(`/spare_parts/${id}`, token, { method: "DELETE" });
 }
 
+export async function getSparePart(token: string, id: number): Promise<SparePartRecord> {
+  const data = await authorizedFetch<unknown>(`/spare_parts/${id}`, token);
+  const record = asRecord(data);
+  return normalizeSparcePart(record.data ?? record.spare_part ?? record);
+}
+
 // ============================================================================
 // PRODUCTS
 // ============================================================================
@@ -714,6 +720,12 @@ export async function updateProduct(
 
 export async function deleteProduct(token: string, id: number): Promise<void> {
   await authorizedFetch<void>(`/products/${id}`, token, { method: "DELETE" });
+}
+
+export async function getProduct(token: string, id: number): Promise<ProductRecord> {
+  const data = await authorizedFetch<unknown>(`/products/${id}`, token);
+  const record = asRecord(data);
+  return normalizeProduct(record.data ?? record.product ?? record);
 }
 
 // ============================================================================
@@ -1189,6 +1201,12 @@ export async function updateBike(token: string, id: number, payload: UpdateBikeP
 
 export async function deleteBike(token: string, id: number): Promise<void> {
   await authorizedFetch<void>(`/bike_for_sale/${id}`, token, { method: "DELETE" });
+}
+
+export async function getBike(token: string, id: number): Promise<BikeRecord> {
+  const data = await authorizedFetch<unknown>(`/bike_for_sale/${id}`, token);
+  const record = asRecord(data);
+  return normalizeBike(record.data ?? record.bike ?? record);
 }
 
 // ============================================================================
