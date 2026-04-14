@@ -574,6 +574,9 @@ export default function ProductsPage() {
                 <th className="px-4 py-3 text-left font-semibold text-on-surface">
                   discount
                 </th>
+                <th className="px-4 py-3 text-left font-semibold text-on-surface">
+                  Notes
+                </th>
                 <th className="px-4 py-3 text-right font-semibold text-on-surface">
                   Actions
                 </th>
@@ -611,6 +614,9 @@ export default function ProductsPage() {
                   <td className="px-4 py-3 text-on-surface-variant text-xs">
                     {product.max_discount_value}{" "}
                     {product.max_discount_type ? product.currency_pricing : "%"}
+                  </td>
+                  <td className="px-4 py-3 text-on-surface-variant text-xs">
+                    {product.notes}
                   </td>
                   <td className="px-4 py-3 text-right">
                     <button

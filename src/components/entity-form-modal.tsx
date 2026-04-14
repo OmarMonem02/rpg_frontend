@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, useState } from "react";
 
@@ -73,7 +73,7 @@ export function EntityFormModal({
   const optionalFieldsCount = fields.length - requiredFieldsCount;
 
   const sections = useMemo(() => {
-    return fields.reduce((acc, field) => {
+    const result = fields.reduce((acc, field) => {
       const sectionName = field.section || "General";
       const existing = acc.find((section) => section.name === sectionName);
 
@@ -92,6 +92,23 @@ export function EntityFormModal({
 
       return acc;
     }, [] as SectionConfig[]);
+
+    // If we have multiple sections, add a final Review step to ensure 
+    // the user reaches the very end before being able to submit.
+    if (result.length > 1) {
+      result.push({
+        name: "Review & Save",
+        description: "Review all your details in the snapshot below before finalizing.",
+        fields: [],
+      });
+    }
+    
+    // Log for debugging: verify all sections are created
+    if (typeof window !== 'undefined' && (window as any).__DEV_MODAL_DEBUG) {
+      console.log(`[EntityFormModal] Created ${result.length} sections from ${fields.length} fields:`, result.map(s => s.name));
+    }
+    
+    return result;
   }, [fields]);
 
   const currentSection = sections[currentSectionIndex];
@@ -200,7 +217,11 @@ export function EntityFormModal({
       return;
     }
 
-    setCurrentSectionIndex((prev) => Math.min(prev + 1, sections.length - 1));
+    // Ensure we move to next section, even if it's the last one
+    const nextIndex = Math.min(currentSectionIndex + 1, sections.length - 1);
+    if (nextIndex > currentSectionIndex) {
+      setCurrentSectionIndex(nextIndex);
+    }
   };
 
   const getFieldDisplayValue = (field: FieldConfig) => {
@@ -250,6 +271,11 @@ export function EntityFormModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (!isFinalSection) {
+      handleNextSection();
+      return;
+    }
+
     const errors = sections.reduce((acc, section) => ({ ...acc, ...validateSection(section.fields) }), {} as Record<string, string>);
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
@@ -293,8 +319,8 @@ export function EntityFormModal({
 
   return (
     <div className="form-modal-overlay fixed inset-0 z-50 flex items-center justify-center px-4 py-5">
-      <div className="form-modal-shell max-h-[94vh] w-full max-w-5xl overflow-y-auto rounded-[2rem] p-4 md:p-6">
-        <div className="mb-5 overflow-hidden rounded-[1.75rem] border border-outline-variant/15 bg-surface-container-low">
+      <form onSubmit={handleSubmit} className="form-modal-shell h-[94vh] max-h-[94vh] w-full max-w-5xl rounded-[2rem] flex flex-col">
+        <div className="overflow-hidden rounded-t-[2rem] border border-outline-variant/15 bg-surface-container-low p-4 md:p-6">
           <div className="grid gap-4 border-b border-outline-variant/10 px-5 py-5 md:grid-cols-[1.4fr_0.9fr] md:px-6">
             <div>
               <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -379,21 +405,22 @@ export function EntityFormModal({
           </div>
         </div>
 
-        {error && (
-          <div className="mb-5 flex gap-3 rounded-2xl border border-error/20 bg-error/10 p-4">
-            <div className="flex-shrink-0">
-              <svg className="h-5 w-5 text-error" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-              </svg>
+        <div className="flex-1 overflow-y-auto">
+          {error && (
+            <div className="mx-4 mt-4 flex gap-3 rounded-2xl border border-error/20 bg-error/10 p-4 md:mx-6">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-error" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-error">{error}</p>
+              </div>
             </div>
-            <div>
-              <p className="text-sm font-medium text-error">{error}</p>
-            </div>
-          </div>
-        )}
+          )}
 
-        <form onSubmit={handleSubmit} className="space-y-5">
-          <section className="form-section-card">
+          <div className="space-y-5 p-4 md:p-6">
+            <section className="form-section-card">
             <div className="form-section-header">
               <div>
                 <p className="text-xs uppercase tracking-[0.22em] text-on-surface-variant">
@@ -409,8 +436,19 @@ export function EntityFormModal({
               </span>
             </div>
 
-            <div className={getSectionLayoutClassName(currentSection.fields)}>
-              {currentSection.fields.map((field) => {
+            <div className={currentSection.fields.length > 0 ? getSectionLayoutClassName(currentSection.fields) : ""}>
+              {currentSection.fields.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-8 text-center">
+                  <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary">
+                    <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <h4 className="text-xl font-semibold text-on-surface">Data Entry Complete</h4>
+                  <p className="mt-2 text-sm text-on-surface-variant">Your entry is ready. Please double-check the review snapshot below.</p>
+                </div>
+              ) : (
+                currentSection.fields.map((field) => {
                 const fieldDisabled = isFieldDisabled(field);
                 const fieldValue = formData[field.name];
                 const helperToneClassName =
@@ -544,7 +582,8 @@ export function EntityFormModal({
                     )}
                   </div>
                 );
-              })}
+              })
+            )}
             </div>
           </section>
 
@@ -581,68 +620,69 @@ export function EntityFormModal({
               ))}
             </div>
           </section>
+          </div>
+        </div>
 
-          <div className="sticky bottom-0 flex flex-col gap-4 rounded-[1.5rem] border border-outline-variant/15 bg-surface-container-lowest/95 px-4 py-4 backdrop-blur md:flex-row md:items-center md:justify-between md:px-5">
-            <div>
-              <p className="text-xs uppercase tracking-[0.18em] text-on-surface-variant">Step Guidance</p>
-              <p className="mt-1 text-sm text-on-surface-variant">
-                {isFinalSection
-                  ? "Review the snapshot, then save to create the record."
-                  : "Finish the current section to unlock the next step."}
-              </p>
-            </div>
+        <div className="flex flex-col gap-4 border-t border-outline-variant/15 rounded-b-[2rem] bg-surface-container-lowest px-4 py-4 md:flex-row md:items-center md:justify-between md:px-6">
+          <div>
+            <p className="text-xs uppercase tracking-[0.18em] text-on-surface-variant">Step Guidance</p>
+            <p className="mt-1 text-sm text-on-surface-variant">
+              {isFinalSection
+                ? "Review the snapshot, then save to create the record."
+                : "Finish the current section to unlock the next step."}
+            </p>
+          </div>
 
-            <div className="flex flex-wrap justify-end gap-3">
+          <div className="flex flex-wrap justify-end gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={isSubmitting || isLoading}
+              className="rounded-xl px-5 py-3 font-medium text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {cancelLabel}
+            </button>
+            {currentSectionIndex > 0 && (
               <button
                 type="button"
-                onClick={onClose}
+                onClick={() => setCurrentSectionIndex((prev) => Math.max(prev - 1, 0))}
                 disabled={isSubmitting || isLoading}
-                className="rounded-xl px-5 py-3 font-medium text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-xl border border-outline-variant/20 bg-surface px-5 py-3 font-medium text-on-surface transition-colors hover:bg-surface-container-low disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {cancelLabel}
+                Back
               </button>
-              {currentSectionIndex > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setCurrentSectionIndex((prev) => Math.max(prev - 1, 0))}
-                  disabled={isSubmitting || isLoading}
-                  className="rounded-xl border border-outline-variant/20 bg-surface px-5 py-3 font-medium text-on-surface transition-colors hover:bg-surface-container-low disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  Back
-                </button>
-              )}
-              {isFinalSection ? (
-                <button
-                  type="submit"
-                  disabled={isSubmitting || isLoading}
-                  className="flex items-center gap-2 rounded-xl bg-primary px-5 py-3 font-medium text-on-primary transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {isSubmitting || isLoading ? (
-                    <>
-                      <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      Loading...
-                    </>
-                  ) : (
-                    submitLabel
-                  )}
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={handleNextSection}
-                  disabled={isSubmitting || isLoading}
-                  className="rounded-xl bg-primary px-5 py-3 font-medium text-on-primary transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  Continue
-                </button>
-              )}
-            </div>
+            )}
+            {isFinalSection ? (
+              <button
+                type="submit"
+                disabled={isSubmitting || isLoading}
+                className="flex items-center gap-2 rounded-xl bg-primary px-5 py-3 font-medium text-on-primary transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {isSubmitting || isLoading ? (
+                  <>
+                    <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Loading...
+                  </>
+                ) : (
+                  submitLabel
+                )}
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleNextSection}
+                disabled={isSubmitting || isLoading}
+                className="rounded-xl bg-primary px-5 py-3 font-medium text-on-primary transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Continue →
+              </button>
+            )}
           </div>
-        </form>
-      </div>
+        </div>
+      </form>
     </div>
   );
 }
