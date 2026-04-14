@@ -18,7 +18,10 @@ import {
   type BrandRecord,
   type CreateCategoryPayload,
 } from "@/lib/crud-api";
-import { EntityFormModal, type FieldConfig } from "@/components/entity-form-modal";
+import {
+  EntityFormModal,
+  type FieldConfig,
+} from "@/components/entity-form-modal";
 import { TabsWrapper } from "@/components/tabs-wrapper";
 import {
   ActionButton,
@@ -46,8 +49,11 @@ export default function ProductsPage() {
   // Modal States
   const [productModalOpen, setProductModalOpen] = useState(false);
   const [categoryModalOpen, setCategoryModalOpen] = useState(false);
-  const [editingProduct, setEditingProduct] = useState<ProductRecord | null>(null);
-  const [editingCategory, setEditingCategory] = useState<ProductCategoryRecord | null>(null);
+  const [editingProduct, setEditingProduct] = useState<ProductRecord | null>(
+    null,
+  );
+  const [editingCategory, setEditingCategory] =
+    useState<ProductCategoryRecord | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -56,12 +62,12 @@ export default function ProductsPage() {
   const [categoryFilter, setCategoryFilter] = useState<number | "">(
     typeof window !== "undefined" && localStorage.getItem("p_cat_filter")
       ? parseInt(localStorage.getItem("p_cat_filter")!)
-      : ""
+      : "",
   );
   const [brandFilter, setBrandFilter] = useState<number | "">(
     typeof window !== "undefined" && localStorage.getItem("p_brand_filter")
       ? parseInt(localStorage.getItem("p_brand_filter")!)
-      : ""
+      : "",
   );
 
   // Load products
@@ -155,14 +161,20 @@ export default function ProductsPage() {
       const payload: CreateProductPayload = {
         name: String(formData.name),
         sku: String(formData.sku),
-        stock_quantity: formData.stock_quantity ? Number(formData.stock_quantity) : 0,
-        low_stock_alarm: formData.low_stock_alarm ? Number(formData.low_stock_alarm) : 0,
+        stock_quantity: formData.stock_quantity
+          ? Number(formData.stock_quantity)
+          : 0,
+        low_stock_alarm: formData.low_stock_alarm
+          ? Number(formData.low_stock_alarm)
+          : 0,
         products_category_id: Number(formData.products_category_id),
         brand_id: Number(formData.brand_id),
         currency_pricing: String(formData.currency_pricing) as "EGP" | "USD",
         cost_price: Number(formData.cost_price),
         sale_price: Number(formData.sale_price),
-        max_discount_type: String(formData.max_discount_type) as "fixed" | "percentage",
+        max_discount_type: String(formData.max_discount_type) as
+          | "fixed"
+          | "percentage",
         max_discount_value: Number(formData.max_discount_value),
         universal: formData.universal === true,
         notes: formData.notes ? String(formData.notes) : undefined,
@@ -177,7 +189,9 @@ export default function ProductsPage() {
       await loadProducts();
       handleCloseProductModal();
     } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : "Failed to save product");
+      setSubmitError(
+        err instanceof Error ? err.message : "Failed to save product",
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -226,7 +240,9 @@ export default function ProductsPage() {
       await loadCategories();
       handleCloseCategoryModal();
     } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : "Failed to save category");
+      setSubmitError(
+        err instanceof Error ? err.message : "Failed to save category",
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -240,19 +256,33 @@ export default function ProductsPage() {
       await deleteProductCategory(token, id);
       await loadCategories();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete category");
+      setError(
+        err instanceof Error ? err.message : "Failed to delete category",
+      );
     }
   };
 
   // Helper function to get stock status badge
   const getStockBadge = (product: ProductRecord) => {
     if (product.stock_quantity === 0) {
-      return <StatusBadge tone="danger">Out of Stock</StatusBadge>;
+      return (
+        <StatusBadge tone="danger">
+          Out of Stock {product.stock_quantity}
+        </StatusBadge>
+      );
     }
     if (product.stock_quantity <= product.low_stock_alarm) {
-      return <StatusBadge tone="warning">Low Stock</StatusBadge>;
+      return (
+        <StatusBadge tone="warning">
+          Low Stock {product.stock_quantity}
+        </StatusBadge>
+      );
     }
-    return <StatusBadge tone="success">In Stock</StatusBadge>;
+    return (
+      <StatusBadge tone="success">
+        In Stock {product.stock_quantity}
+      </StatusBadge>
+    );
   };
 
   const productModalFields: FieldConfig[] = [
@@ -262,8 +292,10 @@ export default function ProductsPage() {
       type: "text",
       required: true,
       section: "Basic Info",
-      sectionDescription: "Start with the core identity your sales and inventory teams will recognize.",
-      description: "Use the product name that should appear in your catalog and stock screens.",
+      sectionDescription:
+        "Start with the core identity your sales and inventory teams will recognize.",
+      description:
+        "Use the product name that should appear in your catalog and stock screens.",
       placeholder: "Enter product name",
       value: editingProduct?.name,
       helperTone: "featured",
@@ -286,7 +318,8 @@ export default function ProductsPage() {
       type: "select",
       required: true,
       section: "Classification",
-      sectionDescription: "Group the product for clearer catalog browsing and reporting.",
+      sectionDescription:
+        "Group the product for clearer catalog browsing and reporting.",
       description: "Choose the main product category.",
       options: categories.map((c) => ({ value: c.id, label: c.name })),
       value: editingProduct?.products_category_id,
@@ -307,7 +340,8 @@ export default function ProductsPage() {
       label: "Stock Quantity",
       type: "number",
       section: "Inventory",
-      sectionDescription: "Set the operating quantities that control stock health.",
+      sectionDescription:
+        "Set the operating quantities that control stock health.",
       description: "Enter the opening stock count for this product.",
       placeholder: "0",
       value: editingProduct?.stock_quantity ?? 0,
@@ -330,14 +364,17 @@ export default function ProductsPage() {
       type: "number",
       required: true,
       section: "Pricing",
-      sectionDescription: "Define the financial baseline before the product goes live.",
+      sectionDescription:
+        "Define the financial baseline before the product goes live.",
       description: "Enter your purchase or landed cost per unit.",
       placeholder: "0.00",
       value: editingProduct?.cost_price ?? 0,
       min: 0,
       step: "0.01",
       summaryValue: ({ value, formData }) =>
-        value !== "" && value !== undefined ? `${String(value)} ${String(formData.currency_pricing ?? "EGP")}` : undefined,
+        value !== "" && value !== undefined
+          ? `${String(value)} ${String(formData.currency_pricing ?? "EGP")}`
+          : undefined,
     },
     {
       name: "sale_price",
@@ -352,7 +389,9 @@ export default function ProductsPage() {
       step: "0.01",
       helperTone: "featured",
       summaryValue: ({ value, formData }) =>
-        value !== "" && value !== undefined ? `${String(value)} ${String(formData.currency_pricing ?? "EGP")}` : undefined,
+        value !== "" && value !== undefined
+          ? `${String(value)} ${String(formData.currency_pricing ?? "EGP")}`
+          : undefined,
     },
     {
       name: "currency_pricing",
@@ -373,8 +412,10 @@ export default function ProductsPage() {
       type: "select",
       required: true,
       section: "Discount",
-      sectionDescription: "Control how much pricing flexibility the team has at sale time.",
-      description: "Choose whether the cap is percentage-based or a fixed value.",
+      sectionDescription:
+        "Control how much pricing flexibility the team has at sale time.",
+      description:
+        "Choose whether the cap is percentage-based or a fixed value.",
       options: [
         { value: "percentage", label: "Percentage (%)" },
         { value: "fixed", label: "Fixed Amount" },
@@ -397,16 +438,19 @@ export default function ProductsPage() {
       label: "Universal Product",
       type: "toggle",
       section: "Discount",
-      description: "Use this when the product should be treated as universally applicable.",
+      description:
+        "Use this when the product should be treated as universally applicable.",
       value: editingProduct?.universal ?? false,
-      summaryValue: ({ value }) => (value === true ? "Universal product" : undefined),
+      summaryValue: ({ value }) =>
+        value === true ? "Universal product" : undefined,
     },
     {
       name: "notes",
       label: "Notes",
       type: "textarea",
       section: "Notes",
-      sectionDescription: "Capture details that help sales or operations later.",
+      sectionDescription:
+        "Capture details that help sales or operations later.",
       description: "Add specifications, selling points, or internal notes.",
       placeholder: "e.g., Material, specifications, compatibility...",
       value: editingProduct?.notes,
@@ -437,7 +481,11 @@ export default function ProductsPage() {
         </ActionButton>
       </div>
 
-      {error && <div className="rounded-2xl border border-error/20 bg-error/10 p-4 text-error text-sm">{error}</div>}
+      {error && (
+        <div className="rounded-2xl border border-error/20 bg-error/10 p-4 text-error text-sm">
+          {error}
+        </div>
+      )}
 
       <FilterBar>
         <InputGroup label="Search" className="md:col-span-5">
@@ -493,35 +541,76 @@ export default function ProductsPage() {
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-outline-variant/30 border-t-primary"></div>
         </div>
       ) : products.length === 0 ? (
-        <EmptyState title="No products found" description="Adjust filters or create a product to start the catalog." />
+        <EmptyState
+          title="No products found"
+          description="Adjust filters or create a product to start the catalog."
+        />
       ) : (
         <div className="overflow-x-auto rounded-[1.5rem] border border-outline-variant/15 bg-surface-container-lowest">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-outline-variant/15 bg-surface-container-low">
-                <th className="px-4 py-3 text-left font-semibold text-on-surface">SKU</th>
-                <th className="px-4 py-3 text-left font-semibold text-on-surface">Name</th>
-                <th className="px-4 py-3 text-center font-semibold text-on-surface">Stock</th>
-                <th className="px-4 py-3 text-left font-semibold text-on-surface">Price</th>
-                <th className="px-4 py-3 text-left font-semibold text-on-surface">Category</th>
-                <th className="px-4 py-3 text-left font-semibold text-on-surface">Brand</th>
-                <th className="px-4 py-3 text-right font-semibold text-on-surface">Actions</th>
+                <th className="px-4 py-3 text-left font-semibold text-on-surface">
+                  SKU
+                </th>
+                <th className="px-4 py-3 text-left font-semibold text-on-surface">
+                  Name
+                </th>
+                <th className="px-4 py-3 text-center font-semibold text-on-surface">
+                  Stock
+                </th>
+                <th className="px-4 py-3 text-left font-semibold text-on-surface">
+                  Price
+                </th>
+                <th className="px-4 py-3 text-left font-semibold text-on-surface">
+                  Category
+                </th>
+                <th className="px-4 py-3 text-left font-semibold text-on-surface">
+                  Brand
+                </th>
+                <th className="px-4 py-3 text-left font-semibold text-on-surface">
+                  universal
+                </th>
+                <th className="px-4 py-3 text-left font-semibold text-on-surface">
+                  discount
+                </th>
+                <th className="px-4 py-3 text-right font-semibold text-on-surface">
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody>
               {products.map((product) => (
-                <tr key={product.id} className="border-b border-outline-variant/10 hover:bg-surface-container-low">
-                  <td className="px-4 py-3 text-on-surface font-mono text-xs">{product.sku}</td>
+                <tr
+                  key={product.id}
+                  className="border-b border-outline-variant/10 hover:bg-surface-container-low"
+                >
+                  <td className="px-4 py-3 text-on-surface font-mono text-xs">
+                    {product.sku}
+                  </td>
                   <td className="px-4 py-3 text-on-surface">{product.name}</td>
-                  <td className="px-4 py-3 text-center">{getStockBadge(product)}</td>
+                  <td className="px-4 py-3 text-center">
+                    {getStockBadge(product)}
+                  </td>
                   <td className="px-4 py-3 text-on-surface">
                     {product.sale_price} {product.currency_pricing}
                   </td>
                   <td className="px-4 py-3 text-on-surface-variant text-xs">
-                    {categories.find((c) => c.id === product.products_category_id)?.name}
+                    {
+                      categories.find(
+                        (c) => c.id === product.products_category_id,
+                      )?.name
+                    }
                   </td>
                   <td className="px-4 py-3 text-on-surface-variant text-xs">
                     {brands.find((b) => b.id === product.brand_id)?.name}
+                  </td>
+                  <td className="px-4 py-3 text-on-surface-variant text-xs">
+                    {product.universal ? "Yes" : "No"}
+                  </td>
+                  <td className="px-4 py-3 text-on-surface-variant text-xs">
+                    {product.max_discount_value}{" "}
+                    {product.max_discount_type ? product.currency_pricing : "%"}
                   </td>
                   <td className="px-4 py-3 text-right">
                     <button
@@ -565,23 +654,37 @@ export default function ProductsPage() {
       </div>
 
       {categories.length === 0 ? (
-        <EmptyState title="No categories found" description="Create a category to structure the product catalog." />
+        <EmptyState
+          title="No categories found"
+          description="Create a category to structure the product catalog."
+        />
       ) : (
         <div className="overflow-x-auto rounded-[1.5rem] border border-outline-variant/15 bg-surface-container-lowest">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-outline-variant/15 bg-surface-container-low">
-                <th className="px-4 py-3 text-left font-semibold text-on-surface">Name</th>
-                <th className="px-4 py-3 text-left font-semibold text-on-surface">Created</th>
-                <th className="px-4 py-3 text-right font-semibold text-on-surface">Actions</th>
+                <th className="px-4 py-3 text-left font-semibold text-on-surface">
+                  Name
+                </th>
+                <th className="px-4 py-3 text-left font-semibold text-on-surface">
+                  Created
+                </th>
+                <th className="px-4 py-3 text-right font-semibold text-on-surface">
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody>
               {categories.map((cat) => (
-                <tr key={cat.id} className="border-b border-outline-variant/10 hover:bg-surface-container-low">
+                <tr
+                  key={cat.id}
+                  className="border-b border-outline-variant/10 hover:bg-surface-container-low"
+                >
                   <td className="px-4 py-3 text-on-surface">{cat.name}</td>
                   <td className="px-4 py-3 text-on-surface-variant text-xs">
-                    {cat.created_at ? new Date(cat.created_at).toLocaleDateString() : "-"}
+                    {cat.created_at
+                      ? new Date(cat.created_at).toLocaleDateString()
+                      : "-"}
                   </td>
                   <td className="px-4 py-3 text-right">
                     <button
@@ -617,8 +720,16 @@ export default function ProductsPage() {
 
       <TabsWrapper
         tabs={[
-          { id: "products", label: "All Products", content: productsTabContent },
-          { id: "categories", label: "Categories", content: categoriesTabContent },
+          {
+            id: "products",
+            label: "All Products",
+            content: productsTabContent,
+          },
+          {
+            id: "categories",
+            label: "Categories",
+            content: categoriesTabContent,
+          },
         ]}
         defaultTabId="products"
       />

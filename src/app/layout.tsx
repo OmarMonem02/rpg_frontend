@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "RPG Hub",
-  description: "RPG Hub frontend",
+  description: "RPG Hub ERP System",
 };
 
 export default function RootLayout({
