@@ -891,6 +891,12 @@ export async function deleteMaintenanceService(token: string, id: number): Promi
   await authorizedFetch<void>(`/maintenance_services/${id}`, token, { method: "DELETE" });
 }
 
+export async function getMaintenanceService(token: string, id: number): Promise<MaintenanceServiceRecord> {
+  const data = await authorizedFetch<unknown>(`/maintenance_services/${id}`, token);
+  const record = asRecord(data);
+  return normalizeMaintenanceService(record.data ?? record.maintenance_service ?? record);
+}
+
 // ============================================================================
 // BIKE BLUEPRINTS
 // ============================================================================

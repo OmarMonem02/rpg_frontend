@@ -11,18 +11,16 @@ import {
   PageShell,
   PaginationControls,
 } from "@/components/ops-ui";
+import Link from "next/link";
 import { TabsWrapper } from "@/components/tabs-wrapper";
 import { getAuthToken } from "@/lib/auth-session";
 import {
-  createMaintenanceService,
   createMaintenanceServiceSector,
   deleteMaintenanceService,
   deleteMaintenanceServiceSector,
   listMaintenanceServices,
   listMaintenanceServiceSectors,
-  updateMaintenanceService,
   updateMaintenanceServiceSector,
-  type CreateMaintenanceServicePayload,
   type CreateMaintenanceServiceSectorPayload,
   type MaintenanceServiceRecord,
   type MaintenanceServiceSectorRecord,
@@ -39,9 +37,7 @@ export default function MaintenanceServicesPage() {
   const [sectorsLoading, setSectorsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [serviceModalOpen, setServiceModalOpen] = useState(false);
   const [sectorModalOpen, setSectorModalOpen] = useState(false);
-  const [editingService, setEditingService] = useState<MaintenanceServiceRecord | null>(null);
   const [editingSector, setEditingSector] = useState<MaintenanceServiceSectorRecord | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -99,46 +95,6 @@ export default function MaintenanceServicesPage() {
     }
   }, [sectors, sectorFilter]);
 
-  const handleOpenServiceModal = (service?: MaintenanceServiceRecord) => {
-    setEditingService(service || null);
-    setSubmitError(null);
-    setServiceModalOpen(true);
-  };
-
-  const handleCloseServiceModal = () => {
-    setServiceModalOpen(false);
-    setEditingService(null);
-  };
-
-  const handleSubmitService = async (formData: Record<string, unknown>) => {
-    try {
-      setIsSubmitting(true);
-      const token = getAuthToken();
-      if (!token) throw new Error("Authentication required");
-
-      const payload: CreateMaintenanceServicePayload = {
-        name: String(formData.name),
-        currency_pricing: String(formData.currency_pricing) as "EGP" | "USD",
-        service_price: Number(formData.service_price),
-        max_discount_type: String(formData.max_discount_type) as "fixed" | "percentage",
-        max_discount_value: Number(formData.max_discount_value),
-        maintenance_service_sector_id: Number(formData.maintenance_service_sector_id),
-      };
-
-      if (editingService) {
-        await updateMaintenanceService(token, editingService.id, payload);
-      } else {
-        await createMaintenanceService(token, payload);
-      }
-
-      await loadServices();
-      handleCloseServiceModal();
-    } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : "Failed to save maintenance service");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
 
   const handleDeleteService = async (id: number) => {
     if (!confirm("Are you sure you want to delete this maintenance service?")) return;
@@ -207,86 +163,6 @@ export default function MaintenanceServicesPage() {
     return sectors.find((sector) => sector.id === sectorFilter)?.name ?? "Selected Sector";
   }, [sectors, sectorFilter]);
 
-  const serviceModalFields: FieldConfig[] = [
-    {
-      name: "name",
-      label: "Service Name",
-      type: "text",
-      required: true,
-      section: "Basic Info",
-      sectionDescription: "Set up the maintenance service identity your team will manage and sell.",
-      description: "Use the service name customers and staff will recognize immediately.",
-      placeholder: "Enter service name",
-      value: editingService?.name,
-      helperTone: "featured",
-    },
-    {
-      name: "maintenance_service_sector_id",
-      label: "Sector",
-      type: "select",
-      required: true,
-      section: "Basic Info",
-      description: "Choose the sector tab this service should appear under.",
-      options: sectors.map((sector) => ({ value: sector.id, label: sector.name })),
-      value: editingService?.maintenance_service_sector_id,
-      disabled: sectorsLoading || sectors.length === 0,
-    },
-    {
-      name: "service_price",
-      label: "Service Price",
-      type: "number",
-      required: true,
-      section: "Pricing",
-      sectionDescription: "Control the default service value and discount rules used by the operations team.",
-      description: "Set the standard service price before any discount is applied.",
-      placeholder: "0.00",
-      value: editingService?.service_price ?? 0,
-      min: 0,
-      step: "0.01",
-      helperTone: "featured",
-      summaryValue: ({ value, formData }) =>
-        value !== "" && value !== undefined ? `${String(value)} ${String(formData.currency_pricing ?? "EGP")}` : undefined,
-    },
-    {
-      name: "currency_pricing",
-      label: "Currency",
-      type: "select",
-      required: true,
-      section: "Pricing",
-      description: "Choose the currency shown anywhere this service price is displayed.",
-      options: [
-        { value: "EGP", label: "Egyptian Pound (EGP)" },
-        { value: "USD", label: "US Dollar (USD)" },
-      ],
-      value: editingService?.currency_pricing ?? "EGP",
-    },
-    {
-      name: "max_discount_type",
-      label: "Discount Type",
-      type: "select",
-      required: true,
-      section: "Discount",
-      sectionDescription: "Limit how much discount can be applied to this service during sale or approval.",
-      description: "Choose whether the maximum discount is fixed or percentage-based.",
-      options: [
-        { value: "percentage", label: "Percentage (%)" },
-        { value: "fixed", label: "Fixed Amount" },
-      ],
-      value: editingService?.max_discount_type ?? "percentage",
-    },
-    {
-      name: "max_discount_value",
-      label: "Max Discount Value",
-      type: "number",
-      required: true,
-      section: "Discount",
-      description: "Set the highest discount value allowed for this service.",
-      placeholder: "0",
-      value: editingService?.max_discount_value ?? 0,
-      min: 0,
-      step: "0.01",
-    },
-  ];
 
   const sectorModalFields: FieldConfig[] = [
     {
@@ -311,9 +187,9 @@ export default function MaintenanceServicesPage() {
             Filter services by sector tabs and manage pricing rules from one place.
           </p>
         </div>
-        <ActionButton tone="primary" onClick={() => handleOpenServiceModal()}>
-          Add Service
-        </ActionButton>
+        <Link href="/inventory/maintenance-services/create">
+          <ActionButton tone="primary">Add Service</ActionButton>
+        </Link>
       </div>
 
       {error && <div className="rounded-2xl border border-error/20 bg-error/10 p-4 text-sm text-error">{error}</div>}
@@ -413,12 +289,12 @@ export default function MaintenanceServicesPage() {
                     {service.created_at ? new Date(service.created_at).toLocaleDateString() : "-"}
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <button
-                      onClick={() => handleOpenServiceModal(service)}
+                    <Link
+                      href={`/inventory/maintenance-services/edit/${service.id}`}
                       className="text-xs font-medium text-primary hover:underline"
                     >
                       Edit
-                    </button>
+                    </Link>
                     <span className="mx-2 text-on-surface-variant">•</span>
                     <button
                       onClick={() => handleDeleteService(service.id)}
@@ -516,22 +392,6 @@ export default function MaintenanceServicesPage() {
         defaultTabId="services"
       />
 
-      <EntityFormModal
-        title={editingService ? "Edit Maintenance Service" : "Create Maintenance Service"}
-        description={
-          editingService
-            ? "Update the service name, sector assignment, and pricing rules from one guided flow."
-            : "Create a maintenance service with clean pricing and discount settings that match the existing inventory experience."
-        }
-        fields={serviceModalFields}
-        isOpen={serviceModalOpen}
-        isLoading={isSubmitting}
-        error={submitError || undefined}
-        onClose={handleCloseServiceModal}
-        onSubmit={handleSubmitService}
-        submitLabel={editingService ? "Save Service" : "Create Service"}
-        heroLabel="Maintenance Services"
-      />
 
       <EntityFormModal
         title={editingSector ? "Edit Service Sector" : "Create Service Sector"}
