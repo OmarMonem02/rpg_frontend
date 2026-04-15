@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { EntityFormModal, type FieldConfig } from "@/components/entity-form-modal";
+import { useEntityFilters } from "@/hooks/useEntityFilters";
 import {
   ActionButton,
   EmptyState,
@@ -13,6 +14,7 @@ import {
 } from "@/components/ops-ui";
 import Link from "next/link";
 import { TabsWrapper } from "@/components/tabs-wrapper";
+import { AdvancedFilters } from "@/components/advanced-filters";
 import { getAuthToken } from "@/lib/auth-session";
 import {
   createMaintenanceServiceSector,
@@ -31,19 +33,18 @@ type SectorFilter = "all" | number;
 export default function MaintenanceServicesPage() {
   const [services, setServices] = useState<MaintenanceServiceRecord[]>([]);
   const [sectors, setSectors] = useState<MaintenanceServiceSectorRecord[]>([]);
-  const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [sectorsLoading, setSectorsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Use custom filter hook
+  const { filters, page, setPage, getCleanFilters, setSearch, setSector, setPriceMin, setPriceMax, setCurrency, logFilters } = useEntityFilters();
+
   const [sectorModalOpen, setSectorModalOpen] = useState(false);
   const [editingSector, setEditingSector] = useState<MaintenanceServiceSectorRecord | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const [searchFilter, setSearchFilter] = useState("");
-  const [sectorFilter, setSectorFilter] = useState<SectorFilter>("all");
 
   const loadServices = useCallback(async () => {
     try {
@@ -51,10 +52,11 @@ export default function MaintenanceServicesPage() {
       const token = getAuthToken();
       if (!token) throw new Error("Authentication required");
 
-      const result = await listMaintenanceServices(token, page, {
-        search: searchFilter || undefined,
-        maintenance_service_sector_id: sectorFilter === "all" ? undefined : sectorFilter,
-      });
+      console.log("[MaintenanceServices] Applying filters:", filters, "Page:", page);
+      logFilters();
+
+      const cleanFilters = getCleanFilters();
+      const result = await listMaintenanceServices(token, page, cleanFilters as any);
       setServices(result.items);
       setTotalPages(result.lastPage);
       setError(null);
@@ -63,7 +65,7 @@ export default function MaintenanceServicesPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, searchFilter, sectorFilter]);
+  }, [page, filters, logFilters]);
 
   const loadSectors = useCallback(async () => {
     try {
@@ -88,12 +90,12 @@ export default function MaintenanceServicesPage() {
   }, [loadServices]);
 
   useEffect(() => {
-    if (sectorFilter === "all") return;
-    const exists = sectors.some((sector) => sector.id === sectorFilter);
+    if (!filters.sector_id) return;
+    const exists = sectors.some((sector) => sector.id === filters.sector_id);
     if (!exists) {
-      setSectorFilter("all");
+      setSector("");
     }
-  }, [sectors, sectorFilter]);
+  }, [sectors, filters.sector_id, setSector]);
 
 
   const handleDeleteService = async (id: number) => {
@@ -158,12 +160,6 @@ export default function MaintenanceServicesPage() {
     }
   };
 
-  const activeSectorName = useMemo(() => {
-    if (sectorFilter === "all") return "All Sectors";
-    return sectors.find((sector) => sector.id === sectorFilter)?.name ?? "Selected Sector";
-  }, [sectors, sectorFilter]);
-
-
   const sectorModalFields: FieldConfig[] = [
     {
       name: "name",
@@ -199,11 +195,10 @@ export default function MaintenanceServicesPage() {
           <button
             type="button"
             onClick={() => {
-              setSectorFilter("all");
-              setPage(1);
+              setSector("");
             }}
             className={`rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors ${
-              sectorFilter === "all"
+              !filters.sector_id
                 ? "bg-primary text-on-primary"
                 : "bg-surface text-on-surface-variant hover:bg-surface-container hover:text-on-surface"
             }`}
@@ -215,11 +210,10 @@ export default function MaintenanceServicesPage() {
               key={sector.id}
               type="button"
               onClick={() => {
-                setSectorFilter(sector.id);
-                setPage(1);
+                setSector(sector.id);
               }}
               className={`rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors ${
-                sectorFilter === sector.id
+                filters.sector_id === sector.id
                   ? "bg-primary text-on-primary"
                   : "bg-surface text-on-surface-variant hover:bg-surface-container hover:text-on-surface"
               }`}
@@ -235,20 +229,37 @@ export default function MaintenanceServicesPage() {
           <input
             type="text"
             placeholder="Search by service name..."
-            value={searchFilter}
-            onChange={(e) => {
-              setSearchFilter(e.target.value);
-              setPage(1);
-            }}
+            value={filters.search || ""}
+            onChange={(e) => setSearch(e.target.value)}
             className="form-input-base"
           />
         </InputGroup>
-        <InputGroup label="Active Sector" className="md:col-span-4">
-          <div className="form-input-base flex items-center bg-surface-container-low text-sm text-on-surface">
-            {activeSectorName}
-          </div>
+        <InputGroup label="Sector" className="md:col-span-4">
+          <select
+            value={filters.sector_id || ""}
+            onChange={(e) => setSector(e.target.value ? parseInt(e.target.value) : "")}
+            className="form-input-base"
+          >
+            <option value="">All Sectors</option>
+            {sectors.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
         </InputGroup>
       </FilterBar>
+
+      <AdvancedFilters
+        priceMin={filters.price_min}
+        setPriceMin={setPriceMin}
+        priceMax={filters.price_max}
+        setPriceMax={setPriceMax}
+        currency={filters.currency || "all"}
+        setCurrency={setCurrency}
+        showPriceFilters={true}
+        showCurrencyFilter={true}
+      />
 
       {loading ? (
         <div className="flex justify-center py-12">

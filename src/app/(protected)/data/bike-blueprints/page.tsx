@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { getAuthToken } from "@/lib/auth-session";
+import { useEntityFilters } from "@/hooks/useEntityFilters";
 import {
   listBikeBlueprints,
   listBrands,
@@ -10,6 +11,7 @@ import {
   type BikeBlueprintRecord,
   type BrandRecord,
 } from "@/lib/crud-api";
+import { AdvancedFilters } from "@/components/advanced-filters";
 import {
   ActionButton,
   EmptyState,
@@ -25,11 +27,12 @@ export default function BikeBlueprintsPage() {
   const router = useRouter();
   const [blueprints, setBlueprints] = useState<BikeBlueprintRecord[]>([]);
   const [brands, setBrands] = useState<BrandRecord[]>([]);
-  const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [searchFilter, setSearchFilter] = useState("");
+
+  // Use custom filter hook
+  const { filters, page, setPage, getCleanFilters, setSearch, setBrand, setPriceMin, setPriceMax, setCurrency, logFilters } = useEntityFilters();
 
   const loadBlueprints = useCallback(async () => {
     try {
@@ -37,7 +40,11 @@ export default function BikeBlueprintsPage() {
       const token = getAuthToken();
       if (!token) throw new Error("Authentication required");
 
-      const result = await listBikeBlueprints(token, page, searchFilter ? { search: searchFilter } : undefined);
+      console.log("[BikeBlueprintsPage] Applying filters:", filters, "Page:", page);
+      logFilters();
+
+      const cleanFilters = getCleanFilters();
+      const result = await listBikeBlueprints(token, page, cleanFilters as any);
       setBlueprints(result.items);
       setTotalPages(result.lastPage);
       setError(null);
@@ -46,7 +53,7 @@ export default function BikeBlueprintsPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, searchFilter]);
+  }, [page, filters, logFilters]);
 
   const loadBrands = async () => {
     try {
@@ -102,19 +109,41 @@ export default function BikeBlueprintsPage() {
 
       <SurfaceCard>
         <FilterBar className="md:grid-cols-12">
-          <InputGroup label="Search by model" className="md:col-span-12">
+          <InputGroup label="Search by model" className="md:col-span-6">
             <input
               type="text"
               placeholder="Search by model..."
-              value={searchFilter}
-              onChange={(e) => {
-                setSearchFilter(e.target.value);
-                setPage(1);
-              }}
+              value={filters.search || ""}
+              onChange={(e) => setSearch(e.target.value)}
               className="form-input-base"
             />
           </InputGroup>
+          <InputGroup label="Brand" className="md:col-span-6">
+            <select
+              value={filters.brand_id || ""}
+              onChange={(e) => setBrand(e.target.value ? parseInt(e.target.value) : "")}
+              className="form-input-base"
+            >
+              <option value="">All Brands</option>
+              {brands.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name}
+                </option>
+              ))}
+            </select>
+          </InputGroup>
         </FilterBar>
+
+        <AdvancedFilters
+          priceMin={filters.price_min}
+          setPriceMin={setPriceMin}
+          priceMax={filters.price_max}
+          setPriceMax={setPriceMax}
+          currency={filters.currency || "all"}
+          setCurrency={setCurrency}
+          showPriceFilters={true}
+          showCurrencyFilter={true}
+        />
 
         {loading ? (
           <div className="flex justify-center py-12">

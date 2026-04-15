@@ -286,9 +286,14 @@ export async function listBrands(
   token: string,
   page = 1,
   type?: "spare_parts" | "products" | "bikes",
+  filters?: {
+    currency?: string;
+  },
 ): Promise<PaginatedResult<BrandRecord>> {
   const query = new URLSearchParams({ page: String(page) });
   if (type) query.append("type", type);
+  if (filters?.currency !== undefined && filters.currency) query.append("currency", filters.currency);
+  console.log(`[API] listBrands - Query: ${query.toString()}`, filters);
   const payload = await authorizedFetch<unknown>(`/brands?${query}`, token);
   const rows = pickArray(payload, ["data", "brands"]);
   const meta = parsePagination(payload);
@@ -546,19 +551,20 @@ export async function listSpareParts(
     search?: string;
     category_id?: number;
     brand_id?: number;
-    in_stock?: boolean;
+    price_range?: string;
+    currency?: string;
     low_stock?: boolean;
-    universal?: boolean;
   },
 ): Promise<PaginatedResult<SparePartRecord>> {
   const query = new URLSearchParams({ page: String(page) });
-  if (filters?.search) query.append("search", filters.search);
-  if (filters?.category_id) query.append("category_id", String(filters.category_id));
-  if (filters?.brand_id) query.append("brand_id", String(filters.brand_id));
-  if (filters?.in_stock) query.append("in_stock", "true");
-  if (filters?.low_stock) query.append("low_stock", "true");
-  if (filters?.universal) query.append("universal", "true");
+  if (filters?.search !== undefined && filters.search) query.append("search", filters.search);
+  if (filters?.category_id !== undefined && filters.category_id) query.append("category_id", String(filters.category_id));
+  if (filters?.brand_id !== undefined && filters.brand_id) query.append("brand_id", String(filters.brand_id));
+  if (filters?.price_range !== undefined && filters.price_range) query.append("price_range", filters.price_range);
+  if (filters?.currency !== undefined && filters.currency) query.append("currency", filters.currency);
+  if (filters?.low_stock === true) query.append("low_stock", "true");
 
+  console.log(`[API] listSpareParts - Query: ${query.toString()}`, filters);
   const payload = await authorizedFetch<unknown>(`/spare_parts?${query}`, token);
   const rows = pickArray(payload, ["data", "spare_parts"]);
   const meta = parsePagination(payload);
@@ -671,19 +677,20 @@ export async function listProducts(
     search?: string;
     category_id?: number;
     brand_id?: number;
-    in_stock?: boolean;
+    price_range?: string;
+    currency?: string;
     low_stock?: boolean;
-    universal?: boolean;
   },
 ): Promise<PaginatedResult<ProductRecord>> {
   const query = new URLSearchParams({ page: String(page) });
-  if (filters?.search) query.append("search", filters.search);
-  if (filters?.category_id) query.append("category_id", String(filters.category_id));
-  if (filters?.brand_id) query.append("brand_id", String(filters.brand_id));
-  if (filters?.in_stock) query.append("in_stock", "true");
-  if (filters?.low_stock) query.append("low_stock", "true");
-  if (filters?.universal) query.append("universal", "true");
+  if (filters?.search !== undefined && filters.search) query.append("search", filters.search);
+  if (filters?.category_id !== undefined && filters.category_id) query.append("category_id", String(filters.category_id));
+  if (filters?.brand_id !== undefined && filters.brand_id) query.append("brand_id", String(filters.brand_id));
+  if (filters?.price_range !== undefined && filters.price_range) query.append("price_range", filters.price_range);
+  if (filters?.currency !== undefined && filters.currency) query.append("currency", filters.currency);
+  if (filters?.low_stock === true) query.append("low_stock", "true");
 
+  console.log(`[API] listProducts - Query: ${query.toString()}`, filters);
   const payload = await authorizedFetch<unknown>(`/products?${query}`, token);
   const rows = pickArray(payload, ["data", "products"]);
   const meta = parsePagination(payload);
@@ -841,15 +848,20 @@ export async function listMaintenanceServices(
   page = 1,
   filters?: {
     search?: string;
-    maintenance_service_sector_id?: number;
+    sector_id?: number;
+    price_range?: string;
+    currency?: string;
   },
 ): Promise<PaginatedResult<MaintenanceServiceRecord>> {
   const query = new URLSearchParams({ page: String(page) });
-  if (filters?.search) query.append("search", filters.search);
-  if (filters?.maintenance_service_sector_id) {
-    query.append("maintenance_service_sector_id", String(filters.maintenance_service_sector_id));
+  if (filters?.search !== undefined && filters.search) query.append("search", filters.search);
+  if (filters?.sector_id !== undefined && filters.sector_id) {
+    query.append("sector_id", String(filters.sector_id));
   }
+  if (filters?.price_range !== undefined && filters.price_range) query.append("price_range", filters.price_range);
+  if (filters?.currency !== undefined && filters.currency) query.append("currency", filters.currency);
 
+  console.log(`[API] listMaintenanceServices - Query: ${query.toString()}`, filters);
   const payload = await authorizedFetch<unknown>(`/maintenance_services?${query}`, token);
   const rows = pickArray(payload, ["data", "maintenance_services"]);
   const meta = parsePagination(payload);
@@ -991,12 +1003,17 @@ export async function listBikeBlueprints(
   filters?: {
     search?: string;
     brand_id?: number;
+    price_range?: string;
+    currency?: string;
   },
 ): Promise<PaginatedResult<BikeBlueprintRecord>> {
   const query = new URLSearchParams({ page: String(page) });
-  if (filters?.search) query.append("search", filters.search);
-  if (filters?.brand_id) query.append("brand_id", String(filters.brand_id));
+  if (filters?.search !== undefined && filters.search) query.append("search", filters.search);
+  if (filters?.brand_id !== undefined && filters.brand_id) query.append("brand_id", String(filters.brand_id));
+  if (filters?.price_range !== undefined && filters.price_range) query.append("price_range", filters.price_range);
+  if (filters?.currency !== undefined && filters.currency) query.append("currency", filters.currency);
 
+  console.log(`[API] listBikeBlueprints - Query: ${query.toString()}`, filters);
   const payload = await authorizedFetch<unknown>(`/bike_blueprints?${query}`, token);
   const rows = pickArray(payload, ["data", "bike_blueprints"]);
   const meta = parsePagination(payload);
@@ -1166,15 +1183,20 @@ export async function listBikes(
   page = 1,
   filters?: {
     search?: string;
-    bike_blueprint_id?: number;
+    blueprint_id?: number;
     status?: string;
+    price_range?: string;
+    currency?: string;
   },
 ): Promise<PaginatedResult<BikeRecord>> {
   const query = new URLSearchParams({ page: String(page) });
-  if (filters?.search) query.append("search", filters.search);
-  if (filters?.bike_blueprint_id) query.append("bike_blueprint_id", String(filters.bike_blueprint_id));
-  if (filters?.status) query.append("status", filters.status);
+  if (filters?.search !== undefined && filters.search) query.append("search", filters.search);
+  if (filters?.blueprint_id !== undefined && filters.blueprint_id) query.append("blueprint_id", String(filters.blueprint_id));
+  if (filters?.status !== undefined && filters.status) query.append("status", filters.status);
+  if (filters?.price_range !== undefined && filters.price_range) query.append("price_range", filters.price_range);
+  if (filters?.currency !== undefined && filters.currency) query.append("currency", filters.currency);
 
+  console.log(`[API] listBikes - Query: ${query.toString()}`, filters);
   const payload = await authorizedFetch<unknown>(`/bike_for_sale?${query}`, token);
   const rows = pickArray(payload, ["data", "bike_for_sale"]);
   const meta = parsePagination(payload);

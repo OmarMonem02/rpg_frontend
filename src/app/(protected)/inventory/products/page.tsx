@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { getAuthToken } from "@/lib/auth-session";
+import { useEntityFilters } from "@/hooks/useEntityFilters";
 import {
   listProducts,
   listProductCategories,
@@ -19,6 +20,7 @@ import {
   EntityFormModal,
   type FieldConfig,
 } from "@/components/entity-form-modal";
+import { AdvancedFilters } from "@/components/advanced-filters";
 import {
   ActionButton,
   EmptyState,
@@ -36,15 +38,12 @@ export default function ProductsPage() {
   const [products, setProducts] = useState<ProductRecord[]>([]);
   const [categories, setCategories] = useState<ProductCategoryRecord[]>([]);
   const [brands, setBrands] = useState<BrandRecord[]>([]);
-  const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Filters
-  const [searchFilter, setSearchFilter] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState<number | "">("");
-  const [brandFilter, setBrandFilter] = useState<number | "">("");
+  // Use custom filter hook
+  const { filters, page, setPage, getCleanFilters, setSearch, setCategory, setBrand, setPriceMin, setPriceMax, setCurrency, logFilters } = useEntityFilters();
 
   // Category Modal State
   const [categoryModalOpen, setCategoryModalOpen] = useState(false);
@@ -59,12 +58,14 @@ export default function ProductsPage() {
       const token = getAuthToken();
       if (!token) throw new Error("Authentication required");
 
+      // Log filters for debugging
+      console.log("[Products] Applying filters:", filters, "Page:", page);
+      logFilters();
+
+      const cleanFilters = getCleanFilters();
+
       const [productsRes, catsRes, brandsRes] = await Promise.all([
-        listProducts(token, page, {
-          search: searchFilter || undefined,
-          category_id: categoryFilter || undefined,
-          brand_id: brandFilter || undefined,
-        }),
+        listProducts(token, page, cleanFilters as any),
         listProductCategories(token, 1),
         listBrands(token, 1, "products"),
       ]);
@@ -79,7 +80,7 @@ export default function ProductsPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, searchFilter, categoryFilter, brandFilter]);
+  }, [page, filters, logFilters]);
 
   useEffect(() => {
     loadData();
@@ -186,21 +187,15 @@ export default function ProductsPage() {
           <input
             type="text"
             placeholder="Search by name or SKU..."
-            value={searchFilter}
-            onChange={(e) => {
-              setSearchFilter(e.target.value);
-              setPage(1);
-            }}
+            value={filters.search || ""}
+            onChange={(e) => setSearch(e.target.value)}
             className="form-input-base"
           />
         </InputGroup>
         <InputGroup label="Category" className="md:col-span-4">
           <select
-            value={categoryFilter}
-            onChange={(e) => {
-              setCategoryFilter(e.target.value ? parseInt(e.target.value) : "");
-              setPage(1);
-            }}
+            value={filters.category_id || ""}
+            onChange={(e) => setCategory(e.target.value ? parseInt(e.target.value) : "")}
             className="form-input-base"
           >
             <option value="">All Categories</option>
@@ -213,11 +208,8 @@ export default function ProductsPage() {
         </InputGroup>
         <InputGroup label="Brand" className="md:col-span-4">
           <select
-            value={brandFilter}
-            onChange={(e) => {
-              setBrandFilter(e.target.value ? parseInt(e.target.value) : "");
-              setPage(1);
-            }}
+            value={filters.brand_id || ""}
+            onChange={(e) => setBrand(e.target.value ? parseInt(e.target.value) : "")}
             className="form-input-base"
           >
             <option value="">All Brands</option>
@@ -229,6 +221,17 @@ export default function ProductsPage() {
           </select>
         </InputGroup>
       </FilterBar>
+
+      <AdvancedFilters
+        priceMin={filters.price_min}
+        setPriceMin={setPriceMin}
+        priceMax={filters.price_max}
+        setPriceMax={setPriceMax}
+        currency={filters.currency || "all"}
+        setCurrency={setCurrency}
+        showPriceFilters={true}
+        showCurrencyFilter={true}
+      />
 
       {loading ? (
         <div className="flex justify-center py-12">

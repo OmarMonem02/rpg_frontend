@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { getAuthToken } from "@/lib/auth-session";
+import { useEntityFilters } from "@/hooks/useEntityFilters";
 import {
   listBikes,
   listBikeBlueprints,
@@ -13,6 +14,7 @@ import {
   type CreateBikePayload,
   type BikeBlueprintRecord,
 } from "@/lib/crud-api";
+import { AdvancedFilters } from "@/components/advanced-filters";
 import {
   ActionButton,
   EmptyState,
@@ -36,23 +38,24 @@ export default function BikesPage() {
   const router = useRouter();
   const [bikes, setBikes] = useState<BikeRecord[]>([]);
   const [blueprints, setBlueprints] = useState<BikeBlueprintRecord[]>([]);
-  const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [searchFilter, setSearchFilter] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("");
 
-  const loadBikes = async () => {
+  // Use custom filter hook
+  const { filters, page, setPage, getCleanFilters, setSearch, setStatus, setBlueprint, setPriceMin, setPriceMax, setCurrency, logFilters } = useEntityFilters();
+
+  const loadBikes = useCallback(async () => {
     try {
       setLoading(true);
       const token = getAuthToken();
       if (!token) throw new Error("Authentication required");
 
-      const result = await listBikes(token, page, {
-        search: searchFilter || undefined,
-        status: statusFilter || undefined,
-      });
+      console.log("[Bikes] Applying filters:", filters, "Page:", page);
+      logFilters();
+
+      const cleanFilters = getCleanFilters();
+      const result = await listBikes(token, page, cleanFilters as any);
       setBikes(result.items);
       setTotalPages(result.lastPage);
       setError(null);
@@ -61,7 +64,7 @@ export default function BikesPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, filters, getCleanFilters, logFilters]);
 
   const loadBlueprints = async () => {
     try {
@@ -80,7 +83,7 @@ export default function BikesPage() {
 
   useEffect(() => {
     loadBikes();
-  }, [page, searchFilter, statusFilter]);
+  }, [loadBikes]);
 
   const handleDelete = async (id: number) => {
     if (!confirm("Are you sure you want to delete this bike?")) return;
@@ -135,25 +138,33 @@ export default function BikesPage() {
 
       <SurfaceCard>
         <FilterBar>
-          <InputGroup label="Search" className="md:col-span-7">
+          <InputGroup label="Search" className="md:col-span-4">
             <input
               type="text"
               placeholder="Search by model or VIN..."
-              value={searchFilter}
-              onChange={(e) => {
-                setSearchFilter(e.target.value);
-                setPage(1);
-              }}
+              value={filters.search || ""}
+              onChange={(e) => setSearch(e.target.value)}
               className="form-input-base"
             />
           </InputGroup>
-          <InputGroup label="Status" className="md:col-span-5">
+          <InputGroup label="Blueprint" className="md:col-span-4">
             <select
-              value={statusFilter}
-              onChange={(e) => {
-                setStatusFilter(e.target.value);
-                setPage(1);
-              }}
+              value={filters.blueprint_id || ""}
+              onChange={(e) => setBlueprint(e.target.value ? parseInt(e.target.value) : "")}
+              className="form-input-base"
+            >
+              <option value="">All Blueprints</option>
+              {blueprints.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.model} {b.year}
+                </option>
+              ))}
+            </select>
+          </InputGroup>
+          <InputGroup label="Status" className="md:col-span-4">
+            <select
+              value={filters.status || ""}
+              onChange={(e) => setStatus(e.target.value)}
               className="form-input-base"
             >
               <option value="">All Statuses</option>
@@ -165,6 +176,17 @@ export default function BikesPage() {
             </select>
           </InputGroup>
         </FilterBar>
+
+        <AdvancedFilters
+          priceMin={filters.price_min}
+          setPriceMin={setPriceMin}
+          priceMax={filters.price_max}
+          setPriceMax={setPriceMax}
+          currency={filters.currency_pricing || "all"}
+          setCurrency={setCurrency}
+          showPriceFilters={true}
+          showCurrencyFilter={true}
+        />
 
         {loading ? (
           <div className="flex justify-center py-12">
