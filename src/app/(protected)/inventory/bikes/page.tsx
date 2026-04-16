@@ -182,7 +182,7 @@ export default function BikesPage() {
           setPriceMin={setPriceMin}
           priceMax={filters.price_max}
           setPriceMax={setPriceMax}
-          currency={filters.currency_pricing || "all"}
+          currency={filters.currency || "all"}
           setCurrency={setCurrency}
           showPriceFilters={true}
           showCurrencyFilter={true}

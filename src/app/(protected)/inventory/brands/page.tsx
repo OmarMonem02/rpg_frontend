@@ -37,7 +37,7 @@ export default function BrandsPage() {
   const [typeFilter, setTypeFilter] = useState<"" | "spare_parts" | "products" | "bikes">("");
 
   // Use custom filter hook
-  const { page, setPage, getCleanFilters, setCurrency, filters, logFilters } = useEntityFilters();
+  const { page, setPage, getCleanFilters, setCurrency, setPriceMin, setPriceMax, filters, logFilters } = useEntityFilters();
 
   const loadBrands = async () => {
     try {
@@ -172,7 +172,11 @@ export default function BrandsPage() {
         </FilterBar>
 
         <AdvancedFilters
-        currency={filters.currency || "all"}
+          priceMin={filters.price_min}
+          setPriceMin={setPriceMin}
+          priceMax={filters.price_max}
+          setPriceMax={setPriceMax}
+          currency={filters.currency || "all"}
           setCurrency={setCurrency}
           showPriceFilters={false}
           showCurrencyFilter={true}

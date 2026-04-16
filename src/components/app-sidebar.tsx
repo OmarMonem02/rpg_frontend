@@ -327,13 +327,13 @@ const defaultNavSections: SidebarNavSection[] = [
     title: "Sales",
     items: [
       {
-        href: "/Sales/",
-        label: "Transactions",
+        href: "/inventory/sales",
+        label: "All Sales",
         icon: <TransactionsIcon className="h-5 w-5" />,
       },
       {
-        href: "/Sales/",
-        label: "Create New",
+        href: "/inventory/sales/create",
+        label: "Create Sale",
         icon: <CreateIcon className="h-5 w-5" />,
       },
     ],
