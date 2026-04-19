@@ -1228,7 +1228,6 @@ export async function deleteBikeBlueprint(
   });
 }
 
-
 // ============================================================================
 // PAYMENT METHODS
 // ============================================================================
@@ -1486,6 +1485,56 @@ export async function assignSparePartToBikeBlueprint(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     },
+  );
+}
+
+export async function removeSparePartFromBikeBlueprint(
+  token: string,
+  blueprintId: number,
+  sparePartId: number,
+): Promise<void> {
+  await authorizedFetch<void>(
+    `/bike_blueprints/${blueprintId}/spare_parts/${sparePartId}`,
+    token,
+    { method: "DELETE" },
+  );
+}
+
+export async function getSparePartBlueprints(
+  token: string,
+  sparePartId: number,
+): Promise<number[]> {
+  const payload = await authorizedFetch<unknown>(
+    `/spare_parts/${sparePartId}/blueprints`,
+    token,
+  );
+  const rows = pickArray(payload, ["data", "blueprints"]);
+  return rows
+    .map((item: any) => toNumber(asRecord(item).id))
+    .filter((id) => id > 0);
+}
+
+export async function assignBlueprintsToSparePart(
+  token: string,
+  sparePartId: number,
+  blueprintIds: number[],
+): Promise<void> {
+  await authorizedFetch<void>(`/spare_parts/${sparePartId}/blueprints`, token, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ bike_blueprint_ids: blueprintIds }),
+  });
+}
+
+export async function removeBlueprintFromSparePart(
+  token: string,
+  sparePartId: number,
+  blueprintId: number,
+): Promise<void> {
+  await authorizedFetch<void>(
+    `/spare_parts/${sparePartId}/blueprints/${blueprintId}`,
+    token,
+    { method: "DELETE" },
   );
 }
 
