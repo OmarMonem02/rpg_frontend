@@ -7,6 +7,8 @@ import {
   BikeRecord,
   MaintenanceServiceRecord,
 } from "@/lib/crud-api";
+import { ActionButton, EmptyState } from "@/components/ops-ui";
+import { TrashIcon, PencilSquareIcon, CheckIcon, XMarkIcon } from "@heroicons/react/24/outline";
 
 export type SaleLineItem = {
   id?: string; // temp ID for unsaved items
@@ -97,199 +99,229 @@ export function CartLineItemsPanel({
   const total = subtotal + shippingFee - saleDiscount;
 
   return (
-    <div className="flex-1 border border-outline-variant/15 rounded-2xl bg-surface-container-lowest overflow-hidden flex flex-col">
+    <div className="flex h-full flex-col overflow-hidden rounded-[1.5rem] border border-outline-variant/20 bg-surface shadow-sm lg:h-auto">
       {/* Header */}
-      <div className="bg-surface-container-high px-5 py-3 border-b border-outline-variant/15">
-        <h3 className="font-display font-600 text-lg text-on-surface">
-          Sale Items ({items.length})
-        </h3>
-      </div>
-
-      {/* Items Table */}
-      <div className="flex-1 overflow-y-auto">
-        {items.length === 0 ? (
-          <div className="flex items-center justify-center h-32">
-            <p className="text-on-surface-variant text-sm">
-              No items added yet. Select items from the catalogs above.
+      <div className="flex items-center justify-between border-b border-outline-variant/15 bg-surface-container-low px-5 py-4">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+            </svg>
+          </div>
+          <div>
+            <h3 className="font-display text-lg font-semibold text-on-surface">Sale Items</h3>
+            <p className="text-xs font-medium text-on-surface-variant">
+              {items.length} {items.length === 1 ? "item" : "items"} in cart
             </p>
           </div>
+        </div>
+      </div>
+
+      {/* Items List */}
+      <div className="flex-1 overflow-x-auto">
+        {items.length === 0 ? (
+          <div className="p-8">
+            <EmptyState
+              title="Cart is Empty"
+              description="Select items from the catalogs on the left to add them to your sale."
+            />
+          </div>
         ) : (
-          <table className="w-full text-sm">
-            <thead className="bg-surface-container sticky top-0">
-              <tr className="border-b border-outline-variant/15">
-                <th className="px-4 py-3 text-left font-semibold text-on-surface">Item</th>
-                <th className="px-4 py-3 text-center font-semibold text-on-surface">Type</th>
-                <th className="px-4 py-3 text-right font-semibold text-on-surface">Price</th>
-                <th className="px-4 py-3 text-right font-semibold text-on-surface">Qty</th>
-                <th className="px-4 py-3 text-right font-semibold text-on-surface">Discount</th>
-                <th className="px-4 py-3 text-right font-semibold text-on-surface">Subtotal</th>
-                <th className="px-4 py-3 text-center font-semibold text-on-surface">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((item, index) => {
-                const isEditing = editingRowId === (item.id || item.sellable_id);
-                return (
-                  <tr
-                    key={index}
-                    className="border-b border-outline-variant/10 hover:bg-surface-container/50 transition-colors"
-                  >
-                    {/* Item Name */}
-                    <td className="px-4 py-3">
-                      <p className="font-medium text-on-surface">{item.item_name}</p>
-                      <p className="text-xs text-on-surface-variant mt-0.5">
-                        ID: {item.sellable_id}
-                      </p>
-                    </td>
+          <div className="min-w-[800px]">
+            <table className="w-full border-collapse text-left text-sm">
+              <thead className="bg-surface-container-lowest sticky top-0 z-10 border-b border-outline-variant/15 shadow-sm">
+                <tr>
+                  <th className="px-5 py-3 font-semibold uppercase tracking-wider text-xs text-on-surface-variant">Item</th>
+                  <th className="px-5 py-3 text-center font-semibold uppercase tracking-wider text-xs text-on-surface-variant">Type</th>
+                  <th className="px-5 py-3 text-right font-semibold uppercase tracking-wider text-xs text-on-surface-variant">Price</th>
+                  <th className="px-5 py-3 text-right font-semibold uppercase tracking-wider text-xs text-on-surface-variant">Qty</th>
+                  <th className="px-5 py-3 text-right font-semibold uppercase tracking-wider text-xs text-on-surface-variant">Discount</th>
+                  <th className="px-5 py-3 text-right font-semibold uppercase tracking-wider text-xs text-on-surface-variant">Subtotal</th>
+                  <th className="px-5 py-3 text-center font-semibold uppercase tracking-wider text-xs text-on-surface-variant">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-outline-variant/10">
+                {items.map((item, index) => {
+                  const isEditing = editingRowId === (item.id || item.sellable_id);
+                  return (
+                    <tr
+                      key={index}
+                      className="group bg-surface transition-colors hover:bg-surface-container/30"
+                    >
+                      {/* Item Name */}
+                      <td className="px-5 py-4">
+                        <p className="font-semibold text-on-surface">{item.item_name}</p>
+                        <p className="text-xs font-medium text-on-surface-variant/70 mt-0.5">
+                          ID: {item.sellable_id}
+                        </p>
+                      </td>
 
-                    {/* Item Type */}
-                    <td className="px-4 py-3 text-center">
-                      <span className="inline-block px-2 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium">
-                        {item.sellable_type === "products" && "Product"}
-                        {item.sellable_type === "spare_parts" && "Spare Part"}
-                        {item.sellable_type === "bikes" && "Bike"}
-                        {item.sellable_type === "maintenance_services" && "Service"}
-                      </span>
-                    </td>
+                      {/* Item Type */}
+                      <td className="px-5 py-4 text-center">
+                        <span className="inline-flex items-center rounded-lg bg-surface-container-high px-2.5 py-1 text-[11px] font-bold tracking-wide text-on-surface">
+                          {item.sellable_type === "products" && "PRODUCT"}
+                          {item.sellable_type === "spare_parts" && "SPARE PART"}
+                          {item.sellable_type === "bikes" && "BIKE"}
+                          {item.sellable_type === "maintenance_services" && "SERVICE"}
+                        </span>
+                      </td>
 
-                    {/* Price */}
-                    <td className="px-4 py-3 text-right">
-                      {(() => {
-                        const priceInfo = getDisplayPrice(item);
-                        return (
-                          <div className="flex flex-col items-end">
-                            <p className="font-medium text-on-surface">
-                              {priceInfo.amount} {priceInfo.currency}
-                            </p>
-                            {priceInfo.converted && (
-                              <p className="text-xs text-on-surface-variant mt-0.5">
-                                ≈ {priceInfo.converted.amount.toFixed(2)} {priceInfo.converted.currency}
+                      {/* Price */}
+                      <td className="px-5 py-4 text-right">
+                        {(() => {
+                          const priceInfo = getDisplayPrice(item);
+                          return (
+                            <div className="flex flex-col items-end">
+                              <p className="font-semibold text-on-surface">
+                                {priceInfo.amount.toLocaleString()} <span className="text-xs text-on-surface-variant">{priceInfo.currency}</span>
                               </p>
-                            )}
-                          </div>
-                        );
-                      })()}
-                    </td>
+                              {priceInfo.converted && (
+                                <p className="text-[11px] font-medium text-on-surface-variant mt-0.5">
+                                  ≈ {priceInfo.converted.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <span className="text-[10px] uppercase">EGP</span>
+                                </p>
+                              )}
+                            </div>
+                          );
+                        })()}
+                      </td>
 
-                    {/* Quantity */}
-                    <td className="px-4 py-3 text-right">
-                      {isEditing ? (
-                        <input
-                          type="number"
-                          value={editValues.qty}
-                          onChange={(e) =>
-                            setEditValues({
-                              ...editValues,
-                              qty: Math.max(1, Number(e.target.value)),
-                            })
-                          }
-                          disabled={item.sellable_type === "bikes"}
-                          className="form-input-base w-20 text-right"
-                        />
-                      ) : (
-                        <p className="font-medium text-on-surface">{item.quantity}</p>
-                      )}
-                    </td>
-
-                    {/* Discount */}
-                    <td className="px-4 py-3 text-right">
-                      {isEditing ? (
-                        <div className="flex flex-col">
+                      {/* Quantity */}
+                      <td className="px-5 py-4 text-right">
+                        {isEditing ? (
                           <input
                             type="number"
-                            value={editValues.discount}
+                            value={editValues.qty}
                             onChange={(e) =>
                               setEditValues({
                                 ...editValues,
-                                discount: Math.max(0, Math.min(Number(e.target.value), calculateMaxDiscount(item))),
+                                qty: Math.max(1, Number(e.target.value)),
                               })
                             }
-                            max={calculateMaxDiscount(item)}
-                            className="form-input-base w-20 text-right"
+                            disabled={item.sellable_type === "bikes"}
+                            className="w-16 rounded-lg border-2 border-primary/30 bg-surface px-2 py-1.5 text-right font-medium text-on-surface outline-none focus:border-primary"
                           />
-                          <span className="text-xs text-on-surface-variant mt-1">
-                            Max: {calculateMaxDiscount(item).toFixed(2)}
+                        ) : (
+                          <span className="inline-flex h-8 min-w-[2rem] items-center justify-center rounded-lg border border-outline-variant/20 bg-surface-container-lowest px-2 font-semibold text-on-surface shadow-sm">
+                            {item.quantity}
                           </span>
-                        </div>
-                      ) : (
-                        <p className="font-medium text-error">
-                          -{item.discount_amount} {item.currency}
+                        )}
+                      </td>
+
+                      {/* Discount */}
+                      <td className="px-5 py-4 text-right">
+                        {isEditing ? (
+                          <div className="flex flex-col items-end gap-1">
+                            <input
+                              type="number"
+                              value={editValues.discount}
+                              onChange={(e) =>
+                                setEditValues({
+                                  ...editValues,
+                                  discount: Math.max(0, Math.min(Number(e.target.value), calculateMaxDiscount(item))),
+                                })
+                              }
+                              max={calculateMaxDiscount(item)}
+                              className="w-20 rounded-lg border-2 border-primary/30 bg-surface px-2 py-1.5 text-right font-medium text-on-surface outline-none focus:border-primary"
+                            />
+                            <span className="text-[10px] font-semibold tracking-wider text-on-surface-variant uppercase">
+                              Max: {calculateMaxDiscount(item).toFixed(0)}
+                            </span>
+                          </div>
+                        ) : (
+                          <p className={`font-semibold ${item.discount_amount > 0 ? 'text-error' : 'text-on-surface-variant opacity-50'}`}>
+                            {item.discount_amount > 0 ? `-${item.discount_amount.toLocaleString()}` : "0"} <span className="text-[11px] uppercase">{item.currency}</span>
+                          </p>
+                        )}
+                      </td>
+
+                      {/* Subtotal */}
+                      <td className="px-5 py-4 text-right">
+                        <p className="font-bold text-primary">
+                          {calculateLineSubtotal(item).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <span className="text-[11px] uppercase">{item.currency}</span>
                         </p>
-                      )}
-                    </td>
+                      </td>
 
-                    {/* Subtotal */}
-                    <td className="px-4 py-3 text-right">
-                      <p className="font-semibold text-primary">
-                        {calculateLineSubtotal(item).toFixed(2)} {item.currency}
-                      </p>
-                    </td>
-
-                    {/* Actions */}
-                    <td className="px-4 py-3 text-center">
-                      {isEditing ? (
-                        <div className="flex gap-2 justify-center">
-                          <button
-                            onClick={() => handleSaveEdit(item.id || item.sellable_id)}
-                            className="px-2 py-1 rounded-lg bg-primary hover:bg-primary/90 text-on-primary text-xs font-medium transition-colors"
-                          >
-                            Save
-                          </button>
-                          <button
-                            onClick={handleCancelEdit}
-                            className="px-2 py-1 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface text-xs font-medium transition-colors"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="flex gap-2 justify-center">
-                          <button
-                            onClick={() => handleEditClick(item)}
-                            className="px-2 py-1 rounded-lg hover:bg-surface-container text-on-surface text-xs font-medium transition-colors"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => onDeleteItem(item.id || item.sellable_id)}
-                            className="px-2 py-1 rounded-lg hover:bg-error/10 text-error text-xs font-medium transition-colors"
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                      {/* Actions */}
+                      <td className="px-5 py-4 text-center">
+                        {isEditing ? (
+                          <div className="flex items-center justify-center gap-1.5">
+                            <button
+                              onClick={() => handleSaveEdit(item.id || item.sellable_id)}
+                              className="flex h-8 w-8 items-center justify-center rounded-lg bg-green-500/10 text-green-600 transition-colors hover:bg-green-500/20"
+                              title="Save Changes"
+                            >
+                              <CheckIcon className="h-5 w-5" />
+                            </button>
+                            <button
+                              onClick={handleCancelEdit}
+                              className="flex h-8 w-8 items-center justify-center rounded-lg bg-surface-container-high text-on-surface-variant transition-colors hover:bg-surface-container-highest hover:text-on-surface"
+                              title="Cancel"
+                            >
+                              <XMarkIcon className="h-5 w-5" />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-center gap-1.5 opacity-60 transition-opacity group-hover:opacity-100">
+                            <button
+                              onClick={() => handleEditClick(item)}
+                              className="flex h-8 w-8 items-center justify-center rounded-lg bg-surface-container-lowest text-on-surface-variant shadow-sm ring-1 ring-inset ring-outline-variant/20 transition-all hover:bg-surface-container-low hover:text-on-surface"
+                              title="Edit Row"
+                            >
+                              <PencilSquareIcon className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={() => onDeleteItem(item.id || item.sellable_id)}
+                              className="flex h-8 w-8 items-center justify-center rounded-lg bg-error-container/50 text-error shadow-sm ring-1 ring-inset ring-error/20 transition-all hover:bg-error-container"
+                              title="Delete Item"
+                            >
+                              <TrashIcon className="h-4 w-4" />
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 
       {/* Totals Summary */}
-      <div className="border-t border-outline-variant/15 bg-surface-container px-5 py-4 space-y-2">
-        <div className="flex justify-between text-sm">
-          <span className="text-on-surface-variant">Subtotal:</span>
-          <span className="font-medium text-on-surface">{subtotal.toFixed(2)}</span>
-        </div>
-        {shippingFee > 0 && (
-          <div className="flex justify-between text-sm">
-            <span className="text-on-surface-variant">Shipping Fee:</span>
-            <span className="font-medium text-on-surface">+{shippingFee.toFixed(2)}</span>
+      <div className="mt-auto border-t border-outline-variant/20 bg-surface-container-low px-5 py-5 sm:px-6">
+        <div className="ml-auto w-full max-w-sm space-y-3">
+          <div className="flex items-center justify-between text-sm">
+            <span className="font-semibold text-on-surface-variant uppercase tracking-wider text-[11px]">Subtotal</span>
+            <span className="font-semibold text-on-surface">{subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
           </div>
-        )}
-        {saleDiscount > 0 && (
-          <div className="flex justify-between text-sm">
-            <span className="text-on-surface-variant">Sale Discount:</span>
-            <span className="font-medium text-error">-{saleDiscount.toFixed(2)}</span>
+
+          {shippingFee > 0 && (
+            <div className="flex items-center justify-between text-sm">
+              <span className="font-semibold text-on-surface-variant uppercase tracking-wider text-[11px]">Shipping Fee</span>
+              <span className="font-semibold text-on-surface">+{shippingFee.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+            </div>
+          )}
+
+          {saleDiscount > 0 && (
+            <div className="flex items-center justify-between text-sm">
+              <span className="font-semibold text-on-surface-variant uppercase tracking-wider text-[11px]">Extra Discount</span>
+              <span className="font-semibold text-error">-{saleDiscount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+            </div>
+          )}
+
+          <div className="relative mt-4">
+            <div className="absolute inset-x-0 -top-4 h-px bg-gradient-to-r from-transparent via-outline-variant/30 to-transparent" />
+            <div className="flex items-end justify-between pt-2">
+              <span className="font-display text-lg font-bold text-on-surface">Total</span>
+              <div className="text-right">
+                <span className="font-display text-3xl font-extrabold tracking-tight text-primary">
+                  {total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+                <span className="ml-1 text-sm font-bold uppercase text-primary/70">EGP</span>
+              </div>
+            </div>
           </div>
-        )}
-        <div className="border-t border-outline-variant/15 pt-2 mt-2 flex justify-between">
-          <span className="font-semibold text-on-surface">Total:</span>
-          <span className="font-display font-600 text-lg text-primary">
-            {total.toFixed(2)}
-          </span>
         </div>
       </div>
     </div>

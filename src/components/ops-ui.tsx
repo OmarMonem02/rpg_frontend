@@ -225,11 +225,13 @@ export function InlineMessage({
 export function StatusBadge({
   children,
   tone = "default",
+  className = "",
 }: {
   children: ReactNode;
   tone?: Tone;
+  className?: string;
 }) {
-  return <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium ${toneClasses[tone]}`}>{children}</span>;
+  return <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium ${toneClasses[tone]} ${className}`.trim()}>{children}</span>;
 }
 
 export function PaginationControls({

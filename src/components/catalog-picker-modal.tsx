@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { getAuthToken } from "@/lib/auth-session";
 import {
   listProducts,
@@ -21,8 +22,17 @@ import {
   type MaintenanceServiceSectorRecord,
 } from "@/lib/crud-api";
 import { ActionButton } from "@/components/ops-ui";
+import {
+  MagnifyingGlassIcon,
+  XMarkIcon,
+  FunnelIcon,
+} from "@heroicons/react/24/outline";
 
-type CatalogType = "products" | "spare_parts" | "bikes" | "maintenance_services";
+type CatalogType =
+  | "products"
+  | "spare_parts"
+  | "bikes"
+  | "maintenance_services";
 
 type CatalogItem =
   | ProductRecord
@@ -37,7 +47,7 @@ type FilterConfig = {
   sectorId?: number;
   priceMin: number;
   priceMax: number;
-  currency: "EGP" | "USD";
+  currency: "" | "EGP" | "USD";
   lowStock?: boolean;
   blueprintId?: number;
 };
@@ -60,23 +70,30 @@ export function CatalogPickerModal({
   blueprintId,
 }: CatalogPickerModalProps) {
   const [items, setItems] = useState<CatalogItem[]>([]);
-  const [selectedItemIds, setSelectedItemIds] = useState<Set<number>>(new Set());
+  const [selectedItemIds, setSelectedItemIds] = useState<Set<number>>(
+    new Set(),
+  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [mounted, setMounted] = useState(false);
 
   // Filter state
   const [filters, setFilters] = useState<FilterConfig>({
     search: "",
     priceMin: 0,
     priceMax: 100000,
-    currency: "EGP",
+    currency: "",
   });
 
   const [brands, setBrands] = useState<BrandRecord[]>([]);
-  const [productCategories, setProductCategories] = useState<ProductCategoryRecord[]>([]);
-  const [sparePartCategories, setSparePartCategories] = useState<SparePartCategoryRecord[]>([]);
+  const [productCategories, setProductCategories] = useState<
+    ProductCategoryRecord[]
+  >([]);
+  const [sparePartCategories, setSparePartCategories] = useState<
+    SparePartCategoryRecord[]
+  >([]);
   const [sectors, setSectors] = useState<MaintenanceServiceSectorRecord[]>([]);
 
   // Memoize filters to prevent unnecessary callback recreation
@@ -92,7 +109,7 @@ export function CatalogPickerModal({
       filters.currency,
       filters.lowStock,
       filters.blueprintId,
-    ]
+    ],
   );
 
   // Load filter options (brands, categories, sectors)
@@ -172,7 +189,7 @@ export function CatalogPickerModal({
       }
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : `Failed to load ${catalogType}`
+        err instanceof Error ? err.message : `Failed to load ${catalogType}`,
       );
     } finally {
       setLoading(false);
@@ -183,13 +200,13 @@ export function CatalogPickerModal({
     if (isOpen) {
       loadFilterOptions();
     }
-  }, [isOpen, catalogType]);
+  }, [isOpen, catalogType, loadFilterOptions]);
 
   useEffect(() => {
     if (isOpen) {
       loadItems();
     }
-  }, [isOpen, catalogType, page, memoizedFilters]);
+  }, [isOpen, catalogType, page, memoizedFilters, loadItems]);
 
   useEffect(() => {
     if (isOpen) {
@@ -198,7 +215,7 @@ export function CatalogPickerModal({
     } else {
       setSelectedItemIds(new Set());
     }
-  }, [isOpen]);
+  }, [isOpen, JSON.stringify(selectedIds)]);
 
   const handleToggleItem = (id: number) => {
     const newSelected = new Set(selectedItemIds);
@@ -211,9 +228,7 @@ export function CatalogPickerModal({
   };
 
   const handleAddSelected = () => {
-    const selectedItems = items.filter((item) =>
-      selectedItemIds.has(item.id)
-    );
+    const selectedItems = items.filter((item) => selectedItemIds.has(item.id));
     if (selectedItems.length > 0) {
       onAddItems(selectedItems);
       setSelectedItemIds(new Set()); // Keep modal open, clear selection
@@ -229,7 +244,11 @@ export function CatalogPickerModal({
     setSelectedItemIds(new Set());
   };
 
-  if (!isOpen) return null;
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!isOpen || !mounted) return null;
 
   const getItemPrice = (item: CatalogItem): number => {
     if ("sale_price" in item) return item.sale_price;
@@ -242,261 +261,497 @@ export function CatalogPickerModal({
     return `Item ${item.id}`;
   };
 
-  return (
-    <div className="form-modal-overlay fixed inset-0 z-50 flex items-center justify-center px-4 py-5 ">
-      <div className="form-modal-shell w-full max-w-4xl max-h-90vh rounded-2xl flex flex-col overflow-hidden animate-app-shell-enter">
+  return createPortal(
+    <div className="fixed inset-0 z-[100] flex justify-end p-0 backdrop-blur-sm bg-on-surface/40 transition-opacity">
+      <div className="w-full sm:w-[500px] md:w-[600px] lg:w-[850px] h-screen h-[100dvh] bg-surface-container-lowest flex flex-col overflow-hidden animate-slide-in-right shadow-2xl border-l border-outline-variant/20 rounded-none sm:rounded-l-[1.5rem] relative">
         {/* Header */}
-        <div className="border-b border-outline-variant/15 bg-surface-container-lowest px-6 py-4 flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-display font-600 text-on-surface mb-1">
-              {catalogType === "products" && "Add Products"}
-              {catalogType === "spare_parts" && "Add Spare Parts"}
-              {catalogType === "bikes" && "Add Bikes For Sale"}
-              {catalogType === "maintenance_services" && "Add Maintenance Services"}
+        <div className="relative border-b border-outline-variant/15 bg-surface-container-low px-4 sm:px-6 py-4 sm:py-5 flex items-start sm:items-center justify-between shrink-0">
+          <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent" />
+          <div className="flex-1 pr-4">
+            <h2 className="text-xl sm:text-2xl font-display font-bold text-on-surface tracking-tight flex items-center gap-2">
+              <span className="flex shrink-0 items-center justify-center w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-primary/10 text-primary">
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+                  />
+                </svg>
+              </span>
+              {catalogType === "products" && "Browse Products"}
+              {catalogType === "spare_parts" && "Browse Spare Parts"}
+              {catalogType === "bikes" && "Browse Bikes"}
+              {catalogType === "maintenance_services" && "Browse Services"}
             </h2>
-            <p className="text-sm text-on-surface-variant">
-              Select items to add to your sale
+            <p className="text-sm font-medium text-on-surface-variant mt-1.5 ml-10">
+              Select items from the catalog to add to your list
             </p>
           </div>
           <button
             onClick={onClose}
-            className="text-on-surface-variant hover:text-on-surface transition-colors p-2"
+            className="flex h-10 w-10 items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors"
           >
-            ✕
+            <XMarkIcon className="w-6 h-6" />
           </button>
         </div>
 
         {/* Filters */}
-        <div className="bg-surface px-6 py-4 border-b border-outline-variant/15">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="bg-surface px-4 sm:px-6 py-4 border-b border-outline-variant/10 shadow-sm z-10 relative shrink-0">
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3">
             {/* Search */}
-            <input
-              type="text"
-              placeholder="Search..."
-              value={filters.search}
-              onChange={(e) => {
-                setFilters({ ...filters, search: e.target.value });
-                setPage(1);
-              }}
-              className="form-input-base"
-            />
+            <div className="relative col-span-2 lg:col-span-2">
+              <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-on-surface-variant/60">
+                <MagnifyingGlassIcon className="w-5 h-5" />
+              </span>
+              <input
+                type="text"
+                placeholder="Search..."
+                value={filters.search}
+                onChange={(e) => {
+                  setFilters({ ...filters, search: e.target.value });
+                  setPage(1);
+                }}
+                className="form-input-base pl-10 w-full"
+              />
+            </div>
 
             {/* Brand Filter */}
             {brands.length > 0 && (
-              <select
-                value={filters.brandId || ""}
-                onChange={(e) => {
-                  setFilters({
-                    ...filters,
-                    brandId: e.target.value ? Number(e.target.value) : undefined,
-                  });
-                  setPage(1);
-                }}
-                className="form-input-base"
-              >
-                <option value="">All Brands</option>
-                {brands.map((brand) => (
-                  <option key={brand.id} value={brand.id}>
-                    {brand.name}
-                  </option>
-                ))}
-              </select>
+              <div className="relative">
+                <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-on-surface-variant/60">
+                  <FunnelIcon className="w-4 h-4" />
+                </span>
+                <select
+                  value={filters.brandId || ""}
+                  onChange={(e) => {
+                    setFilters({
+                      ...filters,
+                      brandId: e.target.value
+                        ? Number(e.target.value)
+                        : undefined,
+                    });
+                    setPage(1);
+                  }}
+                  className="form-input-base pl-9 w-full appearance-none pr-8"
+                >
+                  <option value="">All Brands</option>
+                  {brands.map((brand) => (
+                    <option key={brand.id} value={brand.id}>
+                      {brand.name}
+                    </option>
+                  ))}
+                </select>
+                <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none text-on-surface-variant bg-surface rounded-r-xl border-y border-r border-transparent">
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M19 9l-7 7-7-7"
+                    ></path>
+                  </svg>
+                </div>
+              </div>
             )}
 
             {/* Category Filter */}
             {productCategories.length > 0 && (
-              <select
-                value={filters.categoryId || ""}
-                onChange={(e) => {
-                  setFilters({
-                    ...filters,
-                    categoryId: e.target.value ? Number(e.target.value) : undefined,
-                  });
-                  setPage(1);
-                }}
-                className="form-input-base"
-              >
-                <option value="">All Categories</option>
-                {productCategories.map((cat) => (
-                  <option key={cat.id} value={cat.id}>
-                    {cat.name}
-                  </option>
-                ))}
-              </select>
+              <div className="relative">
+                <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-on-surface-variant/60">
+                  <FunnelIcon className="w-4 h-4" />
+                </span>
+                <select
+                  value={filters.categoryId || ""}
+                  onChange={(e) => {
+                    setFilters({
+                      ...filters,
+                      categoryId: e.target.value
+                        ? Number(e.target.value)
+                        : undefined,
+                    });
+                    setPage(1);
+                  }}
+                  className="form-input-base pl-9 w-full appearance-none pr-8"
+                >
+                  <option value="">All Categories</option>
+                  {productCategories.map((cat) => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.name}
+                    </option>
+                  ))}
+                </select>
+                <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none text-on-surface-variant bg-surface rounded-r-xl">
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M19 9l-7 7-7-7"
+                    ></path>
+                  </svg>
+                </div>
+              </div>
             )}
 
             {/* Spare Part Category Filter */}
             {sparePartCategories.length > 0 && (
-              <select
-                value={filters.categoryId || ""}
-                onChange={(e) => {
-                  setFilters({
-                    ...filters,
-                    categoryId: e.target.value ? Number(e.target.value) : undefined,
-                  });
-                  setPage(1);
-                }}
-                className="form-input-base"
-              >
-                <option value="">All Categories</option>
-                {sparePartCategories.map((cat) => (
-                  <option key={cat.id} value={cat.id}>
-                    {cat.name}
-                  </option>
-                ))}
-              </select>
+              <div className="relative">
+                <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-on-surface-variant/60">
+                  <FunnelIcon className="w-4 h-4" />
+                </span>
+                <select
+                  value={filters.categoryId || ""}
+                  onChange={(e) => {
+                    setFilters({
+                      ...filters,
+                      categoryId: e.target.value
+                        ? Number(e.target.value)
+                        : undefined,
+                    });
+                    setPage(1);
+                  }}
+                  className="form-input-base pl-9 w-full appearance-none pr-8"
+                >
+                  <option value="">All Categories</option>
+                  {sparePartCategories.map((cat) => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.name}
+                    </option>
+                  ))}
+                </select>
+                <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none text-on-surface-variant bg-surface rounded-r-xl">
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M19 9l-7 7-7-7"
+                    ></path>
+                  </svg>
+                </div>
+              </div>
             )}
 
             {/* Sector Filter */}
             {sectors.length > 0 && (
-              <select
-                value={filters.sectorId || ""}
-                onChange={(e) => {
-                  setFilters({
-                    ...filters,
-                    sectorId: e.target.value ? Number(e.target.value) : undefined,
-                  });
-                  setPage(1);
-                }}
-                className="form-input-base"
-              >
-                <option value="">All Sectors</option>
-                {sectors.map((sector) => (
-                  <option key={sector.id} value={sector.id}>
-                    {sector.name}
-                  </option>
-                ))}
-              </select>
+              <div className="relative">
+                <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-on-surface-variant/60">
+                  <FunnelIcon className="w-4 h-4" />
+                </span>
+                <select
+                  value={filters.sectorId || ""}
+                  onChange={(e) => {
+                    setFilters({
+                      ...filters,
+                      sectorId: e.target.value
+                        ? Number(e.target.value)
+                        : undefined,
+                    });
+                    setPage(1);
+                  }}
+                  className="form-input-base pl-9 w-full appearance-none pr-8"
+                >
+                  <option value="">All Sectors</option>
+                  {sectors.map((sector) => (
+                    <option key={sector.id} value={sector.id}>
+                      {sector.name}
+                    </option>
+                  ))}
+                </select>
+                <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none text-on-surface-variant bg-surface rounded-r-xl">
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M19 9l-7 7-7-7"
+                    ></path>
+                  </svg>
+                </div>
+              </div>
             )}
 
             {/* Currency Filter */}
-            <select
-              value={filters.currency}
-              onChange={(e) => {
-                setFilters({
-                  ...filters,
-                  currency: e.target.value as "EGP" | "USD",
-                });
-                setPage(1);
-              }}
-              className="form-input-base"
-            >
-              <option value="">All</option>
-              <option value="EGP">EGP</option>
-              <option value="USD">USD</option>
-            </select>
+            <div className="relative">
+              <select
+                value={filters.currency}
+                onChange={(e) => {
+                  setFilters({
+                    ...filters,
+                    currency: e.target.value as "" | "EGP" | "USD",
+                  });
+                  setPage(1);
+                }}
+                className="form-input-base w-full appearance-none pr-8 bg-surface-container/50 font-medium"
+              >
+                <option value="">Any Currency</option>
+                <option value="EGP">EGP</option>
+                <option value="USD">USD</option>
+              </select>
+              <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none text-on-surface-variant bg-surface-container/50 rounded-r-xl">
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M19 9l-7 7-7-7"
+                  ></path>
+                </svg>
+              </div>
+            </div>
           </div>
         </div>
 
         {/* Items List */}
-        <div className="flex-1 overflow-y-auto px-6 py-4">
+        <div className="flex-1 overflow-y-auto bg-surface-container-low/30 relative">
           {loading ? (
-            <div className="flex items-center justify-center h-40">
-              <p className="text-on-surface-variant">Loading...</p>
+            <div className="flex flex-col items-center justify-center p-12 h-64 gap-3 animate-pulse text-primary">
+              <div className="w-8 h-8 rounded-full border-4 border-primary border-t-transparent animate-spin" />
+              <p className="text-sm font-semibold tracking-wide text-on-surface-variant uppercase">
+                Loading Catalog...
+              </p>
             </div>
           ) : error ? (
-            <div className="rounded-xl bg-error/10 border border-error/30 p-4">
-              <p className="text-error text-sm">{error}</p>
+            <div className="m-6 rounded-2xl bg-error-container border border-error/30 p-5 flex gap-3 shadow-sm">
+              <svg
+                className="w-5 h-5 text-on-error-container shrink-0 mt-0.5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+              <p className="text-on-error-container font-medium text-sm">
+                {error}
+              </p>
             </div>
           ) : items.length === 0 ? (
-            <div className="flex items-center justify-center h-40">
-              <p className="text-on-surface-variant">No items found</p>
+            <div className="flex flex-col items-center justify-center p-12 h-64 text-center">
+              <div className="w-16 h-16 rounded-full bg-surface-container flex items-center justify-center mb-4 text-on-surface-variant/50">
+                <MagnifyingGlassIcon className="w-8 h-8" />
+              </div>
+              <h3 className="font-display text-lg font-semibold text-on-surface">
+                No items found
+              </h3>
+              <p className="text-sm text-on-surface-variant mt-1.5 max-w-sm">
+                Try adjusting your search filters or browse a different catalog
+                type to find what you're looking for.
+              </p>
             </div>
           ) : (
-            <div className="space-y-2 scrollbar-thin scrollbar-thumb-outline-variant/30 scrollbar-track-transparent overflow-y-auto h-80">
-              {items.map((item) => (
-                <label
-                  key={item.id}
-                  className="flex items-center gap-3 p-3 rounded-lg hover:bg-surface-container transition-colors cursor-pointer"
-                >
-                  <input
-                    type="checkbox"
-                    checked={selectedItemIds.has(item.id)}
-                    onChange={() => handleToggleItem(item.id)}
-                    className="w-4 h-4 rounded border-2 border-outline-variant accent-primary cursor-pointer"
-                  />
-                  <div className="flex-1">
-                    <p className="font-medium text-on-surface text-sm">
-                      {getItemName(item)}
-                    </p>
-                    {catalogType === "spare_parts" && "sku" in item && (
-                      <p className="text-xs text-on-surface-variant">
-                        SKU: {item.sku} - Part Num: {item.part_number} - Stock: {item.stock_quantity} - Brand: {brands.find((b) => b.id === item.brand_id)?.name || item.brand_id} - Margine Discount: {item.max_discount_value} {item.max_discount_type === "percentage" ? "%" : item.currency_pricing}
-                      </p>
-                    )}
-                    {catalogType === "products" && "sku" in item && (
-                      <p className="text-xs text-on-surface-variant">
-                        SKU: {item.sku} - Part Num: {item.part_number} - Stock: {item.stock_quantity} - Brand: {brands.find((b) => b.id === item.brand_id)?.name || item.brand_id} - Margine Discount: {item.max_discount_value} {item.max_discount_type === "percentage" ? "%" : item.currency_pricing}
-                      </p>
-                    )}
-                  </div>
-                  <div className="text-right">
-                    <p className="font-semibold text-primary text-sm">
-                      {getItemPrice(item)} {("currency_pricing" in item && item.currency_pricing) || filters.currency}
-                    </p>
-                  </div>
-                </label>
-              ))}
+            <div className="p-4 sm:p-6 grid gap-3">
+              {items.map((item) => {
+                const isSelected = selectedItemIds.has(item.id);
+                return (
+                  <label
+                    key={item.id}
+                    className={`group relative flex flex-col sm:flex-row items-start sm:items-center p-4 rounded-[1.25rem] border-2 transition-all cursor-pointer ${
+                      isSelected
+                        ? "bg-primary/5 border-primary shadow-sm"
+                        : "bg-surface border-outline-variant/15 hover:border-outline-variant/30 hover:bg-surface-container-lowest"
+                    }`}
+                  >
+                    <div className="flex items-center gap-4 w-full">
+                      {/* Checkbox */}
+                      <div className="shrink-0 flex items-center justify-center w-6 h-6 rounded border-2 border-outline-variant group-hover:border-primary transition-colors bg-surface-container-lowest relative">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => handleToggleItem(item.id)}
+                          className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                        />
+                        {isSelected && (
+                          <svg
+                            className="w-4 h-4 text-primary pointer-events-none"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={3}
+                              d="M5 13l4 4L19 7"
+                            />
+                          </svg>
+                        )}
+                      </div>
+
+                      {/* Content */}
+                      <div className="flex-1 min-w-0 pr-4">
+                        <h4 className="font-bold text-on-surface text-base truncate">
+                          {getItemName(item)}
+                        </h4>
+
+                        {(catalogType === "spare_parts" ||
+                          catalogType === "products") &&
+                          "sku" in item && (
+                            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1.5">
+                              <span className="inline-flex items-center text-xs font-medium text-on-surface-variant">
+                                <span className="uppercase tracking-wider mr-1 text-[10px] opacity-70">
+                                  SKU
+                                </span>{" "}
+                                {item.sku}
+                              </span>
+                              <span className="inline-flex items-center text-xs font-medium text-on-surface-variant">
+                                <span className="uppercase tracking-wider mr-1 text-[10px] opacity-70">
+                                  Part#
+                                </span>{" "}
+                                {item.part_number}
+                              </span>
+                              <span className="inline-flex items-center text-xs font-medium text-on-surface-variant">
+                                <span className="uppercase tracking-wider mr-1 text-[10px] opacity-70">
+                                  Stock
+                                </span>
+                                <span
+                                  className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${item.stock_quantity! > 10 ? "bg-green-500/10 text-green-700" : "bg-error/10 text-error"}`}
+                                >
+                                  {item.stock_quantity ?? 0}
+                                </span>
+                              </span>
+                              {item.brand_id && (
+                                <span className="inline-flex items-center text-xs font-medium text-on-surface-variant">
+                                  <span className="uppercase tracking-wider mr-1 text-[10px] opacity-70">
+                                    Brand
+                                  </span>{" "}
+                                  {brands.find((b) => b.id === item.brand_id)
+                                    ?.name || item.brand_id}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                      </div>
+
+                      {/* Price Tag */}
+                      <div className="shrink-0 flex sm:flex-col items-center sm:items-end justify-between w-full sm:w-auto mt-3 sm:mt-0 pt-3 sm:pt-0 border-t border-outline-variant/10 sm:border-0">
+                        <div className="text-xs font-bold uppercase tracking-wider text-on-surface-variant sm:hidden">
+                          Price
+                        </div>
+                        <div className="bg-surface-container-highest/20 px-3 py-1.5 rounded-lg border border-outline-variant/10">
+                          <p className="font-display font-bold text-primary text-base">
+                            {getItemPrice(item).toLocaleString()}{" "}
+                            <span className="text-xs uppercase">
+                              {("currency_pricing" in item &&
+                                item.currency_pricing) ||
+                                filters.currency}
+                            </span>
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </label>
+                );
+              })}
             </div>
           )}
         </div>
 
-        {/* Pagination */}
+        {/* Pagination Header (Mobile only) / Overlay Footer */}
         {totalPages > 1 && (
-          <div className="border-t border-outline-variant/15 px-6 py-3 flex items-center justify-between bg-surface-container-lowest">
-            <button
+          <div className="border-t border-outline-variant/15 px-6 py-3 flex items-center justify-between bg-surface-container shadow-[0_-4px_12px_rgba(0,0,0,0.02)] relative z-10 shrink-0">
+            <ActionButton
+              variant="outline"
+              size="sm"
               onClick={() => setPage(Math.max(1, page - 1))}
               disabled={page === 1}
-              className="px-3 py-2 rounded-lg bg-surface hover:bg-surface-container disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium text-on-surface transition-colors"
+              className="bg-surface"
             >
               Previous
-            </button>
-            <span className="text-sm text-on-surface-variant">
-              Page {page} of {totalPages}
+            </ActionButton>
+            <span className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">
+              Page {page} <span className="opacity-50">of</span> {totalPages}
             </span>
-            <button
+            <ActionButton
+              variant="outline"
+              size="sm"
               onClick={() => setPage(Math.min(totalPages, page + 1))}
               disabled={page === totalPages}
-              className="px-3 py-2 rounded-lg bg-surface hover:bg-surface-container disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium text-on-surface transition-colors"
+              className="bg-surface"
             >
               Next
-            </button>
+            </ActionButton>
           </div>
         )}
 
-        {/* Footer */}
-        <div className="border-t border-outline-variant/15 bg-surface-container-lowest px-6 py-4 flex items-center justify-between">
-          <div className="flex gap-2">
-            <button
+        {/* Footer Actions */}
+        <div className="border-t border-outline-variant/15 bg-surface-container-lowest px-4 sm:px-6 py-4 sm:py-5 flex flex-col-reverse sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 relative z-10 shrink-0">
+          <div className="grid grid-cols-2 sm:flex sm:gap-2 gap-3 w-full sm:w-auto">
+            <ActionButton
+              variant="ghost"
               onClick={handleSelectAll}
-              className="px-3 py-2 rounded-lg border border-outline-variant/25 hover:border-outline-variant/45 text-on-surface text-sm font-medium transition-colors"
+              className="px-3"
             >
               Select All
-            </button>
-            <button
+            </ActionButton>
+            <ActionButton
+              variant="ghost"
               onClick={handleDeselectAll}
-              className="px-3 py-2 rounded-lg border border-outline-variant/25 hover:border-outline-variant/45 text-on-surface text-sm font-medium transition-colors"
+              className="px-3"
+              disabled={selectedItemIds.size === 0}
             >
-              Deselect All
-            </button>
+              Clear
+            </ActionButton>
           </div>
-          <div className="flex gap-3">
-            <button
+
+          <div className="grid grid-cols-2 sm:flex sm:gap-3 gap-3 w-full sm:w-auto mb-1 sm:mb-0">
+            <ActionButton
+              variant="outline"
               onClick={onClose}
-              className="px-4 py-2 rounded-lg bg-surface hover:bg-surface-container text-on-surface text-sm font-medium transition-colors"
+              className="flex-1 sm:flex-none"
             >
-              Close
-            </button>
-            <button
+              Cancel
+            </ActionButton>
+            <ActionButton
+              tone="primary"
+              variant="filled"
               onClick={handleAddSelected}
               disabled={selectedItemIds.size === 0}
-              className="px-4 py-2 rounded-lg bg-primary hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed text-on-primary text-sm font-medium transition-colors"
+              className="flex-1 sm:flex-none shadow-md"
             >
-              Add Selected ({selectedItemIds.size})
-            </button>
+              {selectedItemIds.size > 0
+                ? `Add Selected (${selectedItemIds.size})`
+                : "Add Selected"}
+            </ActionButton>
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

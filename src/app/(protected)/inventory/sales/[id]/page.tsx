@@ -5,6 +5,13 @@ import { useRouter, useParams } from "next/navigation";
 import { getAuthToken } from "@/lib/auth-session";
 import { getSale, deleteSale, type SaleRecord } from "@/lib/crud-api";
 import { PageShell, ActionButton } from "@/components/ops-ui";
+import { InvoiceTemplate } from "@/components/invoice-template";
+import {
+  ArrowLeftIcon,
+  TrashIcon,
+  PrinterIcon,
+  DocumentArrowDownIcon,
+} from "@heroicons/react/24/outline";
 
 export default function SaleDetailsPage() {
   const router = useRouter();
@@ -14,6 +21,8 @@ export default function SaleDetailsPage() {
   const [sale, setSale] = useState<SaleRecord | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isPrinting, setIsPrinting] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     const loadSale = async () => {
@@ -48,188 +57,214 @@ export default function SaleDetailsPage() {
     }
   };
 
+  const handlePrint = () => {
+    setIsPrinting(true);
+    setTimeout(() => {
+      window.print();
+      setTimeout(() => setIsPrinting(false), 500);
+    }, 150);
+  };
+
+  const handleExportPDF = async () => {
+    if (!sale) return;
+    try {
+      setExporting(true);
+      const invoiceElement = document.getElementById("invoice-export-root");
+      if (!invoiceElement) throw new Error("Invoice element not found");
+
+      // @ts-ignore
+      const { default: html2canvas } = await import("html2canvas");
+      // @ts-ignore
+      const jspdf = await import("jspdf").then((m) => m.jsPDF);
+
+      const canvas = await html2canvas(invoiceElement, {
+        scale: 3, // Increased scale for even better clarity
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: "#ffffff",
+        onclone: (clonedDoc: Document) => {
+          const clonedRootElement = clonedDoc.getElementById("invoice-export-root");
+          const originalRootElement = document.getElementById("invoice-export-root");
+          
+          if (clonedRootElement && originalRootElement) {
+            // 1. Resolve and inject CSS variables globally into the cloned document
+            // This helps with pseudo-elements and situations where element-level freezing misses something
+            const styleSheet = clonedDoc.createElement("style");
+            const rootStyle = window.getComputedStyle(document.documentElement);
+            const variables = [
+              "--primary-red", "--primary-red-glow", "--dark-bg", 
+              "--surface-light", "--border-color", "--text-main", "--text-muted"
+            ];
+            
+            let cssVars = ":root { ";
+            variables.forEach(v => {
+              cssVars += `${v}: ${rootStyle.getPropertyValue(v)}; `;
+            });
+            cssVars += "}";
+            styleSheet.innerText = cssVars;
+            clonedDoc.head.appendChild(styleSheet);
+
+            const clonedElements = clonedRootElement.getElementsByTagName("*");
+            const originalElements = originalRootElement.getElementsByTagName("*");
+            
+            // 2. Loop through all elements to freeze their computed styles
+            for (let i = 0; i < originalElements.length; i++) {
+              const originalEl = originalElements[i] as HTMLElement;
+              const clonedEl = clonedElements[i] as HTMLElement;
+              
+              if (!clonedEl) continue;
+
+              const style = window.getComputedStyle(originalEl);
+              
+              const propsToFreeze = [
+                "color", "backgroundColor", "borderColor", 
+                "borderTopColor", "borderBottomColor", 
+                "borderLeftColor", "borderRightColor",
+                "fill", "stroke", "boxShadow", "opacity"
+              ];
+
+              propsToFreeze.forEach(prop => {
+                const computedVal = style.getPropertyValue(prop);
+                if (computedVal) {
+                  clonedEl.style.setProperty(prop, computedVal, "important");
+                }
+              });
+            }
+
+            clonedRootElement.style.animation = "none";
+            clonedRootElement.style.transition = "none";
+            
+            // Force desktop layout for capture regardless of current viewport size
+            const clonedPage = clonedRootElement.querySelector(".receipt-page") as HTMLElement;
+            if (clonedPage) {
+              clonedPage.style.width = "800px";
+              clonedPage.style.maxWidth = "none";
+              clonedPage.style.margin = "0";
+            }
+          }
+        },
+      });
+
+      const imgData = canvas.toDataURL("image/png");
+      const pdf = new jspdf({ orientation: "portrait", unit: "mm", format: "a4" });
+      const imgWidth = 210;
+      const pageHeight = 297;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      let heightLeft = imgHeight;
+      let position = 0;
+
+      pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+      while (heightLeft >= 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+
+      const filename = `Invoice-${sale.id}-${new Date().toISOString().split("T")[0]}.pdf`;
+      pdf.save(filename);
+    } catch (err) {
+      console.error("PDF export error:", err);
+      alert(err instanceof Error ? err.message : "An unknown error occurred during PDF export");
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  // ─── Loading ─────────────────────────────────────────────────────────────────
   if (loading) {
     return (
       <PageShell>
-        <div className="flex items-center justify-center h-80">
-          <p className="text-on-surface-variant">Loading...</p>
+        <div className="flex items-center justify-center h-96">
+          <div className="flex flex-col items-center gap-4">
+            <div className="w-12 h-12 rounded-full border-4 border-primary border-t-transparent animate-spin" />
+            <p className="text-on-surface-variant font-medium">Loading sale details...</p>
+          </div>
         </div>
       </PageShell>
     );
   }
 
+  // ─── Error ────────────────────────────────────────────────────────────────────
   if (error || !sale) {
     return (
       <PageShell>
-        <div className="max-w-2xl mx-auto space-y-6">
-          <h1 className="text-4xl font-display font-600 text-on-surface">Error</h1>
-          <div className="rounded-2xl bg-error/10 border border-error/30 px-5 py-3">
+        <div className="max-w-4xl mx-auto">
+          <button
+            onClick={() => router.back()}
+            className="mb-6 flex items-center gap-2 px-4 py-2 rounded-xl border border-outline-variant/30 hover:border-outline-variant/60 bg-surface-container-lowest text-on-surface font-medium text-sm transition-all"
+          >
+            <ArrowLeftIcon className="w-4 h-4" />
+            Go Back
+          </button>
+          <div className="rounded-2xl bg-error/10 border border-error/30 px-6 py-6">
+            <h3 className="font-semibold text-error mb-2">Error Loading Sale</h3>
             <p className="text-error text-sm">{error || "Sale not found"}</p>
-          </div>
-          <div className="flex gap-3">
-            <button
-              onClick={() => router.back()}
-              className="px-4 py-2 rounded-lg bg-surface hover:bg-surface-container text-on-surface font-medium transition-colors"
-            >
-              Go Back
-            </button>
           </div>
         </div>
       </PageShell>
     );
   }
 
+  // ─── Print Mode — Fullscreen template, no chrome ────────────────────────────
+  if (isPrinting) {
+    return (
+      <div className="bg-white min-h-screen p-8">
+        <style>{`
+          @media print {
+            body { margin: 0 !important; padding: 0 !important; }
+          }
+        `}</style>
+        <div id="invoice-export-root">
+          <InvoiceTemplate sale={sale} />
+        </div>
+      </div>
+    );
+  }
+
+  // ─── Normal Page View ─────────────────────────────────────────────────────────
   return (
     <PageShell>
-      <div className="max-w-4xl mx-auto space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-4xl font-display font-600 text-on-surface mb-2">
-              Sale #{sale.id}
-            </h1>
-            <p className="text-on-surface-variant">
-              Created: {new Date(sale.created_at || "").toLocaleDateString()}
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            <span
-              className={`px-4 py-2 rounded-full text-sm font-medium ${
-                sale.status === "pending"
-                  ? "bg-primary/10 text-primary"
-                  : "bg-surface-container text-on-surface"
-              }`}
-            >
-              {sale.status}
-            </span>
-          </div>
-        </div>
-
-        {/* Main Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Sale Info */}
-          <div className="bg-surface-container-lowest border border-outline-variant/15 rounded-2xl p-6">
-            <h2 className="font-display font-600 text-lg text-on-surface mb-4">
-              Information
-            </h2>
-            <div className="space-y-3 text-sm">
-              <div>
-                <p className="text-on-surface-variant">Customer ID</p>
-                <p className="font-medium text-on-surface">{sale.customer_id}</p>
-              </div>
-              <div>
-                <p className="text-on-surface-variant">Seller ID</p>
-                <p className="font-medium text-on-surface">{sale.seller_id}</p>
-              </div>
-              <div>
-                <p className="text-on-surface-variant">Sale Type</p>
-                <p className="font-medium text-on-surface capitalize">{sale.sale_type}</p>
-              </div>
-              <div>
-                <p className="text-on-surface-variant">Delivery Status</p>
-                <p className="font-medium text-on-surface capitalize">{sale.delivery_status}</p>
-              </div>
-              {sale.is_maintenance && (
-                <div className="rounded-lg bg-primary/10 px-3 py-2">
-                  <p className="text-primary text-xs font-medium">Marked as Maintenance</p>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Totals */}
-          <div className="bg-surface-container-lowest border border-outline-variant/15 rounded-2xl p-6">
-            <h2 className="font-display font-600 text-lg text-on-surface mb-4">
-              Totals
-            </h2>
-            <div className="space-y-3">
-              <div className="flex justify-between">
-                <span className="text-on-surface-variant text-sm">Shipping Fee</span>
-                <span className="font-medium text-on-surface">{sale.shipping_fee}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-on-surface-variant text-sm">Sale Discount</span>
-                <span className="font-medium text-error">-{sale.sale_discount}</span>
-              </div>
-              <div className="border-t border-outline-variant/15 pt-3 flex justify-between">
-                <span className="font-semibold text-on-surface">Total Amount</span>
-                <span className="font-display font-600 text-lg text-primary">
-                  {sale.total_amount}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Items */}
-        {sale.line_items && sale.line_items.length > 0 && (
-          <div className="bg-surface-container-lowest border border-outline-variant/15 rounded-2xl p-6">
-            <h2 className="font-display font-600 text-lg text-on-surface mb-4">
-              Line Items ({sale.line_items.length})
-            </h2>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-surface-container">
-                  <tr className="border-b border-outline-variant/15">
-                    <th className="px-4 py-3 text-left font-semibold text-on-surface">ID</th>
-                    <th className="px-4 py-3 text-left font-semibold text-on-surface">Type</th>
-                    <th className="px-4 py-3 text-right font-semibold text-on-surface">Price</th>
-                    <th className="px-4 py-3 text-right font-semibold text-on-surface">Qty</th>
-                    <th className="px-4 py-3 text-right font-semibold text-on-surface">Discount</th>
-                    <th className="px-4 py-3 text-right font-semibold text-on-surface">Subtotal</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {sale.line_items.map((item) => (
-                    <tr key={item.id} className="border-b border-outline-variant/10">
-                      <td className="px-4 py-3 text-on-surface">#{item.sellable_id}</td>
-                      <td className="px-4 py-3">
-                        <span className="inline-block px-2 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium">
-                          {item.sellable_type}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-right font-medium text-on-surface">
-                        {item.selling_price}
-                      </td>
-                      <td className="px-4 py-3 text-right font-medium text-on-surface">
-                        {item.quantity}
-                      </td>
-                      <td className="px-4 py-3 text-right font-medium text-error">
-                        -{item.discount_amount}
-                      </td>
-                      <td className="px-4 py-3 text-right font-semibold text-primary">
-                        {(item.quantity * item.selling_price - item.discount_amount).toFixed(2)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {/* Actions */}
-        <div className="flex gap-3 justify-between">
+      <div className="max-w-5xl mx-auto animate-app-shell-enter space-y-6">
+        {/* ── Action Bar ── */}
+        <div className="flex items-center justify-between gap-4 flex-wrap">
           <button
             onClick={() => router.back()}
-            className="px-4 py-2 rounded-lg bg-surface hover:bg-surface-container text-on-surface font-medium transition-colors"
+            className="flex items-center gap-2 px-4 py-2 rounded-xl border border-outline-variant/30 hover:border-outline-variant/60 bg-surface-container-lowest text-on-surface font-medium text-sm transition-all"
           >
+            <ArrowLeftIcon className="w-4 h-4" />
             Back
           </button>
-          <div className="flex gap-3">
-            <button
-              onClick={() => router.push(`/inventory/sales/${sale.id}/edit`)}
-              className="px-4 py-2 rounded-lg bg-primary hover:bg-primary/90 text-on-primary font-medium transition-colors"
+
+          <div className="flex items-center gap-2 flex-wrap justify-end">
+            {/* Print */}
+            <ActionButton variant="outline" onClick={handlePrint} className="gap-2">
+              <PrinterIcon className="w-4 h-4" />
+              <span className="hidden sm:inline">Print</span>
+            </ActionButton>
+
+            {/* Export PDF */}
+            <ActionButton
+              variant="outline"
+              onClick={handleExportPDF}
+              disabled={exporting}
+              className="gap-2"
             >
-              Edit
-            </button>
-            <button
-              onClick={handleDelete}
-              className="px-4 py-2 rounded-lg bg-error/10 hover:bg-error/20 text-error font-medium transition-colors"
-            >
-              Delete
-            </button>
+              <DocumentArrowDownIcon className="w-4 h-4" />
+              <span className="hidden sm:inline">{exporting ? "Exporting..." : "PDF"}</span>
+            </ActionButton>
+
+            {/* Delete */}
+            <ActionButton variant="outline" tone="danger" onClick={handleDelete}>
+              <TrashIcon className="w-4 h-4" />
+            </ActionButton>
           </div>
+        </div>
+
+        {/* ── Invoice Template ── */}
+        <div id="invoice-export-root" className="w-full">
+          <InvoiceTemplate sale={sale} />
         </div>
       </div>
     </PageShell>
