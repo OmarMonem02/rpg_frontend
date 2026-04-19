@@ -1,5 +1,7 @@
+"use client";
+
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 
 type Tone = "default" | "primary" | "success" | "warning" | "danger";
 
@@ -131,22 +133,37 @@ export function InputGroup({
 export function ActionButton({
   children,
   tone = "default",
+  variant = "filled",
+  size = "md",
   href,
   className = "",
   ...props
 }: React.ButtonHTMLAttributes<HTMLButtonElement> & {
   children: ReactNode;
   tone?: Tone;
+  variant?: "filled" | "ghost" | "outline";
+  size?: "sm" | "md" | "lg";
   href?: string;
   className?: string;
 }) {
+  const sizeClasses = {
+    sm: "px-3 py-1.5 text-xs",
+    md: "px-4 py-2.5 text-sm",
+    lg: "px-6 py-3.5 text-base",
+  };
+
   const sharedClassName = [
-    "inline-flex items-center justify-center rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors",
-    tone === "primary"
-      ? "bg-primary text-on-primary hover:opacity-90"
-      : tone === "danger"
-        ? "bg-error-container text-on-error-container hover:opacity-90"
-        : "border border-outline-variant/20 bg-surface text-on-surface hover:bg-surface-container",
+    "inline-flex items-center justify-center rounded-xl font-semibold transition-all duration-200 active:scale-95 disabled:opacity-50 disabled:pointer-events-none",
+    sizeClasses[size],
+    variant === "filled"
+      ? tone === "primary"
+        ? "bg-primary text-on-primary hover:opacity-90 shadow-sm"
+        : tone === "danger"
+          ? "bg-error-container text-on-error-container hover:opacity-90"
+          : "border border-outline-variant/20 bg-surface text-on-surface hover:bg-surface-container"
+      : variant === "ghost"
+        ? "hover:bg-surface-container-high text-on-surface-variant hover:text-on-surface"
+        : "border border-outline-variant/20 bg-transparent hover:bg-surface-container-low text-on-surface-variant hover:text-on-surface",
     className,
   ]
     .join(" ")
@@ -208,11 +225,13 @@ export function InlineMessage({
 export function StatusBadge({
   children,
   tone = "default",
+  className = "",
 }: {
   children: ReactNode;
   tone?: Tone;
+  className?: string;
 }) {
-  return <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium ${toneClasses[tone]}`}>{children}</span>;
+  return <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium ${toneClasses[tone]} ${className}`.trim()}>{children}</span>;
 }
 
 export function PaginationControls({
@@ -241,6 +260,36 @@ export function PaginationControls({
           Next
         </ActionButton>
       </div>
+    </div>
+  );
+}
+export function TabsWrapper({
+  tabs,
+  defaultTabId,
+}: {
+  tabs: { id: string; label: string; content: ReactNode }[];
+  defaultTabId: string;
+}) {
+  const [activeTab, setActiveTab] = useState(defaultTabId);
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="flex gap-1 rounded-2xl border border-outline-variant/15 bg-surface-container-low p-1.5 overflow-x-auto no-scrollbar">
+        {tabs.map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`flex-none rounded-xl px-4 py-2 text-sm font-semibold transition-all ${
+              activeTab === tab.id
+                ? "bg-primary text-on-primary shadow-sm"
+                : "text-on-surface-variant hover:bg-surface-container hover:text-on-surface"
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+      <div>{tabs.find((t) => t.id === activeTab)?.content}</div>
     </div>
   );
 }

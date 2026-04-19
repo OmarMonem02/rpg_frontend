@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { getAuthToken } from "@/lib/auth-session";
+import { useEntityFilters } from "@/hooks/useEntityFilters";
 import {
   listBrands,
   createBrand,
@@ -11,6 +12,7 @@ import {
   type CreateBrandPayload,
 } from "@/lib/crud-api";
 import { EntityFormModal, type FieldConfig } from "@/components/entity-form-modal";
+import { AdvancedFilters } from "@/components/advanced-filters";
 import {
   ActionButton,
   EmptyState,
@@ -25,7 +27,6 @@ import {
 
 export default function BrandsPage() {
   const [brands, setBrands] = useState<BrandRecord[]>([]);
-  const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -35,13 +36,20 @@ export default function BrandsPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [typeFilter, setTypeFilter] = useState<"" | "spare_parts" | "products" | "bikes">("");
 
+  // Use custom filter hook
+  const { page, setPage, getCleanFilters, setCurrency, setPriceMin, setPriceMax, filters, logFilters } = useEntityFilters();
+
   const loadBrands = async () => {
     try {
       setLoading(true);
       const token = getAuthToken();
       if (!token) throw new Error("Authentication required");
 
-      const result = await listBrands(token, page, typeFilter || undefined);
+      console.log("[Brands] Applying filters:", filters, "Page:", page);
+      logFilters();
+
+      const cleanFilters = getCleanFilters();
+      const result = await listBrands(token, page, typeFilter || undefined, cleanFilters as any);
       setBrands(result.items);
       setTotalPages(result.lastPage);
       setError(null);
@@ -162,6 +170,17 @@ export default function BrandsPage() {
             </select>
           </InputGroup>
         </FilterBar>
+
+        <AdvancedFilters
+          priceMin={filters.price_min}
+          setPriceMin={setPriceMin}
+          priceMax={filters.price_max}
+          setPriceMax={setPriceMax}
+          currency={filters.currency || "all"}
+          setCurrency={setCurrency}
+          showPriceFilters={false}
+          showCurrencyFilter={true}
+        />
 
       {loading ? (
         <div className="flex justify-center py-12">
