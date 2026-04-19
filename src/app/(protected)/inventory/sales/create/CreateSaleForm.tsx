@@ -41,6 +41,7 @@ export function CreateSaleForm() {
   const [sellerId, setSellerId] = useState<number | null>(null);
   const [paymentMethodId, setPaymentMethodId] = useState<number | null>(null);
   const [saleType, setSaleType] = useState<"site" | "online" | "delivery">("site");
+  const [saleStatus, setSaleStatus] = useState<"pending" | "partial" | "completed">("completed");
   const [deliveryStatus, setDeliveryStatus] = useState("pending");
   const [shippingFee, setShippingFee] = useState(0);
   const [saleDiscount, setSaleDiscount] = useState(0);
@@ -84,6 +85,22 @@ export function CreateSaleForm() {
 
     loadDependencies();
   }, []);
+
+  useEffect(() => {
+    if (saleType === "site") {
+      setDeliveryStatus("delivered");
+      setSaleStatus("completed");
+      setShippingFee(0);
+      return;
+    }
+
+    setDeliveryStatus((current) =>
+      current === "delivered" ? "pending" : current,
+    );
+    setSaleStatus((current) =>
+      current === "completed" ? "pending" : current,
+    );
+  }, [saleType]);
 
   const handleOpenCatalog = (catalogType: CatalogType) => {
     setActiveCatalog(catalogType);
@@ -165,6 +182,8 @@ export function CreateSaleForm() {
       if (!sellerId) throw new Error("Please select a seller");
       if (!paymentMethodId) throw new Error("Please select a payment method");
       if (cartItems.length === 0) throw new Error("Please add at least one item");
+      if (shippingFee < 0) throw new Error("Shipping fee cannot be negative");
+      if (saleDiscount < 0) throw new Error("Overall discount cannot be negative");
 
       const token = getAuthToken();
       if (!token) throw new Error("Authentication required");
@@ -175,7 +194,11 @@ export function CreateSaleForm() {
         seller_id: sellerId,
         payment_method_id: paymentMethodId,
         type: saleType,
-        status: "pending",
+        status: saleStatus,
+        delivery_status: deliveryStatus as "pending" | "in-transit" | "delivered",
+        shipping_fee: Number(shippingFee) || 0,
+        sale_discount: Number(saleDiscount) || 0,
+        is_maintenance: isMaintenance,
         items: cartItems.map((item) => {
           const lineItem: CreateSaleLineItemPayload = {
             selling_price: Number(item.selling_price) || 0,
@@ -370,6 +393,31 @@ export function CreateSaleForm() {
                 </div>
               </div>
 
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">
+                  Sale Status
+                </label>
+                <div className="relative">
+                  <select
+                    value={saleStatus}
+                    onChange={(e) =>
+                      setSaleStatus(
+                        e.target.value as "pending" | "partial" | "completed",
+                      )
+                    }
+                    className="form-input-base w-full appearance-none bg-surface shadow-sm"
+                    disabled={saleType === "site"}
+                  >
+                    <option value="pending">Pending</option>
+                    <option value="partial">Partial</option>
+                    <option value="completed">Completed</option>
+                  </select>
+                  <div className="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none text-on-surface-variant">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                  </div>
+                </div>
+              </div>
+
               {/* Delivery Status */}
               <div className="space-y-2">
                 <label className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">
@@ -380,6 +428,7 @@ export function CreateSaleForm() {
                     value={deliveryStatus}
                     onChange={(e) => setDeliveryStatus(e.target.value)}
                     className="form-input-base w-full appearance-none bg-surface shadow-sm"
+                    disabled={saleType === "site"}
                   >
                     <option value="pending">Pending</option>
                     <option value="in-transit">In Transit</option>
@@ -405,6 +454,7 @@ export function CreateSaleForm() {
                     step="0.01"
                     className="form-input-base pl-9 shadow-sm"
                     placeholder="0.00"
+                    disabled={saleType === "site"}
                   />
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-on-surface-variant font-medium">
                     +

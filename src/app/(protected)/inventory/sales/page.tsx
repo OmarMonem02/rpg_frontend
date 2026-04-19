@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { getAuthToken } from "@/lib/auth-session";
+import { getAuthToken, getAuthUser } from "@/lib/auth-session";
 import { useEntityFilters } from "@/hooks/useEntityFilters";
 import {
   listSales,
@@ -26,6 +26,8 @@ import { ShoppingBagIcon, CurrencyDollarIcon, PlusIcon, TrashIcon, EyeIcon, Chev
 
 export default function SalesPage() {
   const router = useRouter();
+  const currentUser = getAuthUser();
+  const isAdmin = currentUser?.role?.toLowerCase() === "admin";
   const [sales, setSales] = useState<SaleRecord[]>([]);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
@@ -54,7 +56,7 @@ export default function SalesPage() {
       });
 
       // Apply sorting on client side since backend might not support all sort options
-      let sortedSales = [...result.items];
+      const sortedSales = [...result.items];
       if (sortBy === "newest") {
         sortedSales.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
       } else if (sortBy === "oldest") {
@@ -82,6 +84,10 @@ export default function SalesPage() {
   }, [loadData]);
 
   const handleDeleteSale = async (id: number) => {
+    if (!isAdmin) {
+      setError("Only admin users can delete sales.");
+      return;
+    }
     if (!confirm("Are you sure you want to delete this sale?")) return;
     try {
       const token = getAuthToken();
@@ -175,7 +181,11 @@ export default function SalesPage() {
         {/* Sort Dropdown */}
         <select
           value={sortBy}
-          onChange={(e) => setSortBy(e.target.value as any)}
+          onChange={(e) =>
+            setSortBy(
+              e.target.value as "newest" | "oldest" | "highest" | "lowest",
+            )
+          }
           className="ml-auto px-4 py-2 rounded-xl border border-outline-variant/30 hover:border-outline-variant/60 bg-surface-container-lowest text-on-surface font-medium text-sm transition-all form-input-base"
         >
           <option value="newest">Newest First</option>
@@ -314,14 +324,16 @@ export default function SalesPage() {
                   >
                     View Details
                   </ActionButton>
-                  <ActionButton
-                    variant="outline"
-                    tone="danger"
-                    className="px-4"
-                    onClick={() => handleDeleteSale(sale.id)}
-                  >
-                    <TrashIcon className="w-4 h-4" />
-                  </ActionButton>
+                  {isAdmin ? (
+                    <ActionButton
+                      variant="outline"
+                      tone="danger"
+                      className="px-4"
+                      onClick={() => handleDeleteSale(sale.id)}
+                    >
+                      <TrashIcon className="w-4 h-4" />
+                    </ActionButton>
+                  ) : null}
                 </div>
               </SurfaceCard>
             ))}
@@ -390,15 +402,17 @@ export default function SalesPage() {
                             >
                               <EyeIcon className="w-4 h-4" />
                             </ActionButton>
-                            <ActionButton
-                              variant="outline"
-                              tone="danger"
-                              size="sm"
-                              className="px-3"
-                              onClick={() => handleDeleteSale(sale.id)}
-                            >
-                              <TrashIcon className="w-4 h-4" />
-                            </ActionButton>
+                            {isAdmin ? (
+                              <ActionButton
+                                variant="outline"
+                                tone="danger"
+                                size="sm"
+                                className="px-3"
+                                onClick={() => handleDeleteSale(sale.id)}
+                              >
+                                <TrashIcon className="w-4 h-4" />
+                              </ActionButton>
+                            ) : null}
                           </div>
                         </td>
                       </tr>

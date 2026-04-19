@@ -16,14 +16,9 @@ export function InvoiceTemplate({
 }: InvoiceTemplateProps) {
   const itemsSubtotal =
     sale.line_items?.reduce(
-      (sum, item) => sum + item.quantity * item.selling_price,
+      (sum, item) => sum + item.remaining_qty * item.selling_price,
       0,
     ) || 0;
-  const originalSubtotal = itemsSubtotal;
-  const currentSubtotal = itemsSubtotal;
-  const hasReturns = false;
-  const totalRefundAmount = 0;
-  const exchangeAdjustments = 0;
   const shippingFee = sale.shipping_fee || 0;
   const saleDiscount = sale.sale_discount || 0;
   const netTotal = sale.total || 0;
@@ -77,15 +72,14 @@ export function InvoiceTemplate({
 
         .receipt-wrapper { 
           background: transparent; 
-          padding: 40px 0; 
+          padding: 24px 12px; 
           font-family: 'Outfit', sans-serif; 
           display: flex; 
           justify-content: center; 
           width: 100%; 
           color: var(--text-main);
           animation: fadeIn 0.8s ease-out;
-          overflow-x: auto;
-          -webkit-overflow-scrolling: touch;
+          overflow-x: hidden;
         }
         
         @keyframes fadeIn {
@@ -94,8 +88,9 @@ export function InvoiceTemplate({
         }
 
         .receipt-page { 
-          width: 800px; 
-          min-width: 800px;
+          width: min(100%, 210mm);
+          max-width: 210mm;
+          min-height: 297mm;
           margin: 0 auto; 
           background: var(--surface-light); 
           position: relative; 
@@ -103,6 +98,7 @@ export function InvoiceTemplate({
           box-shadow: 0 20px 50px rgba(0,0,0,0.08); 
           border-radius: 12px;
           border: 1px solid var(--border-color);
+          box-sizing: border-box;
         }
 
         .receipt-page::before { 
@@ -123,7 +119,7 @@ export function InvoiceTemplate({
           left: 50%; 
           transform: translate(-50%, -50%) rotate(-20deg); 
           font-family: 'Barlow Condensed', sans-serif; 
-          font-size: 380px; 
+          font-size: clamp(180px, 28vw, 380px); 
           font-weight: 800; 
           color: rgba(0,0,0,0.05); 
           pointer-events: none; 
@@ -132,7 +128,7 @@ export function InvoiceTemplate({
           white-space: nowrap;
         }
         
-        .ri { position: relative; z-index: 1; padding: 48px; }
+        .ri { position: relative; z-index: 1; padding: clamp(18px, 3vw, 48px); }
 
         .receipt-header { 
           display: flex; 
@@ -266,6 +262,7 @@ export function InvoiceTemplate({
         .bcard { background: #f5f3ff; color: #7c3aed; }
 
         .table-section { margin-bottom: 40px; }
+        .table-responsive { width: 100%; overflow: hidden; }
         .receipt-wrapper table { width: 100%; border-collapse: separate; border-spacing: 0; }
         .receipt-wrapper thead th { 
           padding: 16px; 
@@ -366,6 +363,46 @@ export function InvoiceTemplate({
         .fthanks { font-weight: 800; font-size: 16px; color: var(--dark-bg); text-transform: uppercase; letter-spacing: 1px; }
         .ftagline { font-size: 11px; color: var(--text-muted); margin-top: 4px; font-weight: 500; }
 
+        @media (max-width: 900px) {
+          .receipt-header,
+          .receipt-footer,
+          .totals-area {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 20px;
+          }
+
+          .hmeta,
+          .footer-r {
+            text-align: left;
+          }
+
+          .mgrid {
+            grid-template-columns: repeat(2, 1fr);
+          }
+        }
+
+        @media (max-width: 640px) {
+          .receipt-wrapper {
+            padding: 12px 0;
+          }
+
+          .receipt-page {
+            border-radius: 0;
+            border-left: none;
+            border-right: none;
+          }
+
+          .mgrid {
+            grid-template-columns: 1fr;
+          }
+
+          .receipt-wrapper thead th,
+          .receipt-wrapper td {
+            padding: 12px 10px;
+          }
+        }
+
 
         @media print {
           @page {
@@ -383,6 +420,7 @@ export function InvoiceTemplate({
           }
           .receipt-page { 
             width: 210mm !important;
+            max-width: 210mm !important;
             min-height: 297mm !important;
             box-shadow: none !important; 
             border: none !important; 
@@ -390,9 +428,14 @@ export function InvoiceTemplate({
             border-radius: 0 !important;
             overflow: visible !important;
           }
-          .ri { padding: 15mm !important; }
+          .ri { padding: 12mm 12mm 10mm !important; }
           .official-seal { opacity: 0.12 !important; }
           .trow.grand { background: #000 !important; color: #fff !important; }
+          .receipt-footer,
+          .receipt-header,
+          .totals-area {
+            page-break-inside: avoid;
+          }
         }
       `}</style>
 
@@ -472,9 +515,9 @@ export function InvoiceTemplate({
                 <table>
                   <thead>
                     <tr>
-                      <th>Product Details</th>
+                      <th>Item</th>
+                      <th>Type</th>
                       <th className="r">Qty</th>
-                      <th className="r">Unit</th>
                       <th className="r">Price</th>
                       <th className="r">Amount</th>
                     </tr>
@@ -492,24 +535,56 @@ export function InvoiceTemplate({
                       </tr>
                     ) : (
                       sale.line_items.map((item) => (
-                        <tr key={item.id}>
+                        <tr
+                          key={item.id}
+                          className={
+                            item.remaining_qty === 0
+                              ? "item-fully-returned"
+                              : ""
+                          }
+                        >
                           <td>
                             <div className="iname">
-                              {item.item_label}
+                              {item.item_name || item.item_label}
+                              {item.remaining_qty === 0 && (
+                                <span
+                                  style={{
+                                    marginLeft: "8px",
+                                    fontSize: "10px",
+                                    color: "var(--primary-red)",
+                                    border: "1px solid",
+                                    padding: "1px 4px",
+                                    borderRadius: "4px",
+                                  }}
+                                >
+                                  RETURNED
+                                </span>
+                              )}
                             </div>
                           </td>
-                          <td className="r" style={{ fontWeight: 600 }}>
-                            {item.quantity}
-                          </td>
                           <td
-                            className="r"
                             style={{
-                              fontSize: "11px",
-                              color: "#888",
-                              textTransform: "uppercase",
+                              fontSize: "12px",
+                              color: "var(--text-muted)",
+                              textTransform: "capitalize",
                             }}
                           >
-                            {item.sellable_type.split("_")[0]}
+                            {item.sellable_type.replace(/_/g, " ")}
+                          </td>
+                          <td className="r" style={{ fontWeight: 600 }}>
+                            {item.remaining_qty}
+                            {item.returned_qty > 0 &&
+                              item.remaining_qty > 0 && (
+                                <div
+                                  style={{
+                                    fontSize: "10px",
+                                    fontWeight: 400,
+                                    color: "#888",
+                                  }}
+                                >
+                                  Of {item.quantity}
+                                </div>
+                              )}
                           </td>
                           <td className="r">
                             EGP{" "}
@@ -520,22 +595,28 @@ export function InvoiceTemplate({
                           <td className="r istotal">
                             EGP{" "}
                             {(
-                              item.quantity * item.selling_price -
-                              (item.discount_amount || 0)
+                              item.remaining_qty * item.selling_price -
+                              (item.discount_amount / item.quantity) *
+                                item.remaining_qty
                             ).toLocaleString(undefined, {
                               minimumFractionDigits: 2,
                             })}
-                            {item.discount_amount > 0 && (
-                              <div
-                                style={{
-                                  color: "var(--primary-red)",
-                                  fontSize: "10px",
-                                  fontWeight: 500,
-                                }}
-                              >
-                                -{item.discount_amount.toFixed(2)}
-                              </div>
-                            )}
+                            {item.discount_amount > 0 &&
+                              item.remaining_qty > 0 && (
+                                <div
+                                  style={{
+                                    color: "var(--primary-red)",
+                                    fontSize: "10px",
+                                    fontWeight: 500,
+                                  }}
+                                >
+                                  -
+                                  {(
+                                    (item.discount_amount / item.quantity) *
+                                    item.remaining_qty
+                                  ).toFixed(2)}
+                                </div>
+                              )}
                           </td>
                         </tr>
                       ))

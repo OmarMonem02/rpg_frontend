@@ -1228,6 +1228,7 @@ export async function deleteBikeBlueprint(
   });
 }
 
+
 // ============================================================================
 // PAYMENT METHODS
 // ============================================================================
@@ -1488,82 +1489,6 @@ export async function assignSparePartToBikeBlueprint(
   );
 }
 
-export async function removeSparePartFromBikeBlueprint(
-  token: string,
-  blueprintId: number,
-  sparePartId: number,
-): Promise<void> {
-  await authorizedFetch<void>(
-    `/bike_blueprints/${blueprintId}/spare_parts/${sparePartId}`,
-    token,
-    {
-      method: "DELETE",
-    },
-  );
-}
-
-export async function getSparePartBlueprints(
-  token: string,
-  sparePartId: number,
-): Promise<number[]> {
-  try {
-    // Get all blueprints
-    const blueprintsResult = await listBikeBlueprints(token, 1);
-    const allBlueprints = blueprintsResult.items;
-
-    // Query each blueprint to see if it has this spare part
-    const linkedBlueprintIds: number[] = [];
-
-    for (const blueprint of allBlueprints) {
-      const sparePartsResult = await listBikeBlueprintSpareParts(
-        token,
-        blueprint.id,
-        1,
-        {
-          per_page: 1000,
-        },
-      );
-
-      // Check if this spare part is in the blueprint's spare parts
-      if (
-        sparePartsResult.items.some(
-          (item) => item.spare_part_id === sparePartId,
-        )
-      ) {
-        linkedBlueprintIds.push(blueprint.id);
-      }
-    }
-
-    return linkedBlueprintIds;
-  } catch (err) {
-    console.error("Failed to fetch spare part blueprints:", err);
-    return [];
-  }
-}
-
-export async function assignBlueprintsToSparePart(
-  token: string,
-  sparePartId: number,
-  blueprintIds: number[],
-): Promise<void> {
-  // Link a spare part to multiple blueprints
-  // For each blueprint, call the blueprint's spare parts endpoint
-  for (const blueprintId of blueprintIds) {
-    await assignSparePartToBikeBlueprint(token, blueprintId, {
-      spare_part_id: sparePartId,
-    });
-  }
-}
-
-export async function removeBlueprintFromSparePart(
-  token: string,
-  sparePartId: number,
-  blueprintId: number,
-): Promise<void> {
-  // Unlink a spare part from a blueprint
-  await removeSparePartFromBikeBlueprint(token, blueprintId, sparePartId);
-}
-
 // ============================================================================
 // CUSTOMERS
 // ============================================================================
@@ -1651,7 +1576,11 @@ export type SaleLineItemRecord = {
   selling_price: number;
   discount_amount: number;
   quantity: number;
+  returned_qty: number;
+  remaining_qty: number;
   item_label?: string;
+  /** Clean item name with the type prefix stripped (e.g. "Wheel 3" instead of "product Wheel 3") */
+  item_name?: string;
   created_at?: string;
 };
 
@@ -1690,16 +1619,43 @@ export type CreateSalePayload = {
   seller_id: number;
   payment_method_id: number;
   type: "site" | "online" | "delivery";
-  status?: "completed" | "partial" | "pending";
+  status?:
+    | "completed"
+    | "partial"
+    | "pending"
+    | "returned"
+    | "cancelled";
+  delivery_status?: "pending" | "in-transit" | "delivered";
+  shipping_fee?: number;
+  sale_discount?: number;
+  is_maintenance?: boolean;
   items: CreateSaleLineItemPayload[];
 };
 
-export type UpdateSalePayload = Partial<Omit<CreateSalePayload, "line_items">>;
+export type UpdateSalePayload = Partial<
+  Omit<CreateSalePayload, "line_items" | "status">
+> & {
+  status?: string;
+};
 
 export type UpdateSaleLineItemPayload = Partial<CreateSaleLineItemPayload>;
 
+/** Strips known type prefixes the backend prepends to item_label (e.g. "product ", "spare part "). */
+function stripItemTypePrefix(label: string): string {
+  const prefixes = ["maintenance service ", "spare part ", "product ", "bike "];
+  for (const prefix of prefixes) {
+    if (label.toLowerCase().startsWith(prefix)) {
+      return label.slice(prefix.length);
+    }
+  }
+  return label;
+}
+
 function normalizeSaleLineItem(raw: unknown): SaleLineItemRecord {
   const record = asRecord(raw);
+  const qty = toNumber(record.quantity || record.qty || 0);
+  const returned = toNumber(record.returned_qty || 0);
+  const rawLabel = toText(record.item_label) || undefined;
   return {
     id: toNumber(record.id),
     sale_id: toNumber(record.sale_id),
@@ -1711,8 +1667,11 @@ function normalizeSaleLineItem(raw: unknown): SaleLineItemRecord {
     sellable_id: toNumber(record.sellable_id),
     selling_price: toNumber(record.selling_price || record.sale_price || 0),
     discount_amount: toNumber(record.discount_amount || record.discount || 0),
-    quantity: toNumber(record.quantity || record.qty || 0),
-    item_label: toText(record.item_label) || undefined,
+    quantity: qty,
+    returned_qty: returned,
+    remaining_qty: toNumber(record.remaining_qty ?? Math.max(0, qty - returned)),
+    item_label: rawLabel,
+    item_name: rawLabel ? stripItemTypePrefix(rawLabel) : undefined,
     created_at: toText(record.created_at) || undefined,
   };
 }
@@ -1870,4 +1829,45 @@ export async function deleteSaleLineItem(
   await authorizedFetch<void>(`/sales/${saleId}/items/${itemId}`, token, {
     method: "DELETE",
   });
+}
+
+export async function processSaleReturn(
+  token: string,
+  saleId: number,
+  payload: { sale_item_id: number; qty: number; notes?: string },
+): Promise<SaleRecord> {
+  const data = await authorizedFetch<unknown>(
+    `/sales/${saleId}/returns`,
+    token,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    },
+  );
+  const record = asRecord(data);
+  return normalizeSale(record.data ?? record);
+}
+
+export async function processSaleExchange(
+  token: string,
+  saleId: number,
+  payload: {
+    sale_item_id: number;
+    qty: number;
+    notes?: string;
+    replacements: CreateSaleLineItemPayload[];
+  },
+): Promise<SaleRecord> {
+  const data = await authorizedFetch<unknown>(
+    `/sales/${saleId}/exchanges`,
+    token,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    },
+  );
+  const record = asRecord(data);
+  return normalizeSale(record.data ?? record);
 }
