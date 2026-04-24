@@ -1,6 +1,8 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { usePermissions } from "@/components/permission-provider";
 import { ApiError } from "@/lib/auth-api";
 import { getAuthToken } from "@/lib/auth-session";
 import { createUser, deleteUser, listUsers, updateUser, type UserRecord } from "@/lib/crud-api";
@@ -36,6 +38,8 @@ function buildRpgEmail(value: string): string {
 }
 
 export default function UsersPage() {
+  const router = useRouter();
+  const permissions = usePermissions();
   const [records, setRecords] = useState<UserRecord[]>([]);
   const [form, setForm] = useState<UserFormState>(initialForm);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -45,6 +49,9 @@ export default function UsersPage() {
   const [error, setError] = useState("");
   const [page, setPage] = useState(1);
   const [lastPage, setLastPage] = useState(1);
+  const canCreateUsers = permissions.canCreate("users");
+  const canUpdateUsers = permissions.canUpdate("users");
+  const canDeleteUsers = permissions.canDelete("users");
 
   async function loadUsers(nextPage = page) {
     const token = getAuthToken();
@@ -83,6 +90,10 @@ export default function UsersPage() {
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if ((editingId && !canUpdateUsers) || (!editingId && !canCreateUsers)) {
+      setError("You do not have permission to save users.");
+      return;
+    }
     const token = getAuthToken();
     if (!token) {
       setError("You are not authenticated. Please sign in again.");
@@ -130,6 +141,10 @@ export default function UsersPage() {
   }
 
   async function onDelete(id: number) {
+    if (!canDeleteUsers) {
+      setError("You do not have permission to delete users.");
+      return;
+    }
     const token = getAuthToken();
     if (!token) {
       setError("You are not authenticated. Please sign in again.");
@@ -154,6 +169,7 @@ export default function UsersPage() {
   }
 
   function onEdit(record: UserRecord) {
+    if (!canUpdateUsers) return;
     setEditingId(record.id);
     setForm({
       name: record.name,
@@ -174,6 +190,7 @@ export default function UsersPage() {
         description="Manage RPG user accounts and roles with the existing `/users` integration."
       />
 
+      {canCreateUsers || editingId ? (
       <SurfaceCard>
       <form className="space-y-4" onSubmit={onSubmit}>
         <h2 className="text-lg font-semibold text-on-surface">{editingId ? "Edit User" : "Create User"}</h2>
@@ -279,6 +296,13 @@ export default function UsersPage() {
         </div>
       </form>
       </SurfaceCard>
+      ) : null}
+
+      {!canCreateUsers && !canUpdateUsers ? (
+        <InlineMessage tone="warning">
+          Your account can read users, but it cannot create or update them.
+        </InlineMessage>
+      ) : null}
 
       {error ? <InlineMessage tone="danger">{error}</InlineMessage> : null}
       {message ? (
@@ -315,18 +339,31 @@ export default function UsersPage() {
                       <div className="flex gap-2">
                         <button
                           type="button"
-                          onClick={() => onEdit(record)}
-                          className="rounded-md border border-outline-variant/40 bg-surface-container-low px-3 py-1 font-medium text-on-surface"
+                          onClick={() => router.push(`/users/permissions/${record.id}`)}
+                          className="rounded-md border border-primary/40 bg-primary/10 px-3 py-1 font-medium text-primary hover:bg-primary/20 transition-colors"
+                          title="Manage user permissions and authorizations"
+                          hidden={!canUpdateUsers}
                         >
-                          Edit
+                          Permissions
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => onDelete(record.id)}
-                          className="rounded-md bg-error-container px-3 py-1 font-medium text-on-error-container"
-                        >
-                          Delete
-                        </button>
+                        {canUpdateUsers ? (
+                          <button
+                            type="button"
+                            onClick={() => onEdit(record)}
+                            className="rounded-md border border-outline-variant/40 bg-surface-container-low px-3 py-1 font-medium text-on-surface"
+                          >
+                            Edit
+                          </button>
+                        ) : null}
+                        {canDeleteUsers ? (
+                          <button
+                            type="button"
+                            onClick={() => onDelete(record.id)}
+                            className="rounded-md bg-error-container px-3 py-1 font-medium text-on-error-container"
+                          >
+                            Delete
+                          </button>
+                        ) : null}
                       </div>
                     </td>
                   </tr>

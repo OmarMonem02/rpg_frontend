@@ -1,5 +1,6 @@
 import { getApiUrl } from "@/lib/config";
 import type { AuthUser } from "@/lib/auth-session";
+import { normalizeOptionalPermissionMatrix } from "@/lib/permissions";
 
 export type LoginPayload = {
   email: string;
@@ -38,6 +39,19 @@ async function parseJson<T>(response: Response): Promise<T> {
   return (await response.json()) as T;
 }
 
+function normalizeAuthUser(raw: unknown): AuthUser {
+  const record =
+    raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+
+  return {
+    id: typeof record.id === "number" ? record.id : Number(record.id ?? 0),
+    name: typeof record.name === "string" ? record.name : "",
+    email: typeof record.email === "string" ? record.email : "",
+    role: typeof record.role === "string" ? record.role : "",
+    permissions: normalizeOptionalPermissionMatrix(record.permissions),
+  };
+}
+
 export async function login(payload: LoginPayload): Promise<LoginResponse> {
   const response = await fetch(getApiUrl("/login"), {
     method: "POST",
@@ -55,7 +69,11 @@ export async function login(payload: LoginPayload): Promise<LoginResponse> {
     throw new ApiError(await parseErrorMessage(response), response.status);
   }
 
-  return parseJson<LoginResponse>(response);
+  const data = await parseJson<LoginResponse>(response);
+  return {
+    token: data.token,
+    user: normalizeAuthUser(data.user),
+  };
 }
 
 export async function getMe(token: string): Promise<AuthUser> {
@@ -71,7 +89,7 @@ export async function getMe(token: string): Promise<AuthUser> {
   }
 
   const data = await parseJson<{ user: AuthUser }>(response);
-  return data.user;
+  return normalizeAuthUser(data.user);
 }
 
 export async function logout(token: string): Promise<void> {

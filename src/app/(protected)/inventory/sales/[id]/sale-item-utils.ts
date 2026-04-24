@@ -24,6 +24,8 @@ export type PendingExchangeItem = {
   label: string;
   kind: SaleLineItemRecord["sellable_type"];
   payload: CreateSaleLineItemPayload;
+  /** Native currency of the catalog item ("EGP" | "USD") */
+  currency: "EGP" | "USD";
 };
 
 export const money = (n: number) =>
@@ -40,11 +42,27 @@ export const labelOf = (t: SaleLineItemRecord["sellable_type"]) =>
     maintenance_services: "Service",
   })[t];
 
+/**
+ * Converts a price to EGP using the provided exchange rate.
+ * If the currency is already EGP (or no rate is given), the value is returned as-is.
+ */
+export function normalizeToEGP(
+  price: number,
+  currency: "EGP" | "USD",
+  exchangeRate: number
+): number {
+  if (currency === "USD" && exchangeRate > 0) {
+    return Math.round(price * exchangeRate * 100) / 100;
+  }
+  return Math.round(price * 100) / 100;
+}
+
 export function buildPayload(item: CatalogItem) {
   if ("service_price" in item) {
     return {
       label: item.name,
       kind: "maintenance_services" as const,
+      currency: "EGP" as const,
       payload: {
         maintenance_service_id: item.id,
         selling_price: item.service_price,
@@ -58,6 +76,7 @@ export function buildPayload(item: CatalogItem) {
     return {
       label: item.name,
       kind: "products" as const,
+      currency: (item.currency_pricing ?? "EGP") as "EGP" | "USD",
       payload: {
         product_id: item.id,
         selling_price: item.sale_price,
@@ -71,6 +90,7 @@ export function buildPayload(item: CatalogItem) {
     return {
       label: item.name,
       kind: "spare_parts" as const,
+      currency: (item.currency_pricing ?? "EGP") as "EGP" | "USD",
       payload: {
         spare_part_id: item.id,
         selling_price: item.sale_price,
@@ -83,6 +103,7 @@ export function buildPayload(item: CatalogItem) {
   return {
     label: "vin" in item && item.vin ? `Bike ${item.vin}` : `Bike #${item.id}`,
     kind: "bikes" as const,
+    currency: "EGP" as const,
     payload: {
       bike_for_sale_id: item.id,
       selling_price: item.sale_price,

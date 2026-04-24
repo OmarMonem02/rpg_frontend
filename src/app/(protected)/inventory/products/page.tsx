@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { usePermissions } from "@/components/permission-provider";
 import { getAuthToken } from "@/lib/auth-session";
 import { useEntityFilters } from "@/hooks/useEntityFilters";
 import {
@@ -35,6 +36,7 @@ import {
 
 export default function ProductsPage() {
   const router = useRouter();
+  const permissions = usePermissions();
   const [products, setProducts] = useState<ProductRecord[]>([]);
   const [categories, setCategories] = useState<ProductCategoryRecord[]>([]);
   const [brands, setBrands] = useState<BrandRecord[]>([]);
@@ -51,6 +53,12 @@ export default function ProductsPage() {
     useState<ProductCategoryRecord | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const canCreateProducts = permissions.canCreate("products");
+  const canUpdateProducts = permissions.canUpdate("products");
+  const canDeleteProducts = permissions.canDelete("products");
+  const canCreateProductCategories = permissions.canCreate("product-categories");
+  const canUpdateProductCategories = permissions.canUpdate("product-categories");
+  const canDeleteProductCategories = permissions.canDelete("product-categories");
 
   const loadData = useCallback(async () => {
     try {
@@ -87,6 +95,10 @@ export default function ProductsPage() {
   }, [loadData]);
 
   const handleDeleteProduct = async (id: number) => {
+    if (!canDeleteProducts) {
+      setError("You do not have permission to delete products.");
+      return;
+    }
     if (!confirm("Are you sure you want to delete this product?")) return;
     try {
       const token = getAuthToken();
@@ -99,6 +111,8 @@ export default function ProductsPage() {
   };
 
   const handleOpenCategoryModal = (category?: ProductCategoryRecord) => {
+    if (category && !canUpdateProductCategories) return;
+    if (!category && !canCreateProductCategories) return;
     setEditingCategory(category || null);
     setSubmitError(null);
     setCategoryModalOpen(true);
@@ -111,6 +125,12 @@ export default function ProductsPage() {
 
   const handleSubmitCategory = async (formData: Record<string, unknown>) => {
     try {
+      if (
+        (editingCategory && !canUpdateProductCategories) ||
+        (!editingCategory && !canCreateProductCategories)
+      ) {
+        throw new Error("You do not have permission to save product categories.");
+      }
       setIsSubmitting(true);
       const token = getAuthToken();
       if (!token) throw new Error("Authentication required");
@@ -136,6 +156,10 @@ export default function ProductsPage() {
   };
 
   const handleDeleteCategory = async (id: number) => {
+    if (!canDeleteProductCategories) {
+      setError("You do not have permission to delete product categories.");
+      return;
+    }
     if (!confirm("Are you sure you want to delete this category?")) return;
     try {
       const token = getAuthToken();
@@ -242,12 +266,14 @@ export default function ProductsPage() {
           title="No products found"
           description="Try adjusting your filters or create a new product to begin building the catalog."
           action={
-            <ActionButton
-              tone="primary"
-              onClick={() => router.push("/inventory/products/create")}
-            >
-              Create Product
-            </ActionButton>
+            canCreateProducts ? (
+              <ActionButton
+                tone="primary"
+                onClick={() => router.push("/inventory/products/create")}
+              >
+                Create Product
+              </ActionButton>
+            ) : undefined
           }
         />
       ) : (
@@ -309,6 +335,7 @@ export default function ProductsPage() {
                       onClick={() =>
                         router.push(`/inventory/products/edit/${product.id}`)
                       }
+                      hidden={!canUpdateProducts}
                       className="text-primary hover:underline text-xs font-medium"
                     >
                       Edit
@@ -316,6 +343,7 @@ export default function ProductsPage() {
                     <span className="mx-2 text-on-surface-variant">•</span>
                     <button
                       onClick={() => handleDeleteProduct(product.id)}
+                      hidden={!canDeleteProducts}
                       className="text-error hover:underline text-xs font-medium"
                     >
                       Delete
@@ -347,9 +375,11 @@ export default function ProductsPage() {
             Organize products into cleaner catalog groups.
           </p>
         </div>
-        <ActionButton tone="primary" onClick={() => handleOpenCategoryModal()}>
-          Add Category
-        </ActionButton>
+        {canCreateProductCategories ? (
+          <ActionButton tone="primary" onClick={() => handleOpenCategoryModal()}>
+            Add Category
+          </ActionButton>
+        ) : null}
       </div>
 
       {categories.length === 0 ? (
@@ -357,12 +387,14 @@ export default function ProductsPage() {
           title="No categories found"
           description="Create the first category to give your product catalog a stronger structure."
           action={
-            <ActionButton
-              tone="primary"
-              onClick={() => handleOpenCategoryModal()}
-            >
-              Create Category
-            </ActionButton>
+            canCreateProductCategories ? (
+              <ActionButton
+                tone="primary"
+                onClick={() => handleOpenCategoryModal()}
+              >
+                Create Category
+              </ActionButton>
+            ) : undefined
           }
         />
       ) : (
@@ -396,6 +428,7 @@ export default function ProductsPage() {
                   <td className="px-4 py-3 text-right">
                     <button
                       onClick={() => handleOpenCategoryModal(cat)}
+                      hidden={!canUpdateProductCategories}
                       className="text-primary hover:underline text-xs font-medium"
                     >
                       Edit
@@ -403,6 +436,7 @@ export default function ProductsPage() {
                     <span className="mx-2 text-on-surface-variant">•</span>
                     <button
                       onClick={() => handleDeleteCategory(cat.id)}
+                      hidden={!canDeleteProductCategories}
                       className="text-error hover:underline text-xs font-medium"
                     >
                       Delete
@@ -424,12 +458,14 @@ export default function ProductsPage() {
         title="Products Management"
         description="Operate products with the same inventory-first system used for spare parts: clearer filters, cleaner stock status, and guided forms."
         actions={
-          <ActionButton
-            tone="primary"
-            onClick={() => router.push("/inventory/products/create")}
-          >
-            Add Product
-          </ActionButton>
+          canCreateProducts ? (
+            <ActionButton
+              tone="primary"
+              onClick={() => router.push("/inventory/products/create")}
+            >
+              Add Product
+            </ActionButton>
+          ) : null
         }
       />
 

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { usePermissions } from "@/components/permission-provider";
 import { fetchImportExportEntities } from "@/lib/api/import-export";
 import { getAuthToken } from "@/lib/auth-session";
 import type { ImportExportEntity } from "@/types/import-export";
@@ -14,6 +15,9 @@ export default function EntityImportExportPage() {
   const params = useParams();
   const router = useRouter();
   const entitySlug = params.entity as string;
+  const permissions = usePermissions();
+  const canExportData = permissions.canExport("import-export");
+  const canImportData = permissions.canImport("import-export");
 
   const [entity, setEntity] = useState<ImportExportEntity | null>(null);
   const [loading, setLoading] = useState(true);
@@ -109,9 +113,15 @@ export default function EntityImportExportPage() {
       />
 
       <div className="grid gap-6 md:grid-cols-2">
-         <ExportPanel entity={entity} />
-         <ImportPanel entity={entity} />
+         {canExportData ? <ExportPanel entity={entity} /> : null}
+         {canImportData ? <ImportPanel entity={entity} /> : null}
       </div>
+
+      {!canExportData && !canImportData ? (
+        <InlineMessage tone="warning">
+          Your account can read import/export pages, but it cannot import or export data.
+        </InlineMessage>
+      ) : null}
 
       <SurfaceCard className="mt-6">
          <h3 className="text-xl font-semibold text-on-surface mb-4">Expected Import Columns</h3>

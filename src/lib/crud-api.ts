@@ -1,5 +1,10 @@
 import { getApiUrl } from "@/lib/config";
 import { ApiError } from "@/lib/auth-api";
+import {
+  normalizePermissionMatrix,
+  normalizeOptionalPermissionMatrix,
+  type PermissionMatrix,
+} from "@/lib/permissions";
 
 type ValidationErrorResponse = {
   message?: string;
@@ -24,6 +29,7 @@ export type UserRecord = {
   name: string;
   email: string;
   role: string;
+  permissions?: PermissionMatrix;
   created_at?: string;
 };
 
@@ -49,6 +55,10 @@ export type UpdateUserPayload = {
   role: string;
   password?: string;
   password_confirmation?: string;
+};
+
+export type UpdateUserPermissionsPayload = {
+  permissions: PermissionMatrix;
 };
 
 export type UpsertSellerPayload = {
@@ -91,6 +101,7 @@ function normalizeUser(raw: unknown): UserRecord {
     name: toText(record.name),
     email: toText(record.email),
     role: toText(record.role),
+    permissions: normalizeOptionalPermissionMatrix(record.permissions),
     created_at: toText(record.created_at) || undefined,
   };
 }
@@ -138,6 +149,8 @@ async function parseErrorMessage(response: Response): Promise<string> {
 
   if (response.status === 401)
     return "Your session expired. Please log in again.";
+  if (response.status === 403)
+    return "You don't have permission to perform this action.";
   if (response.status === 422)
     return "Please review your form inputs and try again.";
   if (response.status === 500)
@@ -222,6 +235,15 @@ export async function createUser(
   return normalizeUser(record.user ?? record.data ?? record);
 }
 
+export async function getUser(
+  token: string,
+  id: number,
+): Promise<UserRecord> {
+  const data = await authorizedFetch<unknown>(`/users/${id}`, token);
+  const record = asRecord(data);
+  return normalizeUser(record.user ?? record.data ?? record);
+}
+
 export async function updateUser(
   token: string,
   id: number,
@@ -231,6 +253,21 @@ export async function updateUser(
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
+  });
+  const record = asRecord(data);
+  return normalizeUser(record.user ?? record.data ?? record);
+}
+
+export async function updateUserPermissions(
+  token: string,
+  id: number,
+  permissions: PermissionMatrix,
+): Promise<UserRecord> {
+  const normalizedPermissions = normalizePermissionMatrix(permissions);
+  const data = await authorizedFetch<unknown>(`/users/${id}/permissions`, token, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ permissions: normalizedPermissions }),
   });
   const record = asRecord(data);
   return normalizeUser(record.user ?? record.data ?? record);
@@ -1589,6 +1626,26 @@ export async function getCustomer(
   id: number,
 ): Promise<CustomerRecord> {
   const data = await authorizedFetch<unknown>(`/customers/${id}`, token);
+  const record = asRecord(data);
+  return normalizeCustomer(record.data ?? record.customer ?? record);
+}
+
+export type CreateCustomerPayload = {
+  name: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+};
+
+export async function createCustomer(
+  token: string,
+  payload: CreateCustomerPayload,
+): Promise<CustomerRecord> {
+  const data = await authorizedFetch<unknown>("/customers", token, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
   const record = asRecord(data);
   return normalizeCustomer(record.data ?? record.customer ?? record);
 }

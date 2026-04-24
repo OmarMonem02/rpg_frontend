@@ -2,7 +2,8 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { getAuthToken, getAuthUser } from "@/lib/auth-session";
+import { getAuthToken } from "@/lib/auth-session";
+import { usePermissions } from "@/components/permission-provider";
 import { useEntityFilters } from "@/hooks/useEntityFilters";
 import {
   listSales,
@@ -26,8 +27,7 @@ import { ShoppingBagIcon, CurrencyDollarIcon, PlusIcon, TrashIcon, EyeIcon, Chev
 
 export default function SalesPage() {
   const router = useRouter();
-  const currentUser = getAuthUser();
-  const isAdmin = currentUser?.role?.toLowerCase() === "admin";
+  const permissions = usePermissions();
   const [sales, setSales] = useState<SaleRecord[]>([]);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
@@ -84,8 +84,8 @@ export default function SalesPage() {
   }, [loadData]);
 
   const handleDeleteSale = async (id: number) => {
-    if (!isAdmin) {
-      setError("Only admin users can delete sales.");
+    if (!permissions.canDelete("sales")) {
+      setError("You don't have permission to delete sales.");
       return;
     }
     if (!confirm("Are you sure you want to delete this sale?")) return;
@@ -122,16 +122,18 @@ export default function SalesPage() {
         title="Sales"
         description="Manage, track, and monitor all your sales transactions efficiently."
         actions={
-          <ActionButton
-            tone="primary"
-            variant="filled"
-            onClick={() => router.push("/inventory/sales/create")}
-            className="gap-2 shadow-sm"
-          >
-            <PlusIcon className="w-5 h-5 flex-shrink-0" />
-            <span className="hidden sm:inline">Create New Sale</span>
-            <span className="sm:hidden">Create</span>
-          </ActionButton>
+          permissions.canCreate("sales") ? (
+            <ActionButton
+              tone="primary"
+              variant="filled"
+              onClick={() => router.push("/inventory/sales/create")}
+              className="gap-2 shadow-sm"
+            >
+              <PlusIcon className="w-5 h-5 flex-shrink-0" />
+              <span className="hidden sm:inline">Create New Sale</span>
+              <span className="sm:hidden">Create</span>
+            </ActionButton>
+          ) : null
         }
       />
 
@@ -140,13 +142,10 @@ export default function SalesPage() {
         <InputGroup label="Search Sales" className="md:col-span-12">
           <div className="relative">
             <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-on-surface-variant/50">
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
             </span>
             <input
               type="text"
-              placeholder="Search by customer, sale ID or seller..."
+              placeholder="Search by customer, sale or seller..."
               value={filters.search || ""}
               onChange={(e) => setSearch(e.target.value)}
               className="form-input-base pl-10"
@@ -324,7 +323,7 @@ export default function SalesPage() {
                   >
                     View Details
                   </ActionButton>
-                  {isAdmin ? (
+                  {permissions.canDelete("sales") ? (
                     <ActionButton
                       variant="outline"
                       tone="danger"
@@ -402,7 +401,7 @@ export default function SalesPage() {
                             >
                               <EyeIcon className="w-4 h-4" />
                             </ActionButton>
-                            {isAdmin ? (
+                            {permissions.canDelete("sales") ? (
                               <ActionButton
                                 variant="outline"
                                 tone="danger"

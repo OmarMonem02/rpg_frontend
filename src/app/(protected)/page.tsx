@@ -1,3 +1,6 @@
+'use client';
+
+import { usePermissions } from "@/components/permission-provider";
 import {
   ActionButton,
   EmptyState,
@@ -76,6 +79,11 @@ function ShortcutCard({ item }: { item: Shortcut }) {
 }
 
 export default function HomePage() {
+  const permissions = usePermissions();
+  const visibleShortcuts = operationsShortcuts.filter((item) =>
+    permissions.canAccessRoute(item.href),
+  );
+
   return (
     <PageShell>
       <PageHero
@@ -84,10 +92,14 @@ export default function HomePage() {
         description="Use this workspace as the daily launch point for inventory, blueprints, showroom listings, and admin operations. The rebuild keeps the existing routes and backend contracts, but gives every module a more intentional, production-ready surface."
         actions={
           <>
-            <ActionButton href="/inventory/spare-parts" tone="primary">
-              Open Spare Parts
-            </ActionButton>
-            <ActionButton href="/data/bike-blueprints">Manage Blueprints</ActionButton>
+            {permissions.canAccessRoute("/inventory/spare-parts") ? (
+              <ActionButton href="/inventory/spare-parts" tone="primary">
+                Open Spare Parts
+              </ActionButton>
+            ) : null}
+            {permissions.canAccessRoute("/data/bike-blueprints") ? (
+              <ActionButton href="/data/bike-blueprints">Manage Blueprints</ActionButton>
+            ) : null}
           </>
         }
         meta={
@@ -120,7 +132,7 @@ export default function HomePage() {
           <h2 className="mt-2 text-2xl font-semibold text-on-surface">Choose the area you want to operate next</h2>
         </div>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {operationsShortcuts.map((item) => (
+          {visibleShortcuts.map((item) => (
             <ShortcutCard key={item.href} item={item} />
           ))}
         </div>

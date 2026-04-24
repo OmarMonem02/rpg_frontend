@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+import { usePermissions } from "@/components/permission-provider";
 import { getAuthToken } from "@/lib/auth-session";
 import { useEntityFilters } from "@/hooks/useEntityFilters";
 import {
@@ -23,13 +24,24 @@ import {
   SurfaceCard,
 } from "@/components/ops-ui";
 
+type BikeBlueprintFilters = {
+  search?: string;
+  brand_id?: number;
+  price_range?: string;
+  currency?: string;
+};
+
 export default function BikeBlueprintsPage() {
   const router = useRouter();
+  const permissions = usePermissions();
   const [blueprints, setBlueprints] = useState<BikeBlueprintRecord[]>([]);
   const [brands, setBrands] = useState<BrandRecord[]>([]);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const canCreateBlueprints = permissions.canCreate("bike-blueprints");
+  const canUpdateBlueprints = permissions.canUpdate("bike-blueprints");
+  const canDeleteBlueprints = permissions.canDelete("bike-blueprints");
 
   // Use custom filter hook
   const { filters, page, setPage, getCleanFilters, setSearch, setBrand, setPriceMin, setPriceMax, setCurrency, logFilters } = useEntityFilters();
@@ -43,8 +55,8 @@ export default function BikeBlueprintsPage() {
       console.log("[BikeBlueprintsPage] Applying filters:", filters, "Page:", page);
       logFilters();
 
-      const cleanFilters = getCleanFilters();
-      const result = await listBikeBlueprints(token, page, cleanFilters as any);
+      const cleanFilters = getCleanFilters() as BikeBlueprintFilters;
+      const result = await listBikeBlueprints(token, page, cleanFilters);
       setBlueprints(result.items);
       setTotalPages(result.lastPage);
       setError(null);
@@ -53,7 +65,7 @@ export default function BikeBlueprintsPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, filters, logFilters]);
+  }, [getCleanFilters, logFilters, page, filters]);
 
   const loadBrands = async () => {
     try {
@@ -76,6 +88,10 @@ export default function BikeBlueprintsPage() {
   }, [loadBlueprints]);
 
   const handleDelete = async (id: number) => {
+    if (!canDeleteBlueprints) {
+      setError("You do not have permission to delete bike blueprints.");
+      return;
+    }
     if (!confirm("Are you sure you want to delete this blueprint?")) return;
 
     try {
@@ -99,9 +115,14 @@ export default function BikeBlueprintsPage() {
         title="Bike Blueprints"
         description="Define models and years, then jump directly into linked spare-parts management for each blueprint."
         actions={
-          <ActionButton tone="primary" onClick={() => router.push("/data/bike-blueprints/create")}>
-            Add Blueprint
-          </ActionButton>
+          canCreateBlueprints ? (
+            <ActionButton
+              tone="primary"
+              onClick={() => router.push("/data/bike-blueprints/create")}
+            >
+              Add Blueprint
+            </ActionButton>
+          ) : null
         }
       />
 
@@ -151,14 +172,19 @@ export default function BikeBlueprintsPage() {
           </div>
         ) : blueprints.length === 0 ? (
           <EmptyState
-            title="No blueprints found"
-            description="Create the first bike blueprint so parts and bikes can be grouped around a proper model definition."
-            action={
-              <ActionButton tone="primary" onClick={() => router.push("/data/bike-blueprints/create")}>
-                Create Blueprint
-              </ActionButton>
-            }
-          />
+          title="No blueprints found"
+          description="Create the first bike blueprint so parts and bikes can be grouped around a proper model definition."
+          action={
+              canCreateBlueprints ? (
+                <ActionButton
+                  tone="primary"
+                  onClick={() => router.push("/data/bike-blueprints/create")}
+                >
+                  Create Blueprint
+                </ActionButton>
+              ) : undefined
+          }
+        />
         ) : (
           <div className="overflow-x-auto rounded-[1.5rem] border border-outline-variant/15 bg-surface-container-lowest">
             <table className="w-full text-sm">
@@ -185,6 +211,7 @@ export default function BikeBlueprintsPage() {
                         variant="ghost"
                         size="sm"
                         onClick={() => router.push(`/data/bike-blueprints/${blueprint.id}/spare-parts`)}
+                        hidden={!canUpdateBlueprints}
                         className="text-primary"
                       >
                         Manage Parts
@@ -192,6 +219,7 @@ export default function BikeBlueprintsPage() {
                       <span className="mx-2 text-on-surface-variant">•</span>
                       <button
                         onClick={() => router.push(`/data/bike-blueprints/edit/${blueprint.id}`)}
+                        hidden={!canUpdateBlueprints}
                         className="text-primary hover:underline text-xs font-medium"
                       >
                         Edit
@@ -199,6 +227,7 @@ export default function BikeBlueprintsPage() {
                       <span className="mx-2 text-on-surface-variant">•</span>
                       <button
                         onClick={() => handleDelete(blueprint.id)}
+                        hidden={!canDeleteBlueprints}
                         className="text-error hover:underline text-xs font-medium"
                       >
                         Delete

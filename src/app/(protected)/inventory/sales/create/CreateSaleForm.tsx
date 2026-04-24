@@ -9,6 +9,8 @@ import {
   listCustomers,
   listSellers,
   listPaymentMethods,
+  createCustomer,
+  type CreateCustomerPayload,
   type CustomerRecord,
   type SellerRecord,
   type PaymentMethodRecord,
@@ -21,8 +23,9 @@ import {
 } from "@/lib/crud-api";
 import { CatalogPickerModal } from "@/components/catalog-picker-modal";
 import { CartLineItemsPanel, type SaleLineItem } from "@/components/cart-line-items-panel";
+import { EntityDrawer, type FieldConfig } from "@/components/entity-drawer";
 import { PageShell, ActionButton, PageHero, SurfaceCard } from "@/components/ops-ui";
-import { CubeIcon, WrenchIcon, BanknotesIcon, CogIcon, ArrowLeftIcon } from "@heroicons/react/24/outline";
+import { CubeIcon, WrenchIcon, BanknotesIcon, CogIcon, ArrowLeftIcon, PlusIcon, UserPlusIcon } from "@heroicons/react/24/outline";
 
 type CatalogType = "products" | "spare_parts" | "bikes" | "maintenance_services";
 
@@ -50,6 +53,16 @@ export function CreateSaleForm() {
   // Cart state
   const [cartItems, setCartItems] = useState<SaleLineItem[]>([]);
   const [tempItemCounter, setTempItemCounter] = useState(0);
+
+  // Quick Customer state
+  const [customerModalOpen, setCustomerModalOpen] = useState(false);
+
+  const customerFields: FieldConfig[] = [
+    { name: "name", label: "Full Name", type: "text", required: true, span: 2, placeholder: "e.g. John Doe" },
+    { name: "phone", label: "Phone Number", type: "text", required: true, placeholder: "e.g. +20 123 456 7890" },
+    { name: "email", label: "Email Address", type: "email", placeholder: "e.g. john@example.com" },
+    { name: "address", label: "Physical Address", type: "textarea", span: 2, placeholder: "Optional delivery address..." },
+  ];
 
   // Catalog picker state
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -200,9 +213,17 @@ export function CreateSaleForm() {
         sale_discount: Number(saleDiscount) || 0,
         is_maintenance: isMaintenance,
         items: cartItems.map((item) => {
+          // ── Currency Normalization ──────────────────────────────────────────
+          // Backend always expects EGP. USD-priced items are converted using
+          // the current exchange rate fetched from System Settings.
+          const isUSD = item.currency === "USD";
+          const rate = isUSD && exchangeRate > 0 ? exchangeRate : 1;
+          const normalizedPrice    = Math.round(Number(item.selling_price)  * rate * 100) / 100;
+          const normalizedDiscount = Math.round(Number(item.discount_amount) * rate * 100) / 100;
+
           const lineItem: CreateSaleLineItemPayload = {
-            selling_price: Number(item.selling_price) || 0,
-            discount: Number(item.discount_amount) || 0,
+            selling_price: normalizedPrice,
+            discount: normalizedDiscount,
             qty: Number(item.quantity) || 1,
           };
 
@@ -236,6 +257,32 @@ export function CreateSaleForm() {
     }
   };
 
+  const handleCreateCustomer = async (data: Record<string, any>) => {
+    try {
+      const token = getAuthToken();
+      if (!token) throw new Error("Authentication required");
+
+      const payload: CreateCustomerPayload = {
+        name: String(data.name),
+        phone: data.phone ? String(data.phone) : undefined,
+        email: data.email ? String(data.email) : undefined,
+        address: data.address ? String(data.address) : undefined,
+      };
+
+      const newCustomer = await createCustomer(token, payload);
+      
+      // Update customer list and select the new one
+      setCustomers(prev => [...prev, newCustomer]);
+      setCustomerId(newCustomer.id);
+      setCustomerModalOpen(false);
+      
+      console.log("Quick customer created:", newCustomer);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to create customer");
+      throw err;
+    }
+  };
+
   if (loading) {
     return (
       <PageShell>
@@ -243,7 +290,7 @@ export function CreateSaleForm() {
           <div className="w-10 h-10 rounded-full border-4 border-primary border-t-transparent animate-spin"/>
           <p className="text-on-surface-variant font-medium uppercase tracking-widest text-xs">Preparing Workspace...</p>
         </div>
-      </PageShell>
+        </PageShell>
     );
   }
 
@@ -297,9 +344,19 @@ export function CreateSaleForm() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {/* Customer */}
               <div className="space-y-2">
-                <label className="text-xs font-bold uppercase tracking-wider text-on-surface-variant flex items-center gap-2">
-                  Customer <span className="text-error">*</span>
-                </label>
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold uppercase tracking-wider text-on-surface-variant flex items-center gap-2">
+                    Customer <span className="text-error">*</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setCustomerModalOpen(true)}
+                    className="text-[10px] font-bold uppercase tracking-wider text-primary hover:text-primary/80 flex items-center gap-1 transition-colors"
+                  >
+                    <PlusIcon className="w-3 h-3" />
+                    New Customer
+                  </button>
+                </div>
                 <div className="relative">
                   <select
                     required
@@ -638,6 +695,17 @@ export function CreateSaleForm() {
           onAddItems={handleAddItems}
         />
       )}
+      {/* Quick Create Customer Modal */}
+      <EntityDrawer
+        isOpen={customerModalOpen}
+        onClose={() => setCustomerModalOpen(false)}
+        title="Quick Customer Registration"
+        description="Add a new customer to the system without leaving the sales flow."
+        fields={customerFields}
+        onSubmit={handleCreateCustomer}
+        submitLabel="Register & Select"
+        heroLabel="New Customer"
+      />
     </PageShell>
   );
 }

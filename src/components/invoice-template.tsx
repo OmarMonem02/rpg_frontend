@@ -67,7 +67,7 @@ export function InvoiceTemplate({
           --surface-light: #ffffff;
           --border-color: #efefef;
           --text-main: #1a1a1a;
-          --text-muted: #464646ff;
+          --text-muted: #464646;
         }
 
         .receipt-wrapper { 
@@ -437,6 +437,27 @@ export function InvoiceTemplate({
             page-break-inside: avoid;
           }
         }
+
+        /* PDF Export Mode - Matches Print Rules */
+        .pdf-export .receipt-wrapper { 
+          padding: 0 !important; 
+          background: #fff !important;
+          display: block !important;
+          animation: none !important;
+        }
+        .pdf-export .receipt-page { 
+          width: 210mm !important;
+          max-width: 210mm !important;
+          min-height: 297mm !important;
+          box-shadow: none !important; 
+          border: none !important; 
+          margin: 0 auto !important;
+          border-radius: 0 !important;
+          overflow: visible !important;
+        }
+        .pdf-export .ri { padding: 12mm 12mm 10mm !important; }
+        .pdf-export .official-seal { opacity: 0.12 !important; }
+        .pdf-export .trow.grand { background: #000 !important; color: #fff !important; }
       `}</style>
 
       <div className="receipt-wrapper">

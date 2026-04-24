@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePermissions } from "@/components/permission-provider";
 import { getAuthToken } from "@/lib/auth-session";
 import { useEntityFilters } from "@/hooks/useEntityFilters";
 import {
@@ -26,6 +27,7 @@ import {
 } from "@/components/ops-ui";
 
 export default function BrandsPage() {
+  const permissions = usePermissions();
   const [brands, setBrands] = useState<BrandRecord[]>([]);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
@@ -34,10 +36,23 @@ export default function BrandsPage() {
   const [editingBrand, setEditingBrand] = useState<BrandRecord | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [typeFilter, setTypeFilter] = useState<"" | "spare_parts" | "products" | "bikes">("");
+  const [typeFilter, setTypeFilter] = useState<
+    "" | "spare_parts" | "products" | "bikes"
+  >("");
+  const canCreateBrands = permissions.canCreate("brands");
+  const canUpdateBrands = permissions.canUpdate("brands");
+  const canDeleteBrands = permissions.canDelete("brands");
 
-  // Use custom filter hook
-  const { page, setPage, getCleanFilters, setCurrency, setPriceMin, setPriceMax, filters, logFilters } = useEntityFilters();
+  const {
+    page,
+    setPage,
+    getCleanFilters,
+    setCurrency,
+    setPriceMin,
+    setPriceMax,
+    filters,
+    logFilters,
+  } = useEntityFilters();
 
   const loadBrands = async () => {
     try {
@@ -49,7 +64,12 @@ export default function BrandsPage() {
       logFilters();
 
       const cleanFilters = getCleanFilters();
-      const result = await listBrands(token, page, typeFilter || undefined, cleanFilters as any);
+      const result = await listBrands(
+        token,
+        page,
+        typeFilter || undefined,
+        cleanFilters as never,
+      );
       setBrands(result.items);
       setTotalPages(result.lastPage);
       setError(null);
@@ -61,10 +81,14 @@ export default function BrandsPage() {
   };
 
   useEffect(() => {
-    loadBrands();
+    void loadBrands();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, typeFilter]);
 
   const handleOpenModal = (brand?: BrandRecord) => {
+    if (brand && !canUpdateBrands) return;
+    if (!brand && !canCreateBrands) return;
+
     setEditingBrand(brand || null);
     setSubmitError(null);
     setIsModalOpen(true);
@@ -77,6 +101,10 @@ export default function BrandsPage() {
 
   const handleSubmit = async (formData: Record<string, unknown>) => {
     try {
+      if ((editingBrand && !canUpdateBrands) || (!editingBrand && !canCreateBrands)) {
+        throw new Error("You do not have permission to save brands.");
+      }
+
       setIsSubmitting(true);
       const token = getAuthToken();
       if (!token) throw new Error("Authentication required");
@@ -102,6 +130,11 @@ export default function BrandsPage() {
   };
 
   const handleDelete = async (id: number) => {
+    if (!canDeleteBrands) {
+      setError("You do not have permission to delete brands.");
+      return;
+    }
+
     if (!confirm("Are you sure you want to delete this brand?")) return;
 
     try {
@@ -144,21 +177,29 @@ export default function BrandsPage() {
         title="Brands"
         description="Keep supplier and manufacturer brands clean across spare parts, products, and bike blueprints."
         actions={
-          <ActionButton tone="primary" onClick={() => handleOpenModal()}>
-            Add Brand
-          </ActionButton>
+          canCreateBrands ? (
+            <ActionButton tone="primary" onClick={() => handleOpenModal()}>
+              Add Brand
+            </ActionButton>
+          ) : null
         }
       />
 
-      {error && <div className="rounded-2xl border border-error/20 bg-error/10 p-4 text-sm text-error">{error}</div>}
+      {error ? (
+        <div className="rounded-2xl border border-error/20 bg-error/10 p-4 text-sm text-error">
+          {error}
+        </div>
+      ) : null}
 
       <SurfaceCard>
         <FilterBar className="md:grid-cols-4">
           <InputGroup label="Filter by Type" className="md:col-span-2">
             <select
               value={typeFilter}
-              onChange={(e) => {
-                setTypeFilter(e.target.value as "" | "spare_parts" | "products" | "bikes");
+              onChange={(event) => {
+                setTypeFilter(
+                  event.target.value as "" | "spare_parts" | "products" | "bikes",
+                );
                 setPage(1);
               }}
               className="form-input-base"
@@ -182,71 +223,86 @@ export default function BrandsPage() {
           showCurrencyFilter={true}
         />
 
-      {loading ? (
-        <div className="flex justify-center py-12">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-outline-variant/30 border-t-primary"></div>
-        </div>
-      ) : brands.length === 0 ? (
-        <EmptyState
-          title="No brands found"
-          description="Create your first brand so parts, products, and bikes can share the same catalog source."
-          action={
-            <ActionButton tone="primary" onClick={() => handleOpenModal()}>
-              Create Brand
-            </ActionButton>
-          }
-        />
-      ) : (
-        <div className="overflow-x-auto rounded-[1.5rem] border border-outline-variant/15 bg-surface-container-lowest">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-outline-variant/15 bg-surface-container-low">
-                <th className="px-4 py-3 text-left font-semibold text-on-surface">Name</th>
-                <th className="px-4 py-3 text-left font-semibold text-on-surface">Type</th>
-                <th className="px-4 py-3 text-left font-semibold text-on-surface">Created</th>
-                <th className="px-4 py-3 text-right font-semibold text-on-surface">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {brands.map((brand) => (
-                <tr key={brand.id} className="border-b border-outline-variant/10 hover:bg-surface-container-low">
-                  <td className="px-4 py-3 text-on-surface">{brand.name}</td>
-                  <td className="px-4 py-3">
-                    <StatusBadge tone="primary">
-                      {brand.type.replace("_", " ")}
-                    </StatusBadge>
-                  </td>
-                  <td className="px-4 py-3 text-on-surface-variant text-xs">
-                    {brand.created_at ? new Date(brand.created_at).toLocaleDateString() : "-"}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <button
-                      onClick={() => handleOpenModal(brand)}
-                      className="text-primary hover:underline text-xs font-medium"
-                    >
-                      Edit
-                    </button>
-                    <span className="mx-2 text-on-surface-variant">•</span>
-                    <button
-                      onClick={() => handleDelete(brand.id)}
-                      className="text-error hover:underline text-xs font-medium"
-                    >
-                      Delete
-                    </button>
-                  </td>
+        {loading ? (
+          <div className="flex justify-center py-12">
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-outline-variant/30 border-t-primary" />
+          </div>
+        ) : brands.length === 0 ? (
+          <EmptyState
+            title="No brands found"
+            description="Create your first brand so parts, products, and bikes can share the same catalog source."
+            action={
+              canCreateBrands ? (
+                <ActionButton tone="primary" onClick={() => handleOpenModal()}>
+                  Create Brand
+                </ActionButton>
+              ) : undefined
+            }
+          />
+        ) : (
+          <div className="overflow-x-auto rounded-[1.5rem] border border-outline-variant/15 bg-surface-container-lowest">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-outline-variant/15 bg-surface-container-low">
+                  <th className="px-4 py-3 text-left font-semibold text-on-surface">Name</th>
+                  <th className="px-4 py-3 text-left font-semibold text-on-surface">Type</th>
+                  <th className="px-4 py-3 text-left font-semibold text-on-surface">Created</th>
+                  <th className="px-4 py-3 text-right font-semibold text-on-surface">Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+              </thead>
+              <tbody>
+                {brands.map((brand) => (
+                  <tr
+                    key={brand.id}
+                    className="border-b border-outline-variant/10 hover:bg-surface-container-low"
+                  >
+                    <td className="px-4 py-3 text-on-surface">{brand.name}</td>
+                    <td className="px-4 py-3">
+                      <StatusBadge tone="primary">
+                        {brand.type.replace("_", " ")}
+                      </StatusBadge>
+                    </td>
+                    <td className="px-4 py-3 text-on-surface-variant text-xs">
+                      {brand.created_at
+                        ? new Date(brand.created_at).toLocaleDateString()
+                        : "-"}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      {canUpdateBrands ? (
+                        <button
+                          onClick={() => handleOpenModal(brand)}
+                          className="text-primary hover:underline text-xs font-medium"
+                        >
+                          Edit
+                        </button>
+                      ) : null}
+                      {canUpdateBrands && canDeleteBrands ? (
+                        <span className="mx-2 text-on-surface-variant">•</span>
+                      ) : null}
+                      {canDeleteBrands ? (
+                        <button
+                          onClick={() => handleDelete(brand.id)}
+                          className="text-error hover:underline text-xs font-medium"
+                        >
+                          Delete
+                        </button>
+                      ) : null}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </SurfaceCard>
 
       <PaginationControls
         page={page}
         totalPages={totalPages}
-        onPrevious={() => setPage((p) => Math.max(1, p - 1))}
-        onNext={() => setPage((p) => Math.min(totalPages, p + 1))}
+        onPrevious={() => setPage((currentPage) => Math.max(1, currentPage - 1))}
+        onNext={() =>
+          setPage((currentPage) => Math.min(totalPages, currentPage + 1))
+        }
       />
 
       <EntityFormModal
