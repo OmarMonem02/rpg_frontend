@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ActionButton, StatusBadge } from "@/components/ops-ui";
+import { ActionButton } from "@/components/ops-ui";
 
 type SectionSummaryResolver = (args: {
   field: FieldConfig;
@@ -29,7 +29,11 @@ export type FieldConfig = {
     | "time";
   required?: boolean;
   placeholder?: string;
-  options?: Array<{ value: string | number; label: string }>;
+  options?:
+    | Array<{ value: string | number; label: string }>
+    | ((
+        formData: Record<string, unknown>,
+      ) => Array<{ value: string | number; label: string }>);
   value?: unknown;
   error?: string;
   disabled?: DynamicBoolean;
@@ -43,6 +47,10 @@ export type FieldConfig = {
   span?: 1 | 2;
   helperTone?: "default" | "featured" | "muted";
   summaryValue?: string | SectionSummaryResolver;
+  onValueChange?: (args: {
+    value: unknown;
+    formData: Record<string, unknown>;
+  }) => Partial<Record<string, unknown>> | void;
 };
 
 export type EntityFormProps = {
@@ -84,7 +92,6 @@ export function EntityForm({
   const [currentSectionIndex, setCurrentSectionIndex] = useState(0);
 
   const requiredFieldsCount = fields.filter((field) => field.required).length;
-  const optionalFieldsCount = fields.length - requiredFieldsCount;
 
   const sections = useMemo(() => {
     const result = fields.reduce((acc, field) => {
@@ -146,6 +153,13 @@ export function EntityForm({
     return field.disabled === true;
   };
 
+  const getFieldOptions = (field: FieldConfig) => {
+    if (typeof field.options === "function") {
+      return field.options(formData);
+    }
+    return field.options ?? [];
+  };
+
   const isEmptyValue = (field: FieldConfig, value: unknown) => {
     if (field.type === "multiselect")
       return !Array.isArray(value) || value.length === 0;
@@ -175,7 +189,17 @@ export function EntityForm({
   };
 
   const handleChange = (name: string, value: unknown) => {
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    setFormData((prev) => {
+      const next = { ...prev, [name]: value };
+      const field = fields.find((candidate) => candidate.name === name);
+      if (field?.onValueChange) {
+        const updates = field.onValueChange({ value, formData: next });
+        if (updates) {
+          Object.assign(next, updates);
+        }
+      }
+      return next;
+    });
     if (fieldErrors[name]) {
       setFieldErrors((prev) => {
         const next = { ...prev };
@@ -221,50 +245,6 @@ export function EntityForm({
     if (nextIndex > currentSectionIndex) {
       setCurrentSectionIndex(nextIndex);
     }
-  };
-
-  const getFieldDisplayValue = (field: FieldConfig) => {
-    const value = formData[field.name];
-    if (typeof field.summaryValue === "function")
-      return field.summaryValue({ field, formData, value });
-    if (typeof field.summaryValue === "string") return field.summaryValue;
-    if (field.type === "toggle") return value === true ? "Enabled" : undefined;
-    if (field.type === "multiselect") {
-      if (!Array.isArray(value) || value.length === 0) return undefined;
-      const labels = value
-        .map(
-          (item) =>
-            field.options?.find(
-              (option) => String(option.value) === String(item),
-            )?.label ?? String(item),
-        )
-        .filter(Boolean);
-      return (
-        labels.slice(0, 2).join(", ") +
-        (labels.length > 2 ? ` +${labels.length - 2}` : "")
-      );
-    }
-    if (field.type === "select") {
-      if (value === "" || value === undefined || value === null)
-        return undefined;
-      return (
-        field.options?.find((option) => String(option.value) === String(value))
-          ?.label ?? String(value)
-      );
-    }
-    if (value === "" || value === undefined || value === null) return undefined;
-    return String(value);
-  };
-
-  const getSectionSummary = (section: SectionConfig) => {
-    const values = section.fields
-      .map((field) => {
-        const displayValue = getFieldDisplayValue(field);
-        return displayValue ? `${field.label}: ${displayValue}` : undefined;
-      })
-      .filter(Boolean) as string[];
-    if (values.length === 0) return "No selections yet";
-    return values.slice(0, 2).join(" | ");
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -548,12 +528,140 @@ export function EntityForm({
                                 }
                               >
                                 <option value="">Select Option</option>
-                                {field.options?.map((o) => (
+                                {getFieldOptions(field).map((o) => (
                                   <option key={o.value} value={o.value}>
                                     {o.label}
                                   </option>
                                 ))}
                               </select>
+                            ) : field.type === "multiselect" ? (
+                              <div
+                                className={`rounded-2xl border border-outline-variant/20 bg-surface-container-lowest p-3 ${fieldErrors[field.name] ? "!border-error/50" : ""}`}
+                              >
+                                {(() => {
+                                  const multiselectOptions = getFieldOptions(field);
+                                  const currentValues = Array.isArray(fieldValue)
+                                    ? fieldValue
+                                    : [];
+                                  const allFilteredSelected =
+                                    multiselectOptions.length > 0 &&
+                                    multiselectOptions.every((option) =>
+                                      currentValues.some(
+                                        (item) =>
+                                          String(item) === String(option.value),
+                                      ),
+                                    );
+                                  return (
+                                <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-xs">
+                                  <span className="font-semibold text-on-surface-variant">
+                                    {Array.isArray(fieldValue)
+                                      ? `${fieldValue.length} selected`
+                                      : "0 selected"}
+                                  </span>
+                                  <div className="flex items-center gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const existingValues = Array.isArray(fieldValue)
+                                          ? fieldValue
+                                          : [];
+                                        const toAdd = multiselectOptions
+                                          .map((option) => option.value)
+                                          .filter(
+                                            (value) =>
+                                              !existingValues.some(
+                                                (item) =>
+                                                  String(item) === String(value),
+                                              ),
+                                          );
+                                        if (toAdd.length === 0) return;
+                                        handleChange(field.name, [
+                                          ...existingValues,
+                                          ...toAdd,
+                                        ]);
+                                      }}
+                                      disabled={
+                                        isSubmitting ||
+                                        isLoading ||
+                                        fieldDisabled ||
+                                        multiselectOptions.length === 0 ||
+                                        allFilteredSelected
+                                      }
+                                      className="rounded-lg border border-outline-variant/20 px-2 py-1 font-semibold text-on-surface-variant hover:bg-surface-container disabled:cursor-not-allowed disabled:opacity-50"
+                                    >
+                                      Select All Filtered
+                                    </button>
+                                    {Array.isArray(fieldValue) &&
+                                      fieldValue.length > 0 && (
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            handleChange(field.name, [])
+                                          }
+                                          disabled={
+                                            isSubmitting ||
+                                            isLoading ||
+                                            fieldDisabled
+                                          }
+                                          className="rounded-lg border border-outline-variant/20 px-2 py-1 font-semibold text-on-surface-variant hover:bg-surface-container"
+                                        >
+                                          Clear
+                                        </button>
+                                      )}
+                                  </div>
+                                </div>
+                                  );
+                                })()}
+
+                                {getFieldOptions(field).length === 0 ? (
+                                  <p className="text-sm text-on-surface-variant">
+                                    No options match your current filters.
+                                  </p>
+                                ) : (
+                                  <div className="max-h-64 space-y-2 overflow-auto pr-1">
+                                    {getFieldOptions(field).map((option) => {
+                                      const checked =
+                                        Array.isArray(fieldValue) &&
+                                        fieldValue.some(
+                                          (item) =>
+                                            String(item) ===
+                                            String(option.value),
+                                        );
+                                      return (
+                                        <label
+                                          key={option.value}
+                                          className={`flex items-start gap-3 rounded-xl border p-2.5 transition-colors ${
+                                            checked
+                                              ? "border-primary/40 bg-primary/5"
+                                              : "border-outline-variant/10 hover:border-outline-variant/30"
+                                          }`}
+                                        >
+                                          <input
+                                            type="checkbox"
+                                            checked={checked}
+                                            onChange={(e) =>
+                                              handleMultiselectChange(
+                                                field.name,
+                                                option.value,
+                                                e.target.checked,
+                                              )
+                                            }
+                                            disabled={
+                                              isSubmitting ||
+                                              isLoading ||
+                                              fieldDisabled
+                                            }
+                                            className="mt-1 h-4 w-4 rounded border-outline-variant/30 text-primary focus:ring-primary/20"
+                                          />
+                                          <span className="text-sm font-medium text-on-surface">
+                                            {option.label}
+                                          </span>
+                                        </label>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                              </div>
                             ) : (
                               <input
                                 type={field.type}

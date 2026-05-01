@@ -257,9 +257,17 @@ export async function fetchAllPages<T>(
   const items = [...firstPage.items];
   const lastPage = firstPage.lastPage;
 
-  for (let i = 2; i <= lastPage; i++) {
-    const res = await fetcher(i);
-    items.push(...res.items);
+  if (lastPage <= 1) {
+    return items;
+  }
+
+  const batchSize = 4;
+  const remainingPages = Array.from({ length: lastPage - 1 }, (_, index) => index + 2);
+
+  for (let i = 0; i < remainingPages.length; i += batchSize) {
+    const batch = remainingPages.slice(i, i + batchSize);
+    const responses = await Promise.all(batch.map((page) => fetcher(page)));
+    responses.forEach((response) => items.push(...response.items));
   }
 
   return items;
@@ -648,6 +656,7 @@ export type SparePartRecord = {
   max_discount_value: number;
   universal: boolean;
   notes?: string;
+  bike_blueprint_ids?: number[];
   created_at?: string;
 };
 
@@ -706,6 +715,11 @@ function normalizeSparcePart(raw: unknown): SparePartRecord {
     max_discount_value: toNumber(record.max_discount_value),
     universal: record.universal === true || record.universal === "true",
     notes: toText(record.notes) || undefined,
+    bike_blueprint_ids: Array.isArray(record.bike_blueprint_ids)
+      ? record.bike_blueprint_ids
+          .map((item) => toNumber(item))
+          .filter((id) => id > 0)
+      : undefined,
     created_at: toText(record.created_at) || undefined,
   };
 }
@@ -1612,10 +1626,10 @@ export async function getSparePartBlueprints(
   sparePartId: number,
 ): Promise<number[]> {
   const payload = await authorizedFetch<unknown>(
-    `/spare_parts/${sparePartId}/blueprints`,
+    `/spare_parts/${sparePartId}/bike_blueprints`,
     token,
   );
-  const rows = pickArray(payload, ["data", "blueprints"]);
+  const rows = pickArray(payload, ["data", "bike_blueprints"]);
   return rows
     .map((item: unknown) => toNumber(asRecord(item).id))
     .filter((id) => id > 0);
@@ -1626,11 +1640,15 @@ export async function assignBlueprintsToSparePart(
   sparePartId: number,
   blueprintIds: number[],
 ): Promise<void> {
-  await authorizedFetch<void>(`/spare_parts/${sparePartId}/blueprints`, token, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ bike_blueprint_ids: blueprintIds }),
-  });
+  await authorizedFetch<void>(
+    `/spare_parts/${sparePartId}/bike_blueprints`,
+    token,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ bike_blueprint_ids: blueprintIds }),
+    },
+  );
 }
 
 export async function removeBlueprintFromSparePart(
@@ -1639,7 +1657,7 @@ export async function removeBlueprintFromSparePart(
   blueprintId: number,
 ): Promise<void> {
   await authorizedFetch<void>(
-    `/spare_parts/${sparePartId}/blueprints/${blueprintId}`,
+    `/spare_parts/${sparePartId}/bike_blueprints/${blueprintId}`,
     token,
     { method: "DELETE" },
   );

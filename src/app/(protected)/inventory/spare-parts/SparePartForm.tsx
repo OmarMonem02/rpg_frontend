@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getAuthToken } from "@/lib/auth-session";
 import {
@@ -9,10 +9,8 @@ import {
   listBikeBlueprints,
   createSparePart,
   updateSparePart,
-  getSparePartBlueprints,
-  assignBlueprintsToSparePart,
-  removeBlueprintFromSparePart,
   assignSparePartToBikeBlueprint,
+  removeSparePartFromBikeBlueprint,
   type SparePartRecord,
   type CreateSparePartPayload,
   type UpdateSparePartPayload,
@@ -32,6 +30,7 @@ export function SparePartForm({ mode, initialData }: SparePartFormProps) {
   const router = useRouter();
   const [categories, setCategories] = useState<SparePartCategoryRecord[]>([]);
   const [brands, setBrands] = useState<BrandRecord[]>([]);
+  const [bikeBrands, setBikeBrands] = useState<BrandRecord[]>([]);
   const [blueprints, setBlueprints] = useState<BikeBlueprintRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -44,19 +43,20 @@ export function SparePartForm({ mode, initialData }: SparePartFormProps) {
         const token = getAuthToken();
         if (!token) return;
 
-        const [catRes, brandRes, bpRes] = await Promise.all([
+        const [catRes, brandRes, bikeBrandRes, bpRes] = await Promise.all([
           fetchAllPages((p) => listSparePartCategories(token, p)),
           fetchAllPages((p) => listBrands(token, p, "spare_parts")),
+          fetchAllPages((p) => listBrands(token, p, "bikes")),
           fetchAllPages((p) => listBikeBlueprints(token, p)),
         ]);
 
         setCategories(catRes);
         setBrands(brandRes.filter((b) => b.type === "spare_parts"));
+        setBikeBrands(bikeBrandRes.filter((b) => b.type === "bikes"));
         setBlueprints(bpRes);
 
         if (mode === "edit" && initialData) {
-          const bpIds = await getSparePartBlueprints(token, initialData.id);
-          setCurrentBlueprintIds(bpIds);
+          setCurrentBlueprintIds(initialData.bike_blueprint_ids ?? []);
         }
       } catch (err) {
         console.error("Failed to load dependencies:", err);
@@ -67,12 +67,42 @@ export function SparePartForm({ mode, initialData }: SparePartFormProps) {
     fetchData();
   }, [mode, initialData]);
 
+  const bikeBrandNameById = useMemo(
+    () => new Map(bikeBrands.map((brand) => [brand.id, brand.name])),
+    [bikeBrands],
+  );
+
+  const blueprintYears = useMemo(() => {
+    const years = Array.from(
+      new Set(blueprints.map((blueprint) => blueprint.year)),
+    ).sort((a, b) => a - b);
+    return years.map((year) => ({ value: year, label: String(year) }));
+  }, [blueprints]);
+
+  const parseOptionalNumber = (value: unknown): number | undefined => {
+    if (value === "" || value === null || value === undefined) {
+      return undefined;
+    }
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  };
+
   const handleSubmit = async (formData: Record<string, unknown>) => {
     try {
       setIsSubmitting(true);
       setError(null);
       const token = getAuthToken();
       if (!token) throw new Error("Authentication required");
+
+      const yearFrom = parseOptionalNumber(formData.blueprint_year_from);
+      const yearTo = parseOptionalNumber(formData.blueprint_year_to);
+      if (
+        typeof yearFrom === "number" &&
+        typeof yearTo === "number" &&
+        yearFrom > yearTo
+      ) {
+        throw new Error("Compatibility year range is invalid (From year > To year).");
+      }
 
       const toNumber = (v: unknown): number | undefined => {
         const n = Number(v);
@@ -97,34 +127,49 @@ export function SparePartForm({ mode, initialData }: SparePartFormProps) {
       };
 
       let sparePart: SparePartRecord;
+      const isUniversal = Boolean(formData.universal);
+      const selectedBlueprints = isUniversal
+        ? []
+        : ((formData.blueprint_ids as number[]) || []);
       if (mode === "edit" && initialData) {
         sparePart = await updateSparePart(token, initialData.id, basePayload);
       } else {
         const createPayload = {
           ...basePayload,
-          bike_blueprint_ids: (formData.blueprint_ids as number[]) || undefined,
+          bike_blueprint_ids:
+            selectedBlueprints.length > 0 ? selectedBlueprints : undefined,
         } as CreateSparePartPayload;
         sparePart = await createSparePart(token, createPayload);
       }
 
       // Handle blueprint assignments
-      const selectedBlueprints = (formData.blueprint_ids as number[]) || [];
-
       if (mode === "edit" && initialData) {
-        const toAdd = selectedBlueprints.filter(id => !currentBlueprintIds.includes(id));
-        const toRemove = currentBlueprintIds.filter(id => !selectedBlueprints.includes(id));
+        const toAdd = selectedBlueprints.filter((id) => !currentBlueprintIds.includes(id));
+        const toRemove = currentBlueprintIds.filter((id) => !selectedBlueprints.includes(id));
 
         for (const blueprintId of toRemove) {
-          await removeBlueprintFromSparePart(token, sparePart.id, blueprintId);
+          await removeSparePartFromBikeBlueprint(token, blueprintId, sparePart.id);
         }
 
         if (toAdd.length > 0) {
-          await assignBlueprintsToSparePart(token, sparePart.id, toAdd);
+          await Promise.all(
+            toAdd.map((blueprintId) =>
+              assignSparePartToBikeBlueprint(token, blueprintId, {
+                spare_part_id: sparePart.id,
+              }),
+            ),
+          );
         }
       } else {
-         if (selectedBlueprints.length > 0) {
-           await assignBlueprintsToSparePart(token, sparePart.id, selectedBlueprints);
-         }
+        if (selectedBlueprints.length > 0) {
+          await Promise.all(
+            selectedBlueprints.map((blueprintId) =>
+              assignSparePartToBikeBlueprint(token, blueprintId, {
+                spare_part_id: sparePart.id,
+              }),
+            ),
+          );
+        }
       }
 
       router.push("/inventory/spare-parts");
@@ -255,7 +300,7 @@ export function SparePartForm({ mode, initialData }: SparePartFormProps) {
       label: "Discount Type",
       type: "select",
       required: true,
-      section: "Compatibility",
+      section: "Pricing",
       sectionDescription: "Control discount policy and where this part can be used.",
       description: "Choose whether the discount cap is percentage-based or fixed.",
       options: [
@@ -268,7 +313,7 @@ export function SparePartForm({ mode, initialData }: SparePartFormProps) {
       name: "max_discount_value",
       label: "Max Discount Value",
       type: "number",
-      section: "Compatibility",
+      section: "Pricing",
       description: "Set the highest discount your team can apply.",
       placeholder: "0",
       value: initialData?.max_discount_value ?? 0,
@@ -276,15 +321,109 @@ export function SparePartForm({ mode, initialData }: SparePartFormProps) {
       step: "0.01",
     },
     {
+      name: "blueprint_brand_id",
+      label: "Filter by Blueprint Brand",
+      type: "select",
+      section: "Compatibility",
+      description: "Narrow compatibility options by bike brand before selecting blueprints.",
+      options: bikeBrands.map((brand) => ({ value: brand.id, label: brand.name })),
+      disabled: (formData) => formData.universal === true,
+      value: "",
+    },
+    {
+      name: "blueprint_model_search",
+      label: "Filter by Model",
+      type: "text",
+      section: "Compatibility",
+      description: "Search model names like MT, CB, R1, or GS.",
+      placeholder: "Type model keyword",
+      disabled: (formData) => formData.universal === true,
+      value: "",
+    },
+    {
+      name: "blueprint_year_from",
+      label: "Year From",
+      type: "select",
+      section: "Compatibility",
+      description: "Set the first production year in the compatibility range.",
+      options: blueprintYears,
+      disabled: (formData) => formData.universal === true,
+      value: "",
+      onValueChange: ({ value, formData }) => {
+        const selectedFrom = parseOptionalNumber(value);
+        const selectedTo = parseOptionalNumber(formData.blueprint_year_to);
+        if (
+          selectedFrom !== undefined &&
+          selectedTo !== undefined &&
+          selectedFrom > selectedTo
+        ) {
+          return { blueprint_year_to: String(selectedFrom) };
+        }
+      },
+    },
+    {
+      name: "blueprint_year_to",
+      label: "Year To",
+      type: "select",
+      section: "Compatibility",
+      description: "Set the last production year in the compatibility range.",
+      options: (formData) => {
+        const selectedFrom = parseOptionalNumber(formData.blueprint_year_from);
+        if (selectedFrom === undefined) {
+          return blueprintYears;
+        }
+        return blueprintYears.filter((year) => Number(year.value) >= selectedFrom);
+      },
+      disabled: (formData) => formData.universal === true,
+      value: "",
+    },
+    {
       name: "blueprint_ids",
       label: "Compatible Bike Blueprints",
       type: "multiselect",
       section: "Compatibility",
-      description: "Choose the bike blueprints this part fits when it is not universal.",
-      options: blueprints.map((bp) => ({
-        value: bp.id,
-        label: `${bp.model} ${bp.year}`,
-      })),
+      description:
+        "Choose one or more bike blueprints. Use brand, model, and year range filters above to narrow the list. Already selected blueprints stay selected even if they are hidden by current filters.",
+      options: (formData) => {
+        const selectedBrandId = parseOptionalNumber(formData.blueprint_brand_id);
+        const modelSearch = String(formData.blueprint_model_search || "")
+          .trim()
+          .toLowerCase();
+        const yearFrom = parseOptionalNumber(formData.blueprint_year_from);
+        const yearTo = parseOptionalNumber(formData.blueprint_year_to);
+        const selectedBlueprints = Array.isArray(formData.blueprint_ids)
+          ? (formData.blueprint_ids as number[])
+          : [];
+
+        const filteredBlueprints = blueprints.filter((bp) => {
+          const matchesBrand = selectedBrandId !== undefined
+            ? bp.brand_id === selectedBrandId
+            : true;
+          const matchesModel = modelSearch.length > 0
+            ? bp.model.toLowerCase().includes(modelSearch)
+            : true;
+          const matchesYearFrom = yearFrom !== undefined
+            ? bp.year >= yearFrom
+            : true;
+          const matchesYearTo = yearTo !== undefined
+            ? bp.year <= yearTo
+            : true;
+          return matchesBrand && matchesModel && matchesYearFrom && matchesYearTo;
+        });
+
+        const visibleIds = new Set(filteredBlueprints.map((bp) => bp.id));
+        const selectedOutsideFilter = blueprints.filter(
+          (bp) => selectedBlueprints.includes(bp.id) && !visibleIds.has(bp.id),
+        );
+
+        return [...filteredBlueprints, ...selectedOutsideFilter].map((bp) => {
+          const brandName = bikeBrandNameById.get(bp.brand_id) || `Brand ${bp.brand_id}`;
+          return {
+            value: bp.id,
+            label: `${brandName} • ${bp.model} • ${bp.year}`,
+          };
+        });
+      },
       disabled: (formData) => formData.universal === true,
       span: 2,
       value: mode === "edit" ? currentBlueprintIds : undefined,
