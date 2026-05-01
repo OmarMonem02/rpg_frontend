@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { getAuthToken } from "@/lib/auth-session";
+import { getSettings } from "@/lib/api/settings";
 import {
   addSaleLineItem,
   deleteSaleLineItem,
@@ -35,6 +36,7 @@ import {
   buildPayload,
   labelOf,
   money,
+  normalizeToEGP,
   type CatalogItem,
   type CatalogType,
   type PendingExchangeItem,
@@ -65,6 +67,7 @@ export default function ExchangeSaleItemsPage() {
   const [exchangeType, setExchangeType] = useState<CatalogType>("products");
   const [exchangeItems, setExchangeItems] = useState<PendingExchangeItem[]>([]);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [exchangeRate, setExchangeRate] = useState(0);
 
   const loadSale = useCallback(async () => {
     try {
@@ -72,7 +75,12 @@ export default function ExchangeSaleItemsPage() {
       const token = getAuthToken();
       if (!token) throw new Error("Authentication required");
       setLoading(true);
-      setSale(await getSale(token, saleId));
+      const [saleData, settingsData] = await Promise.all([
+        getSale(token, saleId),
+        getSettings(token),
+      ]);
+      setSale(saleData);
+      setExchangeRate(settingsData.exchange_rate ?? 0);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load sale");
@@ -115,11 +123,18 @@ export default function ExchangeSaleItemsPage() {
       ...current,
       ...picked.map((item, index) => {
         const built = buildPayload(item);
+        // Normalize USD prices to EGP immediately so all downstream
+        // calculations (replacementTotal, StatCards, API payload) are in EGP.
+        const egpPrice = normalizeToEGP(built.payload.selling_price, built.currency, exchangeRate);
         return {
           id: `${Date.now()}_${current.length + index}`,
           label: built.label,
           kind: built.kind,
-          payload: built.payload,
+          currency: built.currency,
+          payload: {
+            ...built.payload,
+            selling_price: egpPrice,
+          },
         };
       }),
     ]);
@@ -438,7 +453,7 @@ export default function ExchangeSaleItemsPage() {
                           </InputGroup>
                         </div>
                         <div className="md:col-span-8 lg:col-span-4 grid grid-cols-2 gap-2">
-                          <InputGroup label="Price">
+                          <InputGroup label="Price (EGP)">
                             <input
                               type="number"
                               value={row.payload.selling_price || 0}
@@ -463,7 +478,7 @@ export default function ExchangeSaleItemsPage() {
                               className="w-full rounded-xl border border-outline-variant/30 px-2 py-1 bg-surface text-right tabular-nums font-medium"
                             />
                           </InputGroup>
-                          <InputGroup label="Disc">
+                          <InputGroup label="Disc (EGP)">
                             <input
                               type="number"
                               value={row.payload.discount || 0}

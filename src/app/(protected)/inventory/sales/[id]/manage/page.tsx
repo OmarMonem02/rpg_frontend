@@ -9,6 +9,7 @@ import {
   processSaleExchange,
   type SaleRecord,
 } from "@/lib/crud-api";
+import { getSettings } from "@/lib/api/settings";
 import {
   ActionButton,
   PageShell,
@@ -34,6 +35,7 @@ import {
   buildPayload,
   labelOf,
   money,
+  normalizeToEGP,
   type CatalogItem,
   type CatalogType,
   type PendingExchangeItem,
@@ -74,6 +76,7 @@ export default function ManageSaleItemsPage() {
   const [exchangeType, setExchangeType] = useState<CatalogType>("products");
   const [exchangeItems, setExchangeItems] = useState<PendingExchangeItem[]>([]);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [exchangeRate, setExchangeRate] = useState(0);
 
   const loadSale = useCallback(async () => {
     try {
@@ -81,7 +84,12 @@ export default function ManageSaleItemsPage() {
       const token = getAuthToken();
       if (!token) throw new Error("Authentication required");
       setLoading(true);
-      setSale(await getSale(token, saleId));
+      const [saleData, settingsData] = await Promise.all([
+        getSale(token, saleId),
+        getSettings(token),
+      ]);
+      setSale(saleData);
+      setExchangeRate(settingsData.exchange_rate ?? 0);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load sale");
@@ -132,11 +140,22 @@ export default function ManageSaleItemsPage() {
       ...current,
       ...picked.map((item, index) => {
         const built = buildPayload(item);
+        // Normalize USD prices to EGP immediately so all downstream
+        // calculations (replacementTotal, StatCards, API payload) are in EGP.
+        const egpPrice = normalizeToEGP(
+          built.payload.selling_price,
+          built.currency,
+          exchangeRate || 1
+        );
         return {
           id: `${Date.now()}_${current.length + index}`,
           label: built.label,
           kind: built.kind,
-          payload: built.payload,
+          currency: built.currency,
+          payload: {
+            ...built.payload,
+            selling_price: egpPrice,
+          },
         };
       }),
     ]);
@@ -472,82 +491,88 @@ export default function ManageSaleItemsPage() {
                             </StatusBadge>
                           </div>
                           <div className="md:col-span-4 lg:col-span-2">
-                            <input
-                              type="number"
-                              min="1"
-                              disabled={row.kind === "bikes"}
-                              value={row.payload.qty || 1}
-                              onChange={(e) =>
-                                setExchangeItems((current) =>
-                                  current.map((item) =>
-                                    item.id === row.id
-                                      ? {
-                                          ...item,
-                                          payload: {
-                                            ...item.payload,
-                                            qty:
-                                              row.kind === "bikes"
-                                                ? 1
-                                                : Math.max(
-                                                    1,
-                                                    Number(e.target.value) || 1,
-                                                  ),
-                                          },
-                                        }
-                                      : item,
-                                  ),
-                                )
-                              }
-                              className="w-full rounded-xl border border-outline-variant/30 px-3 py-1.5 bg-surface text-center font-bold tabular-nums text-sm"
-                            />
+                            <InputGroup label="Qty">
+                              <input
+                                type="number"
+                                min="1"
+                                disabled={row.kind === "bikes"}
+                                value={row.payload.qty || 1}
+                                onChange={(e) =>
+                                  setExchangeItems((current) =>
+                                    current.map((item) =>
+                                      item.id === row.id
+                                        ? {
+                                            ...item,
+                                            payload: {
+                                              ...item.payload,
+                                              qty:
+                                                row.kind === "bikes"
+                                                  ? 1
+                                                  : Math.max(
+                                                      1,
+                                                      Number(e.target.value) || 1,
+                                                    ),
+                                            },
+                                          }
+                                        : item,
+                                    ),
+                                  )
+                                }
+                                className="w-full rounded-xl border border-outline-variant/30 px-3 py-1.5 bg-surface text-center font-bold tabular-nums text-sm"
+                              />
+                            </InputGroup>
                           </div>
                           <div className="md:col-span-8 lg:col-span-4 grid grid-cols-2 gap-2">
-                            <input
-                              type="number"
-                              value={row.payload.selling_price || 0}
-                              onChange={(e) =>
-                                setExchangeItems((current) =>
-                                  current.map((item) =>
-                                    item.id === row.id
-                                      ? {
-                                          ...item,
-                                          payload: {
-                                            ...item.payload,
-                                            selling_price: Math.max(
-                                              0,
-                                              Number(e.target.value) || 0,
-                                            ),
-                                          },
-                                        }
-                                      : item,
-                                  ),
-                                )
-                              }
-                              className="w-full rounded-xl border border-outline-variant/30 px-2 py-1.5 bg-surface text-right tabular-nums font-medium text-sm"
-                            />
-                            <input
-                              type="number"
-                              value={row.payload.discount || 0}
-                              onChange={(e) =>
-                                setExchangeItems((current) =>
-                                  current.map((item) =>
-                                    item.id === row.id
-                                      ? {
-                                          ...item,
-                                          payload: {
-                                            ...item.payload,
-                                            discount: Math.max(
-                                              0,
-                                              Number(e.target.value) || 0,
-                                            ),
-                                          },
-                                        }
-                                      : item,
-                                  ),
-                                )
-                              }
-                              className="w-full rounded-xl border border-outline-variant/30 px-2 py-1.5 bg-surface text-right tabular-nums text-error font-medium text-sm"
-                            />
+                            <InputGroup label="Price (EGP)">
+                              <input
+                                type="number"
+                                value={row.payload.selling_price || 0}
+                                onChange={(e) =>
+                                  setExchangeItems((current) =>
+                                    current.map((item) =>
+                                      item.id === row.id
+                                        ? {
+                                            ...item,
+                                            payload: {
+                                              ...item.payload,
+                                              selling_price: Math.max(
+                                                0,
+                                                Number(e.target.value) || 0,
+                                              ),
+                                            },
+                                          }
+                                        : item,
+                                    ),
+                                  )
+                                }
+                                className="w-full rounded-xl border border-outline-variant/30 px-2 py-1.5 bg-surface text-right tabular-nums font-medium text-sm"
+                              />
+                            </InputGroup>
+                            <InputGroup label="Disc (EGP)">
+                              <input
+                                type="number"
+                                value={row.payload.discount || 0}
+                                onChange={(e) =>
+                                  setExchangeItems((current) =>
+                                    current.map((item) =>
+                                      item.id === row.id
+                                        ? {
+                                            ...item,
+                                            payload: {
+                                              ...item.payload,
+                                              discount: Math.max(
+                                                0,
+                                                Number(e.target.value) || 0,
+                                              ),
+                                            },
+                                          }
+                                        : item,
+                                    ),
+                                  )
+                                }
+                                className="w-full rounded-xl border border-outline-variant/30 px-2 py-1.5 bg-surface text-right tabular-nums text-error font-medium text-sm"
+                              />
+                            </InputGroup>
                           </div>
                           <div className="md:col-span-12 lg:col-span-1 flex items-end justify-end">
                             <button

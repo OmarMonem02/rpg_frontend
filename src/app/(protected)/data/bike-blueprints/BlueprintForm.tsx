@@ -10,6 +10,7 @@ import {
   type BikeBlueprintRecord,
   type CreateBikeBlueprintPayload,
   type BrandRecord,
+  fetchAllPages,
 } from "@/lib/crud-api";
 import { EntityForm, type FieldConfig } from "@/components/entity-form";
 
@@ -30,8 +31,8 @@ export function BlueprintForm({ mode, initialData }: BlueprintFormProps) {
       try {
         const token = getAuthToken();
         if (!token) return;
-        const result = await listBrands(token, 1, "bikes");
-        setBrands(result.items);
+        const result = await fetchAllPages((p) => listBrands(token, p, "bikes"));
+        setBrands(result);
       } catch (err) {
         console.error("Failed to load brands:", err);
       } finally {

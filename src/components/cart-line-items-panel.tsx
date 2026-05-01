@@ -64,7 +64,25 @@ export function CartLineItemsPanel({
     setEditingRowId(null);
   };
 
-  // Calculations
+  // ─── Currency Normalization ────────────────────────────────────────────────
+  /**
+   * Returns the EGP-normalised unit price for an item.
+   * USD items are multiplied by exchangeRate; EGP items pass through unchanged.
+   */
+  const toEGP = (item: SaleLineItem): number => {
+    if (item.currency === "USD" && exchangeRate > 0) {
+      return item.selling_price * exchangeRate;
+    }
+    return item.selling_price;
+  };
+
+  const toEGPDiscount = (item: SaleLineItem): number => {
+    if (item.currency === "USD" && exchangeRate > 0) {
+      return item.discount_amount * exchangeRate;
+    }
+    return item.discount_amount;
+  };
+
   const getDisplayPrice = (item: SaleLineItem): { amount: number; currency: string; converted?: { amount: number; currency: string } } => {
     const displayPrice = {
       amount: item.selling_price,
@@ -73,7 +91,7 @@ export function CartLineItemsPanel({
     };
 
     // If item is priced in USD and we have exchange rate, show conversion to EGP
-    if (item.catalogItem.currency_pricing === "USD" && exchangeRate > 0) {
+    if (item.currency === "USD" && exchangeRate > 0) {
       displayPrice.converted = {
         amount: item.selling_price * exchangeRate,
         currency: "EGP",
@@ -85,18 +103,25 @@ export function CartLineItemsPanel({
 
   const calculateMaxDiscount = (item: SaleLineItem): number => {
     const maxDiscountValue = item.catalogItem.max_discount_value || 0;
+    // Max discount is always in item's native currency
     if (item.catalogItem.max_discount_type === "percentage") {
       return (item.selling_price * maxDiscountValue) / 100;
     }
     return maxDiscountValue;
   };
 
+  /**
+   * Line subtotal always in EGP (base currency).
+   * Formula: (unitPriceEGP * qty) - discountEGP
+   */
   const calculateLineSubtotal = (item: SaleLineItem): number => {
-    return item.quantity * item.selling_price - item.discount_amount;
+    const unitEGP = toEGP(item);
+    const discEGP = toEGPDiscount(item);
+    return Math.round((item.quantity * unitEGP - discEGP) * 100) / 100;
   };
 
   const subtotal = items.reduce((sum, item) => sum + calculateLineSubtotal(item), 0);
-  const total = subtotal + shippingFee - saleDiscount;
+  const total = Math.round((subtotal + shippingFee - saleDiscount) * 100) / 100;
 
   return (
     <div className="flex h-full flex-col overflow-hidden rounded-[1.5rem] border border-outline-variant/20 bg-surface shadow-sm lg:h-auto">
@@ -228,17 +253,27 @@ export function CartLineItemsPanel({
                             </span>
                           </div>
                         ) : (
-                          <p className={`font-semibold ${item.discount_amount > 0 ? 'text-error' : 'text-on-surface-variant opacity-50'}`}>
-                            {item.discount_amount > 0 ? `-${item.discount_amount.toLocaleString()}` : "0"} <span className="text-[11px] uppercase">{item.currency}</span>
-                          </p>
+                          <div className="flex flex-col items-end">
+                            <p className={`font-semibold ${item.discount_amount > 0 ? 'text-error' : 'text-on-surface-variant opacity-50'}`}>
+                              {item.discount_amount > 0 ? `-${item.discount_amount.toLocaleString()}` : "0"} <span className="text-[11px] uppercase">{item.currency}</span>
+                            </p>
+                            {item.currency === "USD" && item.discount_amount > 0 && exchangeRate > 0 && (
+                              <p className="text-[11px] text-on-surface-variant/60 mt-0.5">
+                                ≈ -{toEGPDiscount(item).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} EGP
+                              </p>
+                            )}
+                          </div>
                         )}
                       </td>
 
-                      {/* Subtotal */}
+                      {/* Subtotal — always EGP */}
                       <td className="px-5 py-4 text-right">
                         <p className="font-bold text-primary">
-                          {calculateLineSubtotal(item).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <span className="text-[11px] uppercase">{item.currency}</span>
+                          {calculateLineSubtotal(item).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <span className="text-[11px] uppercase">EGP</span>
                         </p>
+                        {item.currency === "USD" && (
+                          <p className="text-[10px] text-on-surface-variant/50 mt-0.5">Converted @ {exchangeRate}x</p>
+                        )}
                       </td>
 
                       {/* Actions */}

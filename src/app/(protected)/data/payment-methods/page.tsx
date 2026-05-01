@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { usePermissions } from "@/components/permission-provider";
 import { ApiError } from "@/lib/auth-api";
 import { getAuthToken } from "@/lib/auth-session";
 import { getSettings, updateSettings } from "@/lib/api/settings";
@@ -28,7 +29,6 @@ import {
   SurfaceCard,
 } from "@/components/ops-ui";
 import type {
-  Currency,
   SettingsResponse,
   SettingsValidationErrors,
 } from "@/types/settings";
@@ -76,6 +76,7 @@ function validateSettingsForm(
 }
 
 export default function PaymentMethodsPage() {
+  const permissions = usePermissions();
   const [methods, setMethods] = useState<PaymentMethodRecord[]>([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -95,6 +96,9 @@ export default function PaymentMethodsPage() {
   const [settingsSuccess, setSettingsSuccess] = useState<string | null>(null);
   const [isSettingsLoading, setIsSettingsLoading] = useState(true);
   const [isSettingsSaving, setIsSettingsSaving] = useState(false);
+  const canCreatePaymentMethods = permissions.canCreate("payment-methods");
+  const canUpdatePaymentMethods = permissions.canUpdate("payment-methods");
+  const canDeletePaymentMethods = permissions.canDelete("payment-methods");
 
   const loadMethods = async () => {
     try {
@@ -170,6 +174,8 @@ export default function PaymentMethodsPage() {
   }, [settings, settingsForm]);
 
   const handleOpenModal = (method?: PaymentMethodRecord) => {
+    if (method && !canUpdatePaymentMethods) return;
+    if (!method && !canCreatePaymentMethods) return;
     setEditingMethod(method || null);
     setSubmitError(null);
     setIsModalOpen(true);
@@ -182,6 +188,12 @@ export default function PaymentMethodsPage() {
 
   const handleSubmit = async (formData: Record<string, unknown>) => {
     try {
+      if (
+        (editingMethod && !canUpdatePaymentMethods) ||
+        (!editingMethod && !canCreatePaymentMethods)
+      ) {
+        throw new Error("You do not have permission to save payment methods.");
+      }
       setIsSubmitting(true);
       const token = getAuthToken();
       if (!token) throw new Error("Authentication required");
@@ -225,6 +237,10 @@ export default function PaymentMethodsPage() {
     event: React.FormEvent<HTMLFormElement>,
   ) => {
     event.preventDefault();
+    if (!canUpdatePaymentMethods) {
+      setSettingsError("You do not have permission to update payment settings.");
+      return;
+    }
     const nextErrors = validateSettingsForm(settingsForm);
     if (Object.keys(nextErrors).length > 0) {
       setSettingsErrors(nextErrors);
@@ -270,6 +286,10 @@ export default function PaymentMethodsPage() {
   };
 
   const handleDelete = async (id: number) => {
+    if (!canDeletePaymentMethods) {
+      setError("You do not have permission to delete payment methods.");
+      return;
+    }
     if (!confirm("Are you sure you want to delete this payment method?"))
       return;
 
@@ -401,14 +421,22 @@ export default function PaymentMethodsPage() {
                 <ActionButton
                   type="button"
                   onClick={() => settings && syncSettingsForm(settings)}
-                  disabled={!hasSettingsChanges || isSettingsSaving}
+                  disabled={
+                    !hasSettingsChanges ||
+                    isSettingsSaving ||
+                    !canUpdatePaymentMethods
+                  }
                 >
                   Reset
                 </ActionButton>
                 <ActionButton
                   type="submit"
                   tone="primary"
-                  disabled={isSettingsSaving || !hasSettingsChanges}
+                  disabled={
+                    isSettingsSaving ||
+                    !hasSettingsChanges ||
+                    !canUpdatePaymentMethods
+                  }
                 >
                   {isSettingsSaving ? "Saving..." : "Save Settings"}
                 </ActionButton>
@@ -422,9 +450,11 @@ export default function PaymentMethodsPage() {
         title="Payment Methods"
         description="Maintain the accepted payment channels used by the RPG shop across sales and reporting."
         actions={
-          <ActionButton tone="primary" onClick={() => handleOpenModal()}>
-            Add Payment Method
-          </ActionButton>
+          canCreatePaymentMethods ? (
+            <ActionButton tone="primary" onClick={() => handleOpenModal()}>
+              Add Payment Method
+            </ActionButton>
+          ) : null
         }
       />
       <SurfaceCard>
@@ -437,9 +467,11 @@ export default function PaymentMethodsPage() {
             title="No payment methods found"
             description="Create the first payment method so the team can align transactions with your accepted payment channels."
             action={
-              <ActionButton tone="primary" onClick={() => handleOpenModal()}>
-                Create Payment Method
-              </ActionButton>
+              canCreatePaymentMethods ? (
+                <ActionButton tone="primary" onClick={() => handleOpenModal()}>
+                  Create Payment Method
+                </ActionButton>
+              ) : undefined
             }
           />
         ) : (
@@ -473,6 +505,7 @@ export default function PaymentMethodsPage() {
                     <td className="px-4 py-3 text-right">
                       <button
                         onClick={() => handleOpenModal(method)}
+                        hidden={!canUpdatePaymentMethods}
                         className="text-primary hover:underline text-xs font-medium"
                       >
                         Edit
@@ -480,6 +513,7 @@ export default function PaymentMethodsPage() {
                       <span className="mx-2 text-on-surface-variant">•</span>
                       <button
                         onClick={() => handleDelete(method.id)}
+                        hidden={!canDeletePaymentMethods}
                         className="text-error hover:underline text-xs font-medium"
                       >
                         Delete

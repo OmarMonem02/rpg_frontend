@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import { usePermissions } from "@/components/permission-provider";
 import { ApiError } from "@/lib/auth-api";
 import { getAuthToken } from "@/lib/auth-session";
 import { createSeller, deleteSeller, listSellers, updateSeller, type SellerRecord } from "@/lib/crud-api";
@@ -19,6 +20,7 @@ const initialForm: SellerFormState = {
 };
 
 export default function SellersPage() {
+  const permissions = usePermissions();
   const [records, setRecords] = useState<SellerRecord[]>([]);
   const [form, setForm] = useState<SellerFormState>(initialForm);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -28,6 +30,9 @@ export default function SellersPage() {
   const [error, setError] = useState("");
   const [page, setPage] = useState(1);
   const [lastPage, setLastPage] = useState(1);
+  const canCreateSellers = permissions.canCreate("sellers");
+  const canUpdateSellers = permissions.canUpdate("sellers");
+  const canDeleteSellers = permissions.canDelete("sellers");
 
   async function loadSellers(nextPage = page) {
     const token = getAuthToken();
@@ -66,6 +71,10 @@ export default function SellersPage() {
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if ((editingId && !canUpdateSellers) || (!editingId && !canCreateSellers)) {
+      setError("You do not have permission to save sellers.");
+      return;
+    }
     const token = getAuthToken();
     if (!token) {
       setError("You are not authenticated. Please sign in again.");
@@ -103,6 +112,10 @@ export default function SellersPage() {
   }
 
   async function onDelete(id: number) {
+    if (!canDeleteSellers) {
+      setError("You do not have permission to delete sellers.");
+      return;
+    }
     const token = getAuthToken();
     if (!token) {
       setError("You are not authenticated. Please sign in again.");
@@ -127,6 +140,7 @@ export default function SellersPage() {
   }
 
   function onEdit(record: SellerRecord) {
+    if (!canUpdateSellers) return;
     setEditingId(record.id);
     setForm({
       name: record.name,
@@ -145,6 +159,7 @@ export default function SellersPage() {
         description="Maintain commission-ready seller records with the existing `/sellers` backend integration."
       />
 
+      {canCreateSellers || editingId ? (
       <SurfaceCard>
       <form className="space-y-4" onSubmit={onSubmit}>
         <h2 className="text-lg font-semibold text-on-surface">{editingId ? "Edit Seller" : "Create Seller"}</h2>
@@ -206,6 +221,13 @@ export default function SellersPage() {
         </div>
       </form>
       </SurfaceCard>
+      ) : null}
+
+      {!canCreateSellers && !canUpdateSellers ? (
+        <InlineMessage tone="warning">
+          Your account can read sellers, but it cannot create or update them.
+        </InlineMessage>
+      ) : null}
 
       {error ? <InlineMessage tone="danger">{error}</InlineMessage> : null}
       {message ? (
@@ -240,20 +262,24 @@ export default function SellersPage() {
                     <td className="px-4 py-3">{record.phone ?? "—"}</td>
                     <td className="px-4 py-3">
                       <div className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() => onEdit(record)}
-                          className="rounded-md border border-outline-variant/40 bg-surface-container-low px-3 py-1 font-medium text-on-surface"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => onDelete(record.id)}
-                          className="rounded-md bg-error-container px-3 py-1 font-medium text-on-error-container"
-                        >
-                          Delete
-                        </button>
+                        {canUpdateSellers ? (
+                          <button
+                            type="button"
+                            onClick={() => onEdit(record)}
+                            className="rounded-md border border-outline-variant/40 bg-surface-container-low px-3 py-1 font-medium text-on-surface"
+                          >
+                            Edit
+                          </button>
+                        ) : null}
+                        {canDeleteSellers ? (
+                          <button
+                            type="button"
+                            onClick={() => onDelete(record.id)}
+                            className="rounded-md bg-error-container px-3 py-1 font-medium text-on-error-container"
+                          >
+                            Delete
+                          </button>
+                        ) : null}
                       </div>
                     </td>
                   </tr>

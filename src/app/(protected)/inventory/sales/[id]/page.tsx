@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { getAuthToken, getAuthUser } from "@/lib/auth-session";
+import { getAuthToken } from "@/lib/auth-session";
+import { usePermissions } from "@/components/permission-provider";
 import { deleteSale, getSale, type SaleRecord } from "@/lib/crud-api";
 import {
   PageShell,
@@ -51,7 +52,10 @@ export default function SaleDetailsPage() {
   const router = useRouter();
   const params = useParams();
   const saleId = Number(params?.id);
-  const isAdmin = getAuthUser()?.role?.toLowerCase() === "admin";
+  const permissions = usePermissions();
+  const canDeleteSales = permissions.canDelete("sales");
+  const canUpdateSales = permissions.canUpdate("sales");
+  const canExportSales = permissions.canExport("sales");
 
   const [sale, setSale] = useState<SaleRecord | null>(null);
   const [loading, setLoading] = useState(true);
@@ -94,8 +98,8 @@ export default function SaleDetailsPage() {
   );
 
   const handleDelete = async () => {
-    if (!isAdmin) {
-      setError("Only admin users can delete sales.");
+    if (!permissions.canDelete("sales")) {
+      setError("You don't have permission to delete sales.");
       return;
     }
     if (!confirm("Are you sure you want to delete this sale?")) return;
@@ -128,16 +132,18 @@ export default function SaleDetailsPage() {
       const invoiceElement = document.getElementById("invoice-export-root");
       if (!invoiceElement) throw new Error("Invoice element not found");
 
+      invoiceElement.classList.add("pdf-export");
       const { default: html2canvas } = await import("html2canvas");
       const jspdf = await import("jspdf").then((m) => m.jsPDF);
 
       const canvas = await html2canvas(invoiceElement, {
-        scale: 2,
+        scale: 3,
         useCORS: true,
         backgroundColor: "#ffffff",
       });
+      invoiceElement.classList.remove("pdf-export");
 
-      const imgData = canvas.toDataURL("image/png");
+      const imgData = canvas.toDataURL("image/jpeg", 1.0);
       const pdf = new jspdf({
         orientation: "portrait",
         unit: "mm",
@@ -163,6 +169,8 @@ export default function SaleDetailsPage() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to export PDF");
     } finally {
+      const invoiceElement = document.getElementById("invoice-export-root");
+      if (invoiceElement) invoiceElement.classList.remove("pdf-export");
       setExporting(false);
     }
   };
@@ -227,16 +235,18 @@ export default function SaleDetailsPage() {
               <PrinterIcon className="w-4 h-4" />
               Print
             </ActionButton>
-            <ActionButton
-              variant="outline"
-              onClick={handleExportPDF}
-              disabled={exporting}
-              className="gap-2"
-            >
-              <DocumentArrowDownIcon className="w-4 h-4" />
-              {exporting ? "Exporting..." : "PDF"}
-            </ActionButton>
-            {isAdmin && (
+            {canExportSales ? (
+              <ActionButton
+                variant="outline"
+                onClick={handleExportPDF}
+                disabled={exporting}
+                className="gap-2"
+              >
+                <DocumentArrowDownIcon className="w-4 h-4" />
+                {exporting ? "Exporting..." : "PDF"}
+              </ActionButton>
+            ) : null}
+            {canDeleteSales ? (
               <ActionButton
                 variant="outline"
                 tone="danger"
@@ -247,7 +257,7 @@ export default function SaleDetailsPage() {
                 <TrashIcon className="w-4 h-4" />
                 Delete
               </ActionButton>
-            )}
+            ) : null}
           </>
         }
       />
@@ -373,30 +383,34 @@ export default function SaleDetailsPage() {
                           </td>
                           <td className="px-6 py-4">
                             <div className="flex justify-end gap-2">
-                              <ActionButton
-                                variant="outline"
-                                size="sm"
-                                title="Process Return"
-                                onClick={() =>
-                                  router.push(
-                                    `/inventory/sales/${sale.id}/manage?item=${row.id}&mode=return`,
-                                  )
-                                }
-                              >
-                                <ArrowUturnLeftIcon className="w-3.5 h-3.5" />
-                              </ActionButton>
-                              <ActionButton
-                                variant="outline"
-                                size="sm"
-                                title="Process Exchange"
-                                onClick={() =>
-                                  router.push(
-                                    `/inventory/sales/${sale.id}/manage?item=${row.id}&mode=exchange`,
-                                  )
-                                }
-                              >
-                                <ArrowPathRoundedSquareIcon className="w-3.5 h-3.5" />
-                              </ActionButton>
+                              {canUpdateSales ? (
+                                <>
+                                  <ActionButton
+                                    variant="outline"
+                                    size="sm"
+                                    title="Process Return"
+                                    onClick={() =>
+                                      router.push(
+                                        `/inventory/sales/${sale.id}/manage?item=${row.id}&mode=return`,
+                                      )
+                                    }
+                                  >
+                                    <ArrowUturnLeftIcon className="w-3.5 h-3.5" />
+                                  </ActionButton>
+                                  <ActionButton
+                                    variant="outline"
+                                    size="sm"
+                                    title="Process Exchange"
+                                    onClick={() =>
+                                      router.push(
+                                        `/inventory/sales/${sale.id}/manage?item=${row.id}&mode=exchange`,
+                                      )
+                                    }
+                                  >
+                                    <ArrowPathRoundedSquareIcon className="w-3.5 h-3.5" />
+                                  </ActionButton>
+                                </>
+                              ) : null}
                             </div>
                           </td>
                         </tr>

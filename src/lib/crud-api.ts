@@ -1,5 +1,10 @@
 import { getApiUrl } from "@/lib/config";
 import { ApiError } from "@/lib/auth-api";
+import {
+  normalizePermissionMatrix,
+  normalizeOptionalPermissionMatrix,
+  type PermissionMatrix,
+} from "@/lib/permissions";
 
 type ValidationErrorResponse = {
   message?: string;
@@ -24,6 +29,7 @@ export type UserRecord = {
   name: string;
   email: string;
   role: string;
+  permissions?: PermissionMatrix;
   created_at?: string;
 };
 
@@ -49,6 +55,10 @@ export type UpdateUserPayload = {
   role: string;
   password?: string;
   password_confirmation?: string;
+};
+
+export type UpdateUserPermissionsPayload = {
+  permissions: PermissionMatrix;
 };
 
 export type UpsertSellerPayload = {
@@ -91,6 +101,7 @@ function normalizeUser(raw: unknown): UserRecord {
     name: toText(record.name),
     email: toText(record.email),
     role: toText(record.role),
+    permissions: normalizeOptionalPermissionMatrix(record.permissions),
     created_at: toText(record.created_at) || undefined,
   };
 }
@@ -138,6 +149,8 @@ async function parseErrorMessage(response: Response): Promise<string> {
 
   if (response.status === 401)
     return "Your session expired. Please log in again.";
+  if (response.status === 403)
+    return "You don't have permission to perform this action.";
   if (response.status === 422)
     return "Please review your form inputs and try again.";
   if (response.status === 500)
@@ -176,7 +189,17 @@ async function authorizedFetch<T>(
     console.error(`[API Error ${response.status}] ${path} - ${errorMsg}`, {
       requestBody,
     });
-    throw new ApiError(errorMsg, response.status);
+    
+    // Enhanced error messaging for 403 Forbidden
+    let enhancedMsg = errorMsg;
+    if (response.status === 403) {
+      const resourceMatch = path.match(/(\w+)/)?.[1];
+      if (resourceMatch) {
+        enhancedMsg = `Permission denied: You don't have access to ${resourceMatch}. Please contact your administrator.`;
+      }
+    }
+    
+    throw new ApiError(enhancedMsg, response.status);
   }
 
   if (response.status === 204) {
@@ -186,12 +209,77 @@ async function authorizedFetch<T>(
   return (await response.json()) as T;
 }
 
+/**
+ * Retry helper for API calls with exponential backoff
+ * Does NOT retry on 403 errors (permission issues)
+ */
+export async function retryApiCall<T>(
+  fn: () => Promise<T>,
+  maxRetries: number = 2,
+): Promise<T> {
+  let lastError: Error | null = null;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+
+      // Don't retry on permission errors
+      if (err instanceof ApiError && err.status === 403) {
+        throw err;
+      }
+
+      // Don't retry on auth errors
+      if (err instanceof ApiError && err.status === 401) {
+        throw err;
+      }
+
+      // Only retry if we have attempts left
+      if (attempt < maxRetries) {
+        const delayMs = Math.pow(2, attempt) * 500; // 500ms, 1s, 2s
+        console.warn(
+          `[API] Attempt ${attempt + 1} failed, retrying in ${delayMs}ms:`,
+          lastError.message,
+        );
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+      }
+    }
+  }
+
+  throw lastError || new Error("Max retries exceeded");
+}
+
+export async function fetchAllPages<T>(
+  fetcher: (page: number) => Promise<PaginatedResult<T>>,
+): Promise<T[]> {
+  const firstPage = await fetcher(1);
+  const items = [...firstPage.items];
+  const lastPage = firstPage.lastPage;
+
+  if (lastPage <= 1) {
+    return items;
+  }
+
+  const batchSize = 4;
+  const remainingPages = Array.from({ length: lastPage - 1 }, (_, index) => index + 2);
+
+  for (let i = 0; i < remainingPages.length; i += batchSize) {
+    const batch = remainingPages.slice(i, i + batchSize);
+    const responses = await Promise.all(batch.map((page) => fetcher(page)));
+    responses.forEach((response) => items.push(...response.items));
+  }
+
+  return items;
+}
+
 function parsePagination(payload: unknown): PaginationMeta {
   const data = asRecord(payload);
   const meta = asRecord(data.meta);
+  const innerData = asRecord(data.data);
   return {
-    current_page: toNumber(meta.current_page) || 1,
-    last_page: toNumber(meta.last_page) || 1,
+    current_page: toNumber(meta.current_page) || toNumber(data.current_page) || toNumber(innerData.current_page) || 1,
+    last_page: toNumber(meta.last_page) || toNumber(data.last_page) || toNumber(innerData.last_page) || 1,
   };
 }
 
@@ -222,6 +310,15 @@ export async function createUser(
   return normalizeUser(record.user ?? record.data ?? record);
 }
 
+export async function getUser(
+  token: string,
+  id: number,
+): Promise<UserRecord> {
+  const data = await authorizedFetch<unknown>(`/users/${id}`, token);
+  const record = asRecord(data);
+  return normalizeUser(record.user ?? record.data ?? record);
+}
+
 export async function updateUser(
   token: string,
   id: number,
@@ -231,6 +328,21 @@ export async function updateUser(
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
+  });
+  const record = asRecord(data);
+  return normalizeUser(record.user ?? record.data ?? record);
+}
+
+export async function updateUserPermissions(
+  token: string,
+  id: number,
+  permissions: PermissionMatrix,
+): Promise<UserRecord> {
+  const normalizedPermissions = normalizePermissionMatrix(permissions);
+  const data = await authorizedFetch<unknown>(`/users/${id}/permissions`, token, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ permissions: normalizedPermissions }),
   });
   const record = asRecord(data);
   return normalizeUser(record.user ?? record.data ?? record);
@@ -544,6 +656,7 @@ export type SparePartRecord = {
   max_discount_value: number;
   universal: boolean;
   notes?: string;
+  bike_blueprint_ids?: number[];
   created_at?: string;
 };
 
@@ -602,6 +715,11 @@ function normalizeSparcePart(raw: unknown): SparePartRecord {
     max_discount_value: toNumber(record.max_discount_value),
     universal: record.universal === true || record.universal === "true",
     notes: toText(record.notes) || undefined,
+    bike_blueprint_ids: Array.isArray(record.bike_blueprint_ids)
+      ? record.bike_blueprint_ids
+          .map((item) => toNumber(item))
+          .filter((id) => id > 0)
+      : undefined,
     created_at: toText(record.created_at) || undefined,
   };
 }
@@ -1362,6 +1480,7 @@ export async function listBikes(
   filters?: {
     search?: string;
     blueprint_id?: number;
+    brand_id?: number;
     status?: string;
     price_range?: string;
     currency?: string;
@@ -1372,6 +1491,8 @@ export async function listBikes(
     query.append("search", filters.search);
   if (filters?.blueprint_id !== undefined && filters.blueprint_id)
     query.append("blueprint_id", String(filters.blueprint_id));
+  if (filters?.brand_id !== undefined && filters.brand_id)
+    query.append("brand_id", String(filters.brand_id));
   if (filters?.status !== undefined && filters.status)
     query.append("status", filters.status);
   if (filters?.price_range !== undefined && filters.price_range)
@@ -1505,12 +1626,12 @@ export async function getSparePartBlueprints(
   sparePartId: number,
 ): Promise<number[]> {
   const payload = await authorizedFetch<unknown>(
-    `/spare_parts/${sparePartId}/blueprints`,
+    `/spare_parts/${sparePartId}/bike_blueprints`,
     token,
   );
-  const rows = pickArray(payload, ["data", "blueprints"]);
+  const rows = pickArray(payload, ["data", "bike_blueprints"]);
   return rows
-    .map((item: any) => toNumber(asRecord(item).id))
+    .map((item: unknown) => toNumber(asRecord(item).id))
     .filter((id) => id > 0);
 }
 
@@ -1519,11 +1640,15 @@ export async function assignBlueprintsToSparePart(
   sparePartId: number,
   blueprintIds: number[],
 ): Promise<void> {
-  await authorizedFetch<void>(`/spare_parts/${sparePartId}/blueprints`, token, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ bike_blueprint_ids: blueprintIds }),
-  });
+  await authorizedFetch<void>(
+    `/spare_parts/${sparePartId}/bike_blueprints`,
+    token,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ bike_blueprint_ids: blueprintIds }),
+    },
+  );
 }
 
 export async function removeBlueprintFromSparePart(
@@ -1532,7 +1657,7 @@ export async function removeBlueprintFromSparePart(
   blueprintId: number,
 ): Promise<void> {
   await authorizedFetch<void>(
-    `/spare_parts/${sparePartId}/blueprints/${blueprintId}`,
+    `/spare_parts/${sparePartId}/bike_blueprints/${blueprintId}`,
     token,
     { method: "DELETE" },
   );
@@ -1593,6 +1718,26 @@ export async function getCustomer(
   return normalizeCustomer(record.data ?? record.customer ?? record);
 }
 
+export type CreateCustomerPayload = {
+  name: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+};
+
+export async function createCustomer(
+  token: string,
+  payload: CreateCustomerPayload,
+): Promise<CustomerRecord> {
+  const data = await authorizedFetch<unknown>("/customers", token, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const record = asRecord(data);
+  return normalizeCustomer(record.data ?? record.customer ?? record);
+}
+
 // ============================================================================
 // BIKES FOR SALE (Alias for listBikes)
 // ============================================================================
@@ -1638,6 +1783,7 @@ export type SaleRecord = {
   customer_id: number;
   seller_id: number;
   payment_method_id: number;
+  payment_method_name?: string;
   user_id: number;
   sale_type: string;
   status: string;
@@ -1733,6 +1879,7 @@ function normalizeSale(raw: unknown): SaleRecord {
     customer_id: toNumber(record.customer_id),
     seller_id: toNumber(record.seller_id),
     payment_method_id: toNumber(record.payment_method_id),
+    payment_method_name: toText(record.payment_method_name || (record.payment_method as any)?.name || (record.paymentMethod as any)?.name) || undefined,
     user_id: toNumber(record.user_id),
     sale_type: toText(record.sale_type || record.type),
     status: toText(record.status),

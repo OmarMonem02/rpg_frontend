@@ -36,5 +36,5 @@ export function debugFilters() {
 
 // Available in window for console testing
 if (typeof window !== "undefined") {
-  (window as any).debugFilters = debugFilters;
+  (window as unknown as { debugFilters: typeof debugFilters }).debugFilters = debugFilters;
 }

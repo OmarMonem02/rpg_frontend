@@ -15,6 +15,7 @@ import {
   type SparePartRecord,
   type SparePartCategoryRecord,
   type BrandRecord,
+  fetchAllPages,
 } from "@/lib/crud-api";
 import {
   EntityFormModal,
@@ -38,8 +39,11 @@ export default function SparePartsPage() {
   const router = useRouter();
   const [spareParts, setSpareParts] = useState<SparePartRecord[]>([]);
   const [categories, setCategories] = useState<SparePartCategoryRecord[]>([]);
+  const [allCategories, setAllCategories] = useState<SparePartCategoryRecord[]>([]);
   const [brands, setBrands] = useState<BrandRecord[]>([]);
   const [totalPages, setTotalPages] = useState(1);
+  const [categoriesPage, setCategoriesPage] = useState(1);
+  const [categoriesTotalPages, setCategoriesTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -53,27 +57,38 @@ export default function SparePartsPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
+  const loadDropdowns = useCallback(async () => {
+    try {
+      const token = getAuthToken();
+      if (!token) return;
+      const [catsRes, brandsRes] = await Promise.all([
+        fetchAllPages((p) => listSparePartCategories(token, p)),
+        fetchAllPages((p) => listBrands(token, p, "spare_parts")),
+      ]);
+      setAllCategories(catsRes);
+      setBrands(brandsRes.filter((b) => b.type === "spare_parts"));
+    } catch (err) {
+      console.error("Failed to load dropdowns:", err);
+    }
+  }, []);
+
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
       const token = getAuthToken();
       if (!token) throw new Error("Authentication required");
 
-      console.log("[SpareParts] Applying filters:", filters, "Page:", page);
-      logFilters();
-
       const cleanFilters = getCleanFilters();
 
-      const [partsRes, catsRes, brandsRes] = await Promise.all([
-        listSpareParts(token, page, cleanFilters as any),
-        listSparePartCategories(token, 1),
-        listBrands(token, 1, "spare_parts"),
+      const [partsRes, catsRes] = await Promise.all([
+        listSpareParts(token, page, cleanFilters as Parameters<typeof listSpareParts>[2]),
+        listSparePartCategories(token, categoriesPage),
       ]);
 
       setSpareParts(partsRes.items);
       setTotalPages(partsRes.lastPage);
       setCategories(catsRes.items);
-      setBrands(brandsRes.items);
+      setCategoriesTotalPages(catsRes.lastPage);
       setError(null);
     } catch (err) {
       setError(
@@ -82,7 +97,11 @@ export default function SparePartsPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, filters, logFilters]);
+  }, [page, filters, getCleanFilters, categoriesPage]);
+
+  useEffect(() => {
+    loadDropdowns();
+  }, [loadDropdowns]);
 
   useEffect(() => {
     loadData();
@@ -127,8 +146,10 @@ export default function SparePartsPage() {
         await createSparePartCategory(token, payload);
       }
 
-      const catsRes = await listSparePartCategories(token, 1);
+      const catsRes = await listSparePartCategories(token, categoriesPage);
       setCategories(catsRes.items);
+      setCategoriesTotalPages(catsRes.lastPage);
+      loadDropdowns();
       handleCloseCategoryModal();
     } catch (err) {
       setSubmitError(
@@ -145,8 +166,10 @@ export default function SparePartsPage() {
       const token = getAuthToken();
       if (!token) return;
       await deleteSparePartCategory(token, id);
-      const catsRes = await listSparePartCategories(token, 1);
+      const catsRes = await listSparePartCategories(token, categoriesPage);
       setCategories(catsRes.items);
+      setCategoriesTotalPages(catsRes.lastPage);
+      loadDropdowns();
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Failed to delete category",
@@ -201,7 +224,7 @@ export default function SparePartsPage() {
             className="form-input-base"
           >
             <option value="">All Categories</option>
-            {categories.map((c) => (
+            {allCategories.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
               </option>
@@ -298,7 +321,7 @@ export default function SparePartsPage() {
                   </td>
                   <td className="px-4 py-3 text-on-surface-variant text-xs">
                     {
-                      categories.find(
+                      allCategories.find(
                         (c) => c.id === part.spare_parts_category_id,
                       )?.name
                     }
@@ -416,6 +439,13 @@ export default function SparePartsPage() {
           </table>
         </div>
       )}
+
+      <PaginationControls
+        page={categoriesPage}
+        totalPages={categoriesTotalPages}
+        onPrevious={() => setCategoriesPage((p) => Math.max(1, p - 1))}
+        onNext={() => setCategoriesPage((p) => Math.min(categoriesTotalPages, p + 1))}
+      />
     </div>
   );
 

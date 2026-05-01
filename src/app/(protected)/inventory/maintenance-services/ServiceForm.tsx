@@ -10,6 +10,7 @@ import {
   type MaintenanceServiceRecord,
   type CreateMaintenanceServicePayload,
   type MaintenanceServiceSectorRecord,
+  fetchAllPages,
 } from "@/lib/crud-api";
 import { EntityForm, type FieldConfig } from "@/components/entity-form";
 import { PageShell } from "@/components/ops-ui";
@@ -31,8 +32,8 @@ export function ServiceForm({ initialData, mode }: ServiceFormProps) {
       try {
         const token = getAuthToken();
         if (!token) return;
-        const result = await listMaintenanceServiceSectors(token, 1);
-        setSectors(result.items);
+        const result = await fetchAllPages((p) => listMaintenanceServiceSectors(token, p));
+        setSectors(result);
       } catch (err) {
         console.error("Failed to load maintenance service sectors:", err);
       } finally {

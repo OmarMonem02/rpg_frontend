@@ -1,8 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { AppSidebar } from "@/components/app-sidebar";
+import {
+  PermissionProvider,
+  usePermissions,
+} from "@/components/permission-provider";
 import { WorkspaceLoadingCard } from "@/components/workspace-loading-card";
 import { getMe, logout } from "@/lib/auth-api";
 import {
@@ -11,6 +15,136 @@ import {
   getAuthUser,
   setAuthSession,
 } from "@/lib/auth-session";
+
+function ProtectedWorkspace({
+  children,
+  isCollapsed,
+  isMobileOpen,
+  onOpenMobile,
+  onCloseMobile,
+  onToggleCollapse,
+  onLogout,
+  userName,
+}: Readonly<{
+  children: React.ReactNode;
+  isCollapsed: boolean;
+  isMobileOpen: boolean;
+  onOpenMobile: () => void;
+  onCloseMobile: () => void;
+  onToggleCollapse: () => void;
+  onLogout: () => Promise<void>;
+  userName: string;
+}>) {
+  const pathname = usePathname();
+  const router = useRouter();
+  const permissions = usePermissions();
+  const canAccessCurrentRoute = permissions.canAccessRoute(pathname);
+  const fallbackRoute = permissions.getDefaultRoute();
+  const canAccessFallbackRoute = permissions.canAccessRoute(fallbackRoute);
+
+  useEffect(() => {
+    if (!canAccessCurrentRoute) {
+      if (canAccessFallbackRoute && fallbackRoute !== pathname) {
+        router.replace(fallbackRoute);
+      }
+    }
+  }, [canAccessCurrentRoute, canAccessFallbackRoute, fallbackRoute, pathname, router]);
+
+  if (!canAccessCurrentRoute && canAccessFallbackRoute && fallbackRoute !== pathname) {
+    return <WorkspaceLoadingCard />;
+  }
+
+  if (!canAccessCurrentRoute) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center px-6">
+        <div className="max-w-lg rounded-[2rem] border border-outline-variant/20 bg-surface-container-lowest p-8 text-center shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-on-surface-variant">
+            Access Restricted
+          </p>
+          <h1 className="mt-3 text-2xl font-display font-bold text-on-surface">
+            No readable workspace is available for this session.
+          </h1>
+          <p className="mt-3 text-sm leading-6 text-on-surface-variant">
+            Your account is signed in, but the current permission matrix does not allow
+            access to this route or any fallback page.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-background flex">
+      <AppSidebar
+        isCollapsed={isCollapsed}
+        onToggleCollapse={onToggleCollapse}
+        isMobileOpen={isMobileOpen}
+        onCloseMobile={onCloseMobile}
+        onLogout={onLogout}
+        userName={userName}
+      />
+
+      <div
+        className={[
+          "flex min-h-screen min-w-0 flex-1 flex-col transition-[margin] duration-300 ease-out motion-reduce:transition-none",
+          isCollapsed ? "md:ml-20" : "md:ml-72",
+          "animate-app-shell-enter",
+        ].join(" ")}
+      >
+        <header className="sticky top-0 z-20 border-b border-outline-variant/15 bg-background/90 px-4 py-4 backdrop-blur md:px-6">
+          <div className="glass ghost-border flex items-center justify-between gap-4 rounded-[1.25rem] border px-4 py-3">
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                className="flex h-10 w-10 items-center justify-center rounded-xl border border-outline-variant/30 bg-surface-container-low text-on-surface transition-colors hover:bg-surface-container md:hidden"
+                onClick={() => {
+                  if (window.innerWidth < 768) {
+                    onOpenMobile();
+                  } else {
+                    onToggleCollapse();
+                  }
+                }}
+                aria-label="Toggle sidebar"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="h-5 w-5"
+                >
+                  <line x1="3" y1="12" x2="21" y2="12" />
+                  <line x1="3" y1="6" x2="21" y2="6" />
+                  <line x1="3" y1="18" x2="21" y2="18" />
+                </svg>
+              </button>
+              <div className="hidden sm:block">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-on-surface-variant">
+                  RPG Workshop Console
+                </p>
+                <p className="text-sm text-on-surface">
+                  Daily operations, inventory, and admin control.
+                </p>
+              </div>
+            </div>
+            <div className="text-right">
+              <p className="text-[11px] uppercase tracking-[0.2em] text-on-surface-variant">
+                Active session
+              </p>
+              <p className="max-w-[120px] truncate text-sm font-semibold text-on-surface sm:max-w-none">
+                {userName}
+              </p>
+            </div>
+          </div>
+        </header>
+
+        <main className="flex-1 px-4 pb-6 pt-4 md:px-6">{children}</main>
+      </div>
+    </div>
+  );
+}
 
 export default function ProtectedLayout({
   children,
@@ -49,18 +183,18 @@ export default function ProtectedLayout({
       }
     }
 
-    validateSession();
+    void validateSession();
     return () => {
       active = false;
     };
   }, [router]);
 
   useEffect(() => {
-    function handleEsc(event: KeyboardEvent) {
+    const handleEsc = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setIsMobileOpen(false);
       }
-    }
+    };
 
     window.addEventListener("keydown", handleEsc);
     return () => window.removeEventListener("keydown", handleEsc);
@@ -86,74 +220,18 @@ export default function ProtectedLayout({
   }
 
   return (
-    <div className="min-h-screen bg-background flex">
-      <AppSidebar
+    <PermissionProvider>
+      <ProtectedWorkspace
         isCollapsed={isCollapsed}
-        onToggleCollapse={() => setIsCollapsed((value) => !value)}
         isMobileOpen={isMobileOpen}
+        onOpenMobile={() => setIsMobileOpen(true)}
         onCloseMobile={() => setIsMobileOpen(false)}
+        onToggleCollapse={() => setIsCollapsed((value) => !value)}
         onLogout={handleLogout}
         userName={userName}
-      />
-
-      <div
-        className={[
-          "flex min-h-screen min-w-0 flex-1 flex-col transition-[margin] duration-300 ease-out motion-reduce:transition-none",
-          isCollapsed ? "md:ml-20" : "md:ml-72",
-          "animate-app-shell-enter",
-        ].join(" ")}
       >
-        <header className="sticky top-0 z-20 border-b border-outline-variant/15 bg-background/90 px-4 py-4 backdrop-blur md:px-6">
-          <div className="glass ghost-border flex items-center justify-between rounded-[1.25rem] border px-4 py-3 gap-4">
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                className="flex h-10 w-10 items-center justify-center rounded-xl border border-outline-variant/30 bg-surface-container-low text-on-surface transition-colors hover:bg-surface-container md:hidden"
-                onClick={() => {
-                  if (window.innerWidth < 768) {
-                    setIsMobileOpen(true);
-                  } else {
-                    setIsCollapsed(!isCollapsed);
-                  }
-                }}
-                aria-label="Toggle sidebar"
-              >
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="h-5 w-5"
-                >
-                  <line x1="3" y1="12" x2="21" y2="12" />
-                  <line x1="3" y1="6" x2="21" y2="6" />
-                  <line x1="3" y1="18" x2="21" y2="18" />
-                </svg>
-              </button>
-              <div className="hidden sm:block">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-on-surface-variant">
-                  RPG Workshop Console
-                </p>
-                <p className="text-sm text-on-surface">
-                  Daily operations, inventory, and admin control.
-                </p>
-              </div>
-            </div>
-            <div className="text-right">
-              <p className="text-[11px] uppercase tracking-[0.2em] text-on-surface-variant">
-                Active session
-              </p>
-              <p className="text-sm font-semibold text-on-surface truncate max-w-[120px] sm:max-w-none">
-                {userName}
-              </p>
-            </div>
-          </div>
-        </header>
-
-        <main className="flex-1 px-4 pb-6 pt-4 md:px-6">{children}</main>
-      </div>
-    </div>
+        {children}
+      </ProtectedWorkspace>
+    </PermissionProvider>
   );
 }

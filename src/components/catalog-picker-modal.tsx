@@ -141,6 +141,10 @@ export function CatalogPickerModal({
       }
     } catch (err) {
       console.error("Failed to load filter options:", err);
+      const errorMsg = err instanceof Error ? err.message : "Failed to load filters";
+      if (errorMsg.includes("Permission denied") || errorMsg.includes("not authorized")) {
+        setError(`You don't have permission to access ${catalogType}. Contact your administrator.`);
+      }
     }
   }, [catalogType]);
 
@@ -188,9 +192,14 @@ export function CatalogPickerModal({
         setTotalPages(result.lastPage);
       }
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : `Failed to load ${catalogType}`,
-      );
+      const errorMsg = err instanceof Error ? err.message : `Failed to load ${catalogType}`;
+      if (errorMsg.includes("Permission denied") || errorMsg.includes("not authorized")) {
+        setError(`Permission denied. You don't have access to this resource. Contact your administrator.`);
+      } else if (errorMsg.includes("Authentication required")) {
+        setError("Your session expired. Please refresh and try again.");
+      } else {
+        setError(errorMsg);
+      }
     } finally {
       setLoading(false);
     }
@@ -571,7 +580,7 @@ export function CatalogPickerModal({
               </h3>
               <p className="text-sm text-on-surface-variant mt-1.5 max-w-sm">
                 Try adjusting your search filters or browse a different catalog
-                type to find what you're looking for.
+                type to find what you&apos;re looking for.
               </p>
             </div>
           ) : (

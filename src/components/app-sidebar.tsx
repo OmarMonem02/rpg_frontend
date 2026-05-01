@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { usePermissions } from "@/components/permission-provider";
 import type { ReactNode, SVGProps } from "react";
 
 export type SidebarNavItem = {
@@ -342,14 +343,9 @@ const defaultNavSections: SidebarNavSection[] = [
     title: "Maintenance",
     items: [
       {
-        href: "/Tickets/",
+        href: "/tickets",
         label: "Tickets",
         icon: <TicketsIcon className="h-5 w-5" />,
-      },
-      {
-        href: "/Tickets/",
-        label: "Create New",
-        icon: <CreateIcon className="h-5 w-5" />,
       },
     ],
   },
@@ -450,6 +446,14 @@ export function AppSidebar({
   navSections = defaultNavSections,
 }: SidebarProps) {
   const pathname = usePathname();
+  const permissions = usePermissions();
+
+  const filteredNavSections = navSections
+    .map((section) => ({
+      ...section,
+      items: section.items.filter((item) => permissions.canAccessRoute(item.href)),
+    }))
+    .filter((section) => section.items.length > 0);
 
   return (
     <>
@@ -489,7 +493,7 @@ export function AppSidebar({
                 title="Expand sidebar"
               >
                 <img
-                  src="/favicon.ico"
+                  src="/logo.ico"
                   alt="menu"
                   className="w-full h-full object-cover"
                 />
@@ -545,7 +549,7 @@ export function AppSidebar({
         </div>
 
         <nav className="min-h-0 flex-1 overflow-y-auto px-2 py-3">
-          {navSections.map((section, sectionIndex) => (
+          {filteredNavSections.map((section, sectionIndex) => (
             <div key={`nav-section-${sectionIndex}`} className="space-y-1.5">
               {sectionIndex > 0 ? (
                 <div

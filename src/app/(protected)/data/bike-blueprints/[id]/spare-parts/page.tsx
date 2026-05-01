@@ -19,6 +19,7 @@ import {
   type CreateSparePartPayload,
   type SparePartCategoryRecord,
   type SparePartRecord,
+  fetchAllPages,
 } from "@/lib/crud-api";
 
 type ModalMode = "single" | "bulk" | "create" | null;
@@ -230,12 +231,12 @@ export default function BikeBlueprintSparePartsPage() {
       if (!token) throw new Error("Authentication required");
 
       const [brandsResult, categoriesResult] = await Promise.all([
-        listBrands(token, 1, "spare_parts"),
-        listSparePartCategories(token, 1),
+        fetchAllPages((p) => listBrands(token, p, "spare_parts")),
+        fetchAllPages((p) => listSparePartCategories(token, p)),
       ]);
 
-      setBrands(brandsResult.items);
-      setCategories(categoriesResult.items);
+      setBrands(brandsResult.filter((b) => b.type === "spare_parts"));
+      setCategories(categoriesResult);
     } catch (err) {
       console.error(err);
     }

@@ -4,7 +4,7 @@ export function WorkspaceLoadingCard() {
       <div className="glass ghost-border w-full max-w-lg rounded-[2rem] border p-8 text-center shadow-ambient">
         <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-[1.5rem] border border-primary/15 bg-primary-container text-sm font-bold uppercase tracking-[0.24em] text-on-primary-container overflow-hidden">
           <img
-            src="/favicon.ico"
+            src="/logo.ico"
             alt="menu"
             className="w-full h-full object-cover"
           />
