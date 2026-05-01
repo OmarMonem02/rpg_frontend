@@ -10,6 +10,7 @@ import {
   removeSparePartFromBikeBlueprint,
   type SparePartRecord,
   type BikeBlueprintRecord,
+  fetchAllPages,
 } from "@/lib/crud-api";
 import {
   ActionButton,
@@ -60,8 +61,8 @@ export default function SparePartsManageLinkingPage() {
       const token = getAuthToken();
       if (!token) throw new Error("Authentication required");
 
-      const result = await listBikeBlueprints(token, 1);
-      setBlueprints(result.items);
+      const result = await fetchAllPages((p) => listBikeBlueprints(token, p));
+      setBlueprints(result);
     } catch (err) {
       console.error("Failed to load blueprints:", err);
       setMessage({

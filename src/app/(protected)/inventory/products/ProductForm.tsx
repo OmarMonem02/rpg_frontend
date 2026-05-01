@@ -12,6 +12,7 @@ import {
   type CreateProductPayload,
   type ProductCategoryRecord,
   type BrandRecord,
+  fetchAllPages,
 } from "@/lib/crud-api";
 import { EntityForm, type FieldConfig } from "@/components/entity-form";
 import { PageShell } from "@/components/ops-ui";
@@ -35,11 +36,11 @@ export function ProductForm({ initialData, mode }: ProductFormProps) {
         const token = getAuthToken();
         if (!token) return;
         const [catRes, brandRes] = await Promise.all([
-          listProductCategories(token, 1),
-          listBrands(token, 1, "products"),
+          fetchAllPages((p) => listProductCategories(token, p)),
+          fetchAllPages((p) => listBrands(token, p, "products")),
         ]);
-        setCategories(catRes.items);
-        setBrands(brandRes.items);
+        setCategories(catRes);
+        setBrands(brandRes.filter((b) => b.type === "products"));
       } catch (err) {
         console.error("Failed to load dependencies:", err);
       } finally {

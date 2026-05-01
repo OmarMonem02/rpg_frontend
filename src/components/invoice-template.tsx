@@ -88,8 +88,7 @@ export function InvoiceTemplate({
         }
 
         .receipt-page { 
-          width: min(100%, 210mm);
-          max-width: 210mm;
+          width: 210mm;
           min-height: 297mm;
           margin: 0 auto; 
           background: var(--surface-light); 
@@ -363,46 +362,6 @@ export function InvoiceTemplate({
         .fthanks { font-weight: 800; font-size: 16px; color: var(--dark-bg); text-transform: uppercase; letter-spacing: 1px; }
         .ftagline { font-size: 11px; color: var(--text-muted); margin-top: 4px; font-weight: 500; }
 
-        @media (max-width: 900px) {
-          .receipt-header,
-          .receipt-footer,
-          .totals-area {
-            flex-direction: column;
-            align-items: stretch;
-            gap: 20px;
-          }
-
-          .hmeta,
-          .footer-r {
-            text-align: left;
-          }
-
-          .mgrid {
-            grid-template-columns: repeat(2, 1fr);
-          }
-        }
-
-        @media (max-width: 640px) {
-          .receipt-wrapper {
-            padding: 12px 0;
-          }
-
-          .receipt-page {
-            border-radius: 0;
-            border-left: none;
-            border-right: none;
-          }
-
-          .mgrid {
-            grid-template-columns: 1fr;
-          }
-
-          .receipt-wrapper thead th,
-          .receipt-wrapper td {
-            padding: 12px 10px;
-          }
-        }
-
 
         @media print {
           @page {
@@ -467,7 +426,7 @@ export function InvoiceTemplate({
               <div className="brand-section">
                 <div className="logo-box">
                   <img
-                    src="/favicon.ico"
+                    src="/logo.ico"
                     alt="RPG"
                     className="w-full h-full object-contain"
                     onError={(e) => {
@@ -514,7 +473,7 @@ export function InvoiceTemplate({
                 <div className="mlabel">Method</div>
                 <div className="mvalue">
                   <span className="receipt-badge bcard">
-                    ID #{sale.payment_method_id}
+                    {sale.payment_method_name || `ID #${sale.payment_method_id}`}
                   </span>
                 </div>
               </div>

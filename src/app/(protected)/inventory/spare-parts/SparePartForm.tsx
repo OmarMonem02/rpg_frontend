@@ -19,6 +19,7 @@ import {
   type SparePartCategoryRecord,
   type BrandRecord,
   type BikeBlueprintRecord,
+  fetchAllPages,
 } from "@/lib/crud-api";
 import { EntityForm, type FieldConfig } from "@/components/entity-form";
 
@@ -44,14 +45,14 @@ export function SparePartForm({ mode, initialData }: SparePartFormProps) {
         if (!token) return;
 
         const [catRes, brandRes, bpRes] = await Promise.all([
-          listSparePartCategories(token, 1),
-          listBrands(token, 1, "spare_parts"),
-          listBikeBlueprints(token, 1),
+          fetchAllPages((p) => listSparePartCategories(token, p)),
+          fetchAllPages((p) => listBrands(token, p, "spare_parts")),
+          fetchAllPages((p) => listBikeBlueprints(token, p)),
         ]);
 
-        setCategories(catRes.items);
-        setBrands(brandRes.items);
-        setBlueprints(bpRes.items);
+        setCategories(catRes);
+        setBrands(brandRes.filter((b) => b.type === "spare_parts"));
+        setBlueprints(bpRes);
 
         if (mode === "edit" && initialData) {
           const bpIds = await getSparePartBlueprints(token, initialData.id);
@@ -78,7 +79,7 @@ export function SparePartForm({ mode, initialData }: SparePartFormProps) {
         return Number.isFinite(n) ? n : undefined;
       };
 
-      const basePayload: any = {
+      const basePayload: UpdateSparePartPayload = {
         name: String(formData.name),
         sku: String(formData.sku),
         part_number: formData.part_number ? String(formData.part_number) : undefined,

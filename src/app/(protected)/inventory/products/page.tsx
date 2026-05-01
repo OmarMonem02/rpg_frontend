@@ -16,6 +16,7 @@ import {
   type ProductRecord,
   type ProductCategoryRecord,
   type BrandRecord,
+  fetchAllPages,
 } from "@/lib/crud-api";
 import {
   EntityFormModal,
@@ -39,8 +40,11 @@ export default function ProductsPage() {
   const permissions = usePermissions();
   const [products, setProducts] = useState<ProductRecord[]>([]);
   const [categories, setCategories] = useState<ProductCategoryRecord[]>([]);
+  const [allCategories, setAllCategories] = useState<ProductCategoryRecord[]>([]);
   const [brands, setBrands] = useState<BrandRecord[]>([]);
   const [totalPages, setTotalPages] = useState(1);
+  const [categoriesPage, setCategoriesPage] = useState(1);
+  const [categoriesTotalPages, setCategoriesTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -60,35 +64,49 @@ export default function ProductsPage() {
   const canUpdateProductCategories = permissions.canUpdate("product-categories");
   const canDeleteProductCategories = permissions.canDelete("product-categories");
 
+  const loadDropdowns = useCallback(async () => {
+    try {
+      const token = getAuthToken();
+      if (!token) return;
+      const [catsRes, brandsRes] = await Promise.all([
+        fetchAllPages((p) => listProductCategories(token, p)),
+        fetchAllPages((p) => listBrands(token, p, "products")),
+      ]);
+      setAllCategories(catsRes);
+      setBrands(brandsRes.filter((b) => b.type === "products"));
+    } catch (err) {
+      console.error("Failed to load dropdowns:", err);
+    }
+  }, []);
+
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
       const token = getAuthToken();
       if (!token) throw new Error("Authentication required");
 
-      // Log filters for debugging
-      console.log("[Products] Applying filters:", filters, "Page:", page);
-      logFilters();
-
       const cleanFilters = getCleanFilters();
 
-      const [productsRes, catsRes, brandsRes] = await Promise.all([
-        listProducts(token, page, cleanFilters as any),
-        listProductCategories(token, 1),
-        listBrands(token, 1, "products"),
+      const [productsRes, catsRes] = await Promise.all([
+        listProducts(token, page, cleanFilters as Parameters<typeof listProducts>[2]),
+        listProductCategories(token, categoriesPage),
       ]);
 
       setProducts(productsRes.items);
       setTotalPages(productsRes.lastPage);
       setCategories(catsRes.items);
-      setBrands(brandsRes.items);
+      setCategoriesTotalPages(catsRes.lastPage);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load products");
     } finally {
       setLoading(false);
     }
-  }, [page, filters, logFilters]);
+  }, [page, filters, getCleanFilters, categoriesPage]);
+
+  useEffect(() => {
+    loadDropdowns();
+  }, [loadDropdowns]);
 
   useEffect(() => {
     loadData();
@@ -143,8 +161,10 @@ export default function ProductsPage() {
         await createProductCategory(token, payload);
       }
 
-      const catsRes = await listProductCategories(token, 1);
+      const catsRes = await listProductCategories(token, categoriesPage);
       setCategories(catsRes.items);
+      setCategoriesTotalPages(catsRes.lastPage);
+      loadDropdowns();
       handleCloseCategoryModal();
     } catch (err) {
       setSubmitError(
@@ -165,8 +185,10 @@ export default function ProductsPage() {
       const token = getAuthToken();
       if (!token) return;
       await deleteProductCategory(token, id);
-      const catsRes = await listProductCategories(token, 1);
+      const catsRes = await listProductCategories(token, categoriesPage);
       setCategories(catsRes.items);
+      setCategoriesTotalPages(catsRes.lastPage);
+      loadDropdowns();
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Failed to delete category",
@@ -223,7 +245,7 @@ export default function ProductsPage() {
             className="form-input-base"
           >
             <option value="">All Categories</option>
-            {categories.map((c) => (
+            {allCategories.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
               </option>
@@ -322,7 +344,7 @@ export default function ProductsPage() {
                   </td>
                   <td className="px-4 py-3 text-on-surface-variant text-xs">
                     {
-                      categories.find(
+                      allCategories.find(
                         (c) => c.id === product.products_category_id,
                       )?.name
                     }
@@ -448,6 +470,13 @@ export default function ProductsPage() {
           </table>
         </div>
       )}
+
+      <PaginationControls
+        page={categoriesPage}
+        totalPages={categoriesTotalPages}
+        onPrevious={() => setCategoriesPage((p) => Math.max(1, p - 1))}
+        onNext={() => setCategoriesPage((p) => Math.min(categoriesTotalPages, p + 1))}
+      />
     </div>
   );
 

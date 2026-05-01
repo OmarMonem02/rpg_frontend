@@ -189,7 +189,17 @@ async function authorizedFetch<T>(
     console.error(`[API Error ${response.status}] ${path} - ${errorMsg}`, {
       requestBody,
     });
-    throw new ApiError(errorMsg, response.status);
+    
+    // Enhanced error messaging for 403 Forbidden
+    let enhancedMsg = errorMsg;
+    if (response.status === 403) {
+      const resourceMatch = path.match(/(\w+)/)?.[1];
+      if (resourceMatch) {
+        enhancedMsg = `Permission denied: You don't have access to ${resourceMatch}. Please contact your administrator.`;
+      }
+    }
+    
+    throw new ApiError(enhancedMsg, response.status);
   }
 
   if (response.status === 204) {
@@ -199,12 +209,69 @@ async function authorizedFetch<T>(
   return (await response.json()) as T;
 }
 
+/**
+ * Retry helper for API calls with exponential backoff
+ * Does NOT retry on 403 errors (permission issues)
+ */
+export async function retryApiCall<T>(
+  fn: () => Promise<T>,
+  maxRetries: number = 2,
+): Promise<T> {
+  let lastError: Error | null = null;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+
+      // Don't retry on permission errors
+      if (err instanceof ApiError && err.status === 403) {
+        throw err;
+      }
+
+      // Don't retry on auth errors
+      if (err instanceof ApiError && err.status === 401) {
+        throw err;
+      }
+
+      // Only retry if we have attempts left
+      if (attempt < maxRetries) {
+        const delayMs = Math.pow(2, attempt) * 500; // 500ms, 1s, 2s
+        console.warn(
+          `[API] Attempt ${attempt + 1} failed, retrying in ${delayMs}ms:`,
+          lastError.message,
+        );
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+      }
+    }
+  }
+
+  throw lastError || new Error("Max retries exceeded");
+}
+
+export async function fetchAllPages<T>(
+  fetcher: (page: number) => Promise<PaginatedResult<T>>,
+): Promise<T[]> {
+  const firstPage = await fetcher(1);
+  const items = [...firstPage.items];
+  const lastPage = firstPage.lastPage;
+
+  for (let i = 2; i <= lastPage; i++) {
+    const res = await fetcher(i);
+    items.push(...res.items);
+  }
+
+  return items;
+}
+
 function parsePagination(payload: unknown): PaginationMeta {
   const data = asRecord(payload);
   const meta = asRecord(data.meta);
+  const innerData = asRecord(data.data);
   return {
-    current_page: toNumber(meta.current_page) || 1,
-    last_page: toNumber(meta.last_page) || 1,
+    current_page: toNumber(meta.current_page) || toNumber(data.current_page) || toNumber(innerData.current_page) || 1,
+    last_page: toNumber(meta.last_page) || toNumber(data.last_page) || toNumber(innerData.last_page) || 1,
   };
 }
 
@@ -1399,6 +1466,7 @@ export async function listBikes(
   filters?: {
     search?: string;
     blueprint_id?: number;
+    brand_id?: number;
     status?: string;
     price_range?: string;
     currency?: string;
@@ -1409,6 +1477,8 @@ export async function listBikes(
     query.append("search", filters.search);
   if (filters?.blueprint_id !== undefined && filters.blueprint_id)
     query.append("blueprint_id", String(filters.blueprint_id));
+  if (filters?.brand_id !== undefined && filters.brand_id)
+    query.append("brand_id", String(filters.brand_id));
   if (filters?.status !== undefined && filters.status)
     query.append("status", filters.status);
   if (filters?.price_range !== undefined && filters.price_range)
@@ -1547,7 +1617,7 @@ export async function getSparePartBlueprints(
   );
   const rows = pickArray(payload, ["data", "blueprints"]);
   return rows
-    .map((item: any) => toNumber(asRecord(item).id))
+    .map((item: unknown) => toNumber(asRecord(item).id))
     .filter((id) => id > 0);
 }
 
@@ -1695,6 +1765,7 @@ export type SaleRecord = {
   customer_id: number;
   seller_id: number;
   payment_method_id: number;
+  payment_method_name?: string;
   user_id: number;
   sale_type: string;
   status: string;
@@ -1790,6 +1861,7 @@ function normalizeSale(raw: unknown): SaleRecord {
     customer_id: toNumber(record.customer_id),
     seller_id: toNumber(record.seller_id),
     payment_method_id: toNumber(record.payment_method_id),
+    payment_method_name: toText(record.payment_method_name || (record.payment_method as any)?.name || (record.paymentMethod as any)?.name) || undefined,
     user_id: toNumber(record.user_id),
     sale_type: toText(record.sale_type || record.type),
     status: toText(record.status),

@@ -77,6 +77,19 @@ export function PermissionsEditor({
     });
   };
 
+  const toggleAllActionsForPage = (page: keyof PermissionMatrix) => {
+    setPermissions((prev) => {
+      const pageActions = prev[page];
+      const nextPageActions =
+        pageActions.length === ALL_ACTIONS.length ? [] : [...ALL_ACTIONS];
+
+      return normalizePermissionMatrix({
+        ...prev,
+        [page]: nextPageActions,
+      });
+    });
+  };
+
   const totalAllowed = Object.values(permissions).reduce(
     (sum, actions) => sum + actions.length,
     0,
@@ -148,6 +161,18 @@ export function PermissionsEditor({
                     <td className="px-4 py-3">
                       <div className="font-medium">{PAGE_LABELS[page]}</div>
                       <div className="text-xs text-on-surface-variant">{page}</div>
+                      <ActionButton
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => toggleAllActionsForPage(page)}
+                        disabled={isSaving || !canSave}
+                        aria-label={`${PAGE_LABELS[page]} select all permissions`}
+                        className="mt-2"
+                      >
+                        {pageActions.length === ALL_ACTIONS.length
+                          ? "Clear all"
+                          : "Select all"}
+                      </ActionButton>
                     </td>
                     {ALL_ACTIONS.map((action) => (
                       <td key={`${page}-${action}`} className="px-4 py-3 text-center">

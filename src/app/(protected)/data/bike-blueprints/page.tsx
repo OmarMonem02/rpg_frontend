@@ -11,6 +11,7 @@ import {
   deleteBikeBlueprint,
   type BikeBlueprintRecord,
   type BrandRecord,
+  fetchAllPages,
 } from "@/lib/crud-api";
 import { AdvancedFilters } from "@/components/advanced-filters";
 import {
@@ -67,21 +68,21 @@ export default function BikeBlueprintsPage() {
     }
   }, [getCleanFilters, logFilters, page, filters]);
 
-  const loadBrands = async () => {
+  const loadBrands = useCallback(async () => {
     try {
       const token = getAuthToken();
       if (!token) throw new Error("Authentication required");
 
-      const result = await listBrands(token, 1, "bikes");
-      setBrands(result.items);
+      const result = await fetchAllPages((p) => listBrands(token, p, "bikes"));
+      setBrands(result.filter((b) => b.type === "bikes"));
     } catch (err) {
       console.error(err);
     }
-  };
+  }, []);
 
   useEffect(() => {
     loadBrands();
-  }, []);
+  }, [loadBrands]);
 
   useEffect(() => {
     loadBlueprints();
@@ -207,31 +208,38 @@ export default function BikeBlueprintsPage() {
                       {blueprint.created_at ? new Date(blueprint.created_at).toLocaleDateString() : "-"}
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <ActionButton
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => router.push(`/data/bike-blueprints/${blueprint.id}/spare-parts`)}
-                        hidden={!canUpdateBlueprints}
-                        className="text-primary"
-                      >
-                        Manage Parts
-                      </ActionButton>
-                      <span className="mx-2 text-on-surface-variant">•</span>
-                      <button
-                        onClick={() => router.push(`/data/bike-blueprints/edit/${blueprint.id}`)}
-                        hidden={!canUpdateBlueprints}
-                        className="text-primary hover:underline text-xs font-medium"
-                      >
-                        Edit
-                      </button>
-                      <span className="mx-2 text-on-surface-variant">•</span>
-                      <button
-                        onClick={() => handleDelete(blueprint.id)}
-                        hidden={!canDeleteBlueprints}
-                        className="text-error hover:underline text-xs font-medium"
-                      >
-                        Delete
-                      </button>
+                      {canUpdateBlueprints && (
+                        <ActionButton
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => router.push(`/data/bike-blueprints/${blueprint.id}/spare-parts`)}
+                          className="text-primary"
+                        >
+                          Manage Parts
+                        </ActionButton>
+                      )}
+                      {canUpdateBlueprints && canDeleteBlueprints && (
+                        <span className="mx-2 text-on-surface-variant">•</span>
+                      )}
+                      {canUpdateBlueprints && (
+                        <button
+                          onClick={() => router.push(`/data/bike-blueprints/edit/${blueprint.id}`)}
+                          className="text-primary hover:underline text-xs font-medium"
+                        >
+                          Edit
+                        </button>
+                      )}
+                      {(canUpdateBlueprints || canDeleteBlueprints) && canDeleteBlueprints && canUpdateBlueprints && (
+                        <span className="mx-2 text-on-surface-variant">•</span>
+                      )}
+                      {canDeleteBlueprints && (
+                        <button
+                          onClick={() => handleDelete(blueprint.id)}
+                          className="text-error hover:underline text-xs font-medium"
+                        >
+                          Delete
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}

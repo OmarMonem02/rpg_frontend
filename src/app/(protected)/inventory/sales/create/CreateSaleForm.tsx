@@ -25,7 +25,7 @@ import { CatalogPickerModal } from "@/components/catalog-picker-modal";
 import { CartLineItemsPanel, type SaleLineItem } from "@/components/cart-line-items-panel";
 import { EntityDrawer, type FieldConfig } from "@/components/entity-drawer";
 import { PageShell, ActionButton, PageHero, SurfaceCard } from "@/components/ops-ui";
-import { CubeIcon, WrenchIcon, BanknotesIcon, CogIcon, ArrowLeftIcon, PlusIcon, UserPlusIcon } from "@heroicons/react/24/outline";
+import { CubeIcon, WrenchIcon, BanknotesIcon, CogIcon, ArrowLeftIcon, PlusIcon } from "@heroicons/react/24/outline";
 
 type CatalogType = "products" | "spare_parts" | "bikes" | "maintenance_services";
 
@@ -158,7 +158,7 @@ export function CreateSaleForm() {
           item_name: "name" in item ? item.name : `Item ${item.id}`,
           selling_price: price,
           discount_amount: 0,
-          quantity: sellableType === "bikes" ? 1 : 1,
+          quantity: 1,
           currency: ("currency_pricing" in item ? item.currency_pricing : "EGP") as "EGP" | "USD",
           catalogItem: item,
         };
@@ -214,8 +214,6 @@ export function CreateSaleForm() {
         is_maintenance: isMaintenance,
         items: cartItems.map((item) => {
           // ── Currency Normalization ──────────────────────────────────────────
-          // Backend always expects EGP. USD-priced items are converted using
-          // the current exchange rate fetched from System Settings.
           const isUSD = item.currency === "USD";
           const rate = isUSD && exchangeRate > 0 ? exchangeRate : 1;
           const normalizedPrice    = Math.round(Number(item.selling_price)  * rate * 100) / 100;
@@ -257,7 +255,7 @@ export function CreateSaleForm() {
     }
   };
 
-  const handleCreateCustomer = async (data: Record<string, any>) => {
+  const handleCreateCustomer = async (data: Record<string, unknown>) => {
     try {
       const token = getAuthToken();
       if (!token) throw new Error("Authentication required");
@@ -290,7 +288,7 @@ export function CreateSaleForm() {
           <div className="w-10 h-10 rounded-full border-4 border-primary border-t-transparent animate-spin"/>
           <p className="text-on-surface-variant font-medium uppercase tracking-widest text-xs">Preparing Workspace...</p>
         </div>
-        </PageShell>
+      </PageShell>
     );
   }
 
@@ -313,7 +311,7 @@ export function CreateSaleForm() {
 
       {/* Error Alert */}
       {error && (
-        <div className="rounded-2xl border border-error/30 bg-error-container p-4 flex items-start gap-3 animate-in fade-in slide-in-from-top-2 shadow-sm">
+        <div className="rounded-2xl border border-error/30 bg-error-container p-4 flex items-start gap-3 animate-in fade-in slide-in-from-top-2 shadow-sm mb-6">
           <svg className="w-5 h-5 text-on-error-container flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>

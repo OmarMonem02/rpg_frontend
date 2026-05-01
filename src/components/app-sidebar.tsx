@@ -343,14 +343,9 @@ const defaultNavSections: SidebarNavSection[] = [
     title: "Maintenance",
     items: [
       {
-        href: "/Tickets/",
+        href: "/tickets",
         label: "Tickets",
         icon: <TicketsIcon className="h-5 w-5" />,
-      },
-      {
-        href: "/Tickets/",
-        label: "Create New",
-        icon: <CreateIcon className="h-5 w-5" />,
       },
     ],
   },
@@ -498,7 +493,7 @@ export function AppSidebar({
                 title="Expand sidebar"
               >
                 <img
-                  src="/favicon.ico"
+                  src="/logo.ico"
                   alt="menu"
                   className="w-full h-full object-cover"
                 />

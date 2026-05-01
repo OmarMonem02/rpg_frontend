@@ -10,6 +10,7 @@ import {
   type BikeRecord,
   type CreateBikePayload,
   type BikeBlueprintRecord,
+  fetchAllPages,
 } from "@/lib/crud-api";
 import { EntityForm, type FieldConfig } from "@/components/entity-form";
 
@@ -42,8 +43,8 @@ export function BikeForm({ mode, initialData }: BikeFormProps) {
       try {
         const token = getAuthToken();
         if (!token) return;
-        const result = await listBikeBlueprints(token, 1);
-        setBlueprints(result.items);
+        const result = await fetchAllPages((p) => listBikeBlueprints(token, p));
+        setBlueprints(result);
       } catch (err) {
         console.error("Failed to load blueprints:", err);
       } finally {

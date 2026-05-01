@@ -71,7 +71,7 @@ export default function LoginPage() {
         <div className="text-center mb-8">
           <div className="inline-flex h-22 w-22 items-center justify-center rounded-xl bg-primary/10 text-primary mb-4 overflow-hidden">
             <img
-              src="/favicon.ico"
+              src="/logo.ico"
               alt="menu"
               className="w-full h-full object-cover"
             />

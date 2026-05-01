@@ -26,6 +26,7 @@ import {
   type CreateMaintenanceServiceSectorPayload,
   type MaintenanceServiceRecord,
   type MaintenanceServiceSectorRecord,
+  fetchAllPages,
 } from "@/lib/crud-api";
 
 type SectorFilter = "all" | number;
@@ -33,7 +34,10 @@ type SectorFilter = "all" | number;
 export default function MaintenanceServicesPage() {
   const [services, setServices] = useState<MaintenanceServiceRecord[]>([]);
   const [sectors, setSectors] = useState<MaintenanceServiceSectorRecord[]>([]);
+  const [allSectors, setAllSectors] = useState<MaintenanceServiceSectorRecord[]>([]);
   const [totalPages, setTotalPages] = useState(1);
+  const [sectorsPage, setSectorsPage] = useState(1);
+  const [sectorsTotalPages, setSectorsTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [sectorsLoading, setSectorsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -56,7 +60,7 @@ export default function MaintenanceServicesPage() {
       logFilters();
 
       const cleanFilters = getCleanFilters();
-      const result = await listMaintenanceServices(token, page, cleanFilters as any);
+      const result = await listMaintenanceServices(token, page, cleanFilters as Parameters<typeof listMaintenanceServices>[2]);
       setServices(result.items);
       setTotalPages(result.lastPage);
       setError(null);
@@ -67,19 +71,35 @@ export default function MaintenanceServicesPage() {
     }
   }, [page, filters, logFilters]);
 
+  const loadDropdowns = useCallback(async () => {
+    try {
+      const token = getAuthToken();
+      if (!token) return;
+      const sectorsRes = await fetchAllPages((p) => listMaintenanceServiceSectors(token, p));
+      setAllSectors(sectorsRes);
+    } catch (err) {
+      console.error("Failed to load all sectors:", err);
+    }
+  }, []);
+
   const loadSectors = useCallback(async () => {
     try {
       setSectorsLoading(true);
       const token = getAuthToken();
       if (!token) return;
-      const result = await listMaintenanceServiceSectors(token, 1);
+      const result = await listMaintenanceServiceSectors(token, sectorsPage);
       setSectors(result.items);
+      setSectorsTotalPages(result.lastPage);
     } catch (err) {
       console.error("Failed to load maintenance service sectors:", err);
     } finally {
       setSectorsLoading(false);
     }
-  }, []);
+  }, [sectorsPage]);
+
+  useEffect(() => {
+    loadDropdowns();
+  }, [loadDropdowns]);
 
   useEffect(() => {
     loadSectors();
@@ -91,11 +111,11 @@ export default function MaintenanceServicesPage() {
 
   useEffect(() => {
     if (!filters.sector_id) return;
-    const exists = sectors.some((sector) => sector.id === filters.sector_id);
+    const exists = allSectors.some((sector) => sector.id === filters.sector_id);
     if (!exists) {
       setSector("");
     }
-  }, [sectors, filters.sector_id, setSector]);
+  }, [allSectors, filters.sector_id, setSector]);
 
 
   const handleDeleteService = async (id: number) => {
@@ -138,6 +158,7 @@ export default function MaintenanceServicesPage() {
       }
 
       await loadSectors();
+      await loadDropdowns();
       await loadServices();
       handleCloseSectorModal();
     } catch (err) {
@@ -154,6 +175,7 @@ export default function MaintenanceServicesPage() {
       if (!token) throw new Error("Authentication required");
       await deleteMaintenanceServiceSector(token, id);
       await loadSectors();
+      await loadDropdowns();
       await loadServices();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to delete maintenance service sector");
@@ -205,7 +227,7 @@ export default function MaintenanceServicesPage() {
           >
             All Sectors
           </button>
-          {sectors.map((sector) => (
+          {allSectors.map((sector) => (
             <button
               key={sector.id}
               type="button"
@@ -241,7 +263,7 @@ export default function MaintenanceServicesPage() {
             className="form-input-base"
           >
             <option value="">All Sectors</option>
-            {sectors.map((s) => (
+            {allSectors.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.name}
               </option>
@@ -288,7 +310,7 @@ export default function MaintenanceServicesPage() {
                 <tr key={service.id} className="border-b border-outline-variant/10 hover:bg-surface-container-low">
                   <td className="px-4 py-3 text-on-surface">{service.name}</td>
                   <td className="px-4 py-3 text-xs text-on-surface-variant">
-                    {sectors.find((sector) => sector.id === service.maintenance_service_sector_id)?.name ?? "-"}
+                    {allSectors.find((sector) => sector.id === service.maintenance_service_sector_id)?.name ?? "-"}
                   </td>
                   <td className="px-4 py-3 text-on-surface">
                     {service.service_price} {service.currency_pricing}
@@ -384,6 +406,13 @@ export default function MaintenanceServicesPage() {
           </table>
         </div>
       )}
+
+      <PaginationControls
+        page={sectorsPage}
+        totalPages={sectorsTotalPages}
+        onPrevious={() => setSectorsPage((current) => Math.max(1, current - 1))}
+        onNext={() => setSectorsPage((current) => Math.min(sectorsTotalPages, current + 1))}
+      />
     </div>
   );
 

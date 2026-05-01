@@ -23,56 +23,6 @@ export function AdvancedFilters({
 }: AdvancedFiltersProps) {
   return (
     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "12px", marginBottom: "16px" }}>
-      {showPriceFilters && (
-        <>
-          <div>
-            <label htmlFor="price-min" style={{ display: "block", fontSize: "12px", fontWeight: "500", marginBottom: "4px" }}>
-              Min Price
-            </label>
-            <input
-              id="price-min"
-              type="number"
-              placeholder="Min Price"
-              value={priceMin ?? ""}
-              onChange={(e) => {
-                const val = e.target.value;
-                setPriceMin(val === "" ? "" : Number(val));
-              }}
-              style={{
-                width: "100%",
-                padding: "8px",
-                border: "1px solid #e0e0e0",
-                borderRadius: "4px",
-                fontSize: "14px",
-              }}
-            />
-          </div>
-
-          <div>
-            <label htmlFor="price-max" style={{ display: "block", fontSize: "12px", fontWeight: "500", marginBottom: "4px" }}>
-              Max Price
-            </label>
-            <input
-              id="price-max"
-              type="number"
-              placeholder="Max Price"
-              value={priceMax ?? ""}
-              onChange={(e) => {
-                const val = e.target.value;
-                setPriceMax(val === "" ? "" : Number(val));
-              }}
-              style={{
-                width: "100%",
-                padding: "8px",
-                border: "1px solid #e0e0e0",
-                borderRadius: "4px",
-                fontSize: "14px",
-              }}
-            />
-          </div>
-        </>
-      )}
-
       {showCurrencyFilter && (
         <div>
           <label htmlFor="currency" style={{ display: "block", fontSize: "12px", fontWeight: "500", marginBottom: "4px" }}>
