@@ -1,18 +1,14 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useMemo, useState } from "react";
 import { usePermissions } from "@/components/permission-provider";
-import { getAuthToken } from "@/lib/auth-session";
 import { useEntityFilters } from "@/hooks/useEntityFilters";
 import {
-  listBikeBlueprints,
-  listBrands,
-  deleteBikeBlueprint,
-  type BikeBlueprintRecord,
-  type BrandRecord,
-  fetchAllPages,
-} from "@/lib/crud-api";
+  useBikeBlueprints,
+  useBikeBrandOptions,
+  useDeleteBikeBlueprint,
+} from "@/hooks/api/useBikeBlueprints";
 import { AdvancedFilters } from "@/components/advanced-filters";
 import {
   ActionButton,
@@ -35,73 +31,45 @@ type BikeBlueprintFilters = {
 export default function BikeBlueprintsPage() {
   const router = useRouter();
   const permissions = usePermissions();
-  const [blueprints, setBlueprints] = useState<BikeBlueprintRecord[]>([]);
-  const [brands, setBrands] = useState<BrandRecord[]>([]);
-  const [totalPages, setTotalPages] = useState(1);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [localError, setLocalError] = useState<string | null>(null);
   const canCreateBlueprints = permissions.canCreate("bike-blueprints");
   const canUpdateBlueprints = permissions.canUpdate("bike-blueprints");
   const canDeleteBlueprints = permissions.canDelete("bike-blueprints");
 
   // Use custom filter hook
-  const { filters, page, setPage, getCleanFilters, setSearch, setBrand, setPriceMin, setPriceMax, setCurrency, logFilters } = useEntityFilters();
+  const { filters, page, setPage, getCleanFilters, setSearch, setBrand, setPriceMin, setPriceMax, setCurrency } = useEntityFilters();
+  const cleanFilters = getCleanFilters() as BikeBlueprintFilters;
+  const blueprintQuery = useBikeBlueprints(page, cleanFilters);
+  const bikeBrandsQuery = useBikeBrandOptions();
+  const deleteMutation = useDeleteBikeBlueprint();
 
-  const loadBlueprints = useCallback(async () => {
-    try {
-      setLoading(true);
-      const token = getAuthToken();
-      if (!token) throw new Error("Authentication required");
-
-      console.log("[BikeBlueprintsPage] Applying filters:", filters, "Page:", page);
-      logFilters();
-
-      const cleanFilters = getCleanFilters() as BikeBlueprintFilters;
-      const result = await listBikeBlueprints(token, page, cleanFilters);
-      setBlueprints(result.items);
-      setTotalPages(result.lastPage);
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load blueprints");
-    } finally {
-      setLoading(false);
-    }
-  }, [getCleanFilters, logFilters, page, filters]);
-
-  const loadBrands = useCallback(async () => {
-    try {
-      const token = getAuthToken();
-      if (!token) throw new Error("Authentication required");
-
-      const result = await fetchAllPages((p) => listBrands(token, p, "bikes"));
-      setBrands(result.filter((b) => b.type === "bikes"));
-    } catch (err) {
-      console.error(err);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadBrands();
-  }, [loadBrands]);
-
-  useEffect(() => {
-    loadBlueprints();
-  }, [loadBlueprints]);
+  const blueprints = blueprintQuery.data?.items ?? [];
+  const totalPages = blueprintQuery.data?.lastPage ?? 1;
+  const loading = blueprintQuery.isLoading || bikeBrandsQuery.isLoading;
+  const bikeBrandItems = useMemo(
+    () => bikeBrandsQuery.data?.items ?? [],
+    [bikeBrandsQuery.data?.items],
+  );
+  const brands = useMemo(() => bikeBrandItems.filter((b) => b.type === "bikes"), [bikeBrandItems]);
+  const error =
+    localError ??
+    (blueprintQuery.error instanceof Error ? blueprintQuery.error.message : null);
 
   const handleDelete = async (id: number) => {
     if (!canDeleteBlueprints) {
-      setError("You do not have permission to delete bike blueprints.");
+      setLocalError("You do not have permission to delete bike blueprints.");
       return;
     }
     if (!confirm("Are you sure you want to delete this blueprint?")) return;
 
     try {
-      const token = getAuthToken();
-      if (!token) throw new Error("Authentication required");
-      await deleteBikeBlueprint(token, id);
-      await loadBlueprints();
+      setLocalError(null);
+      await deleteMutation.mutateAsync(id);
+      await blueprintQuery.refetch();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete blueprint");
+      setLocalError(
+        err instanceof Error ? err.message : "Failed to delete blueprint",
+      );
     }
   };
 
