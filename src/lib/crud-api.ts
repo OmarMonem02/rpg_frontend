@@ -429,15 +429,19 @@ function normalizeBrand(raw: unknown): BrandRecord {
 export async function listBrands(
   token: string,
   page = 1,
-  type?: "spare_parts" | "products" | "bikes",
   filters?: {
+    type?: string;
+    search?: string;
     currency?: string;
   },
 ): Promise<PaginatedResult<BrandRecord>> {
   const query = new URLSearchParams({ page: String(page) });
-  if (type) query.append("type", type);
-  if (filters?.currency !== undefined && filters.currency)
+  
+  if (filters?.type) query.append("type", filters.type);
+  if (filters?.search) query.append("search", filters.search);
+  if (filters?.currency && filters.currency !== "all")
     query.append("currency", filters.currency);
+
   console.log(`[API] listBrands - Query: ${query.toString()}`, filters);
   const payload = await authorizedFetch<unknown>(`/brands?${query}`, token);
   const rows = pickArray(payload, ["data", "brands"]);

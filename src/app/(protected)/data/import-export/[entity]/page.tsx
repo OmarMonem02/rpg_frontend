@@ -89,9 +89,9 @@ export default function EntityImportExportPage() {
   // Determine required columns easily since the prompt provided manual list but columns might not flag required natively.
   // The prompt specified certain required fields:
   const getRequiredColumns = (slug: string) => {
-      if (['products', 'spare_parts'].includes(slug)) return ['name'];
+      if (['products', 'spare_parts'].includes(slug)) return ['name', 'sku'];
       if (['maintenance_services'].includes(slug)) return ['name'];
-      if (['bikes'].includes(slug)) return ['blueprint_id'];
+      if (['bikes'].includes(slug)) return ['blueprint_id', 'vin'];
       if (['bike_blueprints'].includes(slug)) return ['brand_id', 'model', 'year'];
       if (['brands'].includes(slug)) return ['name'];
       return [];

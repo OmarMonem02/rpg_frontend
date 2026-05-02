@@ -13,5 +13,10 @@ export type ImportExportEntity = {
 
 export type ImportResult = {
   message: string;
+  created_count?: number;
+  restored_count?: number;
+  skipped_count?: number;
+  skipped_duplicates?: string[];
+  restored_records?: string[];
   errors: string[];
 };

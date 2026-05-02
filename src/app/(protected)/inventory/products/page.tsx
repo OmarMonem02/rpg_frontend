@@ -70,7 +70,7 @@ export default function ProductsPage() {
       if (!token) return;
       const [catsRes, brandsRes] = await Promise.all([
         fetchAllPages((p) => listProductCategories(token, p)),
-        fetchAllPages((p) => listBrands(token, p, "products")),
+        fetchAllPages((p) => listBrands(token, p, { type: "products" })),
       ]);
       setAllCategories(catsRes);
       setBrands(brandsRes.filter((b) => b.type === "products"));

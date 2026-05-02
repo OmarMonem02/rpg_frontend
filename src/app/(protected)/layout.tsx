@@ -48,9 +48,19 @@ function ProtectedWorkspace({
         router.replace(fallbackRoute);
       }
     }
-  }, [canAccessCurrentRoute, canAccessFallbackRoute, fallbackRoute, pathname, router]);
+  }, [
+    canAccessCurrentRoute,
+    canAccessFallbackRoute,
+    fallbackRoute,
+    pathname,
+    router,
+  ]);
 
-  if (!canAccessCurrentRoute && canAccessFallbackRoute && fallbackRoute !== pathname) {
+  if (
+    !canAccessCurrentRoute &&
+    canAccessFallbackRoute &&
+    fallbackRoute !== pathname
+  ) {
     return <WorkspaceLoadingCard />;
   }
 
@@ -65,8 +75,8 @@ function ProtectedWorkspace({
             No readable workspace is available for this session.
           </h1>
           <p className="mt-3 text-sm leading-6 text-on-surface-variant">
-            Your account is signed in, but the current permission matrix does not allow
-            access to this route or any fallback page.
+            Your account is signed in, but the current permission matrix does
+            not allow access to this route or any fallback page.
           </p>
         </div>
       </div>
@@ -92,52 +102,32 @@ function ProtectedWorkspace({
         ].join(" ")}
       >
         <header className="sticky top-0 z-20 border-b border-outline-variant/15 bg-background/90 px-4 py-4 backdrop-blur md:px-6">
-          <div className="glass ghost-border flex items-center justify-between gap-4 rounded-[1.25rem] border px-4 py-3">
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                className="flex h-10 w-10 items-center justify-center rounded-xl border border-outline-variant/30 bg-surface-container-low text-on-surface transition-colors hover:bg-surface-container md:hidden"
-                onClick={() => {
-                  if (window.innerWidth < 768) {
-                    onOpenMobile();
-                  } else {
-                    onToggleCollapse();
-                  }
-                }}
-                aria-label="Toggle sidebar"
-              >
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="h-5 w-5"
-                >
-                  <line x1="3" y1="12" x2="21" y2="12" />
-                  <line x1="3" y1="6" x2="21" y2="6" />
-                  <line x1="3" y1="18" x2="21" y2="18" />
-                </svg>
-              </button>
-              <div className="hidden sm:block">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-on-surface-variant">
-                  RPG Workshop Console
-                </p>
-                <p className="text-sm text-on-surface">
-                  Daily operations, inventory, and admin control.
-                </p>
-              </div>
-            </div>
-            <div className="text-right">
-              <p className="text-[11px] uppercase tracking-[0.2em] text-on-surface-variant">
-                Active session
-              </p>
-              <p className="max-w-[120px] truncate text-sm font-semibold text-on-surface sm:max-w-none">
-                {userName}
-              </p>
-            </div>
-          </div>
+          <button
+            type="button"
+            className="flex h-10 w-10 items-center justify-center rounded-xl border border-outline-variant/30 bg-surface-container-low text-on-surface transition-colors hover:bg-surface-container md:hidden"
+            onClick={() => {
+              if (window.innerWidth < 768) {
+                onOpenMobile();
+              } else {
+                onToggleCollapse();
+              }
+            }}
+            aria-label="Toggle sidebar"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="h-5 w-5"
+            >
+              <line x1="3" y1="12" x2="21" y2="12" />
+              <line x1="3" y1="6" x2="21" y2="6" />
+              <line x1="3" y1="18" x2="21" y2="18" />
+            </svg>
+          </button>
         </header>
 
         <main className="flex-1 px-4 pb-6 pt-4 md:px-6">{children}</main>
