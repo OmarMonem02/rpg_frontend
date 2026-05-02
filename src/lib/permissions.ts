@@ -14,7 +14,8 @@ export type PagePath =
   | "product-categories"
   | "spare-part-categories"
   | "bike-blueprints"
-  | "sellers";
+  | "sellers"
+  | "reporting";
 
 export type ActionType =
   | "create"
@@ -48,6 +49,7 @@ export const ALL_PAGE_PATHS: PagePath[] = [
   "spare-part-categories",
   "bike-blueprints",
   "sellers",
+  "reporting",
 ];
 
 export const ALL_ACTIONS: ActionType[] = [
@@ -76,6 +78,7 @@ const DEFAULT_ROUTE_BY_PAGE: Record<PagePath, string> = {
   "spare-part-categories": "/data/spare-part-categories",
   "bike-blueprints": "/data/bike-blueprints",
   sellers: "/sellers",
+  reporting: "/reporting",
 };
 
 const ROUTE_PERMISSION_RULES: Array<{
@@ -125,6 +128,10 @@ const ROUTE_PERMISSION_RULES: Array<{
   {
     pattern: /^\/data\/bike-blueprints(?:\/|$)/,
     permission: { page: "bike-blueprints", action: "read" },
+  },
+  {
+    pattern: /^\/reporting(?:\/|$)/,
+    permission: { page: "reporting", action: "read" },
   },
   {
     pattern: /^\/inventory\/sales\/create(?:\/|$)/,

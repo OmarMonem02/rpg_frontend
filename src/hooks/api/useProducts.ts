@@ -58,7 +58,7 @@ export function useProductCategories(page = 1) {
 export function useProductBrands(page = 1) {
   return useQuery({
     queryKey: productsKeys.brands(),
-    queryFn: () => listBrands(getRequiredToken(), page, "products"),
+    queryFn: () => listBrands(getRequiredToken(), page, { type: "products" }),
   });
 }
 

@@ -37,7 +37,7 @@ export function ProductForm({ initialData, mode }: ProductFormProps) {
         if (!token) return;
         const [catRes, brandRes] = await Promise.all([
           fetchAllPages((p) => listProductCategories(token, p)),
-          fetchAllPages((p) => listBrands(token, p, "products")),
+          fetchAllPages((p) => listBrands(token, p, { type: "products" })),
         ]);
         setCategories(catRes);
         setBrands(brandRes.filter((b) => b.type === "products"));

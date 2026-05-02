@@ -120,20 +120,20 @@ export function CatalogPickerModal({
 
       if (catalogType === "products") {
         const [brandsRes, categoriesRes] = await Promise.all([
-          listBrands(token, 1, "products"),
+          listBrands(token, 1, { type: "products" }),
           listProductCategories(token, 1),
         ]);
         setBrands(brandsRes.items);
         setProductCategories(categoriesRes.items);
       } else if (catalogType === "spare_parts") {
         const [brandsRes, categoriesRes] = await Promise.all([
-          listBrands(token, 1, "spare_parts"),
+          listBrands(token, 1, { type: "spare_parts" }),
           listSparePartCategories(token, 1),
         ]);
         setBrands(brandsRes.items);
         setSparePartCategories(categoriesRes.items);
       } else if (catalogType === "bikes") {
-        const brandsRes = await listBrands(token, 1, "bikes");
+        const brandsRes = await listBrands(token, 1, { type: "bikes" });
         setBrands(brandsRes.items);
       } else if (catalogType === "maintenance_services") {
         const sectorsRes = await listMaintenanceServiceSectors(token, 1);

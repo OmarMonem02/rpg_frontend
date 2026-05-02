@@ -36,6 +36,7 @@ const PAGE_LABELS: Record<keyof PermissionMatrix, string> = {
   "spare-part-categories": "Spare Part Categories",
   "bike-blueprints": "Bike Blueprints",
   sellers: "Sellers",
+  reporting: "Reporting",
 };
 
 export function PermissionsEditor({
@@ -119,7 +120,7 @@ export function PermissionsEditor({
               Effective Permission Matrix
             </h3>
             <p className="mt-1 text-sm text-on-surface-variant">
-              The backend owns these permissions. Every save submits the full 16-page matrix.
+              The backend owns these permissions. Every save submits the full page matrix.
             </p>
           </div>
           <div className="flex flex-wrap gap-3 text-sm">
