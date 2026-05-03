@@ -530,6 +530,7 @@ export default function PaymentMethodsPage() {
       <PaginationControls
         page={page}
         totalPages={totalPages}
+        onPageChange={setPage}
         onPrevious={() => setPage((p) => Math.max(1, p - 1))}
         onNext={() => setPage((p) => Math.min(totalPages, p + 1))}
       />

@@ -419,8 +419,9 @@ export function InvoiceTemplate({
         .pdf-export .trow.grand { background: #000 !important; color: #fff !important; }
       `}</style>
 
-      <div className="receipt-wrapper">
+      <div className="receipt-wrapper invoice-template pdf-capture-safe">
         <div className="receipt-page">
+          <div className="h-1 bg-accent" aria-hidden="true" />
           <div className="ri">
             <div className="receipt-header">
               <div className="brand-section">
@@ -438,12 +439,12 @@ export function InvoiceTemplate({
                   />
                 </div>
                 <div className="htext">
-                  <div className="htitle">{companyName}</div>
+                  <div className="htitle font-display font-black">{companyName}</div>
                   <div className="hsub">{companyEmail}</div>
                 </div>
               </div>
               <div className="hmeta">
-                <div className="rnum">
+                <div className="rnum mono-data">
                   <span>#</span>
                   {padId(sale.id)}
                 </div>
@@ -495,11 +496,11 @@ export function InvoiceTemplate({
                 <table>
                   <thead>
                     <tr>
-                      <th>Item</th>
-                      <th>Type</th>
-                      <th className="r">Qty</th>
-                      <th className="r">Price</th>
-                      <th className="r">Amount</th>
+                      <th className="label-caps">Item</th>
+                      <th className="label-caps">Type</th>
+                      <th className="label-caps r">Qty</th>
+                      <th className="label-caps r">Price</th>
+                      <th className="label-caps r">Amount</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -551,7 +552,7 @@ export function InvoiceTemplate({
                           >
                             {item.sellable_type.replace(/_/g, " ")}
                           </td>
-                          <td className="r" style={{ fontWeight: 600 }}>
+                          <td className="r mono-data" style={{ fontWeight: 600 }}>
                             {item.remaining_qty}
                             {item.returned_qty > 0 &&
                               item.remaining_qty > 0 && (
@@ -566,13 +567,13 @@ export function InvoiceTemplate({
                                 </div>
                               )}
                           </td>
-                          <td className="r">
+                          <td className="r mono-data">
                             EGP{" "}
                             {item.selling_price.toLocaleString(undefined, {
                               minimumFractionDigits: 2,
                             })}
                           </td>
-                          <td className="r istotal">
+                          <td className="r istotal mono-data">
                             EGP{" "}
                             {(
                               item.remaining_qty * item.selling_price -
@@ -610,7 +611,7 @@ export function InvoiceTemplate({
               <div className="totals-table">
                 <div className="trow">
                   <span className="lbl">Subtotal</span>
-                  <span className="amt">
+                  <span className="amt mono-data">
                     EGP{" "}
                     {itemsSubtotal.toLocaleString(undefined, {
                       minimumFractionDigits: 2,
@@ -621,7 +622,7 @@ export function InvoiceTemplate({
                 {shippingFee > 0 && (
                   <div className="trow">
                     <span className="lbl">Handling & Shipping</span>
-                    <span className="amt">
+                    <span className="amt mono-data">
                       EGP{" "}
                       {shippingFee.toLocaleString(undefined, {
                         minimumFractionDigits: 2,
@@ -633,7 +634,7 @@ export function InvoiceTemplate({
                 {saleDiscount > 0 && (
                   <div className="trow disc">
                     <span className="lbl">Promotional Discount</span>
-                    <span className="amt">
+                    <span className="amt mono-data">
                       −EGP{" "}
                       {saleDiscount.toLocaleString(undefined, {
                         minimumFractionDigits: 2,
@@ -644,7 +645,7 @@ export function InvoiceTemplate({
 
                 <div className="trow grand">
                   <span className="lbl">Total Amount</span>
-                  <span className="amt">
+                  <span className="amt mono-data">
                     EGP{" "}
                     {netTotal.toLocaleString(undefined, {
                       minimumFractionDigits: 2,

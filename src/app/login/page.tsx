@@ -8,6 +8,7 @@ import {
   getAuthToken,
   setAuthSession,
 } from "@/lib/auth-session";
+import { InlineMessage } from "@/components/ops-ui";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -66,29 +67,47 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-6">
-      <div className="w-full max-w-md">
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background bg-[radial-gradient(ellipse_80%_50%_at_50%_-10%,rgba(0,83,220,0.08),transparent)] p-6">
+      <svg
+        aria-hidden="true"
+        viewBox="0 0 320 320"
+        className="pointer-events-none absolute -right-20 -top-20 h-80 w-80 select-none text-on-surface opacity-[0.04] md:h-[34rem] md:w-[34rem]"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="3"
+      >
+        <circle cx="160" cy="160" r="128" />
+        <circle cx="160" cy="160" r="38" />
+        {Array.from({ length: 16 }).map((_, index) => {
+          const angle = (index * Math.PI) / 8;
+          const x = 160 + Math.cos(angle) * 128;
+          const y = 160 + Math.sin(angle) * 128;
+          return <line key={index} x1="160" y1="160" x2={x} y2={y} />;
+        })}
+      </svg>
+
+      <div className="relative z-10 w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="inline-flex h-22 w-22 items-center justify-center rounded-xl bg-primary/10 text-primary mb-4 overflow-hidden">
+          <div className="mb-4 inline-flex h-22 w-22 items-center justify-center overflow-hidden rounded-2xl bg-primary/8 p-3 text-primary shadow-md shadow-primary/10 ring-1 ring-primary/20">
             <img
               src="/logo.ico"
               alt="menu"
               className="w-full h-full object-cover"
             />
           </div>
-          <h1 className="text-3xl font-display font-bold text-on-surface">
+          <h1 className="font-display text-4xl font-black tracking-tight text-on-surface">
             RPG Workshop
           </h1>
-          <p className="mt-2 text-on-surface-variant font-medium">
+          <p className="label-caps mt-2 text-on-surface-variant/70">
             Control Center Authentication
           </p>
         </div>
 
-        <section className="bg-surface-container-lowest border border-outline-variant/20 rounded-3xl p-8 shadow-ambient">
+        <section className="bg-surface-container-lowest border border-outline-variant/20 rounded-3xl p-8 shadow-[0_20px_60px_rgba(0,83,220,0.07)]">
           <form className="space-y-6" onSubmit={onSubmit}>
             <div className="space-y-2">
               <label
-                className="text-sm font-semibold text-on-surface ml-1"
+                className="label-caps ml-1"
                 htmlFor="email"
               >
                 Email Address
@@ -99,14 +118,14 @@ export default function LoginPage() {
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
                 required
-                className="w-full rounded-2xl border border-outline-variant/30 bg-surface-container-low px-4 py-3.5 text-on-surface outline-none transition-all focus:border-primary focus:bg-surface-container-lowest focus:ring-4 focus:ring-primary/5 placeholder:text-on-surface-variant/40"
+                className="form-input-base"
                 placeholder="admin@rpg.com"
               />
             </div>
 
             <div className="space-y-2">
               <label
-                className="text-sm font-semibold text-on-surface ml-1"
+                className="label-caps ml-1"
                 htmlFor="password"
               >
                 Password
@@ -117,13 +136,14 @@ export default function LoginPage() {
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
                 required
-                className="w-full rounded-2xl border border-outline-variant/30 bg-surface-container-low px-4 py-3.5 text-on-surface outline-none transition-all focus:border-primary focus:bg-surface-container-lowest focus:ring-4 focus:ring-primary/5 placeholder:text-on-surface-variant/40"
+                className="form-input-base"
                 placeholder="••••••••"
               />
             </div>
 
             {message ? (
-              <div className="rounded-2xl border border-error/10 bg-error-container/30 px-4 py-3 text-sm text-error font-medium flex items-center gap-3">
+              <InlineMessage tone="danger">
+                <span className="flex items-center gap-3 font-medium">
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   width="18"
@@ -140,16 +160,17 @@ export default function LoginPage() {
                   <line x1="12" y1="16" x2="12.01" y2="16" />
                 </svg>
                 {message}
-              </div>
+                </span>
+              </InlineMessage>
             ) : null}
 
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full rounded-2xl bg-primary px-4 py-4 font-bold text-on-primary shadow-lg shadow-primary/20 transition-all hover:translate-y-[-1px] hover:shadow-xl hover:shadow-primary/30 active:translate-y-[0px] disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none"
+              className="w-full rounded-2xl bg-primary px-4 py-4 font-bold text-on-primary shadow-lg shadow-primary/20 transition-all hover:-translate-y-px hover:bg-accent hover:shadow-xl hover:shadow-primary/30 active:translate-y-0 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none"
             >
               {isLoading ? (
-                <span className="flex items-center justify-center gap-2">
+                <span className="flex items-center justify-center gap-2" aria-label="Loading">
                   <svg
                     className="animate-spin h-5 w-5 text-on-primary"
                     xmlns="http://www.w3.org/2000/svg"
@@ -179,7 +200,7 @@ export default function LoginPage() {
           </form>
         </section>
 
-        <p className="mt-8 text-center text-xs text-on-surface-variant font-medium">
+        <p className="label-caps mt-8 text-center text-on-surface-variant/40">
           RPG Workshop Console &copy; {new Date().getFullYear()}
         </p>
       </div>

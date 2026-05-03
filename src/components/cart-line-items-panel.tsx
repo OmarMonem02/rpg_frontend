@@ -7,7 +7,7 @@ import {
   BikeRecord,
   MaintenanceServiceRecord,
 } from "@/lib/crud-api";
-import { ActionButton, EmptyState } from "@/components/ops-ui";
+import { EmptyState } from "@/components/ops-ui";
 import { TrashIcon, PencilSquareIcon, CheckIcon, XMarkIcon } from "@heroicons/react/24/outline";
 
 export type SaleLineItem = {
@@ -156,13 +156,13 @@ export function CartLineItemsPanel({
             <table className="w-full border-collapse text-left text-sm">
               <thead className="bg-surface-container-lowest sticky top-0 z-10 border-b border-outline-variant/15 shadow-sm">
                 <tr>
-                  <th className="px-5 py-3 font-semibold uppercase tracking-wider text-xs text-on-surface-variant">Item</th>
-                  <th className="px-5 py-3 text-center font-semibold uppercase tracking-wider text-xs text-on-surface-variant">Type</th>
-                  <th className="px-5 py-3 text-right font-semibold uppercase tracking-wider text-xs text-on-surface-variant">Price</th>
-                  <th className="px-5 py-3 text-right font-semibold uppercase tracking-wider text-xs text-on-surface-variant">Qty</th>
-                  <th className="px-5 py-3 text-right font-semibold uppercase tracking-wider text-xs text-on-surface-variant">Discount</th>
-                  <th className="px-5 py-3 text-right font-semibold uppercase tracking-wider text-xs text-on-surface-variant">Subtotal</th>
-                  <th className="px-5 py-3 text-center font-semibold uppercase tracking-wider text-xs text-on-surface-variant">Actions</th>
+                  <th className="label-caps px-5 py-3">Item</th>
+                  <th className="label-caps px-5 py-3 text-center">Type</th>
+                  <th className="label-caps px-5 py-3 text-right">Price</th>
+                  <th className="label-caps px-5 py-3 text-right">Qty</th>
+                  <th className="label-caps px-5 py-3 text-right">Disc</th>
+                  <th className="label-caps px-5 py-3 text-right">Total</th>
+                  <th className="label-caps px-5 py-3 text-center">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-outline-variant/10">
@@ -171,19 +171,19 @@ export function CartLineItemsPanel({
                   return (
                     <tr
                       key={index}
-                      className="group bg-surface transition-colors hover:bg-surface-container/30"
+                      className={`data-row group ${isEditing ? "bg-primary/3 ring-2 ring-primary/20" : ""}`}
                     >
                       {/* Item Name */}
                       <td className="px-5 py-4">
                         <p className="font-semibold text-on-surface">{item.item_name}</p>
-                        <p className="text-xs font-medium text-on-surface-variant/70 mt-0.5">
+                        <p className="mono-data mt-0.5 text-xs font-medium text-on-surface-variant/70">
                           ID: {item.sellable_id}
                         </p>
                       </td>
 
                       {/* Item Type */}
                       <td className="px-5 py-4 text-center">
-                        <span className="inline-flex items-center rounded-lg bg-surface-container-high px-2.5 py-1 text-[11px] font-bold tracking-wide text-on-surface">
+                        <span className="form-chip rounded-lg bg-primary/8 text-primary border-primary/15 font-mono text-[10px]">
                           {item.sellable_type === "products" && "PRODUCT"}
                           {item.sellable_type === "spare_parts" && "SPARE PART"}
                           {item.sellable_type === "bikes" && "BIKE"}
@@ -197,11 +197,11 @@ export function CartLineItemsPanel({
                           const priceInfo = getDisplayPrice(item);
                           return (
                             <div className="flex flex-col items-end">
-                              <p className="font-semibold text-on-surface">
-                                {priceInfo.amount.toLocaleString()} <span className="text-xs text-on-surface-variant">{priceInfo.currency}</span>
+                              <p className="mono-data font-semibold text-on-surface">
+                                {priceInfo.amount.toLocaleString()} <span className="form-chip bg-primary/8 text-primary border-primary/15 font-mono text-[10px]">{priceInfo.currency}</span>
                               </p>
                               {priceInfo.converted && (
-                                <p className="text-[11px] font-medium text-on-surface-variant mt-0.5">
+                                <p className="mono-data mt-0.5 text-[11px] font-medium text-on-surface-variant">
                                   ≈ {priceInfo.converted.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <span className="text-[10px] uppercase">EGP</span>
                                 </p>
                               )}
@@ -223,10 +223,10 @@ export function CartLineItemsPanel({
                               })
                             }
                             disabled={item.sellable_type === "bikes"}
-                            className="w-16 rounded-lg border-2 border-primary/30 bg-surface px-2 py-1.5 text-right font-medium text-on-surface outline-none focus:border-primary"
+                            className="form-input-base mono-data w-16 py-1.5 text-right text-sm"
                           />
                         ) : (
-                          <span className="inline-flex h-8 min-w-[2rem] items-center justify-center rounded-lg border border-outline-variant/20 bg-surface-container-lowest px-2 font-semibold text-on-surface shadow-sm">
+                          <span className="mono-data inline-flex h-8 min-w-[2rem] items-center justify-center rounded-lg border border-outline-variant/20 bg-surface-container-lowest px-2 font-semibold text-on-surface shadow-sm">
                             {item.quantity}
                           </span>
                         )}
@@ -246,7 +246,7 @@ export function CartLineItemsPanel({
                                 })
                               }
                               max={calculateMaxDiscount(item)}
-                              className="w-20 rounded-lg border-2 border-primary/30 bg-surface px-2 py-1.5 text-right font-medium text-on-surface outline-none focus:border-primary"
+                              className="form-input-base mono-data w-20 py-1.5 text-right text-sm"
                             />
                             <span className="text-[10px] font-semibold tracking-wider text-on-surface-variant uppercase">
                               Max: {calculateMaxDiscount(item).toFixed(0)}
@@ -254,11 +254,11 @@ export function CartLineItemsPanel({
                           </div>
                         ) : (
                           <div className="flex flex-col items-end">
-                            <p className={`font-semibold ${item.discount_amount > 0 ? 'text-error' : 'text-on-surface-variant opacity-50'}`}>
+                            <p className={`mono-data font-semibold ${item.discount_amount > 0 ? 'text-error' : 'text-on-surface-variant opacity-50'}`}>
                               {item.discount_amount > 0 ? `-${item.discount_amount.toLocaleString()}` : "0"} <span className="text-[11px] uppercase">{item.currency}</span>
                             </p>
                             {item.currency === "USD" && item.discount_amount > 0 && exchangeRate > 0 && (
-                              <p className="text-[11px] text-on-surface-variant/60 mt-0.5">
+                              <p className="mono-data mt-0.5 text-[11px] text-on-surface-variant/60">
                                 ≈ -{toEGPDiscount(item).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} EGP
                               </p>
                             )}
@@ -268,11 +268,11 @@ export function CartLineItemsPanel({
 
                       {/* Subtotal — always EGP */}
                       <td className="px-5 py-4 text-right">
-                        <p className="font-bold text-primary">
+                        <p className="mono-data font-bold text-primary">
                           {calculateLineSubtotal(item).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <span className="text-[11px] uppercase">EGP</span>
                         </p>
                         {item.currency === "USD" && (
-                          <p className="text-[10px] text-on-surface-variant/50 mt-0.5">Converted @ {exchangeRate}x</p>
+                          <p className="mono-data mt-0.5 text-[10px] text-on-surface-variant/50">Converted @ {exchangeRate}x</p>
                         )}
                       </td>
 
@@ -282,14 +282,14 @@ export function CartLineItemsPanel({
                           <div className="flex items-center justify-center gap-1.5">
                             <button
                               onClick={() => handleSaveEdit(item.id || item.sellable_id)}
-                              className="flex h-8 w-8 items-center justify-center rounded-lg bg-green-500/10 text-green-600 transition-colors hover:bg-green-500/20"
+                              className="rounded-lg p-1.5 text-green-600 transition-colors hover:bg-green-500/10"
                               title="Save Changes"
                             >
                               <CheckIcon className="h-5 w-5" />
                             </button>
                             <button
                               onClick={handleCancelEdit}
-                              className="flex h-8 w-8 items-center justify-center rounded-lg bg-surface-container-high text-on-surface-variant transition-colors hover:bg-surface-container-highest hover:text-on-surface"
+                              className="rounded-lg p-1.5 text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface"
                               title="Cancel"
                             >
                               <XMarkIcon className="h-5 w-5" />
@@ -306,7 +306,7 @@ export function CartLineItemsPanel({
                             </button>
                             <button
                               onClick={() => onDeleteItem(item.id || item.sellable_id)}
-                              className="flex h-8 w-8 items-center justify-center rounded-lg bg-error-container/50 text-error shadow-sm ring-1 ring-inset ring-error/20 transition-all hover:bg-error-container"
+                              className="rounded-lg p-1.5 text-error/60 transition-colors hover:bg-error/5 hover:text-error"
                               title="Delete Item"
                             >
                               <TrashIcon className="h-4 w-4" />
@@ -325,32 +325,32 @@ export function CartLineItemsPanel({
 
       {/* Totals Summary */}
       <div className="mt-auto border-t border-outline-variant/20 bg-surface-container-low px-5 py-5 sm:px-6">
-        <div className="ml-auto w-full max-w-sm space-y-3">
+        <div className="ml-auto w-full max-w-sm rounded-2xl border border-outline-variant/15 bg-surface-container p-4 space-y-2">
           <div className="flex items-center justify-between text-sm">
-            <span className="font-semibold text-on-surface-variant uppercase tracking-wider text-[11px]">Subtotal</span>
-            <span className="font-semibold text-on-surface">{subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+            <span className="label-caps">Subtotal</span>
+            <span className="mono-data font-bold text-on-surface">{subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
           </div>
 
           {shippingFee > 0 && (
             <div className="flex items-center justify-between text-sm">
-              <span className="font-semibold text-on-surface-variant uppercase tracking-wider text-[11px]">Shipping Fee</span>
-              <span className="font-semibold text-on-surface">+{shippingFee.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              <span className="label-caps">Shipping Fee</span>
+              <span className="mono-data font-bold text-on-surface">+{shippingFee.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
             </div>
           )}
 
           {saleDiscount > 0 && (
             <div className="flex items-center justify-between text-sm">
-              <span className="font-semibold text-on-surface-variant uppercase tracking-wider text-[11px]">Extra Discount</span>
-              <span className="font-semibold text-error">-{saleDiscount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              <span className="label-caps">Extra Discount</span>
+              <span className="mono-data font-bold text-error">-{saleDiscount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
             </div>
           )}
 
           <div className="relative mt-4">
-            <div className="absolute inset-x-0 -top-4 h-px bg-gradient-to-r from-transparent via-outline-variant/30 to-transparent" />
+            <div className="divider absolute inset-x-0 -top-4" />
             <div className="flex items-end justify-between pt-2">
               <span className="font-display text-lg font-bold text-on-surface">Total</span>
               <div className="text-right">
-                <span className="font-display text-3xl font-extrabold tracking-tight text-primary">
+                <span className="mono-data text-lg font-black text-primary">
                   {total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
                 <span className="ml-1 text-sm font-bold uppercase text-primary/70">EGP</span>

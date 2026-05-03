@@ -8,7 +8,6 @@ import {
   BreakdownList,
   EmptyFinanceState,
   FinanceHero,
-  FinanceInsightBand,
   FinanceLoadingCard,
   FinanceSectionTitle,
   MoneyStatGrid,
@@ -91,10 +90,6 @@ export default function AnnualStatementPage() {
         />
       ) : (
         <>
-          <FinanceInsightBand
-            title="Read this sheet as a tempo map for the year."
-            copy="The annual statement is best for spotting seasonality, strong months, and expense spikes. Use it to decide where to push sales effort, where to tighten cost control, and when margins drift."
-          />
 
           {sections.map(([code, section]) => (
             <section key={code} className="space-y-4">

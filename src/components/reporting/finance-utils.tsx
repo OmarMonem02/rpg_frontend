@@ -305,26 +305,6 @@ export function FinanceLoadingCard({
   );
 }
 
-export function FinanceInsightBand({
-  title,
-  copy,
-}: {
-  title: string;
-  copy: string;
-}) {
-  return (
-    <SurfaceCard className="border-emerald-500/10 bg-[linear-gradient(145deg,rgba(255,255,255,0.95),rgba(240,253,244,0.9))]">
-      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-on-surface-variant">
-        Operator Note
-      </p>
-      <h3 className="mt-2 text-lg font-semibold text-on-surface">{title}</h3>
-      <p className="mt-2 max-w-3xl text-sm leading-6 text-on-surface-variant">
-        {copy}
-      </p>
-    </SurfaceCard>
-  );
-}
-
 export function PaymentStatusBadge({ value }: { value: ExpensePaymentStatus }) {
   return value === "paid" ? (
     <StatusBadge tone="success">Paid</StatusBadge>

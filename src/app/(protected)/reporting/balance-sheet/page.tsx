@@ -9,7 +9,6 @@ import {
   EmptyFinanceState,
   FinanceFilterBar,
   FinanceHero,
-  FinanceInsightBand,
   FinanceLoadingCard,
   FinanceSectionTitle,
   MoneyStatGrid,
@@ -88,11 +87,6 @@ export default function BalanceSheetPage() {
         />
       ) : (
         <>
-          <FinanceInsightBand
-            title="Treat this as the current position, not a fully accrued accounting ledger."
-            copy="This MVP sheet is designed for operational finance: collected cash, open receivables, stock value, and unpaid expenses. It helps the team read liquidity and exposure quickly without pretending to be a full GL."
-          />
-
           {sections.map(([code, section]) => (
             <section key={code} className="space-y-4">
               <FinanceSectionTitle

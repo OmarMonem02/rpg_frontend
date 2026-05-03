@@ -16,7 +16,6 @@ import { ApiError } from "@/lib/auth-api";
 import {
   EmptyFinanceState,
   FinanceHero,
-  FinanceInsightBand,
   FinanceLoadingCard,
   FinanceSectionTitle,
   formatMoney,
@@ -112,11 +111,6 @@ export default function ReportingOverviewPage() {
         />
       ) : (
         <>
-          <FinanceInsightBand
-            title="This room is best for directional financial decisions."
-            copy="Recognized revenue comes only from completed sales, receivables stay separate, and unpaid expenses drive liabilities. Use the dedicated sheets when you need drill-down context before acting."
-          />
-
           {currencies.map((currency) => {
             const pnl = profitLoss.currencies[currency];
             const balance = balanceSheet.currencies[currency];

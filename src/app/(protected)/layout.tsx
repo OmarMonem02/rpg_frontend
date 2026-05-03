@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { AppSidebar } from "@/components/app-sidebar";
+import { RefetchAllDataButton } from "@/components/refetch-all-data-button";
 import {
   PermissionProvider,
   usePermissions,
@@ -96,12 +97,12 @@ function ProtectedWorkspace({
 
       <div
         className={[
-          "flex min-h-screen min-w-0 flex-1 flex-col transition-[margin] duration-300 ease-out motion-reduce:transition-none",
-          isCollapsed ? "md:ml-20" : "md:ml-72",
+          "flex min-h-screen min-w-0 flex-1 flex-col transition-[padding] duration-300 ease-out motion-reduce:transition-none",
+          isCollapsed ? "md:pl-20" : "md:pl-72",
           "animate-app-shell-enter",
         ].join(" ")}
       >
-        <header className="sticky top-0 z-20 border-b border-outline-variant/15 bg-background/90 px-4 py-4 backdrop-blur md:px-6">
+        <div className="sticky top-0 z-20 flex items-center justify-between gap-3 py-2 px-4 backdrop-blur md:px-6">
           <button
             type="button"
             className="flex h-10 w-10 items-center justify-center rounded-xl border border-outline-variant/30 bg-surface-container-low text-on-surface transition-colors hover:bg-surface-container md:hidden"
@@ -128,9 +129,14 @@ function ProtectedWorkspace({
               <line x1="3" y1="18" x2="21" y2="18" />
             </svg>
           </button>
-        </header>
+          <div className="flex w-full flex-row items-center justify-end gap-2">
+            <RefetchAllDataButton />
+          </div>
+        </div>
 
-        <main className="flex-1 px-4 pb-6 pt-4 md:px-6">{children}</main>
+        <main className="flex-1 px-4 py-6 md:px-6 md:py-8 lg:px-8">
+          <div className="mx-auto max-w-screen-2xl">{children}</div>
+        </main>
       </div>
     </div>
   );

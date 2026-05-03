@@ -9,7 +9,6 @@ import {
   EmptyFinanceState,
   FinanceFilterBar,
   FinanceHero,
-  FinanceInsightBand,
   FinanceLoadingCard,
   FinanceSectionTitle,
   MoneyStatGrid,
@@ -89,10 +88,6 @@ export default function ProfitLossPage() {
         />
       ) : (
         <>
-          <FinanceInsightBand
-            title="Use this sheet to separate real earnings from work still in motion."
-            copy="Completed sales count as recognized revenue. Partial and pending sales stay out of profit, which keeps this view cleaner when the operations team is still collecting or closing."
-          />
 
           {currencySections.map(([code, section]) => (
             <section key={code} className="space-y-4">

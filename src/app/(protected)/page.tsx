@@ -1,6 +1,7 @@
 'use client';
 
 import { usePermissions } from "@/components/permission-provider";
+import { getAuthUser } from "@/lib/auth-session";
 import {
   ActionButton,
   EmptyState,
@@ -80,6 +81,7 @@ function ShortcutCard({ item }: { item: Shortcut }) {
 
 export default function HomePage() {
   const permissions = usePermissions();
+  const userName = getAuthUser()?.name ?? "operator";
   const visibleShortcuts = operationsShortcuts.filter((item) =>
     permissions.canAccessRoute(item.href),
   );
@@ -87,9 +89,9 @@ export default function HomePage() {
   return (
     <PageShell>
       <PageHero
-        eyebrow="Operations Dashboard"
-        title="Run the bike shop from one clear control room."
-        description="Use this workspace as the daily launch point for inventory, blueprints, showroom listings, and admin operations. The rebuild keeps the existing routes and backend contracts, but gives every module a more intentional, production-ready surface."
+        eyebrow="RPG HUB"
+        title={`Good morning, ${userName}`}
+        description="A precision workspace for sales, workshop tickets, inventory, and operational control."
         actions={
           <>
             {permissions.canAccessRoute("/inventory/spare-parts") ? (
@@ -120,10 +122,10 @@ export default function HomePage() {
       />
 
       <StatGrid>
-        <StatCard label="Inventory Control" value="Parts + Products" hint="Shared filters, tables, and guided CRUD flows." />
-        <StatCard label="Blueprint Logic" value="Linked workflows" hint="Assign parts to bike models from either side of the relationship." />
-        <StatCard label="Admin Operations" value="Users + Sellers" hint="Consistent page rhythm with cleaner forms and list surfaces." />
-        <StatCard label="Design Constraint" value="No globals.css edits" hint="All improvements are done through layout, composition, and reusable components." />
+        <StatCard label="Total Sales" value="-- EGP" hint="Ledger-ready totals appear here when reporting data is connected." tone="primary" />
+        <StatCard label="Active Tickets" value="--" hint="Workshop queue across pending and in-progress jobs." />
+        <StatCard label="Inventory Value" value="-- EGP" hint="Parts, products, and bikes under active control." tone="success" />
+        <StatCard label="Pending Returns" value="--" hint="Items waiting for refund, exchange, or inspection." tone="warning" />
       </StatGrid>
 
       <SurfaceCard>
@@ -138,10 +140,16 @@ export default function HomePage() {
         </div>
       </SurfaceCard>
 
-      <EmptyState
-        title="More modules can now inherit the same page system"
-        description="Brands, payment methods, maintenance services, and the remaining CRUD pages can all share the same operations-first layout language without changing the global stylesheet."
-      />
+      <SurfaceCard>
+        <div className="mb-5">
+          <p className="label-caps">Recent Activity</p>
+          <h2 className="mt-2 text-2xl font-semibold text-on-surface">Latest operational movement</h2>
+        </div>
+        <EmptyState
+          title="No recent activity yet"
+          description="Transactions, service tickets, and stock updates will appear here once activity is available for this session."
+        />
+      </SurfaceCard>
     </PageShell>
   );
 }

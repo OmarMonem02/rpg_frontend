@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { EntityFormModal, type FieldConfig } from "@/components/entity-form-modal";
 import { useEntityFilters } from "@/hooks/useEntityFilters";
+import { useGlobalDataRefresh } from "@/hooks/useGlobalDataRefresh";
 import {
   ActionButton,
   EmptyState,
@@ -108,6 +109,10 @@ export default function MaintenanceServicesPage() {
   useEffect(() => {
     loadServices();
   }, [loadServices]);
+
+  useGlobalDataRefresh(async () => {
+    await Promise.all([loadDropdowns(), loadSectors(), loadServices()]);
+  });
 
   useEffect(() => {
     if (!filters.sector_id) return;
@@ -346,6 +351,7 @@ export default function MaintenanceServicesPage() {
       <PaginationControls
         page={page}
         totalPages={totalPages}
+        onPageChange={setPage}
         onPrevious={() => setPage((current) => Math.max(1, current - 1))}
         onNext={() => setPage((current) => Math.min(totalPages, current + 1))}
       />
@@ -410,6 +416,7 @@ export default function MaintenanceServicesPage() {
       <PaginationControls
         page={sectorsPage}
         totalPages={sectorsTotalPages}
+        onPageChange={setSectorsPage}
         onPrevious={() => setSectorsPage((current) => Math.max(1, current - 1))}
         onNext={() => setSectorsPage((current) => Math.min(sectorsTotalPages, current + 1))}
       />

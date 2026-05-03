@@ -20,7 +20,6 @@ import {
   EmptyFinanceState,
   EXPENSE_CATEGORY_OPTIONS,
   FinanceHero,
-  FinanceInsightBand,
   FinanceLoadingCard,
   FinanceSectionTitle,
   PaymentStatusBadge,
@@ -264,11 +263,6 @@ export default function ExpensesPage() {
       />
 
       {error ? <InlineMessage tone="danger">{error}</InlineMessage> : null}
-
-      <FinanceInsightBand
-        title="Record the reason once, then let the statements do the rest."
-        copy="Use this ledger for real operating costs like rent, transport, utilities, and marketing. Paid entries affect expense totals; unpaid entries also show up as liabilities in the balance sheet."
-      />
       <div>
         <StatGrid>
           {summaryRows.map((item) => (

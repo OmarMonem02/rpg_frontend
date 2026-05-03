@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { getAuthToken } from "@/lib/auth-session";
 import { useEntityFilters } from "@/hooks/useEntityFilters";
+import { useGlobalDataRefresh } from "@/hooks/useGlobalDataRefresh";
 import {
   listSpareParts,
   listSparePartCategories,
@@ -31,7 +32,6 @@ import {
   PageShell,
   PaginationControls,
   StatusBadge,
-  SurfaceCard,
   TabsWrapper,
 } from "@/components/ops-ui";
 
@@ -39,7 +39,9 @@ export default function SparePartsPage() {
   const router = useRouter();
   const [spareParts, setSpareParts] = useState<SparePartRecord[]>([]);
   const [categories, setCategories] = useState<SparePartCategoryRecord[]>([]);
-  const [allCategories, setAllCategories] = useState<SparePartCategoryRecord[]>([]);
+  const [allCategories, setAllCategories] = useState<SparePartCategoryRecord[]>(
+    [],
+  );
   const [brands, setBrands] = useState<BrandRecord[]>([]);
   const [totalPages, setTotalPages] = useState(1);
   const [categoriesPage, setCategoriesPage] = useState(1);
@@ -48,7 +50,18 @@ export default function SparePartsPage() {
   const [error, setError] = useState<string | null>(null);
 
   // Use custom filter hook
-  const { filters, page, setPage, getCleanFilters, setSearch, setCategory, setBrand, setPriceMin, setPriceMax, setCurrency, logFilters } = useEntityFilters();
+  const {
+    filters,
+    page,
+    setPage,
+    getCleanFilters,
+    setSearch,
+    setCategory,
+    setBrand,
+    setPriceMin,
+    setPriceMax,
+    setCurrency,
+  } = useEntityFilters();
 
   // Category Modal State
   const [categoryModalOpen, setCategoryModalOpen] = useState(false);
@@ -81,7 +94,11 @@ export default function SparePartsPage() {
       const cleanFilters = getCleanFilters();
 
       const [partsRes, catsRes] = await Promise.all([
-        listSpareParts(token, page, cleanFilters as Parameters<typeof listSpareParts>[2]),
+        listSpareParts(
+          token,
+          page,
+          cleanFilters as Parameters<typeof listSpareParts>[2],
+        ),
         listSparePartCategories(token, categoriesPage),
       ]);
 
@@ -106,6 +123,8 @@ export default function SparePartsPage() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  useGlobalDataRefresh(loadData);
 
   const handleDeleteSparePart = async (id: number) => {
     if (!confirm("Are you sure you want to delete this spare part?")) return;
@@ -179,15 +198,21 @@ export default function SparePartsPage() {
 
   const getStockBadge = (part: SparePartRecord) => {
     if (part.stock_quantity <= 0)
-      return <StatusBadge tone="default">Out of Stock</StatusBadge>;
+      return (
+        <StatusBadge tone="danger">
+          <span className="mono-data">0</span> Out
+        </StatusBadge>
+      );
     if (part.stock_quantity <= 5)
       return (
         <StatusBadge tone="warning">
-          Low Stock ({part.stock_quantity})
+          Low <span className="mono-data">{part.stock_quantity}</span>
         </StatusBadge>
       );
     return (
-      <StatusBadge tone="success">In Stock ({part.stock_quantity})</StatusBadge>
+      <StatusBadge tone="success">
+        In <span className="mono-data">{part.stock_quantity}</span>
+      </StatusBadge>
     );
   };
 
@@ -220,7 +245,9 @@ export default function SparePartsPage() {
         <InputGroup label="Category" className="md:col-span-4">
           <select
             value={filters.category_id || ""}
-            onChange={(e) => setCategory(e.target.value ? parseInt(e.target.value) : "")}
+            onChange={(e) =>
+              setCategory(e.target.value ? parseInt(e.target.value) : "")
+            }
             className="form-input-base"
           >
             <option value="">All Categories</option>
@@ -234,7 +261,9 @@ export default function SparePartsPage() {
         <InputGroup label="Brand" className="md:col-span-4">
           <select
             value={filters.brand_id || ""}
-            onChange={(e) => setBrand(e.target.value ? parseInt(e.target.value) : "")}
+            onChange={(e) =>
+              setBrand(e.target.value ? parseInt(e.target.value) : "")
+            }
             className="form-input-base"
           >
             <option value="">All Brands</option>
@@ -280,54 +309,41 @@ export default function SparePartsPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-outline-variant/15 bg-surface-container-low">
-                <th className="px-4 py-3 text-left font-semibold text-on-surface">
-                  SKU
-                </th>
-                <th className="px-4 py-3 text-left font-semibold text-on-surface">
-                  Name
-                </th>
-                <th className="px-4 py-3 text-center font-semibold text-on-surface">
-                  Stock
-                </th>
-                <th className="px-4 py-3 text-left font-semibold text-on-surface">
-                  Price
-                </th>
-                <th className="px-4 py-3 text-left font-semibold text-on-surface">
-                  Category
-                </th>
-                <th className="px-4 py-3 text-left font-semibold text-on-surface">
-                  Brand
-                </th>
-                <th className="px-4 py-3 text-right font-semibold text-on-surface">
-                  Actions
-                </th>
+                <th className="label-caps px-4 py-3 text-left">SKU</th>
+                <th className="label-caps px-4 py-3 text-left">Name</th>
+                <th className="label-caps px-4 py-3 text-center">Stock</th>
+                <th className="label-caps px-4 py-3 text-left">Price</th>
+                <th className="label-caps px-4 py-3 text-left">Category</th>
+                <th className="label-caps px-4 py-3 text-left">Brand</th>
+                <th className="label-caps px-4 py-3 text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
               {spareParts.map((part) => (
-                <tr
-                  key={part.id}
-                  className="border-b border-outline-variant/10 hover:bg-surface-container-low"
-                >
-                  <td className="px-4 py-3 text-on-surface font-mono text-xs">
+                <tr key={part.id} className="data-row">
+                  <td className="mono-data px-4 py-3 text-xs text-on-surface-variant">
                     {part.sku}
                   </td>
                   <td className="px-4 py-3 text-on-surface">{part.name}</td>
                   <td className="px-4 py-3 text-center">
                     {getStockBadge(part)}
                   </td>
-                  <td className="px-4 py-3 text-on-surface">
+                  <td className="mono-data px-4 py-3 text-primary">
                     {part.sale_price} {part.currency_pricing}
                   </td>
-                  <td className="px-4 py-3 text-on-surface-variant text-xs">
-                    {
-                      allCategories.find(
-                        (c) => c.id === part.spare_parts_category_id,
-                      )?.name
-                    }
+                  <td className="px-4 py-3">
+                    <span className="form-chip">
+                      {
+                        allCategories.find(
+                          (c) => c.id === part.spare_parts_category_id,
+                        )?.name
+                      }
+                    </span>
                   </td>
-                  <td className="px-4 py-3 text-on-surface-variant text-xs">
-                    {brands.find((b) => b.id === part.brand_id)?.name}
+                  <td className="px-4 py-3">
+                    <span className="form-chip bg-primary/8 text-primary border-primary/15">
+                      {brands.find((b) => b.id === part.brand_id)?.name}
+                    </span>
                   </td>
                   <td className="px-4 py-3 text-right">
                     <button
@@ -356,6 +372,7 @@ export default function SparePartsPage() {
       <PaginationControls
         page={page}
         totalPages={totalPages}
+        onPageChange={setPage}
         onPrevious={() => setPage((p) => Math.max(1, p - 1))}
         onNext={() => setPage((p) => Math.min(totalPages, p + 1))}
       />
@@ -395,23 +412,14 @@ export default function SparePartsPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-outline-variant/15 bg-surface-container-low">
-                <th className="px-4 py-3 text-left font-semibold text-on-surface">
-                  Name
-                </th>
-                <th className="px-4 py-3 text-left font-semibold text-on-surface">
-                  Created
-                </th>
-                <th className="px-4 py-3 text-right font-semibold text-on-surface">
-                  Actions
-                </th>
+                <th className="label-caps px-4 py-3 text-left">Name</th>
+                <th className="label-caps px-4 py-3 text-left">Created</th>
+                <th className="label-caps px-4 py-3 text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
               {categories.map((cat) => (
-                <tr
-                  key={cat.id}
-                  className="border-b border-outline-variant/10 hover:bg-surface-container-low"
-                >
+                <tr key={cat.id} className="data-row">
                   <td className="px-4 py-3 text-on-surface">{cat.name}</td>
                   <td className="px-4 py-3 text-on-surface-variant text-xs">
                     {cat.created_at
@@ -443,8 +451,11 @@ export default function SparePartsPage() {
       <PaginationControls
         page={categoriesPage}
         totalPages={categoriesTotalPages}
+        onPageChange={setCategoriesPage}
         onPrevious={() => setCategoriesPage((p) => Math.max(1, p - 1))}
-        onNext={() => setCategoriesPage((p) => Math.min(categoriesTotalPages, p + 1))}
+        onNext={() =>
+          setCategoriesPage((p) => Math.min(categoriesTotalPages, p + 1))
+        }
       />
     </div>
   );
