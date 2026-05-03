@@ -14,7 +14,7 @@ function createMatrix(overrides: Partial<PermissionMatrix> = {}): PermissionMatr
 }
 
 describe("permissions", () => {
-  it("normalizes invalid payloads into the full 16-page matrix", () => {
+  it("normalizes invalid payloads into the full page matrix", () => {
     const matrix = normalizePermissionMatrix({
       sales: ["READ", "delete", "unknown"],
       users: "invalid",
@@ -42,6 +42,10 @@ describe("permissions", () => {
     expect(getRoutePermission("/data/bike-blueprints/11/spare-parts")).toEqual({
       page: "bike-blueprints",
       action: "update",
+    });
+    expect(getRoutePermission("/reporting/profit-loss")).toEqual({
+      page: "reporting",
+      action: "read",
     });
   });
 

@@ -26,7 +26,7 @@ export const brandsKeys = {
 export function useBrands(page = 1, type?: BrandType) {
   return useQuery({
     queryKey: brandsKeys.list(page, type),
-    queryFn: () => listBrands(getRequiredToken(), page, type),
+    queryFn: () => listBrands(getRequiredToken(), page, type ? { type } : undefined),
   });
 }
 
@@ -35,7 +35,9 @@ export function useBrand(id: number, type?: BrandType) {
     queryKey: brandsKeys.detail(id, type),
     queryFn: async (): Promise<BrandRecord | null> => {
       const token = getRequiredToken();
-      const all = await fetchAllPages((page) => listBrands(token, page, type));
+      const all = await fetchAllPages((page) =>
+        listBrands(token, page, type ? { type } : undefined),
+      );
       return all.find((item) => item.id === id) ?? null;
     },
     enabled: Number.isFinite(id) && id > 0,

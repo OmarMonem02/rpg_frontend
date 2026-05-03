@@ -63,7 +63,7 @@ export default function SparePartsPage() {
       if (!token) return;
       const [catsRes, brandsRes] = await Promise.all([
         fetchAllPages((p) => listSparePartCategories(token, p)),
-        fetchAllPages((p) => listBrands(token, p, "spare_parts")),
+        fetchAllPages((p) => listBrands(token, p, { type: "spare_parts" })),
       ]);
       setAllCategories(catsRes);
       setBrands(brandsRes.filter((b) => b.type === "spare_parts"));

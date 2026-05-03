@@ -31,7 +31,7 @@ export function BlueprintForm({ mode, initialData }: BlueprintFormProps) {
       try {
         const token = getAuthToken();
         if (!token) return;
-        const result = await fetchAllPages((p) => listBrands(token, p, "bikes"));
+        const result = await fetchAllPages((p) => listBrands(token, p, { type: "bikes" }));
         setBrands(result);
       } catch (err) {
         console.error("Failed to load brands:", err);

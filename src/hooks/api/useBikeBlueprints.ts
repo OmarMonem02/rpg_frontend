@@ -46,7 +46,7 @@ export function useBikeBlueprint(id: number) {
 export function useBikeBrandOptions(page = 1) {
   return useQuery({
     queryKey: bikeBlueprintsKeys.brands(),
-    queryFn: () => listBrands(getRequiredToken(), page, "bikes"),
+    queryFn: () => listBrands(getRequiredToken(), page, { type: "bikes" }),
   });
 }
 

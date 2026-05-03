@@ -76,7 +76,7 @@ export default function BikesPage() {
       if (!token) return;
       const [bpRes, brandsRes] = await Promise.all([
         fetchAllPages((p) => listBikeBlueprints(token, p, {})),
-        fetchAllPages((p) => listBrands(token, p, "bikes")),
+        fetchAllPages((p) => listBrands(token, p, { type: "bikes" })),
       ]);
       setBlueprints(bpRes);
       setBrands(brandsRes.filter((b) => b.type === "bikes"));

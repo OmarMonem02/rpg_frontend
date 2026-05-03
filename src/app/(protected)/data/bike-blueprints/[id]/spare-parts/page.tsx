@@ -231,7 +231,7 @@ export default function BikeBlueprintSparePartsPage() {
       if (!token) throw new Error("Authentication required");
 
       const [brandsResult, categoriesResult] = await Promise.all([
-        fetchAllPages((p) => listBrands(token, p, "spare_parts")),
+        fetchAllPages((p) => listBrands(token, p, { type: "spare_parts" })),
         fetchAllPages((p) => listSparePartCategories(token, p)),
       ]);
 

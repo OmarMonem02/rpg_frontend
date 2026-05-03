@@ -92,6 +92,11 @@ export async function importFile(
   
   return {
       message: "Import completed.",
+      created_count: 0,
+      restored_count: 0,
+      skipped_count: 0,
+      skipped_duplicates: [],
+      restored_records: [],
       errors: []
   };
 }

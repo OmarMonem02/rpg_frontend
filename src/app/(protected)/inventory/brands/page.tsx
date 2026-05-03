@@ -36,23 +36,22 @@ export default function BrandsPage() {
   const [editingBrand, setEditingBrand] = useState<BrandRecord | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [typeFilter, setTypeFilter] = useState<
-    "" | "spare_parts" | "products" | "bikes"
-  >("");
-  const canCreateBrands = permissions.canCreate("brands");
-  const canUpdateBrands = permissions.canUpdate("brands");
-  const canDeleteBrands = permissions.canDelete("brands");
-
   const {
     page,
     setPage,
     getCleanFilters,
+    setSearch,
+    setType,
     setCurrency,
     setPriceMin,
     setPriceMax,
     filters,
     logFilters,
   } = useEntityFilters();
+
+  const canCreateBrands = permissions.canCreate("brands");
+  const canUpdateBrands = permissions.canUpdate("brands");
+  const canDeleteBrands = permissions.canDelete("brands");
 
   const loadBrands = async () => {
     try {
@@ -67,7 +66,6 @@ export default function BrandsPage() {
       const result = await listBrands(
         token,
         page,
-        typeFilter || undefined,
         cleanFilters as never,
       );
       setBrands(result.items);
@@ -83,7 +81,7 @@ export default function BrandsPage() {
   useEffect(() => {
     void loadBrands();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, typeFilter]);
+  }, [page, filters]);
 
   const handleOpenModal = (brand?: BrandRecord) => {
     if (brand && !canUpdateBrands) return;
@@ -192,15 +190,21 @@ export default function BrandsPage() {
       ) : null}
 
       <SurfaceCard>
-        <FilterBar className="md:grid-cols-4">
-          <InputGroup label="Filter by Type" className="md:col-span-2">
+        <FilterBar className="md:grid-cols-12">
+          <InputGroup label="Search Brands" className="md:col-span-6">
+            <input
+              type="text"
+              placeholder="Search by brand name..."
+              value={filters.search || ""}
+              onChange={(e) => setSearch(e.target.value)}
+              className="form-input-base"
+            />
+          </InputGroup>
+          <InputGroup label="Filter by Type" className="md:col-span-6">
             <select
-              value={typeFilter}
+              value={filters.type || ""}
               onChange={(event) => {
-                setTypeFilter(
-                  event.target.value as "" | "spare_parts" | "products" | "bikes",
-                );
-                setPage(1);
+                setType(event.target.value);
               }}
               className="form-input-base"
             >
