@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { ApiError } from "@/lib/auth-api";
 import { getAuthToken } from "@/lib/auth-session";
-import { getBalanceSheetReport, type BalanceSheetReport, type ReportingCurrency } from "@/lib/api/reporting";
+import { getBalanceSheetReport, type BalanceSheetReport, type ReportingCurrency, type BalanceSheetCurrencySection } from "@/lib/api/reporting";
 import {
   BreakdownList,
   EmptyFinanceState,
@@ -55,9 +55,9 @@ export default function BalanceSheetPage() {
     };
   }, [dateFrom, dateTo, currency]);
 
-  const sections = Object.entries(report?.currencies ?? {}) as Array<
-    [string, NonNullable<BalanceSheetReport["currencies"][ReportingCurrency]>]
-  >;
+  const sections = Object.entries(report?.currencies ?? {}).filter(
+    (entry): entry is [string, BalanceSheetCurrencySection] => entry[1] !== undefined
+  );
 
   return (
     <PageShell>

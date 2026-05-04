@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { ApiError } from "@/lib/auth-api";
 import { getAuthToken } from "@/lib/auth-session";
-import { getProfitLossReport, type ProfitLossReport, type ReportingCurrency } from "@/lib/api/reporting";
+import { getProfitLossReport, type ProfitLossReport, type ReportingCurrency, type ProfitLossCurrencySection } from "@/lib/api/reporting";
 import {
   BreakdownList,
   EmptyFinanceState,
@@ -54,9 +54,9 @@ export default function ProfitLossPage() {
     };
   }, [dateFrom, dateTo, currency]);
 
-  const currencySections = Object.entries(report?.currencies ?? {}) as Array<
-    [string, NonNullable<ProfitLossReport["currencies"][ReportingCurrency]>]
-  >;
+  const currencySections = Object.entries(report?.currencies ?? {}).filter(
+    (entry): entry is [string, ProfitLossCurrencySection] => entry[1] !== undefined
+  );
 
   return (
     <PageShell>
@@ -65,7 +65,6 @@ export default function ProfitLossPage() {
         description="Read recognized revenue, cost of goods sold, gross profit, manual operating expenses, and net profit without mixing currencies or open sales into realized earnings."
         active="profit-loss"
       />
-
       <FinanceFilterBar
         dateFrom={dateFrom}
         dateTo={dateTo}

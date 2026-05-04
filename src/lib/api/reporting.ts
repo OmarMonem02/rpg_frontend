@@ -334,13 +334,11 @@ export async function getProfitLossReport(
   const record = asRecord(payload);
   const currencies = asRecord(record.currencies);
 
-  return {
-    filters,
-    currencies: {
-      EGP: currencies.EGP ? normalizeProfitLoss(currencies.EGP) : undefined,
-      USD: currencies.USD ? normalizeProfitLoss(currencies.USD) : undefined,
-    },
-  };
+  const result: ProfitLossReport = { filters, currencies: {} };
+  if (currencies.EGP) result.currencies.EGP = normalizeProfitLoss(currencies.EGP);
+  if (currencies.USD) result.currencies.USD = normalizeProfitLoss(currencies.USD);
+
+  return result;
 }
 
 export async function getBalanceSheetReport(
@@ -351,13 +349,11 @@ export async function getBalanceSheetReport(
   const record = asRecord(payload);
   const currencies = asRecord(record.currencies);
 
-  return {
-    filters,
-    currencies: {
-      EGP: currencies.EGP ? normalizeBalanceSheet(currencies.EGP) : undefined,
-      USD: currencies.USD ? normalizeBalanceSheet(currencies.USD) : undefined,
-    },
-  };
+  const result: BalanceSheetReport = { filters, currencies: {} };
+  if (currencies.EGP) result.currencies.EGP = normalizeBalanceSheet(currencies.EGP);
+  if (currencies.USD) result.currencies.USD = normalizeBalanceSheet(currencies.USD);
+
+  return result;
 }
 
 export async function getAnnualSummaryReport(
@@ -368,14 +364,16 @@ export async function getAnnualSummaryReport(
   const record = asRecord(payload);
   const currencies = asRecord(record.currencies);
 
-  return {
+  const result: AnnualSummaryReport = {
     filters,
     year: toNumber(record.year),
-    currencies: {
-      EGP: currencies.EGP ? normalizeAnnualSummary(currencies.EGP) : undefined,
-      USD: currencies.USD ? normalizeAnnualSummary(currencies.USD) : undefined,
-    },
+    currencies: {},
   };
+
+  if (currencies.EGP) result.currencies.EGP = normalizeAnnualSummary(currencies.EGP);
+  if (currencies.USD) result.currencies.USD = normalizeAnnualSummary(currencies.USD);
+
+  return result;
 }
 
 export async function getExpensesReport(

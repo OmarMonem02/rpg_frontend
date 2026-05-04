@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { ApiError } from "@/lib/auth-api";
 import { getAuthToken } from "@/lib/auth-session";
-import { getAnnualSummaryReport, type AnnualSummaryReport, type ReportingCurrency } from "@/lib/api/reporting";
+import { getAnnualSummaryReport, type AnnualSummaryReport, type ReportingCurrency, type AnnualSummaryCurrencySection } from "@/lib/api/reporting";
 import {
   BreakdownList,
   EmptyFinanceState,
@@ -50,9 +50,9 @@ export default function AnnualStatementPage() {
     };
   }, [year, currency]);
 
-  const sections = Object.entries(report?.currencies ?? {}) as Array<
-    [string, NonNullable<AnnualSummaryReport["currencies"][ReportingCurrency]>]
-  >;
+  const sections = Object.entries(report?.currencies ?? {}).filter(
+    (entry): entry is [string, AnnualSummaryCurrencySection] => entry[1] !== undefined
+  );
 
   return (
     <PageShell>

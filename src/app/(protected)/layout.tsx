@@ -102,7 +102,7 @@ function ProtectedWorkspace({
           "animate-app-shell-enter",
         ].join(" ")}
       >
-        <div className="sticky top-0 z-20 flex items-center justify-between gap-3 py-2 px-4 backdrop-blur md:px-6">
+        <div className="sticky top-0 z-20 flex items-center justify-between gap-3 py-2 px-4 bg-background/90 backdrop-blur md:px-8">
           <button
             type="button"
             className="flex h-10 w-10 items-center justify-center rounded-xl border border-outline-variant/30 bg-surface-container-low text-on-surface transition-colors hover:bg-surface-container md:hidden"
