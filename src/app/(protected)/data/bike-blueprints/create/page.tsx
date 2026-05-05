@@ -7,7 +7,6 @@ export default function CreateBlueprintPage() {
       <PageHero
         eyebrow="Master Data"
         title="Add Bike Blueprint"
-        description="Establish a new golden record for a motorcycle model, which will act as the anchor for all future inventory and parts."
       />
       <BlueprintForm mode="create" />
     </PageShell>

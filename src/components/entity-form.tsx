@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { ImageUpload } from "@/components/ui/ImageUpload";
 import { ActionButton } from "@/components/ops-ui";
 
 type SectionSummaryResolver = (args: {
@@ -24,6 +25,7 @@ export type FieldConfig = {
     | "select"
     | "multiselect"
     | "toggle"
+    | "image"
     | "password"
     | "date"
     | "time";
@@ -46,6 +48,8 @@ export type FieldConfig = {
   step?: number | string;
   span?: 1 | 2;
   helperTone?: "default" | "featured" | "muted";
+  imagePublicIdField?: string;
+  uploadFolder?: string;
   summaryValue?: string | SectionSummaryResolver;
   onValueChange?: (args: {
     value: unknown;
@@ -164,6 +168,7 @@ export function EntityForm({
     if (field.type === "multiselect")
       return !Array.isArray(value) || value.length === 0;
     if (field.type === "toggle") return value !== true;
+    if (field.type === "image") return !value;
     if (typeof value === "number") return Number.isNaN(value);
     return value === "" || value === null || value === undefined;
   };
@@ -281,6 +286,7 @@ export function EntityForm({
       (field) =>
         field.type === "textarea" ||
         field.type === "toggle" ||
+        field.type === "image" ||
         field.type === "multiselect" ||
         field.span === 2,
     );
@@ -315,8 +321,8 @@ export function EntityForm({
 
   const footerClassName =
     variant === "modal"
-      ? "sticky bottom-0 z-20 flex flex-col gap-4 border-t border-outline-variant/15 bg-surface-container-lowest/80 backdrop-blur-md px-4 py-4 md:flex-row md:items-center md:justify-between md:px-6"
-      : "flex flex-col gap-4 border border-outline-variant/15 rounded-[2rem] bg-surface-container-lowest px-6 py-6 md:flex-row md:items-center md:justify-between shadow-sm";
+      ? "sticky bottom-0 z-20 flex flex-col gap-4 border-t border-outline-variant/10 bg-surface-container-lowest/90 px-5 py-4 backdrop-blur-sm md:flex-row md:items-center md:justify-between"
+      : "sticky bottom-0 z-20 -mx-5 mt-8 flex flex-col gap-4 border-t border-outline-variant/10 bg-surface-container-lowest/90 px-5 py-4 backdrop-blur-sm md:flex-row md:items-center md:justify-between";
 
   return (
     <form onSubmit={handleSubmit} className={shellClassName}>
@@ -345,7 +351,7 @@ export function EntityForm({
 
           <div className="grid gap-2">
             <div className="form-field-card bg-surface-container-lowest/50 !p-3">
-              <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/70">
+              <p className="label-caps text-on-surface-variant/70">
                 Current Phase
               </p>
               <p className="mt-1 font-bold text-on-surface text-sm">
@@ -362,7 +368,7 @@ export function EntityForm({
                     }}
                   />
                 </div>
-                <span className="text-[10px] font-black text-primary">
+                <span className="mono-data font-black text-primary">
                   {Math.round(
                     ((currentSectionIndex + 1) / sections.length) * 100,
                   )}
@@ -425,15 +431,22 @@ export function EntityForm({
         )}
 
         <div className="space-y-6 p-6">
-          <section className="form-section-card bg-surface-container-lowest shadow-sm">
+          <section className="form-section-card shadow-sm">
             <div className="form-section-header mb-6">
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary">
-                  Step {currentSectionIndex + 1}
-                </p>
-                <h3 className="mt-1 text-2xl font-bold text-on-surface">
-                  {currentSection.name}
-                </h3>
+              <div className="flex items-start gap-3">
+                <span className="mono-data label-caps rounded-lg bg-primary/8 px-2 py-1 text-primary">
+                  {String(currentSectionIndex + 1).padStart(2, "0")}
+                </span>
+                <div>
+                  <h3 className="mt-1 text-2xl font-bold text-on-surface">
+                    {currentSection.name}
+                  </h3>
+                  {currentSection.description ? (
+                    <p className="mt-1 text-[11px] leading-relaxed text-on-surface-variant/70">
+                      {currentSection.description}
+                    </p>
+                  ) : null}
+                </div>
               </div>
             </div>
 
@@ -465,7 +478,7 @@ export function EntityForm({
                   return (
                     <div
                       key={field.name}
-                      className={`${getFieldWrapperClassName(field)} animate-in fade-in slide-in-from-bottom-2 duration-300 fill-mode-both`}
+                      className={`${getFieldWrapperClassName(field)} animate-fade-in`}
                       style={{ animationDelay: `${idx * 50}ms` }}
                     >
                       {field.type === "toggle" ? (
@@ -481,22 +494,61 @@ export function EntityForm({
                             disabled={
                               isSubmitting || isLoading || fieldDisabled
                             }
-                            className="mt-1 h-6 w-6 rounded-lg border-2 border-outline-variant/30 text-primary transition-all focus:ring-primary/20"
+                            className="peer sr-only"
                           />
+                          <span className="mt-1 inline-flex h-6 w-11 shrink-0 rounded-full bg-outline-variant/40 p-0.5 transition-colors peer-checked:bg-primary peer-checked:[&>span]:translate-x-5">
+                            <span className="h-5 w-5 rounded-full bg-surface-container-lowest shadow-sm transition-transform" />
+                          </span>
                           <div>
-                            <span className="font-bold text-on-surface text-lg">
+                            <span className="label-caps block text-on-surface">
                               {field.label}
                             </span>
                             {field.description && (
-                              <p className="mt-1 text-sm text-on-surface-variant font-medium">
+                              <p className="mt-1 text-[11px] leading-relaxed text-on-surface-variant/70">
                                 {field.description}
                               </p>
                             )}
                           </div>
                         </label>
+                      ) : field.type === "image" ? (
+                        <div className="group">
+                          <label className="label-caps mb-2 ml-1 block">
+                            {field.label}{" "}
+                            {field.required && (
+                              <span className="text-error">*</span>
+                            )}
+                          </label>
+                          <ImageUpload
+                            value={String(fieldValue || "") || undefined}
+                            folder={field.label}
+                            uploadFolder={field.uploadFolder}
+                            onChange={(url, publicId) => {
+                              handleChange(field.name, url);
+                              if (field.imagePublicIdField) {
+                                handleChange(field.imagePublicIdField, publicId);
+                              }
+                            }}
+                            onError={(message) => {
+                              setFieldErrors((prev) => ({
+                                ...prev,
+                                [field.name]: message,
+                              }));
+                            }}
+                          />
+                          {field.description && (
+                            <p className="mt-2 ml-2 text-xs leading-relaxed text-on-surface-variant">
+                              {field.description}
+                            </p>
+                          )}
+                          {fieldErrors[field.name] && (
+                            <p className="mt-2 ml-2 text-xs font-bold text-error">
+                              {fieldErrors[field.name]}
+                            </p>
+                          )}
+                        </div>
                       ) : (
                         <div className="group">
-                          <label className="block text-sm font-bold tracking-wide text-on-surface mb-2 ml-1">
+                          <label className="label-caps mb-2 ml-1 block">
                             {field.label}{" "}
                             {field.required && (
                               <span className="text-error">*</span>
@@ -509,7 +561,7 @@ export function EntityForm({
                                 onChange={(e) =>
                                   handleChange(field.name, e.target.value)
                                 }
-                                className={`form-input-base !bg-surface-container-lowest !rounded-2xl transition-all focus:ring-8 ${fieldErrors[field.name] ? "!border-error/50 !ring-error/5" : ""}`}
+                                className={`form-input-base !rounded-2xl !bg-surface-container-lowest transition-all focus:ring-8 ${fieldErrors[field.name] ? "form-input-error" : ""}`}
                                 rows={field.rows ?? 4}
                                 placeholder={field.placeholder}
                                 disabled={
@@ -522,7 +574,7 @@ export function EntityForm({
                                 onChange={(e) =>
                                   handleChange(field.name, e.target.value)
                                 }
-                                className={`form-input-base !bg-surface-container-lowest !rounded-2xl transition-all focus:ring-8 ${fieldErrors[field.name] ? "!border-error/50 !ring-error/5" : ""}`}
+                                className={`form-input-base !rounded-2xl !bg-surface-container-lowest transition-all focus:ring-8 ${fieldErrors[field.name] ? "form-input-error" : ""}`}
                                 disabled={
                                   isSubmitting || isLoading || fieldDisabled
                                 }
@@ -536,7 +588,7 @@ export function EntityForm({
                               </select>
                             ) : field.type === "multiselect" ? (
                               <div
-                                className={`rounded-2xl border border-outline-variant/20 bg-surface-container-lowest p-3 ${fieldErrors[field.name] ? "!border-error/50" : ""}`}
+                                className={`rounded-2xl border border-outline-variant/20 bg-surface-container-lowest p-3 ${fieldErrors[field.name] ? "form-input-error" : ""}`}
                               >
                                 {(() => {
                                   const multiselectOptions = getFieldOptions(field);
@@ -674,7 +726,7 @@ export function EntityForm({
                                       : e.target.value,
                                   )
                                 }
-                                className={`form-input-base !bg-surface-container-lowest !rounded-2xl transition-all focus:ring-8 ${fieldErrors[field.name] ? "!border-error/50 !ring-error/5" : ""}`}
+                                className={`form-input-base !rounded-2xl !bg-surface-container-lowest transition-all focus:ring-8 ${fieldErrors[field.name] ? "form-input-error" : ""}`}
                                 placeholder={field.placeholder}
                                 disabled={
                                   isSubmitting || isLoading || fieldDisabled
@@ -704,7 +756,7 @@ export function EntityForm({
       {/* Footer */}
       <div className={footerClassName}>
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/70">
+          <p className="label-caps text-on-surface-variant/70">
             Operational Status
           </p>
           <p className="mt-1 text-sm font-bold text-on-surface-variant">
@@ -715,7 +767,7 @@ export function EntityForm({
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          <ActionButton onClick={onCancel} disabled={isSubmitting || isLoading}>
+          <ActionButton type="button" variant="ghost" size="lg" onClick={onCancel} disabled={isSubmitting || isLoading}>
             {cancelLabel}
           </ActionButton>
 
@@ -723,7 +775,7 @@ export function EntityForm({
             <button
               type="button"
               onClick={() => setCurrentSectionIndex((p) => p - 1)}
-              className="rounded-2xl border border-outline-variant/20 bg-surface px-6 py-3 py-4 text-sm font-bold text-on-surface-variant transition-all hover:bg-surface-container-low"
+              className="rounded-2xl border border-outline-variant/20 bg-surface px-6 py-4 text-sm font-bold text-on-surface-variant transition-all hover:bg-surface-container-low"
             >
               Back
             </button>
@@ -733,7 +785,7 @@ export function EntityForm({
             <button
               type="submit"
               disabled={isSubmitting || isLoading}
-              className="flex items-center gap-3 rounded-2xl bg-primary px-8 py-4 text-sm font-black text-on-primary shadow-xl shadow-primary/20 transition-all hover:scale-[1.02] hover:shadow-2xl active:scale-95 disabled:opacity-50"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-6 py-3.5 text-base font-semibold text-on-primary shadow-md shadow-primary/15 transition-all duration-200 hover:-translate-y-px hover:shadow-lg hover:shadow-primary/25 active:scale-[0.97] disabled:pointer-events-none disabled:opacity-50"
             >
               {isSubmitting ? "Processing..." : submitLabel}
             </button>
@@ -741,7 +793,7 @@ export function EntityForm({
             <button
               type="button"
               onClick={handleNextSection}
-              className="flex items-center gap-3 rounded-2xl bg-primary px-8 py-4 text-sm font-black text-on-primary shadow-xl shadow-primary/20 transition-all hover:scale-[1.02] hover:shadow-2xl"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-6 py-3.5 text-base font-semibold text-on-primary shadow-md shadow-primary/15 transition-all duration-200 hover:-translate-y-px hover:shadow-lg hover:shadow-primary/25 active:scale-[0.97]"
             >
               Continue →
             </button>

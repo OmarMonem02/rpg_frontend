@@ -112,7 +112,9 @@ export default function ManageSaleItemsPage() {
   useEffect(() => {
     if (!selectedRow) return;
     setSelectedItemId(selectedRow.id);
-    setQty((current) => Math.max(1, Math.min(selectedRow.remaining_qty, current)));
+    setQty((current) =>
+      Math.max(1, Math.min(selectedRow.remaining_qty, current)),
+    );
   }, [selectedRow]);
 
   const replacementTotal = useMemo(
@@ -145,7 +147,7 @@ export default function ManageSaleItemsPage() {
         const egpPrice = normalizeToEGP(
           built.payload.selling_price,
           built.currency,
-          exchangeRate || 1
+          exchangeRate || 1,
         );
         return {
           id: `${Date.now()}_${current.length + index}`,
@@ -219,8 +221,7 @@ export default function ManageSaleItemsPage() {
       {/* ── Page Hero ── */}
       <PageHero
         eyebrow="Order Management"
-        title="Manage Items"
-        description={`Modify line items for Sale #${saleId}. Switch between Return and Exchange modes to process inventory adjustments.`}
+        title={`Manage Items for Sale #${saleId}`}
         actions={
           <>
             <ActionButton
@@ -300,8 +301,7 @@ export default function ManageSaleItemsPage() {
                       </div>
                       <div className="mt-1 flex items-center justify-between text-xs text-on-surface-variant">
                         <span>
-                          {labelOf(item.sellable_type)} | Sold:{" "}
-                          {item.quantity}
+                          {labelOf(item.sellable_type)} | Sold: {item.quantity}
                           {item.returned_qty > 0 && (
                             <span className="ml-2 text-warning font-bold">
                               (Rem: {item.remaining_qty})
@@ -510,7 +510,8 @@ export default function ManageSaleItemsPage() {
                                                   ? 1
                                                   : Math.max(
                                                       1,
-                                                      Number(e.target.value) || 1,
+                                                      Number(e.target.value) ||
+                                                        1,
                                                     ),
                                             },
                                           }

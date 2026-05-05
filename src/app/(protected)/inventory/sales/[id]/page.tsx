@@ -31,7 +31,9 @@ import {
 } from "@heroicons/react/24/outline";
 import { money, labelOf } from "./sale-item-utils";
 
-function getStatusTone(status: string): "success" | "warning" | "danger" | "default" {
+function getStatusTone(
+  status: string,
+): "success" | "warning" | "danger" | "default" {
   const s = status.toLowerCase();
   if (s === "completed") return "success";
   if (s === "pending" || s === "partial") return "warning";
@@ -39,7 +41,9 @@ function getStatusTone(status: string): "success" | "warning" | "danger" | "defa
   return "default";
 }
 
-function getItemTypeTone(type: string): "primary" | "success" | "warning" | "danger" | "default" {
+function getItemTypeTone(
+  type: string,
+): "primary" | "success" | "warning" | "danger" | "default" {
   const t = type.toLowerCase();
   if (t === "products") return "primary";
   if (t === "spare_parts") return "warning";
@@ -89,8 +93,9 @@ export default function SaleDetailsPage() {
       units: items.reduce((sum, item) => sum + item.remaining_qty, 0),
       subtotal: items.reduce(
         (sum, item) =>
-          sum + (item.remaining_qty * item.selling_price) - 
-          ((item.discount_amount / item.quantity) * item.remaining_qty),
+          sum +
+          item.remaining_qty * item.selling_price -
+          (item.discount_amount / item.quantity) * item.remaining_qty,
         0,
       ),
     }),
@@ -214,8 +219,7 @@ export default function SaleDetailsPage() {
       {/* ── Page Hero ── */}
       <PageHero
         eyebrow="Order Management"
-        title={`Sale #${sale.id}`}
-        description={`Customer: ${sale.customer?.name || `Customer #${sale.customer_id}`}. Sale recorded on ${sale.created_at ? new Date(sale.created_at).toLocaleDateString() : "N/A"}.`}
+        title={`Sale #${sale.id} Customer: ${sale.customer?.name || `Customer #${sale.customer_id}`}. Sale recorded on ${sale.created_at ? new Date(sale.created_at).toLocaleDateString() : "N/A"}.`}
         actions={
           <>
             <ActionButton
@@ -378,7 +382,8 @@ export default function SaleDetailsPage() {
                             EGP{" "}
                             {money(
                               row.remaining_qty * row.selling_price -
-                                (row.discount_amount / row.quantity) * row.remaining_qty,
+                                (row.discount_amount / row.quantity) *
+                                  row.remaining_qty,
                             )}
                           </td>
                           <td className="px-6 py-4">

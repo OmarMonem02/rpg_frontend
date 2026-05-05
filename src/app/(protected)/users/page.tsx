@@ -187,7 +187,6 @@ export default function UsersPage() {
       <PageHero
         eyebrow="Admin"
         title="Users"
-        description="Manage RPG user accounts and roles with the existing `/users` integration."
       />
 
       {canCreateUsers || editingId ? (

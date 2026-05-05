@@ -69,7 +69,6 @@ export function formatDate(value?: string): string {
 
 export function FinanceHero({
   title,
-  description,
   active,
 }: {
   title: string;
@@ -132,7 +131,7 @@ export function FinanceFilterBar({
 }) {
   return (
     <FilterBar className="border-emerald-500/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.94),rgba(240,253,244,0.92))] shadow-[0_12px_32px_rgba(15,23,42,0.06)]">
-      <div className="md:col-span-12 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <div className="md:col-span-12  flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-on-surface-variant">
             Statement Filters
@@ -145,8 +144,10 @@ export function FinanceFilterBar({
       </div>
       <InputGroup label="From" className="md:col-span-3">
         <input
+          aria-label="From"
           type="date"
           value={dateFrom}
+          max={dateTo}
           onChange={(event) => onDateFromChange(event.target.value)}
           className="form-input-base"
         />
@@ -155,6 +156,8 @@ export function FinanceFilterBar({
         <input
           type="date"
           value={dateTo}
+          min={dateFrom}
+          max={new Date().toLocaleDateString("en-CA")}
           onChange={(event) => onDateToChange(event.target.value)}
           className="form-input-base"
         />
@@ -301,26 +304,6 @@ export function FinanceLoadingCard({
           </p>
         </div>
       </div>
-    </SurfaceCard>
-  );
-}
-
-export function FinanceInsightBand({
-  title,
-  copy,
-}: {
-  title: string;
-  copy: string;
-}) {
-  return (
-    <SurfaceCard className="border-emerald-500/10 bg-[linear-gradient(145deg,rgba(255,255,255,0.95),rgba(240,253,244,0.9))]">
-      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-on-surface-variant">
-        Operator Note
-      </p>
-      <h3 className="mt-2 text-lg font-semibold text-on-surface">{title}</h3>
-      <p className="mt-2 max-w-3xl text-sm leading-6 text-on-surface-variant">
-        {copy}
-      </p>
     </SurfaceCard>
   );
 }

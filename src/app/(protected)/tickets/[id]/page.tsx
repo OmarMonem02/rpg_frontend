@@ -360,8 +360,7 @@ export default function TicketDetailsPage() {
     <PageShell>
       <PageHero
         eyebrow="Ticket Management"
-        title={`Ticket #${ticket.id}`}
-        description={ticket.notes || "No initial notes"}
+        title={`Ticket #${ticket.id} ${ticket.notes}?${ticket.notes}:"" `}
         meta={
           <div className="flex flex-wrap gap-4">
             <div className="rounded-2xl border border-outline-variant/15 bg-surface p-4 text-sm min-w-[200px] shadow-sm">

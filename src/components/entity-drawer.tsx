@@ -44,19 +44,18 @@ export function EntityDrawer({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex justify-end p-0 bg-on-surface/40 transition-opacity"
+      className="form-modal-overlay fixed inset-0 z-[100] flex justify-end p-0 transition-opacity"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
       <div
-        className={`w-full ${widthClasses[width]} h-screen h-[100dvh] bg-surface-container-lowest flex flex-col overflow-hidden animate-slide-in-right shadow-2xl border-l border-outline-variant/20 rounded-none sm:rounded-l-[2rem] relative`}
+        className={`form-modal-shell w-full ${widthClasses[width]} h-screen h-[100dvh] flex flex-col overflow-hidden animate-slide-in-right rounded-none sm:rounded-l-[2rem] relative`}
       >
         {/* Premium Header - Matching CatalogPickerModal */}
-        <div className="relative border-b border-outline-variant/15 bg-surface-container-low px-4 sm:px-6 py-4 sm:py-5 flex items-start sm:items-center justify-between shrink-0">
-          <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent" />
+        <div className="divider relative bg-surface-container-low px-4 sm:px-6 py-4 sm:py-5 flex items-start sm:items-center justify-between shrink-0">
           <div className="flex-1 pr-4">
-            <h2 className="text-xl sm:text-2xl font-display font-bold text-on-surface tracking-tight flex items-center gap-2">
+            <h2 className="font-display text-xl font-bold text-on-surface tracking-tight flex items-center gap-2">
               <span className="flex shrink-0 items-center justify-center w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-primary/10 text-primary">
                 <svg
                   className="w-5 h-5"
@@ -82,13 +81,14 @@ export function EntityDrawer({
           </div>
           <button
             onClick={onClose}
-            className="flex h-10 w-10 items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors"
+            className="flex h-10 w-10 items-center justify-center rounded-xl p-2 text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors"
+            aria-label="Close drawer"
           >
             <XMarkIcon className="w-6 h-6" />
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto overscroll-contain p-5 md:p-6">
           <EntityForm
             {...props}
             title="" // Hide EntityForm internal title as we have it in the drawer header

@@ -21,7 +21,7 @@ import {
   type SparePartCategoryRecord,
   type MaintenanceServiceSectorRecord,
 } from "@/lib/crud-api";
-import { ActionButton } from "@/components/ops-ui";
+import { ActionButton, StatusBadge } from "@/components/ops-ui";
 import {
   MagnifyingGlassIcon,
   XMarkIcon,
@@ -67,7 +67,6 @@ export function CatalogPickerModal({
   catalogType,
   onAddItems,
   selectedIds = [],
-  blueprintId,
 }: CatalogPickerModalProps) {
   const [items, setItems] = useState<CatalogItem[]>([]);
   const [selectedItemIds, setSelectedItemIds] = useState<Set<number>>(
@@ -271,8 +270,8 @@ export function CatalogPickerModal({
   };
 
   return createPortal(
-    <div className="fixed inset-0 z-[100] flex justify-end p-0 backdrop-blur-sm bg-on-surface/40 transition-opacity">
-      <div className="w-full sm:w-[500px] md:w-[600px] lg:w-[850px] h-screen h-[100dvh] bg-surface-container-lowest flex flex-col overflow-hidden animate-slide-in-right shadow-2xl border-l border-outline-variant/20 rounded-none sm:rounded-l-[1.5rem] relative">
+    <div className="form-modal-overlay fixed inset-0 z-[100] flex items-center justify-center p-3 transition-opacity">
+      <div className="form-modal-shell max-w-3xl w-full max-h-[80vh] flex flex-col animate-scale-in overflow-hidden rounded-[1.5rem] relative">
         {/* Header */}
         <div className="relative border-b border-outline-variant/15 bg-surface-container-low px-4 sm:px-6 py-4 sm:py-5 flex items-start sm:items-center justify-between shrink-0">
           <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent" />
@@ -584,16 +583,16 @@ export function CatalogPickerModal({
               </p>
             </div>
           ) : (
-            <div className="p-4 sm:p-6 grid gap-3">
+            <div className="grid grid-cols-1 gap-2 overflow-y-auto p-4 sm:grid-cols-2">
               {items.map((item) => {
                 const isSelected = selectedItemIds.has(item.id);
                 return (
                   <label
                     key={item.id}
-                    className={`group relative flex flex-col sm:flex-row items-start sm:items-center p-4 rounded-[1.25rem] border-2 transition-all cursor-pointer ${
+                    className={`group relative cursor-pointer rounded-2xl border p-3 transition-all duration-150 active:scale-[0.98] ${
                       isSelected
-                        ? "bg-primary/5 border-primary shadow-sm"
-                        : "bg-surface border-outline-variant/15 hover:border-outline-variant/30 hover:bg-surface-container-lowest"
+                        ? "bg-primary/6 border-primary ring-2 ring-primary shadow-sm"
+                        : "border-outline-variant/15 bg-surface-container-lowest hover:border-primary/30 hover:bg-primary/4 hover:shadow-sm"
                     }`}
                   >
                     <div className="flex items-center gap-4 w-full">
@@ -624,7 +623,7 @@ export function CatalogPickerModal({
 
                       {/* Content */}
                       <div className="flex-1 min-w-0 pr-4">
-                        <h4 className="font-bold text-on-surface text-base truncate">
+                        <h4 className="font-semibold text-sm text-on-surface truncate">
                           {getItemName(item)}
                         </h4>
 
@@ -632,31 +631,29 @@ export function CatalogPickerModal({
                           catalogType === "products") &&
                           "sku" in item && (
                             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1.5">
-                              <span className="inline-flex items-center text-xs font-medium text-on-surface-variant">
-                                <span className="uppercase tracking-wider mr-1 text-[10px] opacity-70">
+                                <span className="mono-data inline-flex items-center text-xs font-medium text-on-surface-variant">
+                                <span className="label-caps mr-1 text-on-surface-variant/60">
                                   SKU
                                 </span>{" "}
                                 {item.sku}
                               </span>
-                              <span className="inline-flex items-center text-xs font-medium text-on-surface-variant">
-                                <span className="uppercase tracking-wider mr-1 text-[10px] opacity-70">
+                              <span className="mono-data inline-flex items-center text-xs font-medium text-on-surface-variant">
+                                <span className="label-caps mr-1 text-on-surface-variant/60">
                                   Part#
                                 </span>{" "}
                                 {item.part_number}
                               </span>
                               <span className="inline-flex items-center text-xs font-medium text-on-surface-variant">
-                                <span className="uppercase tracking-wider mr-1 text-[10px] opacity-70">
+                                <span className="label-caps mr-1 text-on-surface-variant/60">
                                   Stock
                                 </span>
-                                <span
-                                  className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${item.stock_quantity! > 10 ? "bg-green-500/10 text-green-700" : "bg-error/10 text-error"}`}
-                                >
+                                <StatusBadge tone={(item.stock_quantity ?? 0) <= 0 ? "danger" : (item.stock_quantity ?? 0) <= 5 ? "warning" : "success"}>
                                   {item.stock_quantity ?? 0}
-                                </span>
+                                </StatusBadge>
                               </span>
                               {item.brand_id && (
                                 <span className="inline-flex items-center text-xs font-medium text-on-surface-variant">
-                                  <span className="uppercase tracking-wider mr-1 text-[10px] opacity-70">
+                                  <span className="label-caps mr-1 text-on-surface-variant/60">
                                     Brand
                                   </span>{" "}
                                   {brands.find((b) => b.id === item.brand_id)
@@ -669,11 +666,11 @@ export function CatalogPickerModal({
 
                       {/* Price Tag */}
                       <div className="shrink-0 flex sm:flex-col items-center sm:items-end justify-between w-full sm:w-auto mt-3 sm:mt-0 pt-3 sm:pt-0 border-t border-outline-variant/10 sm:border-0">
-                        <div className="text-xs font-bold uppercase tracking-wider text-on-surface-variant sm:hidden">
+                        <div className="label-caps sm:hidden">
                           Price
                         </div>
                         <div className="bg-surface-container-highest/20 px-3 py-1.5 rounded-lg border border-outline-variant/10">
-                          <p className="font-display font-bold text-primary text-base">
+                          <p className="mono-data text-primary font-bold text-base">
                             {getItemPrice(item).toLocaleString()}{" "}
                             <span className="text-xs uppercase">
                               {("currency_pricing" in item &&

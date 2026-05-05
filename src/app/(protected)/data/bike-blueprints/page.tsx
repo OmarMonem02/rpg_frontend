@@ -37,7 +37,17 @@ export default function BikeBlueprintsPage() {
   const canDeleteBlueprints = permissions.canDelete("bike-blueprints");
 
   // Use custom filter hook
-  const { filters, page, setPage, getCleanFilters, setSearch, setBrand, setPriceMin, setPriceMax, setCurrency } = useEntityFilters();
+  const {
+    filters,
+    page,
+    setPage,
+    getCleanFilters,
+    setSearch,
+    setBrand,
+    setPriceMin,
+    setPriceMax,
+    setCurrency,
+  } = useEntityFilters();
   const cleanFilters = getCleanFilters() as BikeBlueprintFilters;
   const blueprintQuery = useBikeBlueprints(page, cleanFilters);
   const bikeBrandsQuery = useBikeBrandOptions();
@@ -50,10 +60,15 @@ export default function BikeBlueprintsPage() {
     () => bikeBrandsQuery.data?.items ?? [],
     [bikeBrandsQuery.data?.items],
   );
-  const brands = useMemo(() => bikeBrandItems.filter((b) => b.type === "bikes"), [bikeBrandItems]);
+  const brands = useMemo(
+    () => bikeBrandItems.filter((b) => b.type === "bikes"),
+    [bikeBrandItems],
+  );
   const error =
     localError ??
-    (blueprintQuery.error instanceof Error ? blueprintQuery.error.message : null);
+    (blueprintQuery.error instanceof Error
+      ? blueprintQuery.error.message
+      : null);
 
   const handleDelete = async (id: number) => {
     if (!canDeleteBlueprints) {
@@ -82,7 +97,6 @@ export default function BikeBlueprintsPage() {
       <PageHero
         eyebrow="Master Data"
         title="Bike Blueprints"
-        description="Define models and years, then jump directly into linked spare-parts management for each blueprint."
         actions={
           canCreateBlueprints ? (
             <ActionButton
@@ -95,7 +109,11 @@ export default function BikeBlueprintsPage() {
         }
       />
 
-      {error && <div className="rounded-2xl border border-error/20 bg-error/10 p-4 text-sm text-error">{error}</div>}
+      {error && (
+        <div className="rounded-2xl border border-error/20 bg-error/10 p-4 text-sm text-error">
+          {error}
+        </div>
+      )}
 
       <SurfaceCard>
         <FilterBar className="md:grid-cols-12">
@@ -111,7 +129,9 @@ export default function BikeBlueprintsPage() {
           <InputGroup label="Brand" className="md:col-span-6">
             <select
               value={filters.brand_id || ""}
-              onChange={(e) => setBrand(e.target.value ? parseInt(e.target.value) : "")}
+              onChange={(e) =>
+                setBrand(e.target.value ? parseInt(e.target.value) : "")
+              }
               className="form-input-base"
             >
               <option value="">All Brands</option>
@@ -141,9 +161,9 @@ export default function BikeBlueprintsPage() {
           </div>
         ) : blueprints.length === 0 ? (
           <EmptyState
-          title="No blueprints found"
-          description="Create the first bike blueprint so parts and bikes can be grouped around a proper model definition."
-          action={
+            title="No blueprints found"
+            description="Create the first bike blueprint so parts and bikes can be grouped around a proper model definition."
+            action={
               canCreateBlueprints ? (
                 <ActionButton
                   tone="primary"
@@ -152,35 +172,60 @@ export default function BikeBlueprintsPage() {
                   Create Blueprint
                 </ActionButton>
               ) : undefined
-          }
-        />
+            }
+          />
         ) : (
           <div className="overflow-x-auto rounded-[1.5rem] border border-outline-variant/15 bg-surface-container-lowest">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-outline-variant/15 bg-surface-container-low">
-                  <th className="px-4 py-3 text-left font-semibold text-on-surface">Brand</th>
-                  <th className="px-4 py-3 text-left font-semibold text-on-surface">Model</th>
-                  <th className="px-4 py-3 text-left font-semibold text-on-surface">Year</th>
-                  <th className="px-4 py-3 text-left font-semibold text-on-surface">Created</th>
-                  <th className="px-4 py-3 text-right font-semibold text-on-surface">Actions</th>
+                  <th className="px-4 py-3 text-left font-semibold text-on-surface">
+                    Brand
+                  </th>
+                  <th className="px-4 py-3 text-left font-semibold text-on-surface">
+                    Model
+                  </th>
+                  <th className="px-4 py-3 text-left font-semibold text-on-surface">
+                    Year
+                  </th>
+                  <th className="px-4 py-3 text-left font-semibold text-on-surface">
+                    Created
+                  </th>
+                  <th className="px-4 py-3 text-right font-semibold text-on-surface">
+                    Actions
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {blueprints.map((blueprint) => (
-                  <tr key={blueprint.id} className="border-b border-outline-variant/10 hover:bg-surface-container-low">
-                    <td className="px-4 py-3 text-on-surface">{getBrandName(blueprint.brand_id)}</td>
-                    <td className="px-4 py-3 text-on-surface">{blueprint.model}</td>
-                    <td className="px-4 py-3 text-on-surface">{blueprint.year}</td>
+                  <tr
+                    key={blueprint.id}
+                    className="border-b border-outline-variant/10 hover:bg-surface-container-low"
+                  >
+                    <td className="px-4 py-3 text-on-surface">
+                      {getBrandName(blueprint.brand_id)}
+                    </td>
+                    <td className="px-4 py-3 text-on-surface">
+                      {blueprint.model}
+                    </td>
+                    <td className="px-4 py-3 text-on-surface">
+                      {blueprint.year}
+                    </td>
                     <td className="px-4 py-3 text-on-surface-variant text-xs">
-                      {blueprint.created_at ? new Date(blueprint.created_at).toLocaleDateString() : "-"}
+                      {blueprint.created_at
+                        ? new Date(blueprint.created_at).toLocaleDateString()
+                        : "-"}
                     </td>
                     <td className="px-4 py-3 text-right">
                       {canUpdateBlueprints && (
                         <ActionButton
                           variant="ghost"
                           size="sm"
-                          onClick={() => router.push(`/data/bike-blueprints/${blueprint.id}/spare-parts`)}
+                          onClick={() =>
+                            router.push(
+                              `/data/bike-blueprints/${blueprint.id}/spare-parts`,
+                            )
+                          }
                           className="text-primary"
                         >
                           Manage Parts
@@ -191,15 +236,23 @@ export default function BikeBlueprintsPage() {
                       )}
                       {canUpdateBlueprints && (
                         <button
-                          onClick={() => router.push(`/data/bike-blueprints/edit/${blueprint.id}`)}
+                          onClick={() =>
+                            router.push(
+                              `/data/bike-blueprints/edit/${blueprint.id}`,
+                            )
+                          }
                           className="text-primary hover:underline text-xs font-medium"
                         >
                           Edit
                         </button>
                       )}
-                      {(canUpdateBlueprints || canDeleteBlueprints) && canDeleteBlueprints && canUpdateBlueprints && (
-                        <span className="mx-2 text-on-surface-variant">•</span>
-                      )}
+                      {(canUpdateBlueprints || canDeleteBlueprints) &&
+                        canDeleteBlueprints &&
+                        canUpdateBlueprints && (
+                          <span className="mx-2 text-on-surface-variant">
+                            •
+                          </span>
+                        )}
                       {canDeleteBlueprints && (
                         <button
                           onClick={() => handleDelete(blueprint.id)}
@@ -220,6 +273,7 @@ export default function BikeBlueprintsPage() {
       <PaginationControls
         page={page}
         totalPages={totalPages}
+        onPageChange={setPage}
         onPrevious={() => setPage((p) => Math.max(1, p - 1))}
         onNext={() => setPage((p) => Math.min(totalPages, p + 1))}
       />

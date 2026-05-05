@@ -4,15 +4,13 @@ import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { getAuthToken } from "@/lib/auth-session";
 import { useEntityFilters } from "@/hooks/useEntityFilters";
+import { useGlobalDataRefresh } from "@/hooks/useGlobalDataRefresh";
 import {
   listBikes,
   listBikeBlueprints,
   listBrands,
-  createBike,
-  updateBike,
   deleteBike,
   type BikeRecord,
-  type CreateBikePayload,
   type BikeBlueprintRecord,
   type BrandRecord,
   fetchAllPages,
@@ -93,6 +91,8 @@ export default function BikesPage() {
     loadBikes();
   }, [loadBikes]);
 
+  useGlobalDataRefresh(loadBikes);
+
   const handleDelete = async (id: number) => {
     if (!confirm("Are you sure you want to delete this bike?")) return;
 
@@ -130,7 +130,6 @@ export default function BikesPage() {
       <PageHero
         eyebrow="Showroom Inventory"
         title="Bikes For Sale"
-        description="Manage the live showroom catalog with blueprint identity, mileage, pricing, and sale status in one operational view."
         actions={
           <ActionButton tone="primary" onClick={() => router.push("/inventory/bikes/create")}>
             Add Bike
@@ -229,41 +228,51 @@ export default function BikesPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-outline-variant/15 bg-surface-container-low">
-                  <th className="px-4 py-3 text-left font-semibold text-on-surface">Blueprint</th>
-                  <th className="px-4 py-3 text-left font-semibold text-on-surface">VIN</th>
-                  <th className="px-4 py-3 text-right font-semibold text-on-surface">Sale Price</th>
-                  <th className="px-4 py-3 text-right font-semibold text-on-surface">Cost Price</th>
-                  <th className="px-4 py-3 text-center font-semibold text-on-surface">
+                  <th className="label-caps px-4 py-3 text-left">Blueprint</th>
+                  <th className="label-caps px-4 py-3 text-left">VIN</th>
+                  <th className="label-caps px-4 py-3 text-right">Sale Price</th>
+                  <th className="label-caps px-4 py-3 text-right">Cost Price</th>
+                  <th className="label-caps px-4 py-3 text-center">
                     Mileage (km)
                   </th>
-                  <th className="px-4 py-3 text-left font-semibold text-on-surface">Status</th>
-                  <th className="px-4 py-3 text-left font-semibold text-on-surface">Discount</th>
-                  <th className="px-4 py-3 text-right font-semibold text-on-surface">Actions</th>
+                  <th className="label-caps px-4 py-3 text-left">Status</th>
+                  <th className="label-caps px-4 py-3 text-left">Discount</th>
+                  <th className="label-caps px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {bikes.map((bike) => (
                   <tr
                     key={bike.id}
-                    className="border-b border-outline-variant/10 hover:bg-surface-container-low"
+                    className="data-row"
                   >
                     <td className="px-4 py-3 text-on-surface font-medium">
-                      {getBlueprintLabel(bike.bike_blueprint_id)}
+                      <div className="flex items-center gap-3">
+                        {bike.image ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={bike.image}
+                            alt=""
+                            className="h-10 w-10 flex-none rounded-xl object-cover"
+                          />
+                        ) : null}
+                        <span>{getBlueprintLabel(bike.bike_blueprint_id)}</span>
+                      </div>
                     </td>
-                    <td className="px-4 py-3 text-on-surface-variant font-mono text-xs">
+                    <td className="mono-data px-4 py-3 text-xs text-on-surface-variant">
                       {bike.vin}
                     </td>
-                    <td className="px-4 py-3 text-right text-on-surface font-semibold">
+                    <td className="mono-data px-4 py-3 text-right font-semibold text-primary">
                       {bike.sale_price} {bike.currency_pricing}
                     </td>
-                    <td className="px-4 py-3 text-right text-on-surface-variant">
+                    <td className="mono-data px-4 py-3 text-right text-on-surface-variant">
                       {bike.cost_price} {bike.currency_pricing}
                     </td>
-                    <td className="px-4 py-3 text-center text-on-surface">
+                    <td className="mono-data px-4 py-3 text-center text-on-surface">
                       {bike.mileage.toLocaleString()}
                     </td>
                     <td className="px-4 py-3">{getStatusBadge(bike.status)}</td>
-                    <td className="px-4 py-3 text-on-surface text-xs">
+                    <td className="mono-data px-4 py-3 text-on-surface text-xs">
                       {bike.max_discount_value}
                       {bike.max_discount_type === "percentage" ? "%" : " " + bike.currency_pricing}
                     </td>
@@ -293,6 +302,7 @@ export default function BikesPage() {
       <PaginationControls
         page={page}
         totalPages={totalPages}
+        onPageChange={setPage}
         onPrevious={() => setPage((p) => Math.max(1, p - 1))}
         onNext={() => setPage((p) => Math.min(totalPages, p + 1))}
       />

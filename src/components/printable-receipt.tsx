@@ -32,7 +32,7 @@ export function ReceiptTemplate({
   const totalAmount = (sale.total || 0).toFixed(2);
 
   return (
-    <div className="w-80 bg-white text-on-surface font-mono text-xs print:w-full print:max-w-none">
+    <div className="receipt-template pdf-capture-safe w-80 bg-white text-on-surface font-mono text-xs print:w-full print:max-w-none">
       <style>{`
         @media print {
           body {
@@ -54,16 +54,17 @@ export function ReceiptTemplate({
       `}</style>
 
       <div className="receipt-container p-4 print:p-2 space-y-3">
+        <div className="h-1 bg-accent" aria-hidden="true" />
         {/* Header */}
         <div className="text-center border-b border-on-surface/20 pb-3">
-          <p className="font-bold text-sm mb-1">{companyName}</p>
+          <p className="font-display font-black text-sm mb-1">{companyName}</p>
           <p className="text-[10px] text-on-surface-variant">{companyEmail}</p>
           <p className="text-[10px] text-on-surface-variant">{companyPhone}</p>
         </div>
 
         {/* Receipt Number & Date */}
         <div className="text-center border-b border-on-surface/20 pb-2 space-y-1 text-[10px]">
-          <p>Receipt #{sale.id}</p>
+          <p className="mono-data">Receipt #{sale.id}</p>
           <p>{new Date(sale.created_at || "").toLocaleDateString()}</p>
           <p>{new Date(sale.created_at || "").toLocaleTimeString()}</p>
         </div>
@@ -82,11 +83,11 @@ export function ReceiptTemplate({
               <div key={item.id}>
                 <div className="flex justify-between">
                   <span className="flex-1 truncate">{item.item_label || `Item ${item.id}`}</span>
-                  <span className="ml-1 flex-shrink-0">${calculateLineItemSubtotal(item.quantity, item.selling_price, item.discount_amount)}</span>
+                  <span className="mono-data ml-1 flex-shrink-0">${calculateLineItemSubtotal(item.quantity, item.selling_price, item.discount_amount)}</span>
                 </div>
                 <div className="flex justify-between text-on-surface-variant text-[9px]">
                   <span>{item.sellable_type} x{item.quantity}</span>
-                  <span>@${item.selling_price.toFixed(2)}</span>
+                  <span className="mono-data">@${item.selling_price.toFixed(2)}</span>
                 </div>
                 {item.discount_amount > 0 && (
                   <div className="flex justify-between text-red-600 text-[9px] ml-2">
@@ -105,23 +106,23 @@ export function ReceiptTemplate({
         <div className="space-y-1 text-[10px] border-b border-on-surface/20 pb-2">
           <div className="flex justify-between">
             <span>Subtotal:</span>
-            <span>${itemsSubtotal}</span>
+            <span className="mono-data">${itemsSubtotal}</span>
           </div>
           {Number(shippingFee) > 0 && (
             <div className="flex justify-between">
               <span>Shipping:</span>
-              <span>${shippingFee}</span>
+              <span className="mono-data">${shippingFee}</span>
             </div>
           )}
           {Number(saleDiscount) > 0 && (
             <div className="flex justify-between text-red-600">
               <span>Discount:</span>
-              <span>-${saleDiscount}</span>
+              <span className="mono-data">-${saleDiscount}</span>
             </div>
           )}
           <div className="flex justify-between font-bold pt-1 border-t border-on-surface/20">
             <span>TOTAL:</span>
-            <span>${totalAmount}</span>
+            <span className="mono-data font-bold">${totalAmount}</span>
           </div>
         </div>
 

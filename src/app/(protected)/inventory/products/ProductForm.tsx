@@ -60,6 +60,10 @@ export function ProductForm({ initialData, mode }: ProductFormProps) {
       const payload: CreateProductPayload = {
         name: String(formData.name),
         sku: String(formData.sku),
+        image: formData.image ? String(formData.image) : undefined,
+        image_public_id: formData.image_public_id
+          ? String(formData.image_public_id)
+          : undefined,
         stock_quantity: formData.stock_quantity ? Number(formData.stock_quantity) : 0,
         low_stock_alarm: formData.low_stock_alarm ? Number(formData.low_stock_alarm) : 0,
         products_category_id: Number(formData.products_category_id),
@@ -110,6 +114,17 @@ export function ProductForm({ initialData, mode }: ProductFormProps) {
       description: "Keep the SKU short, unique, and easy to search.",
       placeholder: "e.g., PROD-001",
       value: initialData?.sku,
+    },
+    {
+      name: "image",
+      label: "Product Photo",
+      type: "image",
+      section: "Basic Info",
+      description: "Upload the main catalog photo for this product.",
+      value: initialData?.image,
+      imagePublicIdField: "image_public_id",
+      uploadFolder: "rpg-system/products",
+      span: 2,
     },
     {
       name: "products_category_id",

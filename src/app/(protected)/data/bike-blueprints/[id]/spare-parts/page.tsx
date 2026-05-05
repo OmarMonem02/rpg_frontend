@@ -326,6 +326,10 @@ export default function BikeBlueprintSparePartsPage() {
       const payload: CreateSparePartPayload = {
         name: String(formData.name),
         sku: String(formData.sku),
+        image: formData.image ? String(formData.image) : undefined,
+        image_public_id: formData.image_public_id
+          ? String(formData.image_public_id)
+          : undefined,
         part_number: formData.part_number ? String(formData.part_number) : undefined,
         stock_quantity: formData.stock_quantity ? Number(formData.stock_quantity) : 0,
         low_stock_alarm: formData.low_stock_alarm ? Number(formData.low_stock_alarm) : 0,
@@ -397,6 +401,16 @@ export default function BikeBlueprintSparePartsPage() {
       section: "Basic Info",
       description: "Add the manufacturer number if your team uses it.",
       placeholder: "e.g., MPN-302",
+    },
+    {
+      name: "image",
+      label: "Spare Part Photo",
+      type: "image",
+      section: "Basic Info",
+      description: "Upload a clear part photo before assigning it to this blueprint.",
+      imagePublicIdField: "image_public_id",
+      uploadFolder: "rpg-system/spare-parts",
+      span: 2,
     },
     {
       name: "spare_parts_category_id",

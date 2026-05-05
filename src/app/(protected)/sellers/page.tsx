@@ -4,8 +4,21 @@ import { FormEvent, useEffect, useState } from "react";
 import { usePermissions } from "@/components/permission-provider";
 import { ApiError } from "@/lib/auth-api";
 import { getAuthToken } from "@/lib/auth-session";
-import { createSeller, deleteSeller, listSellers, updateSeller, type SellerRecord } from "@/lib/crud-api";
-import { ActionButton, InlineMessage, PageHero, PageShell, PaginationControls, SurfaceCard } from "@/components/ops-ui";
+import {
+  createSeller,
+  deleteSeller,
+  listSellers,
+  updateSeller,
+  type SellerRecord,
+} from "@/lib/crud-api";
+import {
+  ActionButton,
+  InlineMessage,
+  PageHero,
+  PageShell,
+  PaginationControls,
+  SurfaceCard,
+} from "@/components/ops-ui";
 
 type SellerFormState = {
   name: string;
@@ -153,74 +166,81 @@ export default function SellersPage() {
 
   return (
     <PageShell>
-      <PageHero
-        eyebrow="Admin"
-        title="Sellers"
-        description="Maintain commission-ready seller records with the existing `/sellers` backend integration."
-      />
+      <PageHero eyebrow="Admin" title="Sellers" />
 
       {canCreateSellers || editingId ? (
-      <SurfaceCard>
-      <form className="space-y-4" onSubmit={onSubmit}>
-        <h2 className="text-lg font-semibold text-on-surface">{editingId ? "Edit Seller" : "Create Seller"}</h2>
+        <SurfaceCard>
+          <form className="space-y-4" onSubmit={onSubmit}>
+            <h2 className="text-lg font-semibold text-on-surface">
+              {editingId ? "Edit Seller" : "Create Seller"}
+            </h2>
 
-        <div className="grid gap-4 md:grid-cols-2">
-          <label className="space-y-1 text-sm text-on-surface">
-            <span className="font-medium">Name</span>
-            <input
-              value={form.name}
-              onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
-              required
-              className="w-full rounded-md border border-outline-variant/40 bg-surface-container-lowest px-3 py-2 outline-none focus:border-primary"
-              placeholder="Seller name"
-            />
-          </label>
+            <div className="grid gap-4 md:grid-cols-2">
+              <label className="space-y-1 text-sm text-on-surface">
+                <span className="font-medium">Name</span>
+                <input
+                  value={form.name}
+                  onChange={(event) =>
+                    setForm((prev) => ({ ...prev, name: event.target.value }))
+                  }
+                  required
+                  className="w-full rounded-md border border-outline-variant/40 bg-surface-container-lowest px-3 py-2 outline-none focus:border-primary"
+                  placeholder="Seller name"
+                />
+              </label>
 
-          <label className="space-y-1 text-sm text-on-surface">
-            <span className="font-medium">Commission Rate (%)</span>
-            <input
-              type="number"
-              min="0"
-              step="0.01"
-              value={form.commission_rate}
-              onChange={(event) => setForm((prev) => ({ ...prev, commission_rate: event.target.value }))}
-              required
-              className="w-full rounded-md border border-outline-variant/40 bg-surface-container-lowest px-3 py-2 outline-none focus:border-primary"
-              placeholder="5"
-            />
-          </label>
+              <label className="space-y-1 text-sm text-on-surface">
+                <span className="font-medium">Commission Rate (%)</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={form.commission_rate}
+                  onChange={(event) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      commission_rate: event.target.value,
+                    }))
+                  }
+                  required
+                  className="w-full rounded-md border border-outline-variant/40 bg-surface-container-lowest px-3 py-2 outline-none focus:border-primary"
+                  placeholder="5"
+                />
+              </label>
 
-          <label className="space-y-1 text-sm text-on-surface">
-            <span className="font-medium">Phone</span>
-            <input
-              value={form.phone}
-              onChange={(event) => setForm((prev) => ({ ...prev, phone: event.target.value }))}
-              className="w-full rounded-md border border-outline-variant/40 bg-surface-container-lowest px-3 py-2 outline-none focus:border-primary"
-              placeholder="+20..."
-            />
-          </label>
+              <label className="space-y-1 text-sm text-on-surface">
+                <span className="font-medium">Phone</span>
+                <input
+                  value={form.phone}
+                  onChange={(event) =>
+                    setForm((prev) => ({ ...prev, phone: event.target.value }))
+                  }
+                  className="w-full rounded-md border border-outline-variant/40 bg-surface-container-lowest px-3 py-2 outline-none focus:border-primary"
+                  placeholder="+20..."
+                />
+              </label>
+            </div>
 
-        </div>
-
-        <div className="flex flex-wrap gap-2">
-          <ActionButton
-            type="submit"
-            disabled={isSubmitting}
-            tone="primary"
-          >
-            {isSubmitting ? "Saving..." : editingId ? "Update Seller" : "Create Seller"}
-          </ActionButton>
-          {editingId ? (
-            <ActionButton
-              type="button"
-              onClick={resetForm}
-            >
-              Cancel Edit
-            </ActionButton>
-          ) : null}
-        </div>
-      </form>
-      </SurfaceCard>
+            <div className="flex flex-wrap gap-2">
+              <ActionButton
+                type="submit"
+                disabled={isSubmitting}
+                tone="primary"
+              >
+                {isSubmitting
+                  ? "Saving..."
+                  : editingId
+                    ? "Update Seller"
+                    : "Create Seller"}
+              </ActionButton>
+              {editingId ? (
+                <ActionButton type="button" onClick={resetForm}>
+                  Cancel Edit
+                </ActionButton>
+              ) : null}
+            </div>
+          </form>
+        </SurfaceCard>
       ) : null}
 
       {!canCreateSellers && !canUpdateSellers ? (
@@ -230,19 +250,23 @@ export default function SellersPage() {
       ) : null}
 
       {error ? <InlineMessage tone="danger">{error}</InlineMessage> : null}
-      {message ? (
-        <InlineMessage tone="primary">{message}</InlineMessage>
-      ) : null}
+      {message ? <InlineMessage tone="primary">{message}</InlineMessage> : null}
 
       <SurfaceCard className="p-0">
         <div className="border-b border-outline-variant/20 px-4 py-3">
-          <h2 className="text-lg font-semibold text-on-surface">Sellers List</h2>
+          <h2 className="text-lg font-semibold text-on-surface">
+            Sellers List
+          </h2>
         </div>
 
         {isLoading ? (
-          <p className="p-4 text-sm text-on-surface-variant">Loading sellers...</p>
+          <p className="p-4 text-sm text-on-surface-variant">
+            Loading sellers...
+          </p>
         ) : records.length === 0 ? (
-          <p className="p-4 text-sm text-on-surface-variant">No sellers found.</p>
+          <p className="p-4 text-sm text-on-surface-variant">
+            No sellers found.
+          </p>
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full text-left text-sm">
@@ -256,7 +280,10 @@ export default function SellersPage() {
               </thead>
               <tbody>
                 {records.map((record) => (
-                  <tr key={record.id} className="border-t border-outline-variant/20 text-on-surface">
+                  <tr
+                    key={record.id}
+                    className="border-t border-outline-variant/20 text-on-surface"
+                  >
                     <td className="px-4 py-3">{record.name}</td>
                     <td className="px-4 py-3">{record.commission_rate}%</td>
                     <td className="px-4 py-3">{record.phone ?? "—"}</td>
@@ -288,7 +315,6 @@ export default function SellersPage() {
             </table>
           </div>
         )}
-
       </SurfaceCard>
 
       <PaginationControls

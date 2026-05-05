@@ -42,7 +42,9 @@ import {
   type PendingExchangeItem,
 } from "../sale-item-utils";
 
-function getItemTypeTone(type: string): "primary" | "success" | "warning" | "danger" | "default" {
+function getItemTypeTone(
+  type: string,
+): "primary" | "success" | "warning" | "danger" | "default" {
   const t = type.toLowerCase();
   if (t === "products") return "primary";
   if (t === "spare_parts") return "warning";
@@ -103,7 +105,9 @@ export default function ExchangeSaleItemsPage() {
   useEffect(() => {
     if (!selectedRow) return;
     setSelectedItemId(selectedRow.id);
-    setExchangeQty((current) => Math.max(1, Math.min(selectedRow.quantity, current)));
+    setExchangeQty((current) =>
+      Math.max(1, Math.min(selectedRow.quantity, current)),
+    );
   }, [selectedRow]);
 
   const replacementTotal = useMemo(
@@ -125,7 +129,11 @@ export default function ExchangeSaleItemsPage() {
         const built = buildPayload(item);
         // Normalize USD prices to EGP immediately so all downstream
         // calculations (replacementTotal, StatCards, API payload) are in EGP.
-        const egpPrice = normalizeToEGP(built.payload.selling_price, built.currency, exchangeRate);
+        const egpPrice = normalizeToEGP(
+          built.payload.selling_price,
+          built.currency,
+          exchangeRate,
+        );
         return {
           id: `${Date.now()}_${current.length + index}`,
           label: built.label,
@@ -172,7 +180,9 @@ export default function ExchangeSaleItemsPage() {
 
       router.push(`/inventory/sales/${sale.id}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to process exchange");
+      setError(
+        err instanceof Error ? err.message : "Failed to process exchange",
+      );
     } finally {
       setBusy(false);
     }
@@ -193,8 +203,7 @@ export default function ExchangeSaleItemsPage() {
       {/* ── Page Hero ── */}
       <PageHero
         eyebrow="Order Management"
-        title="Process Exchange"
-        description={`Scale your service by efficiently managing item exchanges for Sale #${saleId}. Select the item to replace and add new ones from the catalog.`}
+        title={`Process Exchange for Sale #${saleId}`}
         actions={
           <>
             <ActionButton

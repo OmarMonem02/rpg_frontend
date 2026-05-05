@@ -3,13 +3,12 @@
 import { useEffect, useState } from "react";
 import { ApiError } from "@/lib/auth-api";
 import { getAuthToken } from "@/lib/auth-session";
-import { getBalanceSheetReport, type BalanceSheetReport, type ReportingCurrency } from "@/lib/api/reporting";
+import { getBalanceSheetReport, type BalanceSheetReport, type ReportingCurrency, type BalanceSheetCurrencySection } from "@/lib/api/reporting";
 import {
   BreakdownList,
   EmptyFinanceState,
   FinanceFilterBar,
   FinanceHero,
-  FinanceInsightBand,
   FinanceLoadingCard,
   FinanceSectionTitle,
   MoneyStatGrid,
@@ -56,9 +55,9 @@ export default function BalanceSheetPage() {
     };
   }, [dateFrom, dateTo, currency]);
 
-  const sections = Object.entries(report?.currencies ?? {}) as Array<
-    [string, NonNullable<BalanceSheetReport["currencies"][ReportingCurrency]>]
-  >;
+  const sections = Object.entries(report?.currencies ?? {}).filter(
+    (entry): entry is [string, BalanceSheetCurrencySection] => entry[1] !== undefined
+  );
 
   return (
     <PageShell>
@@ -88,11 +87,6 @@ export default function BalanceSheetPage() {
         />
       ) : (
         <>
-          <FinanceInsightBand
-            title="Treat this as the current position, not a fully accrued accounting ledger."
-            copy="This MVP sheet is designed for operational finance: collected cash, open receivables, stock value, and unpaid expenses. It helps the team read liquidity and exposure quickly without pretending to be a full GL."
-          />
-
           {sections.map(([code, section]) => (
             <section key={code} className="space-y-4">
               <FinanceSectionTitle

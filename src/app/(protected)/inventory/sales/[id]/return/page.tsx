@@ -28,7 +28,9 @@ import {
 } from "@heroicons/react/24/outline";
 import { labelOf, money } from "../sale-item-utils";
 
-function getItemTypeTone(type: string): "primary" | "success" | "warning" | "danger" | "default" {
+function getItemTypeTone(
+  type: string,
+): "primary" | "success" | "warning" | "danger" | "default" {
   const t = type.toLowerCase();
   if (t === "products") return "primary";
   if (t === "spare_parts") return "warning";
@@ -80,7 +82,9 @@ export default function ReturnSaleItemsPage() {
   useEffect(() => {
     if (!selectedRow) return;
     setSelectedItemId(selectedRow.id);
-    setReturnQty((current) => Math.max(1, Math.min(selectedRow.quantity, current)));
+    setReturnQty((current) =>
+      Math.max(1, Math.min(selectedRow.quantity, current)),
+    );
   }, [selectedRow]);
 
   const handleReturn = async () => {
@@ -102,7 +106,10 @@ export default function ReturnSaleItemsPage() {
       }
 
       await updateSale(token, sale.id, {
-        status: qty >= selectedRow.quantity && items.length === 1 ? "returned" : "partial",
+        status:
+          qty >= selectedRow.quantity && items.length === 1
+            ? "returned"
+            : "partial",
       });
 
       router.push(`/inventory/sales/${sale.id}`);
@@ -129,7 +136,6 @@ export default function ReturnSaleItemsPage() {
       <PageHero
         eyebrow="Order Management"
         title="Process Return"
-        description={`Select items from Sale #${saleId} to return to inventory. Accurate inventory tracking starts with proper, well-documented returns.`}
         actions={
           <>
             <ActionButton

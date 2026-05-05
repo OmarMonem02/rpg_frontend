@@ -3,12 +3,11 @@
 import { useEffect, useState } from "react";
 import { ApiError } from "@/lib/auth-api";
 import { getAuthToken } from "@/lib/auth-session";
-import { getAnnualSummaryReport, type AnnualSummaryReport, type ReportingCurrency } from "@/lib/api/reporting";
+import { getAnnualSummaryReport, type AnnualSummaryReport, type ReportingCurrency, type AnnualSummaryCurrencySection } from "@/lib/api/reporting";
 import {
   BreakdownList,
   EmptyFinanceState,
   FinanceHero,
-  FinanceInsightBand,
   FinanceLoadingCard,
   FinanceSectionTitle,
   MoneyStatGrid,
@@ -51,9 +50,9 @@ export default function AnnualStatementPage() {
     };
   }, [year, currency]);
 
-  const sections = Object.entries(report?.currencies ?? {}) as Array<
-    [string, NonNullable<AnnualSummaryReport["currencies"][ReportingCurrency]>]
-  >;
+  const sections = Object.entries(report?.currencies ?? {}).filter(
+    (entry): entry is [string, AnnualSummaryCurrencySection] => entry[1] !== undefined
+  );
 
   return (
     <PageShell>
@@ -91,10 +90,6 @@ export default function AnnualStatementPage() {
         />
       ) : (
         <>
-          <FinanceInsightBand
-            title="Read this sheet as a tempo map for the year."
-            copy="The annual statement is best for spotting seasonality, strong months, and expense spikes. Use it to decide where to push sales effort, where to tighten cost control, and when margins drift."
-          />
 
           {sections.map(([code, section]) => (
             <section key={code} className="space-y-4">

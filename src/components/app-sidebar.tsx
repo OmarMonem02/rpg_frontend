@@ -456,13 +456,14 @@ export function AppSidebar({
         <div className="border-b border-outline-variant/20 px-3 py-4 flex flex-col items-center">
           <div className="w-full flex items-center justify-between mb-2">
             {!isCollapsed ? (
-              <div className="flex flex-col">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-on-surface-variant">
-                  Workshop Ops
-                </p>
-                <p className="font-display text-lg font-bold text-on-surface">
-                  {brandTitle}
-                </p>
+              <div className="flex items-center gap-3">
+                <span className="h-8 w-1 rounded-full bg-primary" aria-hidden="true" />
+                <div className="flex flex-col">
+                  <p className="label-caps">Workshop Ops</p>
+                  <p className="font-display text-xl font-black tracking-tight text-on-surface">
+                    {brandTitle}
+                  </p>
+                </div>
               </div>
             ) : (
               <button
@@ -481,7 +482,7 @@ export function AppSidebar({
             {isMobileOpen && (
               <button
                 type="button"
-                className="flex items-center justify-center rounded-xl border border-outline-variant/30 bg-surface-container-low p-2.5 text-on-surface hover:bg-surface-container transition-colors md:hidden"
+                className="flex items-center justify-center rounded-2xl border border-outline-variant/30 bg-surface-container-low p-2.5 text-on-surface hover:bg-surface-container transition-colors md:hidden"
                 onClick={onCloseMobile}
                 aria-label="Close menu"
               >
@@ -502,7 +503,7 @@ export function AppSidebar({
             {!isCollapsed && !isMobileOpen && (
               <button
                 type="button"
-                className="flex items-center justify-center rounded-xl border border-outline-variant/30 bg-surface-container-low p-2.5 text-on-surface hover:bg-surface-container transition-colors hidden md:flex"
+                className="hidden items-center justify-center rounded-2xl border border-outline-variant/30 bg-surface-container-low p-2.5 text-on-surface hover:bg-surface-container transition-colors md:flex"
                 onClick={onToggleCollapse}
                 aria-label="Collapse sidebar"
               >
@@ -513,7 +514,7 @@ export function AppSidebar({
                   strokeWidth="2"
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  className="h-4 w-4"
+                  className="h-4 w-4 transition-transform duration-300 hover:rotate-180"
                 >
                   <path d="M15 18 9 12l6-6" />
                 </svg>
@@ -521,7 +522,7 @@ export function AppSidebar({
             )}
           </div>
           {!isCollapsed && (
-            <p className="text-xs text-on-surface-variant leading-relaxed">
+            <p className="text-[11px] text-on-surface-variant/60 leading-relaxed">
               Sales, inventory, master data, and admin control.
             </p>
           )}
@@ -534,8 +535,8 @@ export function AppSidebar({
                 <div
                   className={
                     isCollapsed
-                      ? "my-1 border-t border-outline-variant/20"
-                      : "my-2 border-t border-outline-variant/20"
+                      ? "divider my-1"
+                      : "divider my-2"
                   }
                   aria-hidden
                 />
@@ -543,7 +544,7 @@ export function AppSidebar({
 
               {section.title ? (
                 !isCollapsed ? (
-                  <p className="px-3 py-0.5 text-[10px] font-semibold uppercase tracking-[0.22em] text-on-surface-variant">
+                  <p className="label-caps py-0.5 pl-1">
                     {section.title}
                   </p>
                 ) : sectionIndex > 0 ? (
@@ -561,18 +562,21 @@ export function AppSidebar({
                     aria-current={isActive ? "page" : undefined}
                     title={isCollapsed ? item.label : undefined}
                     className={[
-                      "flex items-center rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 ease-out",
+                      "flex items-center px-3 py-2.5 text-sm font-medium transition-all duration-150 ease-out",
                       isCollapsed ? "justify-center px-0" : "px-3",
                       isActive
-                        ? "bg-primary text-on-primary shadow-md scale-[1.02]"
-                        : "text-on-surface hover:bg-surface-container-low",
+                        ? isCollapsed
+                          ? "rounded-xl text-primary"
+                          : "rounded-r-xl rounded-l-none border-l-2 border-primary bg-primary/10 font-semibold text-primary"
+                        : "rounded-xl text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface",
                     ].join(" ")}
                     onClick={onCloseMobile}
                   >
                     <span
                       className={[
-                        "shrink-0 transition-transform duration-200",
-                        isActive ? "scale-110" : "",
+                        "shrink-0 transition-transform duration-150",
+                        isActive ? "text-primary" : "",
+                        isCollapsed && isActive ? "rounded-xl bg-primary/10 p-2" : "",
                       ].join(" ")}
                     >
                       {item.icon ?? (
@@ -593,11 +597,11 @@ export function AppSidebar({
 
         <div className="flex-shrink-0 border-t border-outline-variant/20 px-2 py-4">
           {!isCollapsed && (
-            <div className="mb-4 rounded-2xl border border-outline-variant/10 bg-surface px-4 py-3 shadow-sm">
-              <p className="text-[10px] uppercase tracking-[0.2em] text-on-surface-variant font-bold">
+            <div className="mb-4 rounded-2xl border border-outline-variant/10 bg-surface px-4 py-2 shadow-sm">
+              <p className="label-caps">
                 Signed in
               </p>
-              <p className="mt-0.5 truncate text-sm font-semibold text-on-surface">
+              <p className="mono-data mt-0.5 truncate font-semibold text-on-surface">
                 {userName}
               </p>
             </div>
@@ -605,7 +609,7 @@ export function AppSidebar({
           <button
             type="button"
             className={[
-              "flex items-center justify-center rounded-xl bg-error-container text-xs font-bold text-on-error-container transition-all hover:bg-error/10 hover:text-error",
+              "flex items-center justify-center rounded-xl border border-error/20 bg-error/8 text-xs font-bold text-error transition-colors duration-150 hover:bg-error hover:text-white",
               isCollapsed ? "h-11 w-11 mx-auto p-0" : "w-full px-4 py-3",
             ].join(" ")}
             onClick={onLogout}

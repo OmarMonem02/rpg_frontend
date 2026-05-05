@@ -63,6 +63,10 @@ export function BikeForm({ mode, initialData }: BikeFormProps) {
 
       const payload: CreateBikePayload = {
         bike_blueprint_id: Number(formData.bike_blueprint_id),
+        image: formData.image ? String(formData.image) : undefined,
+        image_public_id: formData.image_public_id
+          ? String(formData.image_public_id)
+          : undefined,
         currency_pricing: String(formData.currency_pricing || "EGP"),
         cost_price: Number(formData.cost_price),
         sale_price: Number(formData.sale_price),
@@ -116,6 +120,17 @@ export function BikeForm({ mode, initialData }: BikeFormProps) {
         "Add the vehicle identification number used for traceability.",
       placeholder: "e.g., VIN123456789",
       value: initialData?.vin,
+    },
+    {
+      name: "image",
+      label: "Bike Photo",
+      type: "image",
+      section: "Bike Identity",
+      description: "Upload a clear showroom photo for this bike listing.",
+      value: initialData?.image,
+      imagePublicIdField: "image_public_id",
+      uploadFolder: "rpg-system/bikes",
+      span: 2,
     },
     {
       name: "status",

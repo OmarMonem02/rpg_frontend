@@ -448,7 +448,6 @@ export default function PaymentMethodsPage() {
       <PageHero
         eyebrow="Master Data"
         title="Payment Methods"
-        description="Maintain the accepted payment channels used by the RPG shop across sales and reporting."
         actions={
           canCreatePaymentMethods ? (
             <ActionButton tone="primary" onClick={() => handleOpenModal()}>
@@ -530,6 +529,7 @@ export default function PaymentMethodsPage() {
       <PaginationControls
         page={page}
         totalPages={totalPages}
+        onPageChange={setPage}
         onPrevious={() => setPage((p) => Math.max(1, p - 1))}
         onNext={() => setPage((p) => Math.min(totalPages, p + 1))}
       />

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { usePermissions } from "@/components/permission-provider";
 import { getAuthToken } from "@/lib/auth-session";
 import { useEntityFilters } from "@/hooks/useEntityFilters";
+import { useGlobalDataRefresh } from "@/hooks/useGlobalDataRefresh";
 import {
   listBrands,
   createBrand,
@@ -82,6 +83,8 @@ export default function BrandsPage() {
     void loadBrands();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, filters]);
+
+  useGlobalDataRefresh(loadBrands);
 
   const handleOpenModal = (brand?: BrandRecord) => {
     if (brand && !canUpdateBrands) return;
@@ -173,7 +176,6 @@ export default function BrandsPage() {
       <PageHero
         eyebrow="Master Data"
         title="Brands"
-        description="Keep supplier and manufacturer brands clean across spare parts, products, and bike blueprints."
         actions={
           canCreateBrands ? (
             <ActionButton tone="primary" onClick={() => handleOpenModal()}>
@@ -303,6 +305,7 @@ export default function BrandsPage() {
       <PaginationControls
         page={page}
         totalPages={totalPages}
+        onPageChange={setPage}
         onPrevious={() => setPage((currentPage) => Math.max(1, currentPage - 1))}
         onNext={() =>
           setPage((currentPage) => Math.min(totalPages, currentPage + 1))

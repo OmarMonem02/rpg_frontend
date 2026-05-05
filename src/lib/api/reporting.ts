@@ -174,6 +174,8 @@ export type AnnualSummaryReport = {
 export type ExpenseRecord = {
   id: number;
   title: string;
+  image?: string;
+  image_public_id?: string;
   category: ExpenseCategory;
   amount: number;
   currency: ReportingCurrency;
@@ -204,6 +206,8 @@ export type ExpensesReport = {
 
 export type ExpensePayload = {
   title: string;
+  image?: string;
+  image_public_id?: string;
   category: ExpenseCategory;
   amount: number;
   currency: ReportingCurrency;
@@ -314,6 +318,8 @@ function normalizeExpense(raw: unknown): ExpenseRecord {
   return {
     id: toNumber(record.id),
     title: toText(record.title),
+    image: toText(record.image) || undefined,
+    image_public_id: toText(record.image_public_id) || undefined,
     category: toText(record.category) as ExpenseCategory,
     amount: toNumber(record.amount),
     currency: toText(record.currency) as ReportingCurrency,
@@ -334,13 +340,11 @@ export async function getProfitLossReport(
   const record = asRecord(payload);
   const currencies = asRecord(record.currencies);
 
-  return {
-    filters,
-    currencies: {
-      EGP: currencies.EGP ? normalizeProfitLoss(currencies.EGP) : undefined,
-      USD: currencies.USD ? normalizeProfitLoss(currencies.USD) : undefined,
-    },
-  };
+  const result: ProfitLossReport = { filters, currencies: {} };
+  if (currencies.EGP) result.currencies.EGP = normalizeProfitLoss(currencies.EGP);
+  if (currencies.USD) result.currencies.USD = normalizeProfitLoss(currencies.USD);
+
+  return result;
 }
 
 export async function getBalanceSheetReport(
@@ -351,13 +355,11 @@ export async function getBalanceSheetReport(
   const record = asRecord(payload);
   const currencies = asRecord(record.currencies);
 
-  return {
-    filters,
-    currencies: {
-      EGP: currencies.EGP ? normalizeBalanceSheet(currencies.EGP) : undefined,
-      USD: currencies.USD ? normalizeBalanceSheet(currencies.USD) : undefined,
-    },
-  };
+  const result: BalanceSheetReport = { filters, currencies: {} };
+  if (currencies.EGP) result.currencies.EGP = normalizeBalanceSheet(currencies.EGP);
+  if (currencies.USD) result.currencies.USD = normalizeBalanceSheet(currencies.USD);
+
+  return result;
 }
 
 export async function getAnnualSummaryReport(
@@ -368,14 +370,16 @@ export async function getAnnualSummaryReport(
   const record = asRecord(payload);
   const currencies = asRecord(record.currencies);
 
-  return {
+  const result: AnnualSummaryReport = {
     filters,
     year: toNumber(record.year),
-    currencies: {
-      EGP: currencies.EGP ? normalizeAnnualSummary(currencies.EGP) : undefined,
-      USD: currencies.USD ? normalizeAnnualSummary(currencies.USD) : undefined,
-    },
+    currencies: {},
   };
+
+  if (currencies.EGP) result.currencies.EGP = normalizeAnnualSummary(currencies.EGP);
+  if (currencies.USD) result.currencies.USD = normalizeAnnualSummary(currencies.USD);
+
+  return result;
 }
 
 export async function getExpensesReport(

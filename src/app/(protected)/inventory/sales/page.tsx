@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { getAuthToken } from "@/lib/auth-session";
 import { usePermissions } from "@/components/permission-provider";
 import { useEntityFilters } from "@/hooks/useEntityFilters";
+import { useGlobalDataRefresh } from "@/hooks/useGlobalDataRefresh";
 import {
   listSales,
   deleteSale,
@@ -83,6 +84,8 @@ export default function SalesPage() {
     loadData();
   }, [loadData]);
 
+  useGlobalDataRefresh(loadData);
+
   const handleDeleteSale = async (id: number) => {
     if (!permissions.canDelete("sales")) {
       setError("You don't have permission to delete sales.");
@@ -120,7 +123,6 @@ export default function SalesPage() {
     <PageShell>
       <PageHero
         title="Sales"
-        description="Manage, track, and monitor all your sales transactions efficiently."
         actions={
           permissions.canCreate("sales") ? (
             <ActionButton
@@ -170,7 +172,7 @@ export default function SalesPage() {
         {/* Active Filter Count */}
         {(dateFrom || dateTo || statusFilter) && (
           <div className="flex items-center gap-2 text-xs text-on-surface-variant">
-            <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary font-semibold text-xs">
+            <span className="mono-data inline-flex h-5 w-5 items-center justify-center rounded-full bg-primary text-on-primary text-[10px] font-bold">
               {[dateFrom, dateTo, statusFilter].filter(Boolean).length}
             </span>
             <span>active</span>
@@ -299,16 +301,16 @@ export default function SalesPage() {
 
                 <div className="grid grid-cols-2 gap-y-4 gap-x-2 text-sm">
                   <div>
-                    <p className="text-xs uppercase text-on-surface-variant tracking-wider font-semibold mb-1">Customer</p>
+                    <p className="label-caps mb-1">Customer</p>
                     <p className="font-medium text-on-surface">{sale.customer?.name || `ID ${sale.customer_id}`}</p>
                   </div>
                   <div>
-                    <p className="text-xs uppercase text-on-surface-variant tracking-wider font-semibold mb-1">Items</p>
+                    <p className="label-caps mb-1">Items</p>
                     <p className="font-medium text-on-surface">{sale.line_items?.length || 0} items</p>
                   </div>
                   <div className="col-span-2 p-3 rounded-xl bg-surface-container-highest/30 flex justify-between items-center">
-                    <p className="text-xs uppercase text-on-surface-variant tracking-wider font-semibold">Total Amount</p>
-                    <p className="font-bold text-base text-primary flex items-center gap-1">
+                    <p className="label-caps">Total Amount</p>
+                    <p className="mono-data flex items-center gap-1 font-bold text-base text-primary">
                       <CurrencyDollarIcon className="w-4 h-4"/>
                       {(toNumber(sale.total) || 0).toFixed(2)}
                     </p>
@@ -345,27 +347,27 @@ export default function SalesPage() {
                 <table className="w-full text-sm">
                   <thead className="bg-surface-container/50">
                     <tr className="border-b border-outline-variant/15">
-                      <th className="px-6 py-4 text-left font-semibold text-on-surface-variant uppercase tracking-wider text-xs">Sale Info</th>
-                      <th className="px-6 py-4 text-left font-semibold text-on-surface-variant uppercase tracking-wider text-xs">Customer/Seller</th>
-                      <th className="px-6 py-4 text-center font-semibold text-on-surface-variant uppercase tracking-wider text-xs">Items</th>
-                      <th className="px-6 py-4 text-center font-semibold text-on-surface-variant uppercase tracking-wider text-xs">Status</th>
-                      <th className="px-6 py-4 text-right font-semibold text-on-surface-variant uppercase tracking-wider text-xs">Total Amount</th>
-                      <th className="px-6 py-4 text-center font-semibold text-on-surface-variant uppercase tracking-wider text-xs">Actions</th>
+                      <th className="label-caps px-6 py-4 text-left">Sale Info</th>
+                      <th className="label-caps px-6 py-4 text-left">Customer/Seller</th>
+                      <th className="label-caps px-6 py-4 text-center">Items</th>
+                      <th className="label-caps px-6 py-4 text-center">Status</th>
+                      <th className="label-caps px-6 py-4 text-right">Total Amount</th>
+                      <th className="label-caps px-6 py-4 text-center">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {sales.map((sale) => (
                       <tr
                         key={sale.id}
-                        className="border-b border-outline-variant/10 hover:bg-surface-container/30 transition-colors group"
+                        className="data-row group"
                       >
                         <td className="px-6 py-4">
                           <div className="flex flex-col gap-1">
-                            <span className="font-bold text-on-surface">#{sale.id}</span>
-                            <span className="text-xs text-on-surface-variant">
+                            <span className="mono-data font-bold text-primary">INV-{sale.id}</span>
+                            <span className="mono-data text-xs text-on-surface-variant">
                               {sale.created_at ? new Date(sale.created_at).toLocaleDateString() : "No Date"}
                             </span>
-                            <span className="inline-max-w-fit px-2 py-0.5 rounded-md bg-outline-variant/10 text-[10px] text-on-surface-variant uppercase font-semibold inline-block mt-1 w-max">
+                            <span className="form-chip mt-1 w-max rounded-md text-[10px]">
                               {sale.sale_type}
                             </span>
                           </div>
@@ -387,7 +389,7 @@ export default function SalesPage() {
                           </StatusBadge>
                         </td>
                         <td className="px-6 py-4 text-right">
-                          <span className="font-semibold text-on-surface text-base">
+                            <span className="mono-data font-semibold text-on-surface text-base">
                             ${(toNumber(sale.total) || 0).toFixed(2)}
                           </span>
                         </td>

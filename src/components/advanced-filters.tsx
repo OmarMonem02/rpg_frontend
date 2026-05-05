@@ -1,4 +1,5 @@
 import React from "react";
+import { FilterBar, InputGroup } from "@/components/ops-ui";
 
 type AdvancedFiltersProps = {
   priceMin?: number;
@@ -22,32 +23,43 @@ export function AdvancedFilters({
   showCurrencyFilter = true,
 }: AdvancedFiltersProps) {
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "12px", marginBottom: "16px" }}>
+    <FilterBar className="md:grid-cols-12">
       {showCurrencyFilter && (
-        <div>
-          <label htmlFor="currency" style={{ display: "block", fontSize: "12px", fontWeight: "500", marginBottom: "4px" }}>
-            Currency
-          </label>
+        <InputGroup label="Currency" className="md:col-span-4">
           <select
             id="currency"
             value={currency}
             onChange={(e) => setCurrency(e.target.value)}
-            style={{
-              width: "100%",
-              padding: "8px",
-              border: "1px solid #e0e0e0",
-              borderRadius: "4px",
-              fontSize: "14px",
-              backgroundColor: "#fff",
-              cursor: "pointer",
-            }}
+            className="form-input-base py-2 text-sm"
           >
             <option value="all">All Currencies</option>
             <option value="EGP">EGP</option>
             <option value="USD">USD</option>
           </select>
-        </div>
+        </InputGroup>
       )}
-    </div>
+      {showPriceFilters ? (
+        <>
+          <InputGroup label="Min Price" className="md:col-span-4">
+            <input
+              type="number"
+              value={priceMin ?? ""}
+              onChange={(e) => setPriceMin(e.target.value ? Number(e.target.value) : "")}
+              className="form-input-base py-2 text-sm mono-data"
+              placeholder="0"
+            />
+          </InputGroup>
+          <InputGroup label="Max Price" className="md:col-span-4">
+            <input
+              type="number"
+              value={priceMax ?? ""}
+              onChange={(e) => setPriceMax(e.target.value ? Number(e.target.value) : "")}
+              className="form-input-base py-2 text-sm mono-data"
+              placeholder="No limit"
+            />
+          </InputGroup>
+        </>
+      ) : null}
+    </FilterBar>
   );
 }
