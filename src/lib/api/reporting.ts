@@ -174,6 +174,8 @@ export type AnnualSummaryReport = {
 export type ExpenseRecord = {
   id: number;
   title: string;
+  image?: string;
+  image_public_id?: string;
   category: ExpenseCategory;
   amount: number;
   currency: ReportingCurrency;
@@ -204,6 +206,8 @@ export type ExpensesReport = {
 
 export type ExpensePayload = {
   title: string;
+  image?: string;
+  image_public_id?: string;
   category: ExpenseCategory;
   amount: number;
   currency: ReportingCurrency;
@@ -314,6 +318,8 @@ function normalizeExpense(raw: unknown): ExpenseRecord {
   return {
     id: toNumber(record.id),
     title: toText(record.title),
+    image: toText(record.image) || undefined,
+    image_public_id: toText(record.image_public_id) || undefined,
     category: toText(record.category) as ExpenseCategory,
     amount: toNumber(record.amount),
     currency: toText(record.currency) as ReportingCurrency,

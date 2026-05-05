@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ActionButton, InputGroup, StatusBadge } from "@/components/ops-ui";
+import { ImageUpload } from "@/components/ui/ImageUpload";
 import { ticketsApi, type Customer, type Bike, type BikeBlueprint } from "@/lib/tickets-api";
 
 export function CreateTicketModal({
@@ -29,7 +30,12 @@ export function CreateTicketModal({
   const [blueprintSearchQuery, setBlueprintSearchQuery] = useState("");
   const [blueprints, setBlueprints] = useState<BikeBlueprint[]>([]);
   const [selectedBlueprint, setSelectedBlueprint] = useState<BikeBlueprint | null>(null);
-  const [newBikeDetails, setNewBikeDetails] = useState({ vin: "", mileage: "" });
+  const [newBikeDetails, setNewBikeDetails] = useState({
+    vin: "",
+    mileage: "",
+    image: "",
+    image_public_id: "",
+  });
 
   // Step 3: Ticket Details
   const [notes, setNotes] = useState("");
@@ -105,6 +111,8 @@ export function CreateTicketModal({
       const bike = await ticketsApi.createBike({
         customer_id: selectedCustomer.id,
         bike_blueprint_id: selectedBlueprint.id,
+        image: newBikeDetails.image || undefined,
+        image_public_id: newBikeDetails.image_public_id || undefined,
         vin: newBikeDetails.vin,
         mileage: Number(newBikeDetails.mileage) || 0,
       });
@@ -139,8 +147,6 @@ export function CreateTicketModal({
       setLoading(false);
     }
   };
-
-  const stepTitles = ["Customer Selection", "Bike Selection", "Finalize Ticket"];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md transition-all duration-300">
@@ -278,12 +284,22 @@ export function CreateTicketModal({
                           className={`cursor-pointer rounded-2xl border p-5 transition-all hover:shadow-md ${selectedBike?.id === b.id ? "bg-primary/5 border-primary ring-1 ring-primary/20" : "bg-surface border-outline-variant/20"}`}
                           onClick={() => setSelectedBike(b)}
                         >
-                          <div className="flex items-center justify-between">
-                            <div>
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="flex min-w-0 items-center gap-3">
+                              {b.image ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img
+                                  src={b.image}
+                                  alt=""
+                                  className="h-12 w-12 flex-none rounded-xl object-cover"
+                                />
+                              ) : null}
+                              <div className="min-w-0">
                               <p className="font-black text-on-surface">
                                 {b.bike_blueprint?.brand?.name || "Unknown"} {b.bike_blueprint?.model || "Unknown"}
                               </p>
                               <p className="text-xs text-on-surface-variant font-mono mt-1">VIN: {b.vin || "N/A"} | Year: {b.bike_blueprint?.year || "N/A"}</p>
+                              </div>
                             </div>
                             <div className={`h-6 w-6 rounded-full border-2 flex items-center justify-center transition-all ${selectedBike?.id === b.id ? "bg-primary border-primary" : "border-outline-variant"}`}>
                               {selectedBike?.id === b.id && <span className="text-white text-xs">✓</span>}
@@ -361,6 +377,19 @@ export function CreateTicketModal({
                       />
                     </InputGroup>
                   </div>
+                  <ImageUpload
+                    value={newBikeDetails.image || undefined}
+                    folder="Customer Bike Photo"
+                    uploadFolder="rpg-system/Customer-Bike"
+                    onChange={(url, publicId) =>
+                      setNewBikeDetails((current) => ({
+                        ...current,
+                        image: url,
+                        image_public_id: publicId,
+                      }))
+                    }
+                    onError={setError}
+                  />
                   <div className="flex justify-end gap-3 mt-2">
                     <ActionButton variant="ghost" onClick={() => setIsCreatingBike(false)}>Cancel</ActionButton>
                     <ActionButton tone="primary" onClick={handleCreateBike} disabled={loading || !selectedBlueprint}>

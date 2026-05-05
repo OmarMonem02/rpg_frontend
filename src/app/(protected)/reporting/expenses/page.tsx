@@ -37,9 +37,12 @@ import {
   StatGrid,
   SurfaceCard,
 } from "@/components/ops-ui";
+import { ImageUpload } from "@/components/ui/ImageUpload";
 
 type ExpenseFormState = {
   title: string;
+  image: string;
+  image_public_id: string;
   category: ExpenseCategory;
   amount: string;
   currency: ReportingCurrency;
@@ -52,6 +55,8 @@ type ExpenseFormState = {
 
 const initialFormState: ExpenseFormState = {
   title: "",
+  image: "",
+  image_public_id: "",
   category: "other",
   amount: "",
   currency: "EGP",
@@ -137,6 +142,8 @@ export default function ExpensesPage() {
 
     setForm({
       title: expense.title,
+      image: expense.image ?? "",
+      image_public_id: expense.image_public_id ?? "",
       category: expense.category,
       amount: String(expense.amount),
       currency: expense.currency,
@@ -191,6 +198,8 @@ export default function ExpensesPage() {
 
       const payload: ExpensePayload = {
         title: form.title.trim(),
+        image: form.image || undefined,
+        image_public_id: form.image_public_id || undefined,
         category: form.category,
         amount: Number(form.amount),
         currency: form.currency,
@@ -325,6 +334,22 @@ export default function ExpensesPage() {
                 placeholder="Workshop rent, social ads, utility bill..."
               />
             </InputGroup>
+
+            <div className="md:col-span-2">
+              <ImageUpload
+                value={form.image || undefined}
+                folder="Receipt or Expense Photo"
+                uploadFolder="rpg-system/expenses"
+                onChange={(url, publicId) =>
+                  setForm((current) => ({
+                    ...current,
+                    image: url,
+                    image_public_id: publicId,
+                  }))
+                }
+                onError={setFormError}
+              />
+            </div>
 
             <InputGroup label="Category">
               <select
@@ -579,13 +604,23 @@ export default function ExpensesPage() {
                   className="border-emerald-500/10 bg-white/95 p-4"
                 >
                   <div className="flex items-start justify-between gap-3">
-                    <div>
+                    <div className="flex min-w-0 items-start gap-3">
+                      {expense.image ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={expense.image}
+                          alt=""
+                          className="h-12 w-12 flex-none rounded-xl object-cover"
+                        />
+                      ) : null}
+                      <div className="min-w-0">
                       <p className="text-sm font-semibold text-on-surface">
                         {expense.title}
                       </p>
                       <p className="mt-1 text-xs uppercase tracking-[0.18em] text-on-surface-variant">
                         {getExpenseCategoryLabel(expense.category)}
                       </p>
+                      </div>
                     </div>
                     <PaymentStatusBadge value={expense.payment_status} />
                   </div>
@@ -662,7 +697,16 @@ export default function ExpensesPage() {
                       className="border-b border-outline-variant/10"
                     >
                       <td className="px-4 py-3">
-                        <div>
+                        <div className="flex items-start gap-3">
+                          {expense.image ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={expense.image}
+                              alt=""
+                              className="h-12 w-12 flex-none rounded-xl object-cover"
+                            />
+                          ) : null}
+                          <div>
                           <p className="font-medium text-on-surface">
                             {expense.title}
                           </p>
@@ -671,6 +715,7 @@ export default function ExpensesPage() {
                               {expense.notes}
                             </p>
                           ) : null}
+                          </div>
                         </div>
                       </td>
                       <td className="px-4 py-3 text-on-surface">

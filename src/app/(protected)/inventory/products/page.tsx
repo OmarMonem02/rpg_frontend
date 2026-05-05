@@ -123,7 +123,7 @@ export default function ProductsPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, filters, getCleanFilters, categoriesPage]);
+  }, [page, getCleanFilters, categoriesPage]);
 
   useEffect(() => {
     loadDropdowns();
@@ -351,7 +351,19 @@ export default function ProductsPage() {
                   <td className="mono-data px-4 py-3 text-xs text-on-surface-variant">
                     {product.sku}
                   </td>
-                  <td className="px-4 py-3 text-on-surface">{product.name}</td>
+                  <td className="px-4 py-3 text-on-surface">
+                    <div className="flex items-center gap-3">
+                      {product.image ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={product.image}
+                          alt=""
+                          className="h-10 w-10 flex-none rounded-xl object-cover"
+                        />
+                      ) : null}
+                      <span>{product.name}</span>
+                    </div>
+                  </td>
                   <td className="px-4 py-3 text-center">
                     {getStockBadge(product)}
                   </td>

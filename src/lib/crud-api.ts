@@ -648,6 +648,8 @@ export type SparePartRecord = {
   id: number;
   name: string;
   sku: string;
+  image?: string;
+  image_public_id?: string;
   part_number?: string;
   stock_quantity: number;
   low_stock_alarm: number;
@@ -667,6 +669,8 @@ export type SparePartRecord = {
 export type CreateSparePartPayload = {
   name: string;
   sku: string;
+  image?: string;
+  image_public_id?: string;
   part_number?: string;
   stock_quantity?: number;
   low_stock_alarm?: number;
@@ -685,6 +689,8 @@ export type CreateSparePartPayload = {
 export type UpdateSparePartPayload = {
   name: string;
   sku: string;
+  image?: string;
+  image_public_id?: string;
   part_number?: string;
   stock_quantity?: number;
   low_stock_alarm?: number;
@@ -705,6 +711,8 @@ function normalizeSparcePart(raw: unknown): SparePartRecord {
     id: toNumber(record.id),
     name: toText(record.name),
     sku: toText(record.sku),
+    image: toText(record.image) || undefined,
+    image_public_id: toText(record.image_public_id) || undefined,
     part_number: toText(record.part_number) || undefined,
     stock_quantity: toNumber(record.stock_quantity),
     low_stock_alarm: toNumber(record.low_stock_alarm),
@@ -820,6 +828,8 @@ export type ProductRecord = {
   id: number;
   name: string;
   sku: string;
+  image?: string;
+  image_public_id?: string;
   part_number?: string;
   stock_quantity: number;
   low_stock_alarm: number;
@@ -838,6 +848,8 @@ export type ProductRecord = {
 export type CreateProductPayload = {
   name: string;
   sku: string;
+  image?: string;
+  image_public_id?: string;
   part_number?: string;
   stock_quantity?: number;
   low_stock_alarm?: number;
@@ -860,6 +872,8 @@ function normalizeProduct(raw: unknown): ProductRecord {
     id: toNumber(record.id),
     name: toText(record.name),
     sku: toText(record.sku),
+    image: toText(record.image) || undefined,
+    image_public_id: toText(record.image_public_id) || undefined,
     part_number: toText(record.part_number),
     stock_quantity: toNumber(record.stock_quantity),
     low_stock_alarm: toNumber(record.low_stock_alarm),
@@ -1433,6 +1447,8 @@ export async function deletePaymentMethod(
 export type BikeRecord = {
   id: number;
   bike_blueprint_id: number;
+  image?: string;
+  image_public_id?: string;
   currency_pricing: string;
   cost_price: number;
   sale_price: number;
@@ -1447,6 +1463,8 @@ export type BikeRecord = {
 
 export type CreateBikePayload = {
   bike_blueprint_id: number;
+  image?: string;
+  image_public_id?: string;
   currency_pricing: string;
   cost_price: number;
   sale_price: number;
@@ -1465,6 +1483,8 @@ function normalizeBike(raw: unknown): BikeRecord {
   return {
     id: toNumber(record.id),
     bike_blueprint_id: toNumber(record.bike_blueprint_id),
+    image: toText(record.image) || undefined,
+    image_public_id: toText(record.image_public_id) || undefined,
     currency_pricing: toText(record.currency_pricing),
     cost_price: toNumber(record.cost_price),
     sale_price: toNumber(record.sale_price),
@@ -1878,12 +1898,19 @@ function normalizeSaleLineItem(raw: unknown): SaleLineItemRecord {
 function normalizeSale(raw: unknown): SaleRecord {
   const record = asRecord(raw);
   const lineItemsRaw = pickArray(record, ["line_items", "items"]);
+  const paymentMethod = asRecord(record.payment_method);
+  const camelPaymentMethod = asRecord(record.paymentMethod);
   return {
     id: toNumber(record.id),
     customer_id: toNumber(record.customer_id),
     seller_id: toNumber(record.seller_id),
     payment_method_id: toNumber(record.payment_method_id),
-    payment_method_name: toText(record.payment_method_name || (record.payment_method as any)?.name || (record.paymentMethod as any)?.name) || undefined,
+    payment_method_name:
+      toText(
+        record.payment_method_name ||
+          paymentMethod.name ||
+          camelPaymentMethod.name,
+      ) || undefined,
     user_id: toNumber(record.user_id),
     sale_type: toText(record.sale_type || record.type),
     status: toText(record.status),

@@ -37,7 +37,18 @@ export async function authorizedFetch<T>(
 
 export type Customer = { id: number; name: string; phone: string };
 export type BikeBlueprint = { id: number; model: string; year: number; brand?: { name: string } };
-export type Bike = { id: number; bike_blueprint_id: number; customer_id: number; brand?: string; model?: string; vin?: string; mileage?: number; bike_blueprint?: BikeBlueprint };
+export type Bike = {
+  id: number;
+  bike_blueprint_id: number;
+  customer_id: number;
+  image?: string;
+  image_public_id?: string;
+  brand?: string;
+  model?: string;
+  vin?: string;
+  mileage?: number;
+  bike_blueprint?: BikeBlueprint;
+};
 export type TicketItem = {
   id: number;
   task_id: number;
@@ -94,7 +105,14 @@ export const ticketsApi = {
     const res = await authorizedFetch<{ data: BikeBlueprint[] }>(`/bike_blueprints?search=${encodeURIComponent(search)}`);
     return res.data;
   },
-  createBike: async (data: { customer_id: number; bike_blueprint_id: number; vin?: string; mileage?: number }) => {
+  createBike: async (data: {
+    customer_id: number;
+    bike_blueprint_id: number;
+    image?: string;
+    image_public_id?: string;
+    vin?: string;
+    mileage?: number;
+  }) => {
     const res = await authorizedFetch<Bike>(`/customer_bikes`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },

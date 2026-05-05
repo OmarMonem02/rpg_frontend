@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { ImageUpload } from "@/components/ui/ImageUpload";
 import { ActionButton } from "@/components/ops-ui";
 
 type SectionSummaryResolver = (args: {
@@ -24,6 +25,7 @@ export type FieldConfig = {
     | "select"
     | "multiselect"
     | "toggle"
+    | "image"
     | "password"
     | "date"
     | "time";
@@ -46,6 +48,8 @@ export type FieldConfig = {
   step?: number | string;
   span?: 1 | 2;
   helperTone?: "default" | "featured" | "muted";
+  imagePublicIdField?: string;
+  uploadFolder?: string;
   summaryValue?: string | SectionSummaryResolver;
   onValueChange?: (args: {
     value: unknown;
@@ -164,6 +168,7 @@ export function EntityForm({
     if (field.type === "multiselect")
       return !Array.isArray(value) || value.length === 0;
     if (field.type === "toggle") return value !== true;
+    if (field.type === "image") return !value;
     if (typeof value === "number") return Number.isNaN(value);
     return value === "" || value === null || value === undefined;
   };
@@ -281,6 +286,7 @@ export function EntityForm({
       (field) =>
         field.type === "textarea" ||
         field.type === "toggle" ||
+        field.type === "image" ||
         field.type === "multiselect" ||
         field.span === 2,
     );
@@ -504,6 +510,42 @@ export function EntityForm({
                             )}
                           </div>
                         </label>
+                      ) : field.type === "image" ? (
+                        <div className="group">
+                          <label className="label-caps mb-2 ml-1 block">
+                            {field.label}{" "}
+                            {field.required && (
+                              <span className="text-error">*</span>
+                            )}
+                          </label>
+                          <ImageUpload
+                            value={String(fieldValue || "") || undefined}
+                            folder={field.label}
+                            uploadFolder={field.uploadFolder}
+                            onChange={(url, publicId) => {
+                              handleChange(field.name, url);
+                              if (field.imagePublicIdField) {
+                                handleChange(field.imagePublicIdField, publicId);
+                              }
+                            }}
+                            onError={(message) => {
+                              setFieldErrors((prev) => ({
+                                ...prev,
+                                [field.name]: message,
+                              }));
+                            }}
+                          />
+                          {field.description && (
+                            <p className="mt-2 ml-2 text-xs leading-relaxed text-on-surface-variant">
+                              {field.description}
+                            </p>
+                          )}
+                          {fieldErrors[field.name] && (
+                            <p className="mt-2 ml-2 text-xs font-bold text-error">
+                              {fieldErrors[field.name]}
+                            </p>
+                          )}
+                        </div>
                       ) : (
                         <div className="group">
                           <label className="label-caps mb-2 ml-1 block">

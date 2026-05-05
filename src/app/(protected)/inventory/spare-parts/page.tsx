@@ -114,7 +114,7 @@ export default function SparePartsPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, filters, getCleanFilters, categoriesPage]);
+  }, [page, getCleanFilters, categoriesPage]);
 
   useEffect(() => {
     loadDropdowns();
@@ -324,7 +324,19 @@ export default function SparePartsPage() {
                   <td className="mono-data px-4 py-3 text-xs text-on-surface-variant">
                     {part.sku}
                   </td>
-                  <td className="px-4 py-3 text-on-surface">{part.name}</td>
+                  <td className="px-4 py-3 text-on-surface">
+                    <div className="flex items-center gap-3">
+                      {part.image ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={part.image}
+                          alt=""
+                          className="h-10 w-10 flex-none rounded-xl object-cover"
+                        />
+                      ) : null}
+                      <span>{part.name}</span>
+                    </div>
+                  </td>
                   <td className="px-4 py-3 text-center">
                     {getStockBadge(part)}
                   </td>

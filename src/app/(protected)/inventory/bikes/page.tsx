@@ -248,7 +248,17 @@ export default function BikesPage() {
                     className="data-row"
                   >
                     <td className="px-4 py-3 text-on-surface font-medium">
-                      {getBlueprintLabel(bike.bike_blueprint_id)}
+                      <div className="flex items-center gap-3">
+                        {bike.image ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={bike.image}
+                            alt=""
+                            className="h-10 w-10 flex-none rounded-xl object-cover"
+                          />
+                        ) : null}
+                        <span>{getBlueprintLabel(bike.bike_blueprint_id)}</span>
+                      </div>
                     </td>
                     <td className="mono-data px-4 py-3 text-xs text-on-surface-variant">
                       {bike.vin}
