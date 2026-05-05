@@ -68,24 +68,6 @@ export default function LoginPage() {
 
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background bg-[radial-gradient(ellipse_80%_50%_at_50%_-10%,rgba(0,83,220,0.08),transparent)] p-6">
-      <svg
-        aria-hidden="true"
-        viewBox="0 0 320 320"
-        className="pointer-events-none absolute -right-20 -top-20 h-80 w-80 select-none text-on-surface opacity-[0.04] md:h-[34rem] md:w-[34rem]"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="3"
-      >
-        <circle cx="160" cy="160" r="128" />
-        <circle cx="160" cy="160" r="38" />
-        {Array.from({ length: 16 }).map((_, index) => {
-          const angle = (index * Math.PI) / 8;
-          const x = 160 + Math.cos(angle) * 128;
-          const y = 160 + Math.sin(angle) * 128;
-          return <line key={index} x1="160" y1="160" x2={x} y2={y} />;
-        })}
-      </svg>
-
       <div className="relative z-10 w-full max-w-md">
         <div className="text-center mb-8">
           <div className="mb-4 inline-flex h-22 w-22 items-center justify-center overflow-hidden rounded-2xl bg-primary/8 p-3 text-primary shadow-md shadow-primary/10 ring-1 ring-primary/20">
@@ -106,10 +88,7 @@ export default function LoginPage() {
         <section className="bg-surface-container-lowest border border-outline-variant/20 rounded-3xl p-8 shadow-[0_20px_60px_rgba(0,83,220,0.07)]">
           <form className="space-y-6" onSubmit={onSubmit}>
             <div className="space-y-2">
-              <label
-                className="label-caps ml-1"
-                htmlFor="email"
-              >
+              <label className="label-caps ml-1" htmlFor="email">
                 Email Address
               </label>
               <input
@@ -124,10 +103,7 @@ export default function LoginPage() {
             </div>
 
             <div className="space-y-2">
-              <label
-                className="label-caps ml-1"
-                htmlFor="password"
-              >
+              <label className="label-caps ml-1" htmlFor="password">
                 Password
               </label>
               <input
@@ -144,22 +120,22 @@ export default function LoginPage() {
             {message ? (
               <InlineMessage tone="danger">
                 <span className="flex items-center gap-3 font-medium">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="18"
-                  height="18"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <circle cx="12" cy="12" r="10" />
-                  <line x1="12" y1="8" x2="12" y2="12" />
-                  <line x1="12" y1="16" x2="12.01" y2="16" />
-                </svg>
-                {message}
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="12" y1="8" x2="12" y2="12" />
+                    <line x1="12" y1="16" x2="12.01" y2="16" />
+                  </svg>
+                  {message}
                 </span>
               </InlineMessage>
             ) : null}
@@ -170,7 +146,10 @@ export default function LoginPage() {
               className="w-full rounded-2xl bg-primary px-4 py-4 font-bold text-on-primary shadow-lg shadow-primary/20 transition-all hover:-translate-y-px hover:bg-accent hover:shadow-xl hover:shadow-primary/30 active:translate-y-0 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none"
             >
               {isLoading ? (
-                <span className="flex items-center justify-center gap-2" aria-label="Loading">
+                <span
+                  className="flex items-center justify-center gap-2"
+                  aria-label="Loading"
+                >
                   <svg
                     className="animate-spin h-5 w-5 text-on-primary"
                     xmlns="http://www.w3.org/2000/svg"
