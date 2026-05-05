@@ -56,7 +56,6 @@ export default function EditProductPage() {
       <PageHero
         eyebrow="Inventory Hub"
         title={`Editing ${product.name}`}
-        description="Modify product specifications, adjust stock levels, or update pricing details."
       />
       <ProductForm mode="edit" initialData={product} />
     </PageShell>

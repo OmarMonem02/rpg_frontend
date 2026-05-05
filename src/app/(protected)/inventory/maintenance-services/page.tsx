@@ -428,7 +428,6 @@ export default function MaintenanceServicesPage() {
       <PageHero
         eyebrow="Service Operations"
         title="Maintenance Services"
-        description="Run maintenance services and their sectors with the same operational flow as products, while filtering services directly by sector tabs."
       />
 
       <TabsWrapper

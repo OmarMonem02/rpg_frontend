@@ -91,7 +91,6 @@ export default function HomePage() {
       <PageHero
         eyebrow="RPG HUB"
         title={`Good morning, ${userName}`}
-        description="A precision workspace for sales, workshop tickets, inventory, and operational control."
         actions={
           <>
             {permissions.canAccessRoute("/inventory/spare-parts") ? (

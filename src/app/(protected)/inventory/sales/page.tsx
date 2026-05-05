@@ -123,7 +123,6 @@ export default function SalesPage() {
     <PageShell>
       <PageHero
         title="Sales"
-        description="Manage, track, and monitor all your sales transactions efficiently."
         actions={
           permissions.canCreate("sales") ? (
             <ActionButton

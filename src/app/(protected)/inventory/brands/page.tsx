@@ -176,7 +176,6 @@ export default function BrandsPage() {
       <PageHero
         eyebrow="Master Data"
         title="Brands"
-        description="Keep supplier and manufacturer brands clean across spare parts, products, and bike blueprints."
         actions={
           canCreateBrands ? (
             <ActionButton tone="primary" onClick={() => handleOpenModal()}>

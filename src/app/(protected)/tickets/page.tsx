@@ -54,7 +54,6 @@ export default function TicketsPage() {
       <PageHero
         eyebrow="Operations"
         title="Maintenance Dashboard"
-        description="Track vehicle repairs, manage technician tasks, and process customer billing."
         actions={
           <ActionButton tone="primary" onClick={() => setIsCreateOpen(true)} className="px-8">
             + Create Ticket

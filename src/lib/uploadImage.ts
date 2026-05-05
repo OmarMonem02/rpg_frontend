@@ -21,15 +21,8 @@ export class UploadImageError extends Error {
 }
 
 function getUploadUrl(): string {
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL?.trim().replace(/\/+$/, "");
-
-  if (!apiUrl) {
-    return "/api/upload-image";
-  }
-
-  return apiUrl.endsWith("/api")
-    ? `${apiUrl}/upload-image`
-    : `${apiUrl}/api/upload-image`;
+  // Always route image uploads through the Next.js API proxy to Cloudinary
+  return "/api/upload-image";
 }
 
 async function parseUploadError(response: Response): Promise<string> {

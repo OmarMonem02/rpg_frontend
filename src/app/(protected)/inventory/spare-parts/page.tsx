@@ -477,7 +477,6 @@ export default function SparePartsPage() {
       <PageHero
         eyebrow="Inventory Control"
         title="Spare Parts Management"
-        description="Operate parts inventory with stronger filtering, clearer stock signals, and guided create or edit flows."
         actions={
           <ActionButton
             tone="primary"

@@ -249,7 +249,7 @@ export function CartLineItemsPanel({
                               className="form-input-base mono-data w-20 py-1.5 text-right text-sm"
                             />
                             <span className="text-[10px] font-semibold tracking-wider text-on-surface-variant uppercase">
-                              Max: {calculateMaxDiscount(item).toFixed(0)}
+                              Max: {calculateMaxDiscount(item).toFixed(0)} {item.currency}
                             </span>
                           </div>
                         ) : (
@@ -281,6 +281,7 @@ export function CartLineItemsPanel({
                         {isEditing ? (
                           <div className="flex items-center justify-center gap-1.5">
                             <button
+                              type="button"
                               onClick={() => handleSaveEdit(item.id || item.sellable_id)}
                               className="rounded-lg p-1.5 text-green-600 transition-colors hover:bg-green-500/10"
                               title="Save Changes"
@@ -288,6 +289,7 @@ export function CartLineItemsPanel({
                               <CheckIcon className="h-5 w-5" />
                             </button>
                             <button
+                              type="button"
                               onClick={handleCancelEdit}
                               className="rounded-lg p-1.5 text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface"
                               title="Cancel"
@@ -298,6 +300,7 @@ export function CartLineItemsPanel({
                         ) : (
                           <div className="flex items-center justify-center gap-1.5 opacity-60 transition-opacity group-hover:opacity-100">
                             <button
+                              type="button"
                               onClick={() => handleEditClick(item)}
                               className="flex h-8 w-8 items-center justify-center rounded-lg bg-surface-container-lowest text-on-surface-variant shadow-sm ring-1 ring-inset ring-outline-variant/20 transition-all hover:bg-surface-container-low hover:text-on-surface"
                               title="Edit Row"
@@ -305,6 +308,7 @@ export function CartLineItemsPanel({
                               <PencilSquareIcon className="h-4 w-4" />
                             </button>
                             <button
+                              type="button"
                               onClick={() => onDeleteItem(item.id || item.sellable_id)}
                               className="rounded-lg p-1.5 text-error/60 transition-colors hover:bg-error/5 hover:text-error"
                               title="Delete Item"

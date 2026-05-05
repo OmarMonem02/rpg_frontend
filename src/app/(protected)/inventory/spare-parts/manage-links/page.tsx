@@ -30,11 +30,17 @@ export default function SparePartsManageLinkingPage() {
   const [spareParts, setSpareParts] = useState<SparePartRecord[]>([]);
   const [blueprints, setBlueprints] = useState<BikeBlueprintRecord[]>([]);
 
-  const [selected, setSelected] = useState<SelectedItems>({ spareParts: [], blueprints: [] });
+  const [selected, setSelected] = useState<SelectedItems>({
+    spareParts: [],
+    blueprints: [],
+  });
   const [searchSpareParts, setSearchSpareParts] = useState("");
   const [loading, setLoading] = useState(true);
   const [actionInProgress, setActionInProgress] = useState(false);
-  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [message, setMessage] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
 
   // Load spare parts
   const loadSpareParts = async () => {
@@ -102,7 +108,10 @@ export default function SparePartsManageLinkingPage() {
 
   const handleLinkSelected = async () => {
     if (selected.spareParts.length === 0 || selected.blueprints.length === 0) {
-      setMessage({ type: "error", text: "Please select both spare parts and blueprints" });
+      setMessage({
+        type: "error",
+        text: "Please select both spare parts and blueprints",
+      });
       return;
     }
 
@@ -128,7 +137,6 @@ export default function SparePartsManageLinkingPage() {
 
       // Reset selection
       setSelected({ spareParts: [], blueprints: [] });
-
     } catch (err) {
       setMessage({
         type: "error",
@@ -141,7 +149,10 @@ export default function SparePartsManageLinkingPage() {
 
   const handleUnlinkSelected = async () => {
     if (selected.spareParts.length === 0 || selected.blueprints.length === 0) {
-      setMessage({ type: "error", text: "Please select both spare parts and blueprints" });
+      setMessage({
+        type: "error",
+        text: "Please select both spare parts and blueprints",
+      });
       return;
     }
 
@@ -155,7 +166,11 @@ export default function SparePartsManageLinkingPage() {
       // Remove link for each blueprint-spare part combination
       for (const blueprintId of selected.blueprints) {
         for (const sparePartId of selected.spareParts) {
-          await removeSparePartFromBikeBlueprint(token, blueprintId, sparePartId);
+          await removeSparePartFromBikeBlueprint(
+            token,
+            blueprintId,
+            sparePartId,
+          );
           successCount++;
         }
       }
@@ -167,7 +182,6 @@ export default function SparePartsManageLinkingPage() {
 
       // Reset selection
       setSelected({ spareParts: [], blueprints: [] });
-
     } catch (err) {
       setMessage({
         type: "error",
@@ -180,7 +194,10 @@ export default function SparePartsManageLinkingPage() {
 
   const handleViewCurrentLinks = async () => {
     if (selected.spareParts.length === 0) {
-      setMessage({ type: "error", text: "Please select a spare part to view its links" });
+      setMessage({
+        type: "error",
+        text: "Please select a spare part to view its links",
+      });
       return;
     }
 
@@ -198,14 +215,19 @@ export default function SparePartsManageLinkingPage() {
         const linkedBlueprintModels: string[] = [];
 
         for (const blueprint of blueprints) {
-          const result = await listBikeBlueprintSpareParts(token, blueprint.id, 1, { per_page: 1000 });
+          const result = await listBikeBlueprintSpareParts(
+            token,
+            blueprint.id,
+            1,
+            { per_page: 1000 },
+          );
           if (result.items.some((item) => item.spare_part_id === sparePartId)) {
             linkedBlueprintModels.push(`${blueprint.model} ${blueprint.year}`);
           }
         }
 
         linkedDetails.push(
-          `${sparePart.name} (SKU: ${sparePart.sku}): ${linkedBlueprintModels.length > 0 ? linkedBlueprintModels.join(", ") : "No linked blueprints"}`
+          `${sparePart.name} (SKU: ${sparePart.sku}): ${linkedBlueprintModels.length > 0 ? linkedBlueprintModels.join(", ") : "No linked blueprints"}`,
         );
       }
 
@@ -216,7 +238,8 @@ export default function SparePartsManageLinkingPage() {
     } catch (err) {
       setMessage({
         type: "error",
-        text: err instanceof Error ? err.message : "Failed to fetch current links",
+        text:
+          err instanceof Error ? err.message : "Failed to fetch current links",
       });
     } finally {
       setActionInProgress(false);
@@ -237,9 +260,8 @@ export default function SparePartsManageLinkingPage() {
   return (
     <PageShell>
       <PageHero
-        eyebrow="Relationship Management"
-        title="Manage Spare Parts and Blueprint Links"
-        description="Link or unlink spare parts against bike blueprints from a single coordination surface."
+        eyebrow="Inventory Management"
+        title="Spare Parts and Blueprint Links"
       />
 
       {message && (
@@ -251,7 +273,10 @@ export default function SparePartsManageLinkingPage() {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* Left Column - Spare Parts List */}
         <SurfaceCard className="lg:col-span-1">
-          <SectionHeading title="Spare Parts" description="Choose one or more parts to inspect or link." />
+          <SectionHeading
+            title="Spare Parts"
+            description="Choose one or more parts to inspect or link."
+          />
 
           {/* Search */}
           <div className="mb-4">
@@ -268,7 +293,10 @@ export default function SparePartsManageLinkingPage() {
           <div className="max-h-96 space-y-2 overflow-y-auto">
             {spareParts.length > 0 ? (
               spareParts.map((part) => (
-                <label key={part.id} className="flex items-center space-x-3 p-2 hover:bg-gray-50">
+                <label
+                  key={part.id}
+                  className="flex items-center space-x-3 p-2 hover:bg-gray-50"
+                >
                   <input
                     type="checkbox"
                     checked={selected.spareParts.includes(part.id)}
@@ -286,21 +314,27 @@ export default function SparePartsManageLinkingPage() {
             )}
           </div>
 
-            <div className="mt-4 text-sm text-on-surface-variant">
-              Selected: {selected.spareParts.length} part(s)
-            </div>
+          <div className="mt-4 text-sm text-on-surface-variant">
+            Selected: {selected.spareParts.length} part(s)
+          </div>
         </SurfaceCard>
 
         {/* Right Column - Blueprints Multi-select and Actions */}
         <div className="lg:col-span-2 space-y-6">
           {/* Blueprints Multi-select */}
           <SurfaceCard>
-            <SectionHeading title="Blueprints" description="Choose the blueprints to link or unlink against the selected parts." />
+            <SectionHeading
+              title="Blueprints"
+              description="Choose the blueprints to link or unlink against the selected parts."
+            />
 
             <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
               {blueprints.length > 0 ? (
                 blueprints.map((blueprint) => (
-                  <label key={blueprint.id} className="flex items-center space-x-3 p-2 hover:bg-gray-50">
+                  <label
+                    key={blueprint.id}
+                    className="flex items-center space-x-3 p-2 hover:bg-gray-50"
+                  >
                     <input
                       type="checkbox"
                       checked={selected.blueprints.includes(blueprint.id)}
@@ -315,7 +349,9 @@ export default function SparePartsManageLinkingPage() {
                   </label>
                 ))
               ) : (
-                <p className="col-span-2 text-center text-gray-500">No blueprints available</p>
+                <p className="col-span-2 text-center text-gray-500">
+                  No blueprints available
+                </p>
               )}
             </div>
 
@@ -337,17 +373,28 @@ export default function SparePartsManageLinkingPage() {
 
           {/* Action Buttons */}
           <SurfaceCard>
-            <SectionHeading title="Actions" description="Apply the selected relationships in bulk." />
+            <SectionHeading
+              title="Actions"
+              description="Apply the selected relationships in bulk."
+            />
             <div className="flex flex-col gap-3">
               <ActionButton
                 onClick={handleLinkSelected}
-                disabled={actionInProgress || selected.spareParts.length === 0 || selected.blueprints.length === 0}
+                disabled={
+                  actionInProgress ||
+                  selected.spareParts.length === 0 ||
+                  selected.blueprints.length === 0
+                }
               >
                 {actionInProgress ? "Processing..." : "Link Selected"}
               </ActionButton>
               <ActionButton
                 onClick={handleUnlinkSelected}
-                disabled={actionInProgress || selected.spareParts.length === 0 || selected.blueprints.length === 0}
+                disabled={
+                  actionInProgress ||
+                  selected.spareParts.length === 0 ||
+                  selected.blueprints.length === 0
+                }
                 tone="danger"
               >
                 {actionInProgress ? "Processing..." : "Unlink Selected"}

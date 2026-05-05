@@ -20,33 +20,30 @@ export function PageShell({ children, className = "" }: { children: ReactNode; c
 export function PageHero({
   eyebrow,
   title,
-  description,
   actions,
   meta,
 }: {
   eyebrow?: string;
   title: string;
-  description: string;
   actions?: ReactNode;
   meta?: ReactNode;
 }) {
   return (
-    <section className="animate-fade-in overflow-hidden rounded-[1.75rem] border border-l-4 border-outline-variant/15 border-l-primary bg-surface-container-low shadow-ambient">
+    <section className="animate-fade-in overflow-hidden rounded-[1.75rem] border border-outline-variant/15 bg-surface-container-low shadow-ambient">
       <div className="grid gap-5 p-5 md:p-6 lg:grid-cols-[1.35fr_0.85fr] lg:items-end">
         <div>
           {eyebrow ? (
-            <div className="mb-3">
-              <span className="label-caps inline-flex items-center rounded-full border border-outline-variant/15 bg-surface px-3 py-1">
+            <div className="mb-4">
+              <span className="label-caps inline-flex items-center rounded-full border border-primary/20 bg-primary/5 px-3.5 py-1.5 text-primary">
                 {eyebrow}
               </span>
             </div>
           ) : null}
-          <h1 className="font-display text-3xl font-extrabold leading-tight text-on-surface md:text-[2.75rem]">
+          <h1 className="font-display text-3xl font-extrabold tracking-tight text-on-surface md:text-4xl lg:text-[2.75rem] lg:leading-[1.1]">
             {title}
           </h1>
-          <p className="mt-3 max-w-xl text-sm leading-relaxed text-on-surface-variant md:text-base">{description}</p>
         </div>
-        <div className="flex flex-col gap-3 lg:items-end">
+        <div className="flex flex-col gap-4 lg:items-end">
           {meta ? <div className="grid w-full gap-3 lg:max-w-md">{meta}</div> : null}
           {actions ? <div className="flex w-full flex-wrap gap-3 lg:justify-end">{actions}</div> : null}
         </div>

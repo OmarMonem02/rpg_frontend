@@ -97,7 +97,6 @@ export default function BikeBlueprintsPage() {
       <PageHero
         eyebrow="Master Data"
         title="Bike Blueprints"
-        description="Define models and years, then jump directly into linked spare-parts management for each blueprint."
         actions={
           canCreateBlueprints ? (
             <ActionButton

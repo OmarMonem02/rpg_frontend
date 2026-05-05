@@ -56,7 +56,6 @@ export default function EditBlueprintPage() {
       <PageHero
         eyebrow="Master Data"
         title={`Editing ${blueprint.model}`}
-        description="Update the manufacturer, model, or production year for this model record."
       />
       <BlueprintForm mode="edit" initialData={blueprint} />
     </PageShell>

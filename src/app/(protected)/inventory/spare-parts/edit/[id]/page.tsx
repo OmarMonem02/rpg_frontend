@@ -22,7 +22,9 @@ export default function EditSparePartPage() {
         const data = await getSparePart(token, id);
         setPart(data);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load spare part");
+        setError(
+          err instanceof Error ? err.message : "Failed to load spare part",
+        );
       } finally {
         setLoading(false);
       }
@@ -44,8 +46,12 @@ export default function EditSparePartPage() {
     return (
       <PageShell>
         <div className="max-w-4xl mx-auto py-24 text-center">
-           <h2 className="text-2xl font-bold text-on-surface">Spare Part Not Found</h2>
-           <p className="mt-2 text-on-surface-variant">{error ?? "The part you are looking for does not exist."}</p>
+          <h2 className="text-2xl font-bold text-on-surface">
+            Spare Part Not Found
+          </h2>
+          <p className="mt-2 text-on-surface-variant">
+            {error ?? "The part you are looking for does not exist."}
+          </p>
         </div>
       </PageShell>
     );
@@ -53,11 +59,7 @@ export default function EditSparePartPage() {
 
   return (
     <PageShell>
-      <PageHero
-        eyebrow="Inventory Control"
-        title={`Editing ${part.name}`}
-        description="Update stock levels, compatibility links, or pricing models for this spare part."
-      />
+      <PageHero eyebrow="Inventory Control" title={`Editing ${part.name}`} />
       <SparePartForm mode="edit" initialData={part} />
     </PageShell>
   );

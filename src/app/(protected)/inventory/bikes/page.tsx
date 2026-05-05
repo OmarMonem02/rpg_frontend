@@ -130,7 +130,6 @@ export default function BikesPage() {
       <PageHero
         eyebrow="Showroom Inventory"
         title="Bikes For Sale"
-        description="Manage the live showroom catalog with blueprint identity, mileage, pricing, and sale status in one operational view."
         actions={
           <ActionButton tone="primary" onClick={() => router.push("/inventory/bikes/create")}>
             Add Bike

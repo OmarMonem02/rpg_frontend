@@ -56,7 +56,6 @@ export default function EditBikePage() {
       <PageHero
         eyebrow="Showroom Inventory"
         title={`Editing VIN: ${bike.vin}`}
-        description="Modify listing details, adjust current status, or update pricing for this showroom unit."
       />
       <BikeForm mode="edit" initialData={bike} />
     </PageShell>

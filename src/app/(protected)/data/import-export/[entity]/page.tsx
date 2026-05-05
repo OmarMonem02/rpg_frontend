@@ -109,7 +109,6 @@ export default function EntityImportExportPage() {
 
       <PageHero
         title={`Manage ${entity.label}`}
-        description="Export existing data or import bulk changes for this entity."
       />
 
       <div className="grid gap-6 md:grid-cols-2">

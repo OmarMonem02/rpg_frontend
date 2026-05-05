@@ -37,7 +37,8 @@ export default function UserPermissionsPage() {
       setUser(userData);
       setLoadError(null);
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to load user";
+      const message =
+        err instanceof Error ? err.message : "Failed to load user";
       setLoadError(message);
     } finally {
       setLoading(false);
@@ -58,7 +59,11 @@ export default function UserPermissionsPage() {
       if (!token) throw new Error("Authentication required");
       if (!userId || userId <= 0) throw new Error("Invalid user ID");
 
-      const updatedUser = await updateUserPermissions(token, userId, newPermissions);
+      const updatedUser = await updateUserPermissions(
+        token,
+        userId,
+        newPermissions,
+      );
       setUser(updatedUser);
 
       const currentUser = getAuthUser();
@@ -96,7 +101,7 @@ export default function UserPermissionsPage() {
   if (!user) {
     return (
       <PageShell>
-        <PageHero title="User Not Found" description="The user could not be loaded." />
+        <PageHero title="User Not Found" />
         <InlineMessage tone="danger">
           {loadError || "Failed to load user information. Please try again."}
         </InlineMessage>
@@ -112,8 +117,18 @@ export default function UserPermissionsPage() {
           className="flex items-center justify-center w-10 h-10 rounded-lg border border-outline-variant/30 hover:bg-surface-container transition-colors"
           title="Go back"
         >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          <svg
+            className="w-5 h-5"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M15 19l-7-7 7-7"
+            />
           </svg>
         </button>
         <div>
@@ -123,9 +138,7 @@ export default function UserPermissionsPage() {
       </div>
 
       <PageHero
-        title="User Authorizations"
-        description={`Manage permissions and access controls for ${user.name} (${user.email}). 
-        Review the backend-owned permissions matrix and update page and action access directly.`}
+        title={`User Authorizations for ${user.name} (${user.email})`}
       />
 
       {loadError && <InlineMessage tone="danger">{loadError}</InlineMessage>}

@@ -1,0 +1,398 @@
+// === SALES & PAYMENT METHODS ===
+import {
+  asRecord,
+  pickArray,
+  toText,
+  toNumber,
+  parsePagination,
+  authorizedFetch,
+  buildQuery,
+  type PaginatedResult,
+} from "./core";
+import { normalizeCustomer, type CustomerRecord } from "./customers";
+import { normalizeSeller, type SellerRecord } from "./users";
+
+// --- PAYMENT METHODS ---
+export type PaymentMethodRecord = {
+  id: number;
+  name: string;
+  created_at?: string;
+};
+
+export type CreatePaymentMethodPayload = {
+  name: string;
+};
+
+export function normalizePaymentMethod(raw: unknown): PaymentMethodRecord {
+  const record = asRecord(raw);
+  return {
+    id: toNumber(record.id),
+    name: toText(record.name),
+    created_at: toText(record.created_at) || undefined,
+  };
+}
+
+export async function listPaymentMethods(
+  token: string,
+  page = 1,
+): Promise<PaginatedResult<PaymentMethodRecord>> {
+  const query = buildQuery({ page });
+  const payload = await authorizedFetch<unknown>(
+    `/payment_methods?${query}`,
+    token,
+  );
+  const rows = pickArray(payload, ["data", "payment_methods"]);
+  const meta = parsePagination(payload);
+  return {
+    items: rows.map(normalizePaymentMethod).filter((item) => item.id > 0),
+    currentPage: meta.current_page ?? 1,
+    lastPage: meta.last_page ?? 1,
+  };
+}
+
+export async function createPaymentMethod(
+  token: string,
+  payload: CreatePaymentMethodPayload,
+): Promise<PaymentMethodRecord> {
+  const data = await authorizedFetch<unknown>("/payment_methods", token, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const record = asRecord(data);
+  return normalizePaymentMethod(record.data ?? record);
+}
+
+export async function updatePaymentMethod(
+  token: string,
+  id: number,
+  payload: CreatePaymentMethodPayload,
+): Promise<PaymentMethodRecord> {
+  const data = await authorizedFetch<unknown>(`/payment_methods/${id}`, token, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const record = asRecord(data);
+  return normalizePaymentMethod(record.data ?? record);
+}
+
+export async function deletePaymentMethod(
+  token: string,
+  id: number,
+): Promise<void> {
+  await authorizedFetch<void>(`/payment_methods/${id}`, token, {
+    method: "DELETE",
+  });
+}
+
+// --- SALES ---
+export type SaleLineItemRecord = {
+  id: number;
+  sale_id: number;
+  sellable_type: "products" | "spare_parts" | "bikes" | "maintenance_services";
+  sellable_id: number;
+  selling_price: number;
+  discount_amount: number;
+  quantity: number;
+  returned_qty: number;
+  remaining_qty: number;
+  item_label?: string;
+  item_name?: string;
+  created_at?: string;
+};
+
+export type SaleRecord = {
+  id: number;
+  customer_id: number;
+  seller_id: number;
+  payment_method_id: number;
+  payment_method_name?: string;
+  user_id: number;
+  sale_type: string;
+  status: string;
+  delivery_status: string;
+  is_maintenance: boolean;
+  shipping_fee: number;
+  sale_discount: number;
+  total: number;
+  line_items?: SaleLineItemRecord[];
+  created_at?: string;
+  updated_at?: string;
+  customer?: CustomerRecord;
+  seller?: SellerRecord;
+};
+
+export type CreateSaleLineItemPayload = {
+  product_id?: number;
+  spare_part_id?: number;
+  bike_for_sale_id?: number;
+  maintenance_service_id?: number;
+  selling_price: number;
+  discount?: number;
+  qty: number;
+};
+
+export type CreateSalePayload = {
+  customer_id: number;
+  seller_id: number;
+  payment_method_id: number;
+  type: "site" | "online" | "delivery";
+  status?:
+    | "completed"
+    | "partial"
+    | "pending"
+    | "returned"
+    | "cancelled";
+  delivery_status?: "pending" | "in-transit" | "delivered";
+  shipping_fee?: number;
+  sale_discount?: number;
+  is_maintenance?: boolean;
+  items: CreateSaleLineItemPayload[];
+};
+
+export type UpdateSalePayload = Partial<
+  Omit<CreateSalePayload, "line_items" | "status">
+> & {
+  status?: string;
+};
+
+export type UpdateSaleLineItemPayload = Partial<CreateSaleLineItemPayload>;
+
+/** Strips known type prefixes the backend prepends to item_label (e.g. "product ", "spare part "). */
+export function stripItemTypePrefix(label: string): string {
+  const prefixes = ["maintenance service ", "spare part ", "product ", "bike "];
+  for (const prefix of prefixes) {
+    if (label.toLowerCase().startsWith(prefix)) {
+      return label.slice(prefix.length);
+    }
+  }
+  return label;
+}
+
+export function normalizeSaleLineItem(raw: unknown): SaleLineItemRecord {
+  const record = asRecord(raw);
+  const qty = toNumber(record.quantity || record.qty || 0);
+  const returned = toNumber(record.returned_qty || 0);
+  const rawLabel = toText(record.item_label) || undefined;
+  return {
+    id: toNumber(record.id),
+    sale_id: toNumber(record.sale_id),
+    sellable_type: toText(record.sellable_type) as
+      | "products"
+      | "spare_parts"
+      | "bikes"
+      | "maintenance_services",
+    sellable_id: toNumber(record.sellable_id),
+    selling_price: toNumber(record.selling_price || record.sale_price || 0),
+    discount_amount: toNumber(record.discount_amount || record.discount || 0),
+    quantity: qty,
+    returned_qty: returned,
+    remaining_qty: toNumber(record.remaining_qty ?? Math.max(0, qty - returned)),
+    item_label: rawLabel,
+    item_name: rawLabel ? stripItemTypePrefix(rawLabel) : undefined,
+    created_at: toText(record.created_at) || undefined,
+  };
+}
+
+export function normalizeSale(raw: unknown): SaleRecord {
+  const record = asRecord(raw);
+  const lineItemsRaw = pickArray(record, ["line_items", "items"]);
+  const paymentMethod = asRecord(record.payment_method);
+  const camelPaymentMethod = asRecord(record.paymentMethod);
+  return {
+    id: toNumber(record.id),
+    customer_id: toNumber(record.customer_id),
+    seller_id: toNumber(record.seller_id),
+    payment_method_id: toNumber(record.payment_method_id),
+    payment_method_name:
+      toText(
+        record.payment_method_name ||
+          paymentMethod.name ||
+          camelPaymentMethod.name,
+      ) || undefined,
+    user_id: toNumber(record.user_id),
+    sale_type: toText(record.sale_type || record.type),
+    status: toText(record.status),
+    delivery_status: toText(
+      record.delivery_status || record.delivery_date || "pending",
+    ),
+    is_maintenance:
+      record.is_maintenance === true || record.is_maintenance === "true",
+    shipping_fee: toNumber(record.shipping_fee || 0),
+    sale_discount: toNumber(record.sale_discount || record.discount || 0),
+    total: toNumber(record.total || 0),
+    line_items: lineItemsRaw.map(normalizeSaleLineItem),
+    created_at: toText(record.created_at) || undefined,
+    updated_at: toText(record.updated_at) || undefined,
+    customer: record.customer ? normalizeCustomer(record.customer) : undefined,
+    seller: record.seller ? normalizeSeller(record.seller) : undefined,
+  };
+}
+
+export async function listSales(
+  token: string,
+  page = 1,
+  filters?: {
+    search?: string;
+    customer_id?: number;
+    seller_id?: number;
+    payment_method_id?: number;
+    status?: string;
+    delivery_status?: string;
+    sale_type?: string;
+    is_maintenance?: boolean;
+    date_from?: string;
+    date_to?: string;
+    total_min?: number;
+    total_max?: number;
+    user_id?: number;
+  },
+): Promise<PaginatedResult<SaleRecord>> {
+  const query = buildQuery({
+    page,
+    search: filters?.search,
+    customer_id: filters?.customer_id,
+    seller_id: filters?.seller_id,
+    payment_method_id: filters?.payment_method_id,
+    status: filters?.status,
+    delivery_status: filters?.delivery_status,
+    type: filters?.sale_type,
+    is_maintenance: filters?.is_maintenance,
+    date_from: filters?.date_from,
+    date_to: filters?.date_to,
+    total_min: filters?.total_min,
+    total_max: filters?.total_max,
+    user_id: filters?.user_id,
+  });
+
+  const payload = await authorizedFetch<unknown>(`/sales?${query}`, token);
+  const rows = pickArray(payload, ["data", "sales"]);
+  const meta = parsePagination(payload);
+  return {
+    items: rows.map(normalizeSale).filter((item) => item.id > 0),
+    currentPage: meta.current_page ?? 1,
+    lastPage: meta.last_page ?? 1,
+  };
+}
+
+export async function getSale(token: string, id: number): Promise<SaleRecord> {
+  const data = await authorizedFetch<unknown>(`/sales/${id}`, token);
+  const record = asRecord(data);
+  return normalizeSale(record.data ?? record.sale ?? record);
+}
+
+export async function createSale(
+  token: string,
+  payload: CreateSalePayload,
+): Promise<SaleRecord> {
+  const data = await authorizedFetch<unknown>("/sales", token, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const record = asRecord(data);
+  return normalizeSale(record.data ?? record);
+}
+
+export async function updateSale(
+  token: string,
+  id: number,
+  payload: UpdateSalePayload,
+): Promise<SaleRecord> {
+  const data = await authorizedFetch<unknown>(`/sales/${id}`, token, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const record = asRecord(data);
+  return normalizeSale(record.data ?? record);
+}
+
+export async function deleteSale(token: string, id: number): Promise<void> {
+  await authorizedFetch<void>(`/sales/${id}`, token, { method: "DELETE" });
+}
+
+export async function addSaleLineItem(
+  token: string,
+  saleId: number,
+  payload: CreateSaleLineItemPayload,
+): Promise<SaleLineItemRecord> {
+  const data = await authorizedFetch<unknown>(`/sales/${saleId}/items`, token, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const record = asRecord(data);
+  return normalizeSaleLineItem(record.data ?? record);
+}
+
+export async function updateSaleLineItem(
+  token: string,
+  saleId: number,
+  itemId: number,
+  payload: UpdateSaleLineItemPayload,
+): Promise<SaleLineItemRecord> {
+  const data = await authorizedFetch<unknown>(
+    `/sales/${saleId}/items/${itemId}`,
+    token,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    },
+  );
+  const record = asRecord(data);
+  return normalizeSaleLineItem(record.data ?? record);
+}
+
+export async function deleteSaleLineItem(
+  token: string,
+  saleId: number,
+  itemId: number,
+): Promise<void> {
+  await authorizedFetch<void>(`/sales/${saleId}/items/${itemId}`, token, {
+    method: "DELETE",
+  });
+}
+
+export async function processSaleReturn(
+  token: string,
+  saleId: number,
+  payload: { sale_item_id: number; qty: number; notes?: string },
+): Promise<SaleRecord> {
+  const data = await authorizedFetch<unknown>(
+    `/sales/${saleId}/returns`,
+    token,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    },
+  );
+  const record = asRecord(data);
+  return normalizeSale(record.data ?? record);
+}
+
+export async function processSaleExchange(
+  token: string,
+  saleId: number,
+  payload: {
+    sale_item_id: number;
+    qty: number;
+    notes?: string;
+    replacements: CreateSaleLineItemPayload[];
+  },
+): Promise<SaleRecord> {
+  const data = await authorizedFetch<unknown>(
+    `/sales/${saleId}/exchanges`,
+    token,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    },
+  );
+  const record = asRecord(data);
+  return normalizeSale(record.data ?? record);
+}

@@ -515,7 +515,6 @@ export default function ProductsPage() {
       <PageHero
         eyebrow="Inventory Control"
         title="Products Management"
-        description="Operate products with the same inventory-first system used for spare parts: clearer filters, cleaner stock status, and guided forms."
         actions={
           canCreateProducts ? (
             <ActionButton
