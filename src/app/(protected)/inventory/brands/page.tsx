@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { usePermissions } from "@/components/permission-provider";
 import { getAuthToken } from "@/lib/auth-session";
 import { useEntityFilters } from "@/hooks/useEntityFilters";
@@ -43,31 +43,24 @@ export default function BrandsPage() {
     getCleanFilters,
     setSearch,
     setType,
-    setCurrency,
-    setPriceMin,
-    setPriceMax,
     filters,
-    logFilters,
   } = useEntityFilters();
 
   const canCreateBrands = permissions.canCreate("brands");
   const canUpdateBrands = permissions.canUpdate("brands");
   const canDeleteBrands = permissions.canDelete("brands");
 
-  const loadBrands = async () => {
+  const loadBrands = useCallback(async () => {
     try {
       setLoading(true);
       const token = getAuthToken();
       if (!token) throw new Error("Authentication required");
 
-      console.log("[Brands] Applying filters:", filters, "Page:", page);
-      logFilters();
-
       const cleanFilters = getCleanFilters();
       const result = await listBrands(
         token,
         page,
-        cleanFilters as never,
+        cleanFilters as { type?: string; search?: string; currency?: string },
       );
       setBrands(result.items);
       setTotalPages(result.lastPage);
@@ -77,12 +70,11 @@ export default function BrandsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, getCleanFilters]);
 
   useEffect(() => {
     void loadBrands();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, filters]);
+  }, [loadBrands]);
 
   useGlobalDataRefresh(loadBrands);
 
