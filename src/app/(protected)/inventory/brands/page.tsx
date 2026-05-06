@@ -192,7 +192,7 @@ export default function BrandsPage() {
       ) : null}
 
       <SurfaceCard>
-        <FilterBar className="md:grid-cols-12">
+        <FilterBar className="mb-6 md:grid-cols-12">
           <InputGroup label="Search Brands" className="md:col-span-6">
             <input
               type="text"
@@ -217,18 +217,6 @@ export default function BrandsPage() {
             </select>
           </InputGroup>
         </FilterBar>
-
-        <AdvancedFilters
-          priceMin={filters.price_min}
-          setPriceMin={setPriceMin}
-          priceMax={filters.price_max}
-          setPriceMax={setPriceMax}
-          currency={filters.currency || "all"}
-          setCurrency={setCurrency}
-          showPriceFilters={false}
-          showCurrencyFilter={true}
-        />
-
         {loading ? (
           <div className="flex justify-center py-12">
             <div className="h-8 w-8 animate-spin rounded-full border-4 border-outline-variant/30 border-t-primary" />

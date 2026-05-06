@@ -144,16 +144,6 @@ export default function BikeBlueprintsPage() {
           </InputGroup>
         </FilterBar>
 
-        <AdvancedFilters
-          priceMin={filters.price_min}
-          setPriceMin={setPriceMin}
-          priceMax={filters.price_max}
-          setPriceMax={setPriceMax}
-          currency={filters.currency || "all"}
-          setCurrency={setCurrency}
-          showPriceFilters={true}
-          showCurrencyFilter={true}
-        />
 
         {loading ? (
           <div className="flex justify-center py-12">

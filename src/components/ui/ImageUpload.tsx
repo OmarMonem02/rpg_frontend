@@ -156,12 +156,12 @@ export function ImageUpload({
         onDragLeave={() => setIsDragging(false)}
         onDrop={handleDrop}
         className={[
-          "group relative flex min-h-56 cursor-pointer overflow-hidden rounded-2xl border border-dashed p-4 transition-all duration-200",
-          "bg-[#14100e] text-white shadow-[0_18px_42px_rgba(20,16,14,0.18)]",
+          "group relative flex min-h-56 cursor-pointer overflow-hidden rounded-[1.5rem] border border-dashed p-5 transition-all duration-200",
+          "bg-surface-container-low hover:bg-surface-container shadow-ambient",
           isDragging
-            ? "border-accent ring-4 ring-accent/20"
-            : "border-orange-500/35 hover:border-accent",
-          errorMessage ? "border-error/70 ring-4 ring-error/15" : "",
+            ? "border-primary ring-4 ring-primary/20 bg-primary/5"
+            : "border-outline-variant/25 hover:border-primary/50",
+          errorMessage ? "border-error/70 ring-4 ring-error/15 bg-error/5" : "",
         ].join(" ")}
       >
         <input
@@ -177,28 +177,33 @@ export function ImageUpload({
         />
 
         {previewUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={previewUrl}
-            alt=""
-            className="absolute inset-0 h-full w-full object-cover opacity-80 transition-transform duration-300 group-hover:scale-[1.02]"
-          />
-        ) : (
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(232,56,13,0.26),transparent_38%),linear-gradient(135deg,rgba(255,122,26,0.16),transparent_45%)]" />
-        )}
-
-        <div className="absolute inset-0 bg-gradient-to-t from-black/78 via-black/20 to-black/10" />
+          <>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={previewUrl}
+              alt=""
+              className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-black/40" />
+          </>
+        ) : null}
 
         <div className="relative z-10 flex w-full flex-col justify-between gap-6">
           <div className="flex items-start justify-between gap-3">
-            <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-black/35 px-3 py-1.5 text-xs font-semibold uppercase text-orange-100 backdrop-blur">
+            <div
+              className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold uppercase backdrop-blur shadow-sm ${
+                previewUrl
+                  ? "border-white/20 bg-black/40 text-white"
+                  : "border-outline-variant/20 bg-surface text-on-surface-variant"
+              }`}
+            >
               <PhotoIcon className="h-4 w-4" aria-hidden="true" />
               {folder}
             </div>
             {previewUrl ? (
               <button
                 type="button"
-                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-black/40 text-white transition-colors hover:bg-black/65"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-black/40 text-white backdrop-blur transition-all hover:bg-error hover:border-error shadow-sm"
                 aria-label="Clear selected preview"
                 onClick={(event) => {
                   event.preventDefault();
@@ -212,20 +217,46 @@ export function ImageUpload({
           </div>
 
           <div>
-            <div className="mb-3 inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-accent text-white shadow-lg shadow-accent/25">
+            <div
+              className={`mb-3 inline-flex h-12 w-12 items-center justify-center rounded-2xl shadow-lg transition-transform group-hover:-translate-y-1 ${
+                previewUrl
+                  ? "bg-white/20 text-white backdrop-blur border border-white/10"
+                  : "bg-primary text-on-primary shadow-primary/25"
+              }`}
+            >
               {isUploading ? (
                 <span
-                  className="h-5 w-5 animate-spin rounded-full border-2 border-white/40 border-t-white"
+                  className={`h-5 w-5 animate-spin rounded-full border-2 ${
+                    previewUrl
+                      ? "border-white/40 border-t-white"
+                      : "border-on-primary/40 border-t-on-primary"
+                  }`}
                   aria-hidden="true"
                 />
               ) : (
                 <ArrowUpTrayIcon className="h-6 w-6" aria-hidden="true" />
               )}
             </div>
-            <p className="text-lg font-bold">
-              {isUploading ? "Uploading image" : "Drop image or browse"}
+            <p
+              className={`text-lg font-bold ${
+                previewUrl
+                  ? "text-white shadow-black/50 drop-shadow-sm"
+                  : "text-on-surface"
+              }`}
+            >
+              {isUploading
+                ? "Uploading image"
+                : previewUrl
+                  ? "Change image"
+                  : "Drop image or browse"}
             </p>
-            <p className="mt-1 max-w-md text-sm leading-6 text-orange-50/78">
+            <p
+              className={`mt-1 max-w-md text-sm leading-6 ${
+                previewUrl
+                  ? "text-white/80 shadow-black/50 drop-shadow-sm"
+                  : "text-on-surface-variant"
+              }`}
+            >
               JPG, PNG, or WebP. Max {maxSizeMB}MB.
             </p>
           </div>

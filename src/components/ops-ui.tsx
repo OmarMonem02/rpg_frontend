@@ -276,7 +276,7 @@ export function PaginationControls({
   ).filter((pageNumber) => pageNumber <= totalPages);
 
   return (
-    <div className="pagination-controls flex flex-wrap items-center justify-between gap-3 rounded-[1.25rem] border border-outline-variant/15 bg-surface-container-low px-4 py-3">
+    <div className="pagination-controls sticky bottom-1 z-20 flex flex-wrap items-center justify-between gap-3 rounded-[1.25rem] border border-outline-variant/15 bg-surface-container-low px-4 py-3">
       <p className="text-sm text-on-surface-variant">
         Page <span className="mono-data rounded-lg bg-primary px-2 py-0.5 text-xs text-on-primary">{page}</span> of {totalPages}
       </p>
