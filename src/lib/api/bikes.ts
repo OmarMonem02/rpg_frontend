@@ -115,6 +115,61 @@ export async function deleteBikeBlueprint(
   });
 }
 
+/** Options for cascading spare-part compatibility filters (matches Laravel JSON shape). */
+export type BikeBlueprintFilterModelOption = {
+  value: string;
+  label: string;
+};
+
+export type BikeBlueprintFilterYearOption = {
+  value: number;
+  label: string;
+};
+
+/**
+ * GET /api/bike_blueprints/filter/models — distinct blueprint models for a bike brand.
+ */
+export async function listBikeBlueprintFilterModels(
+  token: string,
+  brandId: number,
+): Promise<BikeBlueprintFilterModelOption[]> {
+  const query = buildQuery({ brand_id: brandId });
+  const data = await authorizedFetch<unknown>(
+    `/bike_blueprints/filter/models?${query}`,
+    token,
+  );
+  if (!Array.isArray(data)) return [];
+  return data.map((row) => {
+    const r = asRecord(row);
+    const value = toText(r.value) || toText(r.label);
+    const label = toText(r.label) || value;
+    return { value, label };
+  });
+}
+
+/**
+ * GET /api/bike_blueprints/filter/years — distinct years for brand + exact model.
+ */
+export async function listBikeBlueprintFilterYears(
+  token: string,
+  brandId: number,
+  model: string,
+): Promise<BikeBlueprintFilterYearOption[]> {
+  const query = buildQuery({ brand_id: brandId, model });
+  const data = await authorizedFetch<unknown>(
+    `/bike_blueprints/filter/years?${query}`,
+    token,
+  );
+  if (!Array.isArray(data)) return [];
+  return data.map((row) => {
+    const r = asRecord(row);
+    return {
+      value: toNumber(r.value),
+      label: toText(r.label) || String(toNumber(r.value)),
+    };
+  });
+}
+
 // --- BIKES FOR SALE ---
 export type BikeRecord = {
   id: number;

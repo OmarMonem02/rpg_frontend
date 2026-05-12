@@ -99,6 +99,16 @@ export function SparePartForm({ mode, initialData }: SparePartFormProps) {
         throw new Error("Compatibility year range is invalid (From year > To year).");
       }
 
+      const isUniversal = Boolean(formData.universal);
+      const selectedBlueprintsRaw = Array.isArray(formData.blueprint_ids)
+        ? (formData.blueprint_ids as number[])
+        : [];
+      if (!isUniversal && selectedBlueprintsRaw.length === 0) {
+        throw new Error(
+          "Please select at least one Compatible Bike Blueprint (or enable Universal Part).",
+        );
+      }
+
       const toNumber = (v: unknown): number | undefined => {
         const n = Number(v);
         return Number.isFinite(n) ? n : undefined;
@@ -126,14 +136,15 @@ export function SparePartForm({ mode, initialData }: SparePartFormProps) {
       };
 
       let sparePart: SparePartRecord;
-      const isUniversal = Boolean(formData.universal);
-      const selectedBlueprints = isUniversal
-        ? []
-        : ((formData.blueprint_ids as number[]) || []);
+      const selectedBlueprints = isUniversal ? [] : selectedBlueprintsRaw;
       if (mode === "edit" && initialData) {
         sparePart = await updateMutation.mutateAsync({
           id: initialData.id,
-          payload: basePayload,
+          payload: {
+            ...basePayload,
+            // Same request as universal toggle so SparePartRequest validation passes; controller syncs pivot.
+            bike_blueprint_ids: selectedBlueprints,
+          },
         });
       } else {
         const createPayload = {
@@ -144,13 +155,7 @@ export function SparePartForm({ mode, initialData }: SparePartFormProps) {
         sparePart = await createMutation.mutateAsync(createPayload);
       }
 
-      if (mode === "edit" && initialData) {
-        await syncBlueprintsMutation.mutateAsync({
-          sparePart,
-          currentBlueprintIds,
-          selectedBlueprintIds: selectedBlueprints,
-        });
-      } else {
+      if (mode !== "edit") {
         await syncBlueprintsMutation.mutateAsync({
           sparePart,
           currentBlueprintIds: [],
@@ -316,6 +321,16 @@ export function SparePartForm({ mode, initialData }: SparePartFormProps) {
       step: "0.01",
     },
     {
+      name: "universal",
+      label: "Universal Part",
+      type: "toggle",
+      section: "Compatibility",
+      description:
+        "When off, select at least one compatible bike blueprint below. When on, the part applies broadly without blueprint links.",
+      value: mode === "create" ? true : (initialData?.universal ?? false),
+      helperTone: "featured",
+    },
+    {
       name: "blueprint_brand_id",
       label: "Filter by Blueprint Brand",
       type: "select",
@@ -376,6 +391,7 @@ export function SparePartForm({ mode, initialData }: SparePartFormProps) {
       name: "blueprint_ids",
       label: "Compatible Bike Blueprints",
       type: "multiselect",
+      required: true,
       section: "Compatibility",
       description:
         "Choose one or more bike blueprints. Use brand, model, and year range filters above to narrow the list. Already selected blueprints stay selected even if they are hidden by current filters.",
@@ -386,11 +402,12 @@ export function SparePartForm({ mode, initialData }: SparePartFormProps) {
           .toLowerCase();
         const yearFrom = parseOptionalNumber(formData.blueprint_year_from);
         const yearTo = parseOptionalNumber(formData.blueprint_year_to);
-        const selectedBlueprints = Array.isArray(formData.blueprint_ids)
+        const selectedBlueprintIds = Array.isArray(formData.blueprint_ids)
           ? (formData.blueprint_ids as number[])
           : [];
+        const selectedSet = new Set(selectedBlueprintIds);
 
-        const filteredBlueprints = blueprints.filter((bp) => {
+        const matchesFilters = (bp: BikeBlueprintRecord) => {
           const matchesBrand = selectedBrandId !== undefined
             ? bp.brand_id === selectedBrandId
             : true;
@@ -404,14 +421,27 @@ export function SparePartForm({ mode, initialData }: SparePartFormProps) {
             ? bp.year <= yearTo
             : true;
           return matchesBrand && matchesModel && matchesYearFrom && matchesYearTo;
-        });
+        };
 
-        const visibleIds = new Set(filteredBlueprints.map((bp) => bp.id));
-        const selectedOutsideFilter = blueprints.filter(
-          (bp) => selectedBlueprints.includes(bp.id) && !visibleIds.has(bp.id),
+        const selectedOrdered = [...blueprints]
+          .filter((bp) => selectedSet.has(bp.id))
+          .sort((a, b) => {
+            const bnA = bikeBrandNameById.get(a.brand_id) || "";
+            const bnB = bikeBrandNameById.get(b.brand_id) || "";
+            const byBrand = bnA.localeCompare(bnB);
+            if (byBrand !== 0) return byBrand;
+            const byModel = a.model.localeCompare(b.model);
+            if (byModel !== 0) return byModel;
+            return a.year - b.year;
+          });
+
+        const filteredUnselected = blueprints.filter(
+          (bp) => !selectedSet.has(bp.id) && matchesFilters(bp),
         );
 
-        return [...filteredBlueprints, ...selectedOutsideFilter].map((bp) => {
+        const orderedBlueprints = [...selectedOrdered, ...filteredUnselected];
+
+        return orderedBlueprints.map((bp) => {
           const brandName = bikeBrandNameById.get(bp.brand_id) || `Brand ${bp.brand_id}`;
           return {
             value: bp.id,
@@ -422,15 +452,6 @@ export function SparePartForm({ mode, initialData }: SparePartFormProps) {
       disabled: (formData) => formData.universal === true,
       span: 2,
       value: mode === "edit" ? currentBlueprintIds : undefined,
-    },
-    {
-      name: "universal",
-      label: "Universal Part",
-      type: "toggle",
-      section: "Compatibility",
-      description: "Enable this when the part fits all bikes and blueprint matching is not needed.",
-      value: initialData?.universal ?? false,
-      helperTone: "featured",
     },
     {
       name: "notes",

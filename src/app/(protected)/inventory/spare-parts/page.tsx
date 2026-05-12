@@ -18,6 +18,7 @@ import {
   type BrandRecord,
   fetchAllPages,
 } from "@/lib/crud-api";
+import { BikeCompatibilityFilter } from "@/components/BikeCompatibilityFilter";
 import {
   EntityFormModal,
   type FieldConfig,
@@ -43,6 +44,7 @@ export default function SparePartsPage() {
     [],
   );
   const [brands, setBrands] = useState<BrandRecord[]>([]);
+  const [bikeBrands, setBikeBrands] = useState<BrandRecord[]>([]);
   const [totalPages, setTotalPages] = useState(1);
   const [categoriesPage, setCategoriesPage] = useState(1);
   const [categoriesTotalPages, setCategoriesTotalPages] = useState(1);
@@ -61,6 +63,7 @@ export default function SparePartsPage() {
     setPriceMin,
     setPriceMax,
     setCurrency,
+    setBikeCompatibility,
   } = useEntityFilters();
 
   // Category Modal State
@@ -76,10 +79,11 @@ export default function SparePartsPage() {
       if (!token) return;
       const [catsRes, brandsRes] = await Promise.all([
         fetchAllPages((p) => listSparePartCategories(token, p)),
-        fetchAllPages((p) => listBrands(token, p, { type: "spare_parts" })),
+        fetchAllPages((p) => listBrands(token, p)),
       ]);
       setAllCategories(catsRes);
       setBrands(brandsRes.filter((b) => b.type === "spare_parts"));
+      setBikeBrands(brandsRes.filter((b) => b.type === "bikes"));
     } catch (err) {
       console.error("Failed to load dropdowns:", err);
     }
@@ -211,7 +215,7 @@ export default function SparePartsPage() {
       );
     return (
       <StatusBadge tone="success">
-        In <span className="mono-data">{part.stock_quantity}</span>
+        In <span className="mono-data"> {part.stock_quantity}</span>
       </StatusBadge>
     );
   };
@@ -287,6 +291,24 @@ export default function SparePartsPage() {
         showCurrencyFilter={true}
       />
 
+      <div className="rounded-[1.5rem] border border-outline-variant/15 bg-surface-container-lowest p-4">
+        <div className="mb-3">
+          <p className="label-caps text-on-surface-variant">Compatible Bike</p>
+          <p className="mt-1 text-xs text-on-surface-variant/80">
+            Filter spare parts by bike brand, model, and year. Universal parts
+            remain visible.
+          </p>
+        </div>
+        <BikeCompatibilityFilter
+          brands={bikeBrands}
+          selectedBrandId={filters.bike_brand_id}
+          selectedModel={filters.bike_model}
+          selectedYear={filters.bike_year}
+          isLoading={loading}
+          onFilterChange={(compat) => setBikeCompatibility(compat)}
+        />
+      </div>
+
       {loading ? (
         <div className="flex justify-center py-12">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-outline-variant/30 border-t-primary"></div>
@@ -309,12 +331,16 @@ export default function SparePartsPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-outline-variant/15 bg-surface-container-low">
-                <th className="label-caps px-4 py-3 text-left">SKU</th>
+                <th className="label-caps px-4 py-3 text-left">Image</th>
+                <th className="label-caps px-4 py-3 text-left">
+                  SKU/Part Number
+                </th>
                 <th className="label-caps px-4 py-3 text-left">Name</th>
                 <th className="label-caps px-4 py-3 text-center">Stock</th>
                 <th className="label-caps px-4 py-3 text-left">Price</th>
                 <th className="label-caps px-4 py-3 text-left">Category</th>
                 <th className="label-caps px-4 py-3 text-left">Brand</th>
+                <th className="label-caps px-4 py-3 text-left">Is Universal</th>
                 <th className="label-caps px-4 py-3 text-right">Actions</th>
               </tr>
             </thead>
@@ -322,18 +348,20 @@ export default function SparePartsPage() {
               {spareParts.map((part) => (
                 <tr key={part.id} className="data-row">
                   <td className="mono-data px-4 py-3 text-xs text-on-surface-variant">
-                    {part.sku}
+                    {part.image ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={part.image}
+                        alt=""
+                        className="h-10 w-10 flex-none rounded-xl object-cover"
+                      />
+                    ) : null}{" "}
+                  </td>
+                  <td className="mono-data px-4 py-3 text-xs text-on-surface-variant">
+                    {part.sku}/{part.part_number}
                   </td>
                   <td className="px-4 py-3 text-on-surface">
                     <div className="flex items-center gap-3">
-                      {part.image ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={part.image}
-                          alt=""
-                          className="h-10 w-10 flex-none rounded-xl object-cover"
-                        />
-                      ) : null}
                       <span>{part.name}</span>
                     </div>
                   </td>
@@ -355,6 +383,11 @@ export default function SparePartsPage() {
                   <td className="px-4 py-3">
                     <span className="form-chip bg-primary/8 text-primary border-primary/15">
                       {brands.find((b) => b.id === part.brand_id)?.name}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className="form-chip bg-primary/8 text-primary border-primary/15">
+                      {part.universal ? "Universal" : "Specific"}
                     </span>
                   </td>
                   <td className="px-4 py-3 text-right">
