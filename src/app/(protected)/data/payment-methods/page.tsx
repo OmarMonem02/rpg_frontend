@@ -391,11 +391,11 @@ export default function PaymentMethodsPage() {
             <div className="h-8 w-8 animate-spin rounded-full border-4 border-outline-variant/30 border-t-primary"></div>
           </div>
         ) : isAdmin ? (
-          <form onSubmit={handleSettingsSubmit} className="flex flex-col gap-4">
+          <form onSubmit={handleSettingsSubmit} className="flex flex-col gap-4 grid grid-cols-2">
             <InputGroupCard
               label="USD → EGP"
               hint="Saved on the server as exchange_rate. Used when line items are priced in USD."
-              tone="primary"
+              tone="default"
               value={formatUsdRateSummary(settings?.exchange_rate ?? null)}
               footer={
                 <div className="flex w-full flex-wrap items-end justify-between gap-3">
@@ -452,7 +452,7 @@ export default function PaymentMethodsPage() {
             <InputGroupCard
               label="EUR → EGP"
               hint="Saved on the server as exchange_rate_eur. Used when line items are priced in EUR."
-              tone="primary"
+              tone="default"
               value={formatEurRateSummary(settings?.exchange_rate_eur ?? null)}
               footer={
                 <div className="flex w-full flex-wrap items-end justify-between gap-3">
