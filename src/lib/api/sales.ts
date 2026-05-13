@@ -10,6 +10,7 @@ import {
   type PaginatedResult,
 } from "./core";
 import { normalizeCustomer, type CustomerRecord } from "./customers";
+import { downloadFile } from "./import-export";
 import { normalizeSeller, type SellerRecord } from "./users";
 
 // --- PAYMENT METHODS ---
@@ -285,6 +286,44 @@ export async function listSales(
     currentPage: meta.current_page ?? 1,
     lastPage: meta.last_page ?? 1,
   };
+}
+
+export function buildSalesExportQuery(
+  filters: SaleListFilters | undefined,
+  format: "xlsx" | "csv",
+): string {
+  const query = buildQuery({
+    search: filters?.search,
+    customer_id: filters?.customer_id,
+    seller_id: filters?.seller_id,
+    payment_method_id: filters?.payment_method_id,
+    status: filters?.status,
+    delivery_status: filters?.delivery_status,
+    type: filters?.sale_type,
+    is_maintenance: filters?.is_maintenance,
+    date_from: filters?.date_from,
+    date_to: filters?.date_to,
+    total_min: filters?.total_min,
+    total_max: filters?.total_max,
+    item_type: filters?.item_type,
+    user_id: filters?.user_id,
+    sort: filters?.sort,
+    format,
+  });
+
+  return query.toString();
+}
+
+export async function exportSales(
+  token: string,
+  filters: SaleListFilters | undefined,
+  format: "xlsx" | "csv",
+): Promise<void> {
+  const qs = buildSalesExportQuery(filters, format);
+  const ext = format === "csv" ? "csv" : "xlsx";
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const filename = `sales_export_${stamp}.${ext}`;
+  await downloadFile(`/sales/export?${qs}`, token, filename);
 }
 
 export async function getSale(token: string, id: number): Promise<SaleRecord> {

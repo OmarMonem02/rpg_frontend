@@ -386,7 +386,7 @@ function asRecord(value: unknown): Record<string, unknown> {
   return {};
 }
 
-function normalizePathname(pathname: string | null | undefined): string {
+export function normalizePathname(pathname: string | null | undefined): string {
   if (!pathname) return "/";
 
   const trimmed = pathname.trim().toLowerCase();
@@ -605,6 +605,14 @@ export function canAccessRoute(
   permissions: unknown,
   pathname: string | null | undefined,
 ): boolean {
+  const normalizedPath = normalizePathname(pathname);
+  if (/^\/customers(?:\/|$)/.test(normalizedPath)) {
+    return (
+      hasPermission(permissions, "sales", "read") ||
+      hasPermission(permissions, "maintenance", "read")
+    );
+  }
+
   const routePermission = getRoutePermission(pathname);
   if (!routePermission) return true;
 

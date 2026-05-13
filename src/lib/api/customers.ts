@@ -13,10 +13,12 @@ import {
 export type CustomerRecord = {
   id: number;
   name: string;
-  email?: string;
   phone?: string;
   address?: string;
+  how_did_you_know_us?: string;
+  notes?: string;
   created_at?: string;
+  updated_at?: string;
 };
 
 export function normalizeCustomer(raw: unknown): CustomerRecord {
@@ -24,10 +26,12 @@ export function normalizeCustomer(raw: unknown): CustomerRecord {
   return {
     id: toNumber(record.id),
     name: toText(record.name),
-    email: toText(record.email) || undefined,
     phone: toText(record.phone) || undefined,
     address: toText(record.address) || undefined,
+    how_did_you_know_us: toText(record.how_did_you_know_us) || undefined,
+    notes: toText(record.notes) || undefined,
     created_at: toText(record.created_at) || undefined,
+    updated_at: toText(record.updated_at) || undefined,
   };
 }
 
@@ -36,11 +40,13 @@ export async function listCustomers(
   page = 1,
   filters?: {
     search?: string;
+    per_page?: number;
   },
 ): Promise<PaginatedResult<CustomerRecord>> {
   const query = buildQuery({
     page,
     search: filters?.search,
+    per_page: filters?.per_page,
   });
 
   const payload = await authorizedFetch<unknown>(`/customers?${query}`, token);
@@ -57,26 +63,37 @@ export async function getCustomer(
   token: string,
   id: number,
 ): Promise<CustomerRecord> {
-  const data = await authorizedFetch<unknown>(`/customers/${id}`, token);
-  const record = asRecord(data);
-  return normalizeCustomer(record.data ?? record.customer ?? record);
+  const { getCustomerWorkspace } = await import("./customer-workspace");
+  const workspace = await getCustomerWorkspace(token, id);
+  return workspace.customer;
 }
 
 export type CreateCustomerPayload = {
   name: string;
-  email?: string;
-  phone?: string;
+  phone: string;
   address?: string;
+  how_did_you_know_us?: string;
+  notes?: string;
 };
 
 export async function createCustomer(
   token: string,
   payload: CreateCustomerPayload,
 ): Promise<CustomerRecord> {
+  const body: Record<string, string> = {
+    name: payload.name.trim(),
+    phone: payload.phone.trim(),
+  };
+  if (payload.address?.trim()) body.address = payload.address.trim();
+  if (payload.how_did_you_know_us?.trim()) {
+    body.how_did_you_know_us = payload.how_did_you_know_us.trim();
+  }
+  if (payload.notes?.trim()) body.notes = payload.notes.trim();
+
   const data = await authorizedFetch<unknown>("/customers", token, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
+    body: JSON.stringify(body),
   });
   const record = asRecord(data);
   return normalizeCustomer(record.data ?? record.customer ?? record);

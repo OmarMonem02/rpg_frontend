@@ -9,7 +9,9 @@ import { useGlobalDataRefresh } from "@/hooks/useGlobalDataRefresh";
 import {
   listSales,
   deleteSale,
+  exportSales,
   toNumber,
+  type SaleListFilters,
   type SaleRecord,
 } from "@/lib/crud-api";
 import {
@@ -28,6 +30,7 @@ import {
   StatGrid,
 } from "@/components/ops-ui";
 import {
+  ArrowDownTrayIcon,
   ArrowPathIcon,
   BanknotesIcon,
   CalendarDaysIcon,
@@ -113,6 +116,9 @@ function SalesPageContent() {
   const [error, setError] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [exportingFormat, setExportingFormat] = useState<"xlsx" | "csv" | null>(
+    null,
+  );
 
   const { filters, page, setPage, setSearch } = useEntityFilters();
   const sellerFilterId = Number(searchParams.get("seller_id") || 0) || undefined;
@@ -254,97 +260,97 @@ function SalesPageContent() {
       [
         filters.search
           ? {
-              key: "search",
-              label: `Search: ${filters.search}`,
-              onClear: () => setSearch(""),
-            }
+            key: "search",
+            label: `Search: ${filters.search}`,
+            onClear: () => setSearch(""),
+          }
           : null,
         sellerFilterId
           ? {
-              key: "seller",
-              label: `Seller: ${sellerFilterName || `#${sellerFilterId}`}`,
-              onClear: () => router.push("/inventory/sales"),
-            }
+            key: "seller",
+            label: `Seller: ${sellerFilterName || `#${sellerFilterId}`}`,
+            onClear: () => router.push("/inventory/sales"),
+          }
           : null,
         statusFilter
           ? {
-              key: "status",
-              label: `Status: ${titleCase(statusFilter)}`,
-              onClear: () => {
-                setStatusFilter("");
-                setPage(1);
-              },
-            }
+            key: "status",
+            label: `Status: ${titleCase(statusFilter)}`,
+            onClear: () => {
+              setStatusFilter("");
+              setPage(1);
+            },
+          }
           : null,
         deliveryStatusFilter
           ? {
-              key: "delivery",
-              label: `Delivery: ${titleCase(deliveryStatusFilter)}`,
-              onClear: () => {
-                setDeliveryStatusFilter("");
-                setPage(1);
-              },
-            }
+            key: "delivery",
+            label: `Delivery: ${titleCase(deliveryStatusFilter)}`,
+            onClear: () => {
+              setDeliveryStatusFilter("");
+              setPage(1);
+            },
+          }
           : null,
         saleTypeFilter
           ? {
-              key: "type",
-              label: `Channel: ${titleCase(saleTypeFilter)}`,
-              onClear: () => {
-                setSaleTypeFilter("");
-                setPage(1);
-              },
-            }
+            key: "type",
+            label: `Channel: ${titleCase(saleTypeFilter)}`,
+            onClear: () => {
+              setSaleTypeFilter("");
+              setPage(1);
+            },
+          }
           : null,
         itemTypeFilter
           ? {
-              key: "item",
-              label: `Item: ${titleCase(itemTypeFilter)}`,
-              onClear: () => {
-                setItemTypeFilter("");
-                setPage(1);
-              },
-            }
+            key: "item",
+            label: `Item: ${titleCase(itemTypeFilter)}`,
+            onClear: () => {
+              setItemTypeFilter("");
+              setPage(1);
+            },
+          }
           : null,
         dateFrom
           ? {
-              key: "from",
-              label: `From: ${formatDate(dateFrom)}`,
-              onClear: () => {
-                setDateFrom("");
-                setPage(1);
-              },
-            }
+            key: "from",
+            label: `From: ${formatDate(dateFrom)}`,
+            onClear: () => {
+              setDateFrom("");
+              setPage(1);
+            },
+          }
           : null,
         dateTo
           ? {
-              key: "to",
-              label: `To: ${formatDate(dateTo)}`,
-              onClear: () => {
-                setDateTo("");
-                setPage(1);
-              },
-            }
+            key: "to",
+            label: `To: ${formatDate(dateTo)}`,
+            onClear: () => {
+              setDateTo("");
+              setPage(1);
+            },
+          }
           : null,
         totalMin
           ? {
-              key: "min",
-              label: `Min: ${formatMoney(Number(totalMin))}`,
-              onClear: () => {
-                setTotalMin("");
-                setPage(1);
-              },
-            }
+            key: "min",
+            label: `Min: ${formatMoney(Number(totalMin))}`,
+            onClear: () => {
+              setTotalMin("");
+              setPage(1);
+            },
+          }
           : null,
         totalMax
           ? {
-              key: "max",
-              label: `Max: ${formatMoney(Number(totalMax))}`,
-              onClear: () => {
-                setTotalMax("");
-                setPage(1);
-              },
-            }
+            key: "max",
+            label: `Max: ${formatMoney(Number(totalMax))}`,
+            onClear: () => {
+              setTotalMax("");
+              setPage(1);
+            },
+          }
           : null,
       ].filter(Boolean) as Array<{
         key: string;
@@ -367,6 +373,52 @@ function SalesPageContent() {
       totalMax,
       totalMin,
     ],
+  );
+
+  const exportFilters = useMemo(
+    (): SaleListFilters => ({
+      search: filters.search || undefined,
+      seller_id: sellerFilterId,
+      status: statusFilter || undefined,
+      delivery_status: deliveryStatusFilter || undefined,
+      sale_type: saleTypeFilter || undefined,
+      item_type: itemTypeFilter || undefined,
+      date_from: dateFrom || undefined,
+      date_to: dateTo || undefined,
+      total_min: totalMin ? Number(totalMin) : undefined,
+      total_max: totalMax ? Number(totalMax) : undefined,
+      sort: sortBy,
+    }),
+    [
+      filters.search,
+      sellerFilterId,
+      statusFilter,
+      deliveryStatusFilter,
+      saleTypeFilter,
+      itemTypeFilter,
+      dateFrom,
+      dateTo,
+      totalMin,
+      totalMax,
+      sortBy,
+    ],
+  );
+
+  const handleExportSales = useCallback(
+    async (format: "xlsx" | "csv") => {
+      try {
+        setExportingFormat(format);
+        setError(null);
+        const token = getAuthToken();
+        if (!token) throw new Error("Authentication required");
+        await exportSales(token, exportFilters, format);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Export failed");
+      } finally {
+        setExportingFormat(null);
+      }
+    },
+    [exportFilters],
   );
 
   function resetOperationsFilters() {
@@ -405,71 +457,67 @@ function SalesPageContent() {
       <PageHero
         eyebrow="Sales operations"
         title="Sales Command Center"
-        meta={
-          <div className="grid grid-cols-2 gap-3">
-            <div className="rounded-2xl border border-primary/15 bg-primary/5 p-3">
-              <p className="label-caps flex items-center gap-2 text-primary">
-                <BanknotesIcon className="h-4 w-4" />
-                Visible revenue
-              </p>
-              <p className="mono-data mt-2 text-lg font-semibold text-on-surface">
-                {formatMoney(pageSummary.revenue)}
-              </p>
-            </div>
-            <div className="rounded-2xl border border-outline-variant/15 bg-surface-container-lowest p-3">
-              <p className="label-caps flex items-center gap-2 text-on-surface-variant">
-                <ClockIcon className="h-4 w-4" />
-                Pending work
-              </p>
-              <p className="mono-data mt-2 text-lg font-semibold text-on-surface">
-                {pageSummary.pendingCount} sales
-              </p>
-            </div>
-          </div>
-        }
         actions={
-          permissions.canCreate("sales") ? (
-            <ActionButton
-              tone="primary"
-              variant="filled"
-              onClick={() => router.push("/inventory/sales/create")}
-              className="gap-2 shadow-sm"
-            >
-              <PlusIcon className="h-5 w-5 flex-shrink-0" />
-              <span className="hidden sm:inline">Create New Sale</span>
-              <span className="sm:hidden">Create</span>
-            </ActionButton>
+          permissions.canCreate("sales") || permissions.canExport("sales") ? (
+            <div className="flex w-full flex-wrap items-center justify-end gap-2">
+              {permissions.canExport("sales") ? (
+                <div
+                  className="flex flex-wrap items-center gap-2 rounded-2xl border border-outline-variant/15 bg-surface-container-lowest/80 p-1.5 shadow-inner"
+                  title="Downloads all sales matching your current filters (up to 50,000 rows). Pagination does not limit the export."
+                >
+                  <span className="label-caps hidden px-2 text-on-surface-variant sm:inline">
+                    Export
+                  </span>
+                  <ActionButton
+                    type="button"
+                    tone="default"
+                    variant="outline"
+                    size="sm"
+                    disabled={!!exportingFormat}
+                    onClick={() => void handleExportSales("xlsx")}
+                    className="gap-1.5"
+                  >
+                    {exportingFormat === "xlsx" ? (
+                      <ArrowPathIcon className="h-4 w-4 shrink-0 animate-spin" />
+                    ) : (
+                      <ArrowDownTrayIcon className="h-4 w-4 shrink-0" />
+                    )}
+                    Excel
+                  </ActionButton>
+                  <ActionButton
+                    type="button"
+                    tone="default"
+                    variant="outline"
+                    size="sm"
+                    disabled={!!exportingFormat}
+                    onClick={() => void handleExportSales("csv")}
+                    className="gap-1.5"
+                  >
+                    {exportingFormat === "csv" ? (
+                      <ArrowPathIcon className="h-4 w-4 shrink-0 animate-spin" />
+                    ) : (
+                      <ArrowDownTrayIcon className="h-4 w-4 shrink-0" />
+                    )}
+                    CSV
+                  </ActionButton>
+                </div>
+              ) : null}
+              {permissions.canCreate("sales") ? (
+                <ActionButton
+                  tone="primary"
+                  variant="filled"
+                  onClick={() => router.push("/inventory/sales/create")}
+                  className="gap-2 shadow-sm"
+                >
+                  <PlusIcon className="h-5 w-5 flex-shrink-0" />
+                  <span className="hidden sm:inline">Create New Sale</span>
+                  <span className="sm:hidden">Create</span>
+                </ActionButton>
+              ) : null}
+            </div>
           ) : null
         }
       />
-
-      <StatGrid>
-        <StatCard
-          label="Visible sales"
-          value={sales.length.toLocaleString()}
-          hint={`${pageSummary.itemCount.toLocaleString()} line items on this page`}
-          tone="primary"
-        />
-        <StatCard
-          label="Revenue"
-          value={formatMoney(pageSummary.revenue)}
-          hint="Calculated from the current result page"
-          tone="success"
-        />
-        <StatCard
-          label="Pending or partial"
-          value={pageSummary.pendingCount.toLocaleString()}
-          hint="Needs cashier or fulfillment attention"
-          tone={pageSummary.pendingCount > 0 ? "warning" : "default"}
-        />
-        <StatCard
-          label="Delivery queue"
-          value={pageSummary.deliveryQueue.toLocaleString()}
-          hint="Delivery sales not marked delivered"
-          tone={pageSummary.deliveryQueue > 0 ? "warning" : "default"}
-        />
-      </StatGrid>
-
       {sellerFilterId ? (
         <InlineMessage tone="primary">
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -495,7 +543,6 @@ function SalesPageContent() {
       <FilterBar className="shadow-sm">
         <InputGroup label="Search Sales" className="md:col-span-5 xl:col-span-6">
           <div className="relative">
-            <MagnifyingGlassIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-on-surface-variant/55" />
             <input
               type="text"
               placeholder="Sale #, customer, phone, seller, item, SKU or VIN"
@@ -563,7 +610,7 @@ function SalesPageContent() {
             className="w-full"
             onClick={() => setShowFilters((value) => !value)}
           >
-            <FunnelIcon className="h-4 w-4" />
+            <FunnelIcon className="h-7 w-4" />
             Filters
             <ChevronDownIcon
               className={`h-4 w-4 transition-transform ${showFilters ? "rotate-180" : ""}`}
@@ -728,7 +775,7 @@ function SalesPageContent() {
                 className="w-full"
                 onClick={resetOperationsFilters}
               >
-                <XMarkIcon className="h-4 w-4" />
+                <XMarkIcon className="h-7.5 w-4" />
                 Clear filters
               </ActionButton>
             </div>

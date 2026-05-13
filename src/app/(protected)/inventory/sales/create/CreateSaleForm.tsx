@@ -107,17 +107,25 @@ export function CreateSaleForm() {
       placeholder: "e.g. +20 123 456 7890",
     },
     {
-      name: "email",
-      label: "Email Address",
-      type: "email",
-      placeholder: "e.g. john@example.com",
-    },
-    {
       name: "address",
       label: "Physical Address",
       type: "textarea",
       span: 2,
-      placeholder: "Optional delivery address...",
+      placeholder: "Street, area, city (optional)",
+    },
+    {
+      name: "how_did_you_know_us",
+      label: "How did they find us?",
+      type: "text",
+      span: 2,
+      placeholder: "e.g. Instagram, walk-in, referral…",
+    },
+    {
+      name: "notes",
+      label: "Internal notes",
+      type: "textarea",
+      span: 2,
+      placeholder: "Optional notes for your team only",
     },
   ];
 
@@ -335,11 +343,17 @@ export function CreateSaleForm() {
       if (!token) throw new Error("Authentication required");
 
       const payload: CreateCustomerPayload = {
-        name: String(data.name),
-        phone: data.phone ? String(data.phone) : undefined,
-        email: data.email ? String(data.email) : undefined,
-        address: data.address ? String(data.address) : undefined,
+        name: String(data.name ?? "").trim(),
+        phone: String(data.phone ?? "").trim(),
+        address: data.address ? String(data.address).trim() : undefined,
+        how_did_you_know_us: data.how_did_you_know_us
+          ? String(data.how_did_you_know_us).trim()
+          : undefined,
+        notes: data.notes ? String(data.notes).trim() : undefined,
       };
+
+      if (!payload.name) throw new Error("Name is required");
+      if (!payload.phone) throw new Error("Phone is required");
 
       const newCustomer = await createCustomer(token, payload);
 

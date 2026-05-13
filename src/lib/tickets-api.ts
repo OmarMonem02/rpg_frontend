@@ -1,6 +1,7 @@
 import { getApiUrl } from "@/lib/config";
 import { getAuthToken } from "@/lib/auth-session";
 import { ApiError } from "@/lib/auth-api";
+import { asRecord, toNumber, toText } from "@/lib/api/core";
 
 export async function authorizedFetch<T>(
   path: string,
@@ -35,7 +36,34 @@ export async function authorizedFetch<T>(
   return response.json() as T;
 }
 
-export type Customer = { id: number; name: string; phone: string };
+export type Customer = {
+  id: number;
+  name: string;
+  phone: string;
+  address?: string;
+  how_did_you_know_us?: string;
+  notes?: string;
+};
+
+export type CreateTicketCustomerPayload = {
+  name: string;
+  phone: string;
+  address?: string;
+  how_did_you_know_us?: string;
+  notes?: string;
+};
+
+function normalizeCustomerResponse(raw: unknown): Customer {
+  const r = asRecord(raw);
+  return {
+    id: toNumber(r.id),
+    name: toText(r.name),
+    phone: toText(r.phone),
+    address: toText(r.address) || undefined,
+    how_did_you_know_us: toText(r.how_did_you_know_us) || undefined,
+    notes: toText(r.notes) || undefined,
+  };
+}
 export type BikeBlueprint = { id: number; model: string; year: number; brand?: { name: string } };
 export type Bike = {
   id: number;
@@ -89,13 +117,13 @@ export const ticketsApi = {
     const res = await authorizedFetch<{ data: Customer[] }>(`/customers?search=${encodeURIComponent(search)}`);
     return res.data;
   },
-  createCustomer: async (data: { name: string; phone: string }) => {
-    const res = await authorizedFetch<{ message: string; customer: Customer }>(`/customers`, {
+  createCustomer: async (data: CreateTicketCustomerPayload) => {
+    const raw = await authorizedFetch<unknown>(`/customers`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     });
-    return res.customer;
+    return normalizeCustomerResponse(raw);
   },
   getCustomerBikes: async (customerId: number) => {
     const res = await authorizedFetch<{ data: Bike[] }>(`/customer_bikes?customer_id=${customerId}`);

@@ -113,7 +113,7 @@ export function SectionHeading({
 }
 
 export function FilterBar({ children, className = "" }: { children: ReactNode; className?: string }) {
-  return <div className={`sticky top-14 z-20 grid gap-3 rounded-[1.25rem] border border-outline-variant/12 bg-surface/95 p-3 backdrop-blur-sm transition-shadow duration-200 focus-within:shadow-ambient md:grid-cols-12 ${className}`.trim()}>{children}</div>;
+  return <div className={`grid gap-3 rounded-[1.25rem] border border-outline-variant/12 bg-surface/95 p-3 backdrop-blur-sm transition-shadow duration-200 focus-within:shadow-ambient md:grid-cols-12 ${className}`.trim()}>{children}</div>;
 }
 
 export function InputGroup({

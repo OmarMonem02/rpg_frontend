@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { ActionButton, InputGroup, StatusBadge } from "@/components/ops-ui";
 import { ImageUpload } from "@/components/ui/ImageUpload";
-import { ticketsApi, type Customer, type Bike, type BikeBlueprint } from "@/lib/tickets-api";
+import { ticketsApi, type Customer, type Bike, type BikeBlueprint, type CreateTicketCustomerPayload } from "@/lib/tickets-api";
 
 export function CreateTicketModal({
   onClose,
@@ -21,7 +21,13 @@ export function CreateTicketModal({
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [isCreatingCustomer, setIsCreatingCustomer] = useState(false);
-  const [newCustomer, setNewCustomer] = useState({ name: "", phone: "" });
+  const [newCustomer, setNewCustomer] = useState({
+    name: "",
+    phone: "",
+    address: "",
+    how_did_you_know_us: "",
+    notes: "",
+  });
 
   // Step 2: Bike
   const [bikes, setBikes] = useState<Bike[]>([]);
@@ -86,7 +92,17 @@ export function CreateTicketModal({
     if (!newCustomer.name || !newCustomer.phone) return;
     try {
       setLoading(true);
-      const cust = await ticketsApi.createCustomer(newCustomer);
+      const payload: CreateTicketCustomerPayload = {
+        name: newCustomer.name.trim(),
+        phone: newCustomer.phone.trim(),
+      };
+      const addr = newCustomer.address.trim();
+      const ref = newCustomer.how_did_you_know_us.trim();
+      const notesVal = newCustomer.notes.trim();
+      if (addr) payload.address = addr;
+      if (ref) payload.how_did_you_know_us = ref;
+      if (notesVal) payload.notes = notesVal;
+      const cust = await ticketsApi.createCustomer(payload);
       setSelectedCustomer(cust);
       setIsCreatingCustomer(false);
       setStep(2);
@@ -251,6 +267,32 @@ export function CreateTicketModal({
                       className="w-full rounded-xl border border-outline-variant/30 bg-surface px-4 py-2 outline-none focus:border-primary transition-all"
                       value={newCustomer.phone}
                       onChange={(e) => setNewCustomer({ ...newCustomer, phone: e.target.value })}
+                    />
+                  </InputGroup>
+                  <InputGroup label="Address (optional)">
+                    <input
+                      type="text"
+                      className="w-full rounded-xl border border-outline-variant/30 bg-surface px-4 py-2 outline-none focus:border-primary transition-all"
+                      value={newCustomer.address}
+                      onChange={(e) => setNewCustomer({ ...newCustomer, address: e.target.value })}
+                    />
+                  </InputGroup>
+                  <InputGroup label="How did they find us? (optional)">
+                    <input
+                      type="text"
+                      className="w-full rounded-xl border border-outline-variant/30 bg-surface px-4 py-2 outline-none focus:border-primary transition-all"
+                      value={newCustomer.how_did_you_know_us}
+                      onChange={(e) =>
+                        setNewCustomer({ ...newCustomer, how_did_you_know_us: e.target.value })
+                      }
+                    />
+                  </InputGroup>
+                  <InputGroup label="Internal notes (optional)">
+                    <textarea
+                      rows={3}
+                      className="w-full rounded-xl border border-outline-variant/30 bg-surface px-4 py-2 outline-none focus:border-primary transition-all resize-y min-h-[72px]"
+                      value={newCustomer.notes}
+                      onChange={(e) => setNewCustomer({ ...newCustomer, notes: e.target.value })}
                     />
                   </InputGroup>
                   <div className="flex justify-end gap-3 mt-2">
