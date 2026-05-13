@@ -21,6 +21,7 @@ import {
   type SparePartRecord,
   fetchAllPages,
 } from "@/lib/crud-api";
+import { CURRENCY_SELECT_OPTIONS, toPricingCurrency } from "@/lib/currencies";
 
 type ModalMode = "single" | "bulk" | "create" | null;
 
@@ -335,7 +336,7 @@ export default function BikeBlueprintSparePartsPage() {
         low_stock_alarm: formData.low_stock_alarm ? Number(formData.low_stock_alarm) : 0,
         spare_parts_category_id: Number(formData.spare_parts_category_id),
         brand_id: Number(formData.brand_id),
-        currency_pricing: String(formData.currency_pricing) as "EGP" | "USD",
+        currency_pricing: toPricingCurrency(String(formData.currency_pricing)),
         cost_price: Number(formData.cost_price),
         sale_price: Number(formData.sale_price),
         max_discount_type: String(formData.max_discount_type) as "fixed" | "percentage",
@@ -486,10 +487,10 @@ export default function BikeBlueprintSparePartsPage() {
       required: true,
       section: "Pricing",
       description: "Choose the currency shown in inventory and sales.",
-      options: [
-        { value: "EGP", label: "Egyptian Pound (EGP)" },
-        { value: "USD", label: "US Dollar (USD)" },
-      ],
+      options: CURRENCY_SELECT_OPTIONS.map((o) => ({
+        value: o.value,
+        label: o.label,
+      })),
       value: "EGP",
     },
     {

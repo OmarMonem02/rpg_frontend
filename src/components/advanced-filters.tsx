@@ -1,4 +1,5 @@
 import React from "react";
+import { SUPPORTED_PRICING_CURRENCIES } from "@/lib/currencies";
 import { FilterBar, InputGroup } from "@/components/ops-ui";
 
 type AdvancedFiltersProps = {
@@ -33,8 +34,11 @@ export function AdvancedFilters({
             className="form-input-base py-2 text-sm"
           >
             <option value="all">All Currencies</option>
-            <option value="EGP">EGP</option>
-            <option value="USD">USD</option>
+            {SUPPORTED_PRICING_CURRENCIES.map((code) => (
+              <option key={code} value={code}>
+                {code}
+              </option>
+            ))}
           </select>
         </InputGroup>
       )}

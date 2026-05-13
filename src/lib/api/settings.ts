@@ -28,6 +28,7 @@ function normalizeSettings(payload: unknown): SettingsResponse {
   return {
     tax_rate: toNumberOrNull(source.tax_rate),
     exchange_rate: toNumberOrNull(source.exchange_rate),
+    exchange_rate_eur: toNumberOrNull(source.exchange_rate_eur),
   };
 }
 
@@ -45,8 +46,12 @@ async function parseApiError(response: Response): Promise<{ message: string; fie
             const nextMessage = Array.isArray(rawValue) ? rawValue[0] : rawValue;
             if (!nextMessage) continue;
 
-            if (field === "tax_rate" || field === "exchange_rate") {
-              fieldErrors[field] = nextMessage;
+            if (
+              field === "tax_rate" ||
+              field === "exchange_rate" ||
+              field === "exchange_rate_eur"
+            ) {
+              fieldErrors[field as keyof SettingsValidationErrors] = nextMessage;
             }
           }
         }

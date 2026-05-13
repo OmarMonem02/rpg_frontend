@@ -16,6 +16,7 @@ import {
   type ExpensesReport,
   type ReportingCurrency,
 } from "@/lib/api/reporting";
+import { SUPPORTED_PRICING_CURRENCIES } from "@/lib/currencies";
 import {
   EmptyFinanceState,
   EXPENSE_CATEGORY_OPTIONS,
@@ -251,7 +252,7 @@ export default function ExpensesPage() {
     }
   }
 
-  const summaryRows = ["EGP", "USD"].map((code) => ({
+  const summaryRows = SUPPORTED_PRICING_CURRENCIES.map((code) => ({
     code,
     total: summary?.summary[code as ReportingCurrency]?.total ?? 0,
   }));
@@ -397,8 +398,11 @@ export default function ExpensesPage() {
                 }
                 className="form-input-base"
               >
-                <option value="EGP">EGP</option>
-                <option value="USD">USD</option>
+                {SUPPORTED_PRICING_CURRENCIES.map((code) => (
+                  <option key={code} value={code}>
+                    {code}
+                  </option>
+                ))}
               </select>
             </InputGroup>
 
@@ -534,8 +538,11 @@ export default function ExpensesPage() {
                   className="form-input-base"
                 >
                   <option value="">All currencies</option>
-                  <option value="EGP">EGP</option>
-                  <option value="USD">USD</option>
+                  {SUPPORTED_PRICING_CURRENCIES.map((code) => (
+                    <option key={code} value={code}>
+                      {code}
+                    </option>
+                  ))}
                 </select>
               </InputGroup>
               <InputGroup label="Payment Status">

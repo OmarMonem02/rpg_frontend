@@ -22,12 +22,14 @@ import {
   type MaintenanceServiceSectorRecord,
   fetchAllPages,
 } from "@/lib/crud-api";
+import type { PricingCurrency } from "@/lib/currencies";
+import { SUPPORTED_PRICING_CURRENCIES } from "@/lib/currencies";
 import { ActionButton, StatusBadge } from "@/components/ops-ui";
 import { BikeCompatibilityFilter } from "@/components/BikeCompatibilityFilter";
 import {
-  MagnifyingGlassIcon,
   XMarkIcon,
   FunnelIcon,
+  ChevronDownIcon,
 } from "@heroicons/react/24/outline";
 
 type CatalogType =
@@ -49,7 +51,7 @@ type FilterConfig = {
   sectorId?: number;
   priceMin: number;
   priceMax: number;
-  currency: "" | "EGP" | "USD";
+  currency: "" | PricingCurrency;
   lowStock?: boolean;
   bike_brand_id?: number;
   bike_model?: string;
@@ -63,6 +65,14 @@ interface CatalogPickerModalProps {
   onAddItems: (items: CatalogItem[]) => void;
   selectedIds?: number[];
   blueprintId?: number;
+}
+
+function NativeSelectChevron() {
+  return (
+    <span className="pointer-events-none absolute inset-y-0 right-2 flex items-center text-on-surface-variant/70">
+      <ChevronDownIcon className="h-4 w-4 shrink-0" aria-hidden />
+    </span>
+  );
 }
 
 export function CatalogPickerModal({
@@ -81,6 +91,7 @@ export function CatalogPickerModal({
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [mounted, setMounted] = useState(false);
+  const [filtersExpanded, setFiltersExpanded] = useState(false);
 
   // Filter state
   const [filters, setFilters] = useState<FilterConfig>({
@@ -117,6 +128,50 @@ export function CatalogPickerModal({
       filters.bike_year,
     ],
   );
+
+  const activeFilterCount = useMemo(() => {
+    let n = 0;
+    if (filters.search.trim()) n++;
+    if (filters.brandId != null) n++;
+    if (filters.categoryId != null) n++;
+    if (filters.sectorId != null) n++;
+    if (filters.currency) n++;
+    if (filters.lowStock) n++;
+    if (
+      filters.bike_brand_id != null ||
+      (filters.bike_model && filters.bike_model.trim()) ||
+      filters.bike_year != null
+    )
+      n++;
+    return n;
+  }, [
+    filters.search,
+    filters.brandId,
+    filters.categoryId,
+    filters.sectorId,
+    filters.currency,
+    filters.lowStock,
+    filters.bike_brand_id,
+    filters.bike_model,
+    filters.bike_year,
+  ]);
+
+  const clearAllFilters = useCallback(() => {
+    setFilters({
+      search: "",
+      priceMin: 0,
+      priceMax: 100000,
+      currency: "",
+      brandId: undefined,
+      categoryId: undefined,
+      sectorId: undefined,
+      lowStock: undefined,
+      bike_brand_id: undefined,
+      bike_model: undefined,
+      bike_year: undefined,
+    });
+    setPage(1);
+  }, []);
 
   // Load filter options (brands, categories, sectors)
   const loadFilterOptions = useCallback(async () => {
@@ -248,6 +303,7 @@ export function CatalogPickerModal({
     if (isOpen) {
       setSelectedItemIds(new Set(selectedIds));
       setPage(1);
+      setFiltersExpanded(false);
     } else {
       setSelectedItemIds(new Set());
     }
@@ -308,7 +364,7 @@ export function CatalogPickerModal({
       />
 
       {/* Right Sidebar Drawer */}
-      <div className="form-modal-shell relative h-full w-full max-w-[820px] sm:max-w-[860px] lg:max-w-[940px] flex flex-col animate-in slide-in-from-right-8 overflow-hidden bg-surface shadow-ambient border-l border-outline-variant/15">
+      <div className="form-modal-shell relative flex h-full max-h-[100dvh] min-h-0 w-full max-w-[820px] animate-in slide-in-from-right-8 flex-col overflow-hidden border-l border-outline-variant/15 bg-surface shadow-ambient sm:max-w-[860px] lg:max-w-[940px]">
         {/* Header */}
         <div className="relative border-b border-outline-variant/15 bg-surface-container-low px-4 sm:px-6 py-4 sm:py-5 flex items-start sm:items-center justify-between shrink-0">
           <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent" />
@@ -339,6 +395,7 @@ export function CatalogPickerModal({
             </p>
           </div>
           <button
+            type="button"
             onClick={onClose}
             className="flex h-10 w-10 items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors"
           >
@@ -346,254 +403,324 @@ export function CatalogPickerModal({
           </button>
         </div>
 
-        {/* Filters */}
-        <div className="bg-surface px-4 sm:px-6 py-4 border-b border-outline-variant/10 shadow-sm z-10 relative shrink-0">
-          {catalogType === "spare_parts" && bikeBrands.length > 0 && (
-            <div className="mb-4 rounded-2xl border border-outline-variant/15 bg-surface-container-lowest p-4">
-              <div className="mb-3">
-                <p className="label-caps text-on-surface-variant">
-                  Compatible Bike
-                </p>
-              </div>
-              <BikeCompatibilityFilter
-                brands={bikeBrands}
-                selectedBrandId={filters.bike_brand_id}
-                selectedModel={filters.bike_model}
-                selectedYear={filters.bike_year}
-                isLoading={loading}
-                onFilterChange={(compat) => {
-                  setFilters({
-                    ...filters,
-                    bike_brand_id: compat.bike_brand_id,
-                    bike_model: compat.bike_model,
-                    bike_year: compat.bike_year,
-                  });
-                  setPage(1);
-                }}
-              />
-            </div>
-          )}
-          <div className="grid grid-cols-1 gap-2 ">
-            {/* Search */}
-            <div className="relative col-span-2 lg:col-span-2">
-              <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-on-surface-variant/60">
-                {/* <MagnifyingGlassIcon className="w-5 h-5" /> */}
+        {/* Filters — disclosure; facet panel scrolls independently */}
+        <div className="relative z-10 shrink-0 border-b border-outline-variant/10 bg-surface shadow-sm">
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/15 to-transparent" />
+          <div className="flex flex-wrap items-stretch gap-2 px-4 py-2.5 sm:px-6 sm:py-3">
+            <button
+              type="button"
+              id="catalog-picker-filters-toggle"
+              aria-expanded={filtersExpanded}
+              aria-controls="catalog-picker-filters-panel"
+              onClick={() => setFiltersExpanded((v) => !v)}
+              className="flex min-h-[44px] min-w-0 flex-1 items-center gap-3 rounded-xl border border-outline-variant/15 bg-surface-container-lowest/60 px-3 py-2 text-left shadow-sm transition-[border-color,background-color] hover:border-primary/35 hover:bg-primary/[0.05] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            >
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary ring-1 ring-inset ring-primary/12">
+                <FunnelIcon className="h-4 w-4" aria-hidden />
               </span>
-              <input
-                type="text"
-                placeholder="Search..."
-                value={filters.search}
-                onChange={(e) => {
-                  setFilters({ ...filters, search: e.target.value });
-                  setPage(1);
-                }}
-                className="form-input-base pl-10 w-full"
+              <span className="min-w-0 flex-1">
+                <span className="font-display text-sm font-bold tracking-tight text-on-surface sm:text-base">
+                  Refine results
+                </span>
+                <span className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-on-surface-variant sm:text-xs">
+                  {filtersExpanded
+                    ? "Filters below scroll separately from the catalog list."
+                    : activeFilterCount > 0
+                      ? `${activeFilterCount} filter${activeFilterCount === 1 ? "" : "s"} active — expand to edit`
+                      : "Collapsed — expand for search, facets, and currency"}
+                </span>
+              </span>
+              {activeFilterCount > 0 ? (
+                <span className="hidden shrink-0 items-center rounded-full border border-primary/30 bg-primary/12 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary sm:inline-flex">
+                  {activeFilterCount}
+                </span>
+              ) : null}
+              <ChevronDownIcon
+                className={`h-5 w-5 shrink-0 text-on-surface-variant transition-transform duration-200 ease-out ${filtersExpanded ? "rotate-180" : ""}`}
+                aria-hidden
               />
-            </div>
-            <div className="relative grid grid-cols-3 gap-3">
-              {/* Brand Filter */}
-              {brands.length > 0 && (
-                <div className="relative">
-                  <select
-                    value={filters.brandId || ""}
-                    onChange={(e) => {
-                      setFilters({
-                        ...filters,
-                        brandId: e.target.value
-                          ? Number(e.target.value)
-                          : undefined,
-                      });
-                      setPage(1);
-                    }}
-                    className="form-input-base pl-9 w-full appearance-none pr-8"
-                  >
-                    <option value="">All Brands</option>
-                    {brands.map((brand) => (
-                      <option key={brand.id} value={brand.id}>
-                        {brand.name}
-                      </option>
-                    ))}
-                  </select>
-                  <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none text-on-surface-variant bg-surface-container/50 rounded-r-xl">
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth="2"
-                        d="M19 9l-7 7-7-7"
-                      ></path>
-                    </svg>
-                  </div>
-                </div>
-              )}
+            </button>
+            {activeFilterCount > 0 ? (
+              <button
+                type="button"
+                onClick={clearAllFilters}
+                className="flex min-h-[44px] shrink-0 items-center rounded-xl border border-outline-variant/25 bg-surface px-3 text-xs font-semibold text-on-surface shadow-sm transition-colors hover:border-primary/30 hover:bg-primary/5 hover:text-primary sm:px-4"
+              >
+                Clear all
+              </button>
+            ) : null}
+          </div>
 
-              {/* Category Filter */}
-              {productCategories.length > 0 && (
-                <div className="relative">
-                  <select
-                    value={filters.categoryId || ""}
-                    onChange={(e) => {
-                      setFilters({
-                        ...filters,
-                        categoryId: e.target.value
-                          ? Number(e.target.value)
-                          : undefined,
-                      });
-                      setPage(1);
-                    }}
-                    className="form-input-base pl-9 w-full appearance-none pr-8"
-                  >
-                    <option value="">All Categories</option>
-                    {productCategories.map((cat) => (
-                      <option key={cat.id} value={cat.id}>
-                        {cat.name}
-                      </option>
-                    ))}
-                  </select>
-                  <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none text-on-surface-variant bg-surface-container/50 rounded-r-xl">
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth="2"
-                        d="M19 9l-7 7-7-7"
-                      ></path>
-                    </svg>
+          {filtersExpanded ? (
+            <div
+              id="catalog-picker-filters-panel"
+              role="region"
+              aria-labelledby="catalog-picker-filters-toggle"
+              className="max-h-[min(50vh,26rem)] overflow-y-auto overscroll-y-contain scroll-smooth border-t border-outline-variant/10 px-4 py-3 [scrollbar-gutter:stable] sm:max-h-[min(56vh,32rem)] sm:px-6 sm:py-4"
+            >
+              <div className="rounded-2xl border border-outline-variant/10 bg-surface-container-lowest/35 p-4 sm:p-5">
+                {catalogType === "spare_parts" && bikeBrands.length > 0 && (
+                  <div className="mb-4 rounded-xl border border-outline-variant/15 bg-surface-container-low/60 p-4 sm:rounded-2xl sm:p-4">
+                    <p className="label-caps mb-3 text-on-surface-variant">
+                      Compatible bike
+                    </p>
+                    <BikeCompatibilityFilter
+                      brands={bikeBrands}
+                      selectedBrandId={filters.bike_brand_id}
+                      selectedModel={filters.bike_model}
+                      selectedYear={filters.bike_year}
+                      isLoading={loading}
+                      onFilterChange={(compat) => {
+                        setFilters({
+                          ...filters,
+                          bike_brand_id: compat.bike_brand_id,
+                          bike_model: compat.bike_model,
+                          bike_year: compat.bike_year,
+                        });
+                        setPage(1);
+                      }}
+                    />
                   </div>
-                </div>
-              )}
+                )}
 
-              {/* Spare Part Category Filter */}
-              {sparePartCategories.length > 0 && (
-                <div className="relative">
-                  <select
-                    value={filters.categoryId || ""}
-                    onChange={(e) => {
-                      setFilters({
-                        ...filters,
-                        categoryId: e.target.value
-                          ? Number(e.target.value)
-                          : undefined,
-                      });
-                      setPage(1);
-                    }}
-                    className="form-input-base pl-9 w-full appearance-none pr-8"
-                  >
-                    <option value="">All Categories</option>
-                    {sparePartCategories.map((cat) => (
-                      <option key={cat.id} value={cat.id}>
-                        {cat.name}
-                      </option>
-                    ))}
-                  </select>
-                  <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none text-on-surface-variant bg-surface-container/50 rounded-r-xl">
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
+                <div className="space-y-4">
+                  <div>
+                    <label
+                      htmlFor="catalog-picker-search"
+                      className="label-caps mb-1.5 block text-on-surface-variant"
                     >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth="2"
-                        d="M19 9l-7 7-7-7"
-                      ></path>
-                    </svg>
+                      Search
+                    </label>
+                    <div className="relative">
+                      <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-on-surface-variant/55">
+                      </span>
+                      <input
+                        id="catalog-picker-search"
+                        type="search"
+                        autoComplete="off"
+                        placeholder="Name, SKU, part number…"
+                        value={filters.search}
+                        onChange={(e) => {
+                          setFilters({ ...filters, search: e.target.value });
+                          setPage(1);
+                        }}
+                        className="form-input-base w-full pl-10"
+                      />
+                    </div>
                   </div>
-                </div>
-              )}
 
-              {/* Sector Filter */}
-              {sectors.length > 0 && (
-                <div className="relative">
-                  <select
-                    value={filters.sectorId || ""}
-                    onChange={(e) => {
-                      setFilters({
-                        ...filters,
-                        sectorId: e.target.value
-                          ? Number(e.target.value)
-                          : undefined,
-                      });
-                      setPage(1);
-                    }}
-                    className="form-input-base pl-9 w-full appearance-none pr-8"
-                  >
-                    <option value="">All Sectors</option>
-                    {sectors.map((sector) => (
-                      <option key={sector.id} value={sector.id}>
-                        {sector.name}
-                      </option>
-                    ))}
-                  </select>
-                  <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none text-on-surface-variant bg-surface-container/50 rounded-r-xl">
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth="2"
-                        d="M19 9l-7 7-7-7"
-                      ></path>
-                    </svg>
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                    {brands.length > 0 && (
+                      <div className="space-y-1.5">
+                        <label
+                          htmlFor="catalog-picker-brand"
+                          className="label-caps text-on-surface-variant"
+                        >
+                          Brand
+                        </label>
+                        <div className="relative">
+                          <select
+                            id="catalog-picker-brand"
+                            value={filters.brandId || ""}
+                            onChange={(e) => {
+                              setFilters({
+                                ...filters,
+                                brandId: e.target.value
+                                  ? Number(e.target.value)
+                                  : undefined,
+                              });
+                              setPage(1);
+                            }}
+                            className="form-input-base w-full appearance-none bg-surface-container-lowest/80 py-2.5 pl-3 pr-9 font-medium"
+                          >
+                            <option value="">All brands</option>
+                            {brands.map((brand) => (
+                              <option key={brand.id} value={brand.id}>
+                                {brand.name}
+                              </option>
+                            ))}
+                          </select>
+                          <NativeSelectChevron />
+                        </div>
+                      </div>
+                    )}
+
+                    {productCategories.length > 0 && (
+                      <div className="space-y-1.5">
+                        <label
+                          htmlFor="catalog-picker-product-category"
+                          className="label-caps text-on-surface-variant"
+                        >
+                          Category
+                        </label>
+                        <div className="relative">
+                          <select
+                            id="catalog-picker-product-category"
+                            value={filters.categoryId || ""}
+                            onChange={(e) => {
+                              setFilters({
+                                ...filters,
+                                categoryId: e.target.value
+                                  ? Number(e.target.value)
+                                  : undefined,
+                              });
+                              setPage(1);
+                            }}
+                            className="form-input-base w-full appearance-none bg-surface-container-lowest/80 py-2.5 pl-3 pr-9 font-medium"
+                          >
+                            <option value="">All categories</option>
+                            {productCategories.map((cat) => (
+                              <option key={cat.id} value={cat.id}>
+                                {cat.name}
+                              </option>
+                            ))}
+                          </select>
+                          <NativeSelectChevron />
+                        </div>
+                      </div>
+                    )}
+
+                    {sparePartCategories.length > 0 && (
+                      <div className="space-y-1.5">
+                        <label
+                          htmlFor="catalog-picker-spare-category"
+                          className="label-caps text-on-surface-variant"
+                        >
+                          Category
+                        </label>
+                        <div className="relative">
+                          <select
+                            id="catalog-picker-spare-category"
+                            value={filters.categoryId || ""}
+                            onChange={(e) => {
+                              setFilters({
+                                ...filters,
+                                categoryId: e.target.value
+                                  ? Number(e.target.value)
+                                  : undefined,
+                              });
+                              setPage(1);
+                            }}
+                            className="form-input-base w-full appearance-none bg-surface-container-lowest/80 py-2.5 pl-3 pr-9 font-medium"
+                          >
+                            <option value="">All categories</option>
+                            {sparePartCategories.map((cat) => (
+                              <option key={cat.id} value={cat.id}>
+                                {cat.name}
+                              </option>
+                            ))}
+                          </select>
+                          <NativeSelectChevron />
+                        </div>
+                      </div>
+                    )}
+
+                    {sectors.length > 0 && (
+                      <div className="space-y-1.5">
+                        <label
+                          htmlFor="catalog-picker-sector"
+                          className="label-caps text-on-surface-variant"
+                        >
+                          Sector
+                        </label>
+                        <div className="relative">
+                          <select
+                            id="catalog-picker-sector"
+                            value={filters.sectorId || ""}
+                            onChange={(e) => {
+                              setFilters({
+                                ...filters,
+                                sectorId: e.target.value
+                                  ? Number(e.target.value)
+                                  : undefined,
+                              });
+                              setPage(1);
+                            }}
+                            className="form-input-base w-full appearance-none bg-surface-container-lowest/80 py-2.5 pl-3 pr-9 font-medium"
+                          >
+                            <option value="">All sectors</option>
+                            {sectors.map((sector) => (
+                              <option key={sector.id} value={sector.id}>
+                                {sector.name}
+                              </option>
+                            ))}
+                          </select>
+                          <NativeSelectChevron />
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="space-y-1.5">
+                      <label
+                        htmlFor="catalog-picker-currency"
+                        className="label-caps text-on-surface-variant"
+                      >
+                        Currency
+                      </label>
+                      <div className="relative">
+                        <select
+                          id="catalog-picker-currency"
+                          value={filters.currency}
+                          onChange={(e) => {
+                            setFilters({
+                              ...filters,
+                              currency:
+                                e.target.value === ""
+                                  ? ""
+                                  : (e.target.value as PricingCurrency),
+                            });
+                            setPage(1);
+                          }}
+                          className="form-input-base w-full appearance-none bg-surface-container-lowest/80 py-2.5 pl-3 pr-9 font-medium"
+                        >
+                          <option value="">Any currency</option>
+                          {SUPPORTED_PRICING_CURRENCIES.map((code) => (
+                            <option key={code} value={code}>
+                              {code}
+                            </option>
+                          ))}
+                        </select>
+                        <NativeSelectChevron />
+                      </div>
+                    </div>
                   </div>
-                </div>
-              )}
 
-              {/* Currency Filter */}
-              <div className="relative">
-                <select
-                  value={filters.currency}
-                  onChange={(e) => {
-                    setFilters({
-                      ...filters,
-                      currency: e.target.value as "" | "EGP" | "USD",
-                    });
-                    setPage(1);
-                  }}
-                  className="form-input-base w-full appearance-none pr-8 bg-surface-container/50 font-medium"
-                >
-                  <option value="">Any Currency</option>
-                  <option value="EGP">EGP</option>
-                  <option value="USD">USD</option>
-                </select>
-                <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none text-on-surface-variant bg-surface-container/50 rounded-r-xl">
-                  <svg
-                    className="w-4 h-4"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="2"
-                      d="M19 9l-7 7-7-7"
-                    ></path>
-                  </svg>
+                  {catalogType === "spare_parts" ? (
+                    <div className="flex flex-col gap-2 border-t border-outline-variant/10 pt-4 sm:flex-row sm:items-center sm:justify-between">
+                      <p className="label-caps text-on-surface-variant">Inventory</p>
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={filters.lowStock === true}
+                        onClick={() => {
+                          setFilters((prev) => ({
+                            ...prev,
+                            lowStock: prev.lowStock ? undefined : true,
+                          }));
+                          setPage(1);
+                        }}
+                        className={`inline-flex w-full items-center justify-center gap-2 rounded-xl border px-4 py-2.5 text-left text-sm font-semibold transition-all sm:w-auto ${filters.lowStock
+                          ? "border-warning/40 bg-warning/10 text-on-surface shadow-sm ring-1 ring-warning/25"
+                          : "border-outline-variant/20 bg-surface text-on-surface-variant hover:border-warning/35 hover:bg-warning/5 hover:text-on-surface"
+                          }`}
+                      >
+                        <span
+                          className={`flex h-2 w-2 shrink-0 rounded-full ${filters.lowStock ? "bg-warning" : "bg-outline-variant"
+                            }`}
+                          aria-hidden
+                        />
+                        Low stock only
+                      </button>
+                    </div>
+                  ) : null}
                 </div>
               </div>
             </div>
-          </div>
+          ) : null}
         </div>
 
         {/* Items List */}
-        <div className="flex-1 overflow-y-auto bg-surface-container-low/30 relative">
+        <div className="relative flex min-h-0 flex-1 scroll-smooth overflow-y-auto overscroll-y-contain bg-surface-container-low/30 [-webkit-overflow-scrolling:touch]">
           {loading ? (
             <div className="flex flex-col items-center justify-center p-12 h-64 gap-3 animate-pulse text-primary">
               <div className="w-8 h-8 rounded-full border-4 border-primary border-t-transparent animate-spin" />
@@ -623,7 +750,6 @@ export function CatalogPickerModal({
           ) : items.length === 0 ? (
             <div className="flex flex-col items-center justify-center p-12 h-64 text-center">
               <div className="w-16 h-16 rounded-full bg-surface-container flex items-center justify-center mb-4 text-on-surface-variant/50">
-                <MagnifyingGlassIcon className="w-8 h-8" />
               </div>
               <h3 className="font-display text-lg font-semibold text-on-surface">
                 No items found
@@ -634,16 +760,22 @@ export function CatalogPickerModal({
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 gap-2 overflow-y-auto p-4">
+            <div className="grid grid-cols-1 gap-2 p-4 pb-6">
               {items.map((item) => {
                 const isSelected = selectedItemIds.has(item.id);
+                const isUniversalSparePart =
+                  catalogType === "spare_parts" &&
+                  "universal" in item &&
+                  item.universal === true;
                 return (
                   <label
                     key={item.id}
                     className={`group relative cursor-pointer rounded-2xl border p-3 transition-all duration-150 active:scale-[0.98] ${
                       isSelected
                         ? "bg-primary/6 border-primary ring-2 ring-primary shadow-sm"
-                        : "border-outline-variant/15 bg-surface-container-lowest hover:border-primary/30 hover:bg-primary/4 hover:shadow-sm"
+                        : isUniversalSparePart
+                          ? "border-outline-variant/15 border-primary/15 bg-primary-container/15 hover:border-primary/45 hover:bg-primary-container/50 hover:shadow-sm"
+                          : "border-outline-variant/15 bg-surface-container-lowest hover:border-primary/30 hover:bg-primary/4 hover:shadow-sm"
                     }`}
                   >
                     <div className="flex items-center gap-4 w-full">
@@ -674,8 +806,8 @@ export function CatalogPickerModal({
                       <div className="w-10">
                         {(catalogType === "spare_parts" ||
                           catalogType === "products") &&
-                        "sku" in item &&
-                        item.image ? (
+                          "sku" in item &&
+                          item.image ? (
                           <img
                             src={item.image}
                             alt=""
@@ -729,19 +861,9 @@ export function CatalogPickerModal({
                               )}
                               <span className="inline-flex items-center text-xs font-medium text-on-surface-variant">
                                 <span className="label-caps mr-1 text-on-surface-variant/60">
-                                  Stock
+                                  Stock:
                                 </span>
-                                <StatusBadge
-                                  tone={
-                                    (item.stock_quantity ?? 0) <= 0
-                                      ? "danger"
-                                      : (item.stock_quantity ?? 0) <= 5
-                                        ? "warning"
-                                        : "success"
-                                  }
-                                >
-                                  {item.stock_quantity ?? 0}
-                                </StatusBadge>
+                                {item.stock_quantity ?? 0}
                               </span>
                             </div>
                           )}

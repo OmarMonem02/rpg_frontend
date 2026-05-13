@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import type { PricingCurrency } from "@/lib/currencies";
+import { egpMultiplierForPricingCurrency } from "@/lib/currencies";
 import {
   ProductRecord,
   SparePartRecord,
@@ -18,7 +20,7 @@ export type SaleLineItem = {
   selling_price: number;
   discount_amount: number;
   quantity: number;
-  currency: "EGP" | "USD";
+  currency: PricingCurrency;
   catalogItem: ProductRecord | SparePartRecord | BikeRecord | MaintenanceServiceRecord;
 };
 
@@ -29,6 +31,8 @@ interface CartLineItemsPanelProps {
   shippingFee: number;
   saleDiscount: number;
   exchangeRate?: number;
+  /** EGP per 1 EUR (same naming as settings `exchange_rate_eur`). */
+  exchangeRateEur?: number;
 }
 
 export function CartLineItemsPanel({
@@ -38,6 +42,7 @@ export function CartLineItemsPanel({
   shippingFee = 0,
   saleDiscount = 0,
   exchangeRate = 0,
+  exchangeRateEur = 0,
 }: CartLineItemsPanelProps) {
   const [editingRowId, setEditingRowId] = useState<string | number | null>(null);
   const [editValues, setEditValues] = useState<{ qty: number; price: number; discount: number }>({ qty: 1, price: 0, discount: 0 });
@@ -70,30 +75,39 @@ export function CartLineItemsPanel({
    * USD items are multiplied by exchangeRate; EGP items pass through unchanged.
    */
   const toEGP = (item: SaleLineItem): number => {
-    if (item.currency === "USD" && exchangeRate > 0) {
-      return item.selling_price * exchangeRate;
-    }
-    return item.selling_price;
+    const m = egpMultiplierForPricingCurrency(item.currency, {
+      usdToEgp: exchangeRate,
+      eurToEgp: exchangeRateEur,
+    });
+    return item.selling_price * m;
   };
 
   const toEGPDiscount = (item: SaleLineItem): number => {
-    if (item.currency === "USD" && exchangeRate > 0) {
-      return item.discount_amount * exchangeRate;
-    }
-    return item.discount_amount;
+    const m = egpMultiplierForPricingCurrency(item.currency, {
+      usdToEgp: exchangeRate,
+      eurToEgp: exchangeRateEur,
+    });
+    return item.discount_amount * m;
   };
 
-  const getDisplayPrice = (item: SaleLineItem): { amount: number; currency: string; converted?: { amount: number; currency: string } } => {
+  const getDisplayPrice = (item: SaleLineItem): {
+    amount: number;
+    currency: string;
+    converted?: { amount: number; currency: string };
+  } => {
     const displayPrice = {
       amount: item.selling_price,
       currency: item.currency,
       converted: undefined as { amount: number; currency: string } | undefined,
     };
 
-    // If item is priced in USD and we have exchange rate, show conversion to EGP
-    if (item.currency === "USD" && exchangeRate > 0) {
+    const m = egpMultiplierForPricingCurrency(item.currency, {
+      usdToEgp: exchangeRate,
+      eurToEgp: exchangeRateEur,
+    });
+    if (item.currency !== "EGP" && m > 0 && m !== 1) {
       displayPrice.converted = {
-        amount: item.selling_price * exchangeRate,
+        amount: item.selling_price * m,
         currency: "EGP",
       };
     }

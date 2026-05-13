@@ -8,14 +8,17 @@ import {
   PageShell,
   PageHero,
   ActionButton,
-  DataTableCard,
   StatusBadge,
   SurfaceCard,
   InputGroup,
 } from "@/components/ops-ui";
 import { InvoiceTemplate } from "@/components/invoice-template";
-import { ticketsApi, type Ticket, type TicketTask, type TicketItem } from "@/lib/tickets-api";
-import { type SaleRecord } from "@/lib/crud-api";
+import { ticketsApi, type Ticket } from "@/lib/tickets-api";
+import {
+  type SaleRecord,
+  type SparePartRecord,
+  type MaintenanceServiceRecord,
+} from "@/lib/crud-api";
 import { CatalogPickerModal } from "@/components/catalog-picker-modal";
 
 export default function TicketDetailsPage() {
@@ -121,7 +124,13 @@ export default function TicketDetailsPage() {
     }
   };
 
-  const handleAddItemToTask = async (taskId: number, item: any) => {
+  const taskPickerPrice = (item: SparePartRecord | MaintenanceServiceRecord) =>
+    "sale_price" in item ? item.sale_price : item.service_price;
+
+  const handleAddItemToTask = async (
+    taskId: number,
+    item: SparePartRecord | MaintenanceServiceRecord,
+  ) => {
     if (!canEditItems) {
       setError("Start work before adding parts or services to this ticket.");
       return;
@@ -133,7 +142,7 @@ export default function TicketDetailsPage() {
       await ticketsApi.addItemToTask(Number(id), taskId, {
         spare_part_id: isPart ? item.id : undefined,
         maintenance_service_id: !isPart ? item.id : undefined,
-        price_snapshot: item.price || 0,
+        price_snapshot: taskPickerPrice(item),
         qty: 1,
         discount: 0,
       });
@@ -292,7 +301,13 @@ export default function TicketDetailsPage() {
       invoiceElement.classList.add("pdf-export");
       const { default: html2canvas } = await import("html2canvas");
       const jspdfModule = await import("jspdf");
-      const JsPDF = jspdfModule.jsPDF || (jspdfModule as any).default;
+      const JsPDF =
+        "jsPDF" in jspdfModule && typeof jspdfModule.jsPDF === "function"
+          ? jspdfModule.jsPDF
+          : jspdfModule.default;
+      if (typeof JsPDF !== "function") {
+        throw new Error("jsPDF constructor not available");
+      }
 
       const canvas = await html2canvas(invoiceElement, {
         scale: 3,
@@ -320,10 +335,12 @@ export default function TicketDetailsPage() {
 
       const filename = `Invoice-Ticket-${ticketInvoice.id}-${new Date().toISOString().split("T")[0]}.pdf`;
       pdf.save(filename);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("PDF Export Error:", err);
-      alert(err.message || "Failed to export invoice PDF");
-      setError(err instanceof Error ? err.message : "Failed to export invoice PDF");
+      const message =
+        err instanceof Error ? err.message : "Failed to export invoice PDF";
+      alert(message);
+      setError(message);
     } finally {
       const invoiceElement = document.getElementById("invoice-export-root");
       if (invoiceElement) invoiceElement.classList.remove("pdf-export");
@@ -342,7 +359,7 @@ export default function TicketDetailsPage() {
           <div className="h-16 w-16 rounded-full bg-error/10 flex items-center justify-center text-error text-2xl font-bold">!</div>
           <h2 className="text-2xl font-bold text-on-surface">{error || "Ticket Not Found"}</h2>
           <p className="text-on-surface-variant max-w-md">
-            We couldn't find a maintenance ticket with ID <strong>#{id}</strong>. 
+            We could not find a maintenance ticket with ID <strong>#{id}</strong>. 
             It may have been deleted or the ID might be incorrect.
           </p>
           <ActionButton variant="outline" onClick={() => router.push("/tickets")} className="mt-4">
@@ -370,7 +387,7 @@ export default function TicketDetailsPage() {
     <PageShell>
       <PageHero
         eyebrow="Ticket Management"
-        title={`Ticket #${ticket.id} ${ticket.notes}?${ticket.notes}:"" `}
+        title={`Ticket #${ticket.id} ${ticket.notes ? `: ${ticket.notes}` : ""}`}
         meta={
           <div className="flex flex-wrap gap-4">
             <div className="rounded-2xl border border-outline-variant/15 bg-surface p-4 text-sm min-w-[200px] shadow-sm">
@@ -584,7 +601,7 @@ export default function TicketDetailsPage() {
         catalogType={itemType}
         onAddItems={(items) => {
           if (items.length > 0 && activeTaskId) {
-            handleAddItemToTask(activeTaskId, items[0]);
+            handleAddItemToTask(activeTaskId, items[0] as SparePartRecord | MaintenanceServiceRecord);
           }
           setIsPickerOpen(false);
         }}

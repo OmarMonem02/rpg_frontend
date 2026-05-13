@@ -15,6 +15,7 @@ import type {
   ExpensePaymentStatus,
   ReportingCurrency,
 } from "@/lib/api/reporting";
+import { SUPPORTED_PRICING_CURRENCIES } from "@/lib/currencies";
 
 const financeNavItems = [
   { href: "/reporting", label: "Overview", key: "overview" },
@@ -169,8 +170,11 @@ export function FinanceFilterBar({
           className="form-input-base"
         >
           <option value="">All currencies</option>
-          <option value="EGP">EGP</option>
-          <option value="USD">USD</option>
+          {SUPPORTED_PRICING_CURRENCIES.map((code) => (
+            <option key={code} value={code}>
+              {code}
+            </option>
+          ))}
         </select>
       </InputGroup>
       <div className="md:col-span-3">{extra}</div>
@@ -386,8 +390,11 @@ export function CurrencySelector({
         className="form-input-base"
       >
         <option value="">All currencies</option>
-        <option value="EGP">EGP</option>
-        <option value="USD">USD</option>
+        {SUPPORTED_PRICING_CURRENCIES.map((code) => (
+          <option key={code} value={code}>
+            {code}
+          </option>
+        ))}
       </select>
     </InputGroup>
   );

@@ -2,6 +2,8 @@
 
 import { ApiError } from "@/lib/auth-api";
 import { getApiUrl } from "@/lib/config";
+import type { PricingCurrency } from "@/lib/currencies";
+import { SUPPORTED_PRICING_CURRENCIES, toPricingCurrency } from "@/lib/currencies";
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -76,7 +78,7 @@ async function authorizedFetch<T>(
   return (await response.json()) as T;
 }
 
-export type ReportingCurrency = "EGP" | "USD";
+export type ReportingCurrency = PricingCurrency;
 export type ExpensePaymentStatus = "paid" | "unpaid";
 export type ExpenseCategory =
   | "rent"
@@ -322,7 +324,7 @@ function normalizeExpense(raw: unknown): ExpenseRecord {
     image_public_id: toText(record.image_public_id) || undefined,
     category: toText(record.category) as ExpenseCategory,
     amount: toNumber(record.amount),
-    currency: toText(record.currency) as ReportingCurrency,
+    currency: toPricingCurrency(record.currency),
     payment_status: toText(record.payment_status) as ExpensePaymentStatus,
     incurred_on: toText(record.incurred_on) || undefined,
     due_date: toText(record.due_date) || undefined,
@@ -341,8 +343,12 @@ export async function getProfitLossReport(
   const currencies = asRecord(record.currencies);
 
   const result: ProfitLossReport = { filters, currencies: {} };
-  if (currencies.EGP) result.currencies.EGP = normalizeProfitLoss(currencies.EGP);
-  if (currencies.USD) result.currencies.USD = normalizeProfitLoss(currencies.USD);
+  for (const code of SUPPORTED_PRICING_CURRENCIES) {
+    const raw = currencies[code];
+    if (raw) {
+      result.currencies[code as ReportingCurrency] = normalizeProfitLoss(raw);
+    }
+  }
 
   return result;
 }
@@ -356,8 +362,12 @@ export async function getBalanceSheetReport(
   const currencies = asRecord(record.currencies);
 
   const result: BalanceSheetReport = { filters, currencies: {} };
-  if (currencies.EGP) result.currencies.EGP = normalizeBalanceSheet(currencies.EGP);
-  if (currencies.USD) result.currencies.USD = normalizeBalanceSheet(currencies.USD);
+  for (const code of SUPPORTED_PRICING_CURRENCIES) {
+    const raw = currencies[code];
+    if (raw) {
+      result.currencies[code as ReportingCurrency] = normalizeBalanceSheet(raw);
+    }
+  }
 
   return result;
 }
@@ -376,8 +386,12 @@ export async function getAnnualSummaryReport(
     currencies: {},
   };
 
-  if (currencies.EGP) result.currencies.EGP = normalizeAnnualSummary(currencies.EGP);
-  if (currencies.USD) result.currencies.USD = normalizeAnnualSummary(currencies.USD);
+  for (const code of SUPPORTED_PRICING_CURRENCIES) {
+    const raw = currencies[code];
+    if (raw) {
+      result.currencies[code as ReportingCurrency] = normalizeAnnualSummary(raw);
+    }
+  }
 
   return result;
 }
@@ -388,24 +402,23 @@ export async function getExpensesReport(
 ): Promise<ExpensesReport> {
   const payload = await authorizedFetch<unknown>(`/reporting/expenses${buildQuery(filters)}`, token);
   const record = asRecord(payload);
-  const summary = asRecord(record.summary);
+  const rawSummary = asRecord(record.summary);
+
+  const summary: ExpensesReport["summary"] = {};
+  for (const code of SUPPORTED_PRICING_CURRENCIES) {
+    const entry = rawSummary[code];
+    if (entry) {
+      const r = asRecord(entry);
+      summary[code as ReportingCurrency] = {
+        total: toNumber(r.total),
+        categories: normalizeNumericMap(r.categories),
+      };
+    }
+  }
 
   return {
     filters,
-    summary: {
-      EGP: summary.EGP
-        ? {
-            total: toNumber(asRecord(summary.EGP).total),
-            categories: normalizeNumericMap(asRecord(summary.EGP).categories),
-          }
-        : undefined,
-      USD: summary.USD
-        ? {
-            total: toNumber(asRecord(summary.USD).total),
-            categories: normalizeNumericMap(asRecord(summary.USD).categories),
-          }
-        : undefined,
-    },
+    summary,
     data: asArray(record.data).map(normalizeExpense),
     current_page: toNumber(record.current_page),
     last_page: toNumber(record.last_page),

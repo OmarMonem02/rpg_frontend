@@ -9,6 +9,8 @@ import {
   buildQuery,
   type PaginatedResult,
 } from "./core";
+import type { PricingCurrency } from "@/lib/currencies";
+import { toPricingCurrency } from "@/lib/currencies";
 
 // --- BRANDS ---
 export type BrandRecord = {
@@ -254,7 +256,7 @@ export type SparePartRecord = {
   low_stock_alarm: number;
   spare_parts_category_id: number;
   brand_id: number;
-  currency_pricing: "EGP" | "USD";
+  currency_pricing: PricingCurrency;
   cost_price: number;
   sale_price: number;
   max_discount_type: "fixed" | "percentage";
@@ -275,7 +277,7 @@ export type CreateSparePartPayload = {
   low_stock_alarm?: number;
   spare_parts_category_id: number;
   brand_id: number;
-  currency_pricing: "EGP" | "USD";
+  currency_pricing: PricingCurrency;
   cost_price: number;
   sale_price: number;
   max_discount_type: "fixed" | "percentage";
@@ -295,7 +297,7 @@ export type UpdateSparePartPayload = {
   low_stock_alarm?: number;
   spare_parts_category_id: number;
   brand_id: number;
-  currency_pricing: "EGP" | "USD";
+  currency_pricing: PricingCurrency;
   cost_price: number;
   sale_price: number;
   max_discount_type: "fixed" | "percentage";
@@ -334,7 +336,7 @@ export function normalizeSparePart(raw: unknown): SparePartRecord {
     low_stock_alarm: toNumber(record.low_stock_alarm),
     spare_parts_category_id: toNumber(record.spare_parts_category_id),
     brand_id: toNumber(record.brand_id),
-    currency_pricing: toText(record.currency_pricing) as "EGP" | "USD",
+    currency_pricing: toPricingCurrency(record.currency_pricing),
     cost_price: toNumber(record.cost_price),
     sale_price: toNumber(record.sale_price),
     max_discount_type: toText(record.max_discount_type) as "fixed" | "percentage",
@@ -448,7 +450,7 @@ export type ProductRecord = {
   low_stock_alarm: number;
   products_category_id: number;
   brand_id: number;
-  currency_pricing: "EGP" | "USD";
+  currency_pricing: PricingCurrency;
   cost_price: number;
   sale_price: number;
   max_discount_type: "fixed" | "percentage";
@@ -468,7 +470,7 @@ export type CreateProductPayload = {
   low_stock_alarm?: number;
   products_category_id: number;
   brand_id: number;
-  currency_pricing: "EGP" | "USD";
+  currency_pricing: PricingCurrency;
   cost_price: number;
   sale_price: number;
   max_discount_type: "fixed" | "percentage";
@@ -492,7 +494,7 @@ export function normalizeProduct(raw: unknown): ProductRecord {
     low_stock_alarm: toNumber(record.low_stock_alarm),
     products_category_id: toNumber(record.products_category_id),
     brand_id: toNumber(record.brand_id),
-    currency_pricing: toText(record.currency_pricing) as "EGP" | "USD",
+    currency_pricing: toPricingCurrency(record.currency_pricing),
     cost_price: toNumber(record.cost_price),
     sale_price: toNumber(record.sale_price),
     max_discount_type: toText(record.max_discount_type) as "fixed" | "percentage",

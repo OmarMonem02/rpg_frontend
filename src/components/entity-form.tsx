@@ -68,7 +68,7 @@ export type EntityFormProps = {
   cancelLabel?: string;
   description?: string;
   heroLabel?: string;
-  variant?: "modal" | "page";
+  variant?: "modal" | "page" | "drawer";
 };
 
 type SectionConfig = {
@@ -306,21 +306,25 @@ export function EntityForm({
 
   if (!currentSection) return null;
 
+  const isModalStyleChrome = variant === "modal" || variant === "drawer";
+
   const shellClassName =
-    variant === "modal"
-      ? "form-modal-shell h-[94vh] max-h-[94vh] w-full flex flex-col overflow-hidden"
-      : "w-full flex flex-col space-y-6";
+    variant === "drawer"
+      ? "form-modal-shell flex min-h-0 flex-1 w-full flex-col overflow-hidden"
+      : isModalStyleChrome
+        ? "form-modal-shell h-[94vh] max-h-[94vh] w-full flex flex-col overflow-hidden"
+        : "w-full flex flex-col space-y-6";
 
   const headerClassName =
-    variant === "modal"
+    isModalStyleChrome
       ? "overflow-hidden border border-outline-variant/15 bg-surface-container-low p-4 md:p-2"
       : "rounded-[2rem] border border-outline-variant/15 bg-surface-container-low p-6 shadow-sm";
 
   const contentClassName =
-    variant === "modal" ? "flex-1 overflow-y-auto" : "flex-1";
+    isModalStyleChrome ? "min-h-0 flex-1 overflow-y-auto" : "flex-1";
 
   const footerClassName =
-    variant === "modal"
+    isModalStyleChrome
       ? "sticky bottom-0 z-20 flex flex-col gap-4 border-t border-outline-variant/10 bg-surface-container-lowest/90 px-5 py-4 backdrop-blur-sm md:flex-row md:items-center md:justify-between"
       : "sticky bottom-0 z-20 -mx-5 mt-8 flex flex-col gap-4 border-t border-outline-variant/10 bg-surface-container-lowest/90 px-5 py-4 backdrop-blur-sm md:flex-row md:items-center md:justify-between";
 
@@ -331,18 +335,18 @@ export function EntityForm({
         <div className="grid gap-2 border-b border-outline-variant/10 pb-4 md:grid-cols-[1fr_0.7fr]">
           <div>
             <div
-              className={`mb-3 flex flex-wrap items-center gap-2 ${variant === "modal" ? "scale-90 origin-left" : ""}`}
+              className={`mb-3 flex flex-wrap items-center gap-2 ${isModalStyleChrome ? "scale-90 origin-left" : ""}`}
             >
               <span className="form-chip">{heroLabel}</span>
               <span className="form-chip">{sections.length} steps</span>
               <span className="form-chip">{requiredFieldsCount} required</span>
             </div>
             <h2
-              className={`${variant === "modal" ? "text-2xl" : "text-3xl md:text-4xl"} font-display font-bold tracking-tight text-on-surface`}
+              className={`${isModalStyleChrome ? "text-2xl" : "text-3xl md:text-4xl"} font-display font-bold tracking-tight text-on-surface`}
             >
               {title}
             </h2>
-            {description && !["modal"].includes(variant || "") && (
+            {description && !isModalStyleChrome && (
               <p className="mt-2 max-w-2xl text-sm leading-6 text-on-surface-variant">
                 {description}
               </p>
@@ -381,7 +385,7 @@ export function EntityForm({
 
         {/* Step Indicators */}
         <div
-          className={`mt-6 grid gap-2 ${variant === "modal" ? "md:grid-cols-3 lg:grid-cols-5" : "md:grid-cols-5"}`}
+          className={`mt-6 grid gap-2 ${isModalStyleChrome ? "md:grid-cols-3 lg:grid-cols-5" : "md:grid-cols-5"}`}
         >
           {sections.map((section, index) => (
             <button

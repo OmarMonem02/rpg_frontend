@@ -35,9 +35,19 @@ export function normalizePaymentMethod(raw: unknown): PaymentMethodRecord {
 
 export async function listPaymentMethods(
   token: string,
-  page = 1,
+  pageOrOptions:
+    | number
+    | { page?: number; per_page?: number; search?: string } = 1,
 ): Promise<PaginatedResult<PaymentMethodRecord>> {
-  const query = buildQuery({ page });
+  const opts =
+    typeof pageOrOptions === "number"
+      ? { page: pageOrOptions }
+      : pageOrOptions;
+  const query = buildQuery({
+    page: opts.page ?? 1,
+    per_page: opts.per_page,
+    search: opts.search?.trim() || undefined,
+  });
   const payload = await authorizedFetch<unknown>(
     `/payment_methods?${query}`,
     token,

@@ -12,6 +12,7 @@ import {
   type BikeBlueprintRecord,
   fetchAllPages,
 } from "@/lib/crud-api";
+import { CURRENCY_SELECT_OPTIONS, toPricingCurrency } from "@/lib/currencies";
 import { EntityForm, type FieldConfig } from "@/components/entity-form";
 
 interface BikeFormProps {
@@ -67,7 +68,7 @@ export function BikeForm({ mode, initialData }: BikeFormProps) {
         image_public_id: formData.image_public_id
           ? String(formData.image_public_id)
           : undefined,
-        currency_pricing: String(formData.currency_pricing || "EGP"),
+        currency_pricing: toPricingCurrency(String(formData.currency_pricing || "EGP")),
         cost_price: Number(formData.cost_price),
         sale_price: Number(formData.sale_price),
         status: String(formData.status),
@@ -190,10 +191,10 @@ export function BikeForm({ mode, initialData }: BikeFormProps) {
       required: true,
       section: "Pricing",
       description: "Choose the pricing currency used in the listing.",
-      options: [
-        { value: "EGP", label: "EGP (Egyptian Pound)" },
-        { value: "USD", label: "USD (US Dollar)" },
-      ],
+      options: CURRENCY_SELECT_OPTIONS.map((o) => ({
+        value: o.value,
+        label: o.label,
+      })),
       value: initialData?.currency_pricing ?? "EGP",
     },
     {

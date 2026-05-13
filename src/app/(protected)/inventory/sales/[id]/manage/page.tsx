@@ -77,6 +77,7 @@ export default function ManageSaleItemsPage() {
   const [exchangeItems, setExchangeItems] = useState<PendingExchangeItem[]>([]);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [exchangeRate, setExchangeRate] = useState(0);
+  const [exchangeRateEur, setExchangeRateEur] = useState(0);
 
   const loadSale = useCallback(async () => {
     try {
@@ -90,6 +91,7 @@ export default function ManageSaleItemsPage() {
       ]);
       setSale(saleData);
       setExchangeRate(settingsData.exchange_rate ?? 0);
+      setExchangeRateEur(settingsData.exchange_rate_eur ?? 0);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load sale");
@@ -142,12 +144,12 @@ export default function ManageSaleItemsPage() {
       ...current,
       ...picked.map((item, index) => {
         const built = buildPayload(item);
-        // Normalize USD prices to EGP immediately so all downstream
-        // calculations (replacementTotal, StatCards, API payload) are in EGP.
+        // Normalize foreign-currency catalog prices to EGP so downstream
+        // calculations (replacementTotal, StatCards, API payload) stay in EGP.
         const egpPrice = normalizeToEGP(
           built.payload.selling_price,
           built.currency,
-          exchangeRate || 1,
+          { usdToEgp: exchangeRate, eurToEgp: exchangeRateEur },
         );
         return {
           id: `${Date.now()}_${current.length + index}`,
