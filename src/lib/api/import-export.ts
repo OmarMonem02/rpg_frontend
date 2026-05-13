@@ -1,5 +1,5 @@
 import { getApiUrl } from "@/lib/config";
-import type { ImportExportEntity, ImportResult } from "@/types/import-export";
+import type { ImportExportEntity, ImportPreview, ImportResult } from "@/types/import-export";
 import { ApiError } from "@/lib/auth-api";
 
 async function parseErrorMessage(response: Response): Promise<string> {
@@ -90,13 +90,29 @@ export async function importFile(
       return (await response.json()) as ImportResult;
   }
   
-  return {
-      message: "Import completed.",
-      created_count: 0,
-      restored_count: 0,
-      skipped_count: 0,
-      skipped_duplicates: [],
-      restored_records: [],
-      errors: []
-  };
+  throw new ApiError("Import completed but the server returned an unreadable response.", response.status);
+}
+
+export async function parseImportFile(
+  entitySlug: string,
+  file: File,
+  token: string
+): Promise<ImportPreview> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const response = await fetch(getApiUrl(`/import-export/${entitySlug}/parse`), {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: formData,
+  });
+
+  if (!response.ok) {
+    throw new ApiError(await parseErrorMessage(response), response.status);
+  }
+
+  return (await response.json()) as ImportPreview;
 }

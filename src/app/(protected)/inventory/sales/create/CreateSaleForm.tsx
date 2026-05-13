@@ -319,11 +319,8 @@ export function CreateSaleForm() {
         }),
       };
 
-      console.log("Sale payload:", payload);
       const sale = await createSale(token, payload);
 
-      // Success
-      console.log("Sale created successfully:", sale);
       router.push(`/inventory/sales/${sale.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create sale");
@@ -351,7 +348,6 @@ export function CreateSaleForm() {
       setCustomerId(newCustomer.id);
       setCustomerModalOpen(false);
 
-      console.log("Quick customer created:", newCustomer);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Failed to create customer",

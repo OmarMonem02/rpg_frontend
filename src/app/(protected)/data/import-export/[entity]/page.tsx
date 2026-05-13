@@ -86,19 +86,6 @@ export default function EntityImportExportPage() {
       );
   }
 
-  // Determine required columns easily since the prompt provided manual list but columns might not flag required natively.
-  // The prompt specified certain required fields:
-  const getRequiredColumns = (slug: string) => {
-      if (['products', 'spare_parts'].includes(slug)) return ['name', 'sku'];
-      if (['maintenance_services'].includes(slug)) return ['name'];
-      if (['bikes'].includes(slug)) return ['blueprint_id', 'vin'];
-      if (['bike_blueprints'].includes(slug)) return ['brand_id', 'model', 'year'];
-      if (['brands'].includes(slug)) return ['name'];
-      return [];
-  };
-
-  const requiredCols = getRequiredColumns(entity.slug);
-
   return (
     <PageShell>
       <div className="mb-2 text-sm text-on-surface-variant flex items-center gap-2">
@@ -108,6 +95,7 @@ export default function EntityImportExportPage() {
       </div>
 
       <PageHero
+        eyebrow="Import / Export"
         title={`Manage ${entity.label}`}
       />
 
@@ -125,33 +113,37 @@ export default function EntityImportExportPage() {
       <SurfaceCard className="mt-6">
          <h3 className="text-xl font-semibold text-on-surface mb-4">Expected Import Columns</h3>
          <p className="text-sm text-on-surface-variant mb-4">
-             Marked with a red asterisk <span className="text-error font-bold">*</span> means required.
+             Templates use human-friendly names for references. Required fields are marked with a red asterisk.
          </p>
          
          <div className="overflow-x-auto rounded-[1.25rem] border border-outline-variant/15">
             <table className="w-full text-sm text-left">
                <thead className="bg-surface-container-low border-b border-outline-variant/15 text-on-surface font-semibold">
                    <tr>
-                       <th className="px-4 py-3 border-r border-outline-variant/15 w-1/3">Column Name</th>
-                       <th className="px-4 py-3">Description / Required</th>
+                       <th className="px-4 py-3 border-r border-outline-variant/15 w-1/4">Column</th>
+                       <th className="px-4 py-3 border-r border-outline-variant/15">Description</th>
+                       <th className="px-4 py-3">Type</th>
                    </tr>
                </thead>
                <tbody className="divide-y divide-outline-variant/10 text-on-surface">
                    {entity.columns.map(col => {
-                       const isReq = requiredCols.includes(col);
                        return (
-                           <tr key={col} className="hover:bg-surface-container-lowest transition-colors">
+                           <tr key={col.key} className="hover:bg-surface-container-lowest transition-colors">
                                <td className="px-4 py-3 border-r border-outline-variant/15 font-mono text-xs">
-                                   {col}
+                                   {col.key}
+                                   {col.required ? <span className="ml-1 text-error font-bold">*</span> : null}
                                </td>
-                               <td className="px-4 py-3">
-                                   {isReq ? (
-                                       <span className="inline-flex items-center gap-1">
-                                           <span className="text-error font-bold">*</span> Required field
-                                       </span>
-                                   ) : (
-                                       <span className="text-on-surface-variant">Optional field</span>
-                                   )}
+                               <td className="px-4 py-3 border-r border-outline-variant/15">
+                                   <div className="font-medium">{col.label}</div>
+                                   <div className="mt-1 text-sm text-on-surface-variant">{col.description}</div>
+                                   {col.accepted_values.length > 0 ? (
+                                     <div className="mt-2 text-xs text-on-surface-variant">
+                                       Accepted: {col.accepted_values.join(", ")}
+                                     </div>
+                                   ) : null}
+                               </td>
+                               <td className="px-4 py-3 text-sm text-on-surface-variant">
+                                   {col.type}
                                </td>
                            </tr>
                        );
