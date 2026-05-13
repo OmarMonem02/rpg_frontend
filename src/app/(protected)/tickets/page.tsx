@@ -105,9 +105,16 @@ export default function TicketsPage() {
                     </td>
                     <td className="px-6 py-5">
                       <div className="font-medium">
-                        {ticket.customer_bike?.bike_blueprint?.brand?.name || "Unknown"} {ticket.customer_bike?.bike_blueprint?.model || ""}
+                        {ticket.customer_bike?.bike_blueprint?.brand?.name ||
+                          ticket.customer_bike?.brand ||
+                          "Unknown"}{" "}
+                        {ticket.customer_bike?.bike_blueprint?.model ||
+                          ticket.customer_bike?.model ||
+                          ""}
                       </div>
-                      <div className="mono-data text-xs text-on-surface-variant">VIN: {ticket.customer_bike?.brand || "N/A"}</div>
+                      <div className="mono-data text-xs text-on-surface-variant">
+                        VIN: {ticket.customer_bike?.vin || "N/A"}
+                      </div>
                     </td>
                     <td className="px-6 py-5">
                       <StatusBadge tone={getStatusTone(ticket.status)}>

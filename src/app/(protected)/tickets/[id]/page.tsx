@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
+import { usePermissions } from "@/components/permission-provider";
 import {
   PageShell,
   PageHero,
@@ -19,6 +21,10 @@ import { CatalogPickerModal } from "@/components/catalog-picker-modal";
 export default function TicketDetailsPage() {
   const { id } = useParams() as { id: string };
   const router = useRouter();
+  const permissions = usePermissions();
+  const canViewCustomerWorkspace =
+    permissions.canReadPage("sales") ||
+    permissions.canReadPage("maintenance");
   const [ticket, setTicket] = useState<Ticket | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -202,12 +208,16 @@ export default function TicketDetailsPage() {
       total: ticketData.total,
       line_items: lineItems,
       created_at: ticketData.created_at,
-      customer: ticketData.customer ? {
-        id: ticketData.customer.id,
-        name: ticketData.customer.name,
-        email: "",
-        phone: ticketData.customer.phone,
-      } : undefined,
+      customer: ticketData.customer
+        ? {
+            id: ticketData.customer.id,
+            name: ticketData.customer.name,
+            phone: ticketData.customer.phone,
+            address: ticketData.customer.address,
+            how_did_you_know_us: ticketData.customer.how_did_you_know_us,
+            notes: ticketData.customer.notes,
+          }
+        : undefined,
     };
   };
 
@@ -366,6 +376,16 @@ export default function TicketDetailsPage() {
             <div className="rounded-2xl border border-outline-variant/15 bg-surface p-4 text-sm min-w-[200px] shadow-sm">
               <p className="text-on-surface-variant font-medium mb-1">Customer & Bike</p>
               <p className="font-bold text-base">{ticket.customer?.name || "No Customer Name"}</p>
+              {ticket.customer_id > 0 && canViewCustomerWorkspace ? (
+                <p className="mt-1">
+                  <Link
+                    href={`/customers/${ticket.customer_id}`}
+                    className="text-xs font-semibold text-primary hover:underline"
+                  >
+                    View customer workspace
+                  </Link>
+                </p>
+              ) : null}
               <p className="text-on-surface-variant">
                 {ticket.customer_bike?.bike_blueprint?.brand?.name} {ticket.customer_bike?.bike_blueprint?.model}
               </p>

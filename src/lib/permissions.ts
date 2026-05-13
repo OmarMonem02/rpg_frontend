@@ -32,6 +32,32 @@ export type RoutePermission = {
   action: ActionType;
 };
 
+export type PermissionGroup = {
+  key: string;
+  label: string;
+};
+
+export type PermissionPageDefinition = {
+  key: PagePath;
+  label: string;
+  group: string;
+  description: string;
+  actions: ActionType[];
+};
+
+export type RolePermissionPreset = {
+  key: string;
+  label: string;
+  permissions: PermissionMatrix;
+};
+
+export type PermissionMetadata = {
+  actions: ActionType[];
+  groups: PermissionGroup[];
+  pages: PermissionPageDefinition[];
+  role_presets: RolePermissionPreset[];
+};
+
 export const ALL_PAGE_PATHS: PagePath[] = [
   "dashboard",
   "sales",
@@ -60,6 +86,144 @@ export const ALL_ACTIONS: ActionType[] = [
   "export",
   "import",
 ];
+
+const FALLBACK_PAGE_DEFINITIONS: PermissionPageDefinition[] = [
+  {
+    key: "dashboard",
+    label: "Dashboard",
+    group: "overview",
+    description: "View the operational home screen and quick links.",
+    actions: ["read"],
+  },
+  {
+    key: "sales",
+    label: "Sales",
+    group: "sales",
+    description: "Create, manage, delete, and export sales records.",
+    actions: ["create", "read", "update", "delete", "export"],
+  },
+  {
+    key: "maintenance",
+    label: "Maintenance",
+    group: "maintenance",
+    description: "Operate tickets, service tasks, and workshop activity.",
+    actions: ["create", "read", "update", "delete"],
+  },
+  {
+    key: "inventory",
+    label: "Inventory",
+    group: "inventory",
+    description: "Access inventory workspace navigation and summaries.",
+    actions: ["read"],
+  },
+  {
+    key: "brands",
+    label: "Brands",
+    group: "master-data",
+    description: "Maintain brand records used by products and bikes.",
+    actions: ["create", "read", "update", "delete"],
+  },
+  {
+    key: "products",
+    label: "Products",
+    group: "inventory",
+    description: "Manage products, pricing, stock, and catalog data.",
+    actions: ["create", "read", "update", "delete"],
+  },
+  {
+    key: "bikes",
+    label: "Bikes",
+    group: "inventory",
+    description: "Manage bikes for sale and bike inventory records.",
+    actions: ["create", "read", "update", "delete"],
+  },
+  {
+    key: "spare-parts",
+    label: "Spare Parts",
+    group: "inventory",
+    description: "Manage spare parts, compatibility links, and stock.",
+    actions: ["create", "read", "update", "delete"],
+  },
+  {
+    key: "maintenance-services",
+    label: "Maintenance Services",
+    group: "maintenance",
+    description: "Maintain service catalog items and pricing.",
+    actions: ["create", "read", "update", "delete"],
+  },
+  {
+    key: "users",
+    label: "Users & Access",
+    group: "admin",
+    description: "Create users and manage account-level permissions.",
+    actions: ["create", "read", "update", "delete"],
+  },
+  {
+    key: "import-export",
+    label: "Import / Export",
+    group: "data",
+    description: "Access templates, exports, and spreadsheet imports.",
+    actions: ["read", "export", "import"],
+  },
+  {
+    key: "payment-methods",
+    label: "Payment Methods",
+    group: "admin",
+    description: "Maintain payment methods and payment settings.",
+    actions: ["create", "read", "update", "delete"],
+  },
+  {
+    key: "product-categories",
+    label: "Product Categories",
+    group: "master-data",
+    description: "Maintain product classification data.",
+    actions: ["create", "read", "update", "delete"],
+  },
+  {
+    key: "spare-part-categories",
+    label: "Spare Part Categories",
+    group: "master-data",
+    description: "Maintain spare part classification data.",
+    actions: ["create", "read", "update", "delete"],
+  },
+  {
+    key: "bike-blueprints",
+    label: "Bike Blueprints",
+    group: "master-data",
+    description: "Maintain bike blueprint data and spare part links.",
+    actions: ["create", "read", "update", "delete"],
+  },
+  {
+    key: "sellers",
+    label: "Sellers",
+    group: "admin",
+    description: "Manage seller records and commission rates.",
+    actions: ["create", "read", "update", "delete"],
+  },
+  {
+    key: "reporting",
+    label: "Reporting & Expenses",
+    group: "reporting",
+    description: "View reports and manage the expense ledger.",
+    actions: ["create", "read", "update", "delete"],
+  },
+];
+
+export const FALLBACK_PERMISSION_METADATA: PermissionMetadata = {
+  actions: ALL_ACTIONS,
+  groups: [
+    { key: "overview", label: "Overview" },
+    { key: "sales", label: "Sales" },
+    { key: "maintenance", label: "Maintenance" },
+    { key: "inventory", label: "Inventory" },
+    { key: "master-data", label: "Master Data" },
+    { key: "data", label: "Data" },
+    { key: "admin", label: "Admin" },
+    { key: "reporting", label: "Reporting" },
+  ],
+  pages: FALLBACK_PAGE_DEFINITIONS,
+  role_presets: [],
+};
 
 const DEFAULT_ROUTE_BY_PAGE: Record<PagePath, string> = {
   dashboard: "/",
@@ -222,7 +386,7 @@ function asRecord(value: unknown): Record<string, unknown> {
   return {};
 }
 
-function normalizePathname(pathname: string | null | undefined): string {
+export function normalizePathname(pathname: string | null | undefined): string {
   if (!pathname) return "/";
 
   const trimmed = pathname.trim().toLowerCase();
@@ -259,6 +423,113 @@ export function normalizePermissionMatrix(value: unknown): PermissionMatrix {
   }
 
   return matrix;
+}
+
+function normalizePermissionPageDefinition(
+  value: unknown,
+): PermissionPageDefinition | null {
+  const record = asRecord(value);
+  const key = typeof record.key === "string" ? record.key : "";
+  if (!ALL_PAGE_PATHS.includes(key as PagePath)) return null;
+
+  return {
+    key: key as PagePath,
+    label: typeof record.label === "string" ? record.label : key,
+    group: typeof record.group === "string" ? record.group : "overview",
+    description:
+      typeof record.description === "string" ? record.description : "",
+    actions: normalizeActions(record.actions),
+  };
+}
+
+export function normalizePermissionMetadata(
+  value: unknown,
+): PermissionMetadata {
+  const record = asRecord(value);
+  const groups = Array.isArray(record.groups)
+    ? record.groups
+        .map((group) => {
+          const item = asRecord(group);
+          return typeof item.key === "string" && typeof item.label === "string"
+            ? { key: item.key, label: item.label }
+            : null;
+        })
+        .filter((group): group is PermissionGroup => Boolean(group))
+    : FALLBACK_PERMISSION_METADATA.groups;
+
+  const pages = Array.isArray(record.pages)
+    ? record.pages
+        .map(normalizePermissionPageDefinition)
+        .filter((page): page is PermissionPageDefinition => Boolean(page))
+    : FALLBACK_PERMISSION_METADATA.pages;
+
+  const pageKeys = new Set(pages.map((page) => page.key));
+  const completePages = [
+    ...pages,
+    ...FALLBACK_PERMISSION_METADATA.pages.filter(
+      (page) => !pageKeys.has(page.key),
+    ),
+  ];
+
+  const rolePresets = Array.isArray(record.role_presets)
+    ? record.role_presets
+        .map((preset) => {
+          const item = asRecord(preset);
+          if (typeof item.key !== "string" || typeof item.label !== "string") {
+            return null;
+          }
+          return {
+            key: item.key,
+            label: item.label,
+            permissions: normalizePermissionMatrix(item.permissions),
+          };
+        })
+        .filter((preset): preset is RolePermissionPreset => Boolean(preset))
+    : [];
+
+  const actions = normalizeActions(record.actions);
+
+  return {
+    actions: actions.length > 0 ? actions : ALL_ACTIONS,
+    groups,
+    pages: completePages,
+    role_presets: rolePresets,
+  };
+}
+
+export function getAllowedActionsForPage(
+  metadata: PermissionMetadata,
+  page: PagePath,
+): ActionType[] {
+  return (
+    metadata.pages.find((definition) => definition.key === page)?.actions ??
+    ALL_ACTIONS
+  );
+}
+
+export function normalizePermissionMatrixForMetadata(
+  value: unknown,
+  metadata: PermissionMetadata,
+): PermissionMatrix {
+  const base = normalizePermissionMatrix(value);
+  const normalized = createEmptyPermissionMatrix();
+
+  for (const page of ALL_PAGE_PATHS) {
+    const allowedActions = getAllowedActionsForPage(metadata, page);
+    normalized[page] = allowedActions.filter((action) =>
+      base[page].includes(action),
+    );
+  }
+
+  return normalized;
+}
+
+export function getRolePresetPermissions(
+  metadata: PermissionMetadata,
+  role: string,
+): PermissionMatrix | null {
+  const preset = metadata.role_presets.find((item) => item.key === role);
+  return preset ? normalizePermissionMatrixForMetadata(preset.permissions, metadata) : null;
 }
 
 export function normalizeOptionalPermissionMatrix(
@@ -334,6 +605,14 @@ export function canAccessRoute(
   permissions: unknown,
   pathname: string | null | undefined,
 ): boolean {
+  const normalizedPath = normalizePathname(pathname);
+  if (/^\/customers(?:\/|$)/.test(normalizedPath)) {
+    return (
+      hasPermission(permissions, "sales", "read") ||
+      hasPermission(permissions, "maintenance", "read")
+    );
+  }
+
   const routePermission = getRoutePermission(pathname);
   if (!routePermission) return true;
 

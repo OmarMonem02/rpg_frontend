@@ -12,6 +12,9 @@ export type EntityFilters = {
   status?: string;
   type?: string;
   low_stock?: boolean;
+  bike_brand_id?: number;
+  bike_model?: string;
+  bike_year?: number;
 };
 
 export type FilterState = EntityFilters & {
@@ -48,6 +51,20 @@ export function useEntityFilters(initialFilters?: EntityFilters) {
     }));
     setPage(1);
   }, []);
+
+  // Spare-part compatibility (Bike Brand/Model/Year) filter
+  const setBikeCompatibility = useCallback(
+    (compat: { bike_brand_id?: number; bike_model?: string; bike_year?: number }) => {
+      setFilters((prev) => ({
+        ...prev,
+        bike_brand_id: compat.bike_brand_id,
+        bike_model: compat.bike_model,
+        bike_year: compat.bike_year,
+      }));
+      setPage(1);
+    },
+    [],
+  );
 
   // Maintenance Service Sector filter
   const setSector = useCallback((sector_id: number | "") => {
@@ -161,6 +178,7 @@ export function useEntityFilters(initialFilters?: EntityFilters) {
     setCategory,
     setBrand,
     setBlueprint,
+    setBikeCompatibility,
     setSector,
     setPriceRange,
     setPriceMin,

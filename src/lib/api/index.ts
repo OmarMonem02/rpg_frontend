@@ -5,3 +5,4 @@ export * from './bikes';
 export * from './maintenance';
 export * from './sales';
 export * from './customers';
+export * from './customer-workspace';

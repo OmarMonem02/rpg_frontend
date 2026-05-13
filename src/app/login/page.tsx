@@ -98,7 +98,7 @@ export default function LoginPage() {
                 onChange={(event) => setEmail(event.target.value)}
                 required
                 className="form-input-base"
-                placeholder="admin@rpg.com"
+                placeholder="admin@rpg.hub"
               />
             </div>
 

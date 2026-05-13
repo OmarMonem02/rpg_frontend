@@ -1,6 +1,5 @@
-import { ImportResult } from "@/types/import-export";
+import type { ImportResult } from "@/types/import-export";
 import { InlineMessage } from "@/components/ops-ui";
-import { useState } from "react";
 
 type Props = {
   result: ImportResult | null;
@@ -8,55 +7,35 @@ type Props = {
 };
 
 export function ImportResultAlert({ result, httpError }: Props) {
-  const [showAllErrors, setShowAllErrors] = useState(false);
-
   if (!result && !httpError) return null;
 
   if (httpError) {
     return <InlineMessage tone="danger">{httpError}</InlineMessage>;
   }
 
-  if (result) {
-    const createdCount = result.created_count ?? 0;
-    const restoredCount = result.restored_count ?? 0;
-    const skippedCount = result.skipped_count ?? 0;
-    const skippedDuplicates = result.skipped_duplicates ?? [];
-    const restoredRecords = result.restored_records ?? [];
-    const allMessages = [...result.errors, ...restoredRecords, ...skippedDuplicates];
+  if (!result) return null;
 
-    if (allMessages.length === 0 && skippedCount === 0 && restoredCount === 0) {
-      return (
-        <InlineMessage tone="success">
-          <div className="font-semibold mb-1">{result.message}</div>
-          <div className="text-sm opacity-90">Created: {createdCount}</div>
-        </InlineMessage>
-      );
-    }
+  const summary = result.summary;
+  const issueRows = result.rows.filter((row) => row.issues.length > 0).slice(0, 6);
 
-    const displayedMessages = showAllErrors ? allMessages : allMessages.slice(0, 5);
-
-    return (
-      <InlineMessage tone="warning">
-        <div className="font-semibold mb-2">{result.message}</div>
-        <div className="mb-3 text-sm opacity-90">
-          Created: {createdCount} | Restored: {restoredCount} | Skipped: {skippedCount}
-        </div>
-        <ul className="list-disc pl-5 space-y-1 text-sm opacity-90">
-          {displayedMessages.map((message, index) => (
-            <li key={index}>{message}</li>
+  return (
+    <InlineMessage tone={summary.skipped_count > 0 ? "warning" : "success"}>
+      <div className="font-semibold">{result.message}</div>
+      <div className="mt-2 grid gap-2 text-sm sm:grid-cols-4">
+        <span>Created: {summary.created_count}</span>
+        <span>Restored: {summary.restored_count}</span>
+        <span>Skipped: {summary.skipped_count}</span>
+        <span>Total: {summary.total_rows}</span>
+      </div>
+      {issueRows.length > 0 ? (
+        <ul className="mt-3 list-disc space-y-1 pl-5 text-sm">
+          {issueRows.map((row) => (
+            <li key={row.row_number}>
+              Row {row.row_number}: {row.issues.map((issue) => issue.message).join(" ")}
+            </li>
           ))}
         </ul>
-        {allMessages.length > 5 && (
-          <button
-            className="mt-3 text-xs font-semibold underline hover:no-underline"
-            onClick={() => setShowAllErrors(!showAllErrors)}
-          >
-            {showAllErrors ? "Show less" : `Show ${allMessages.length - 5} more`}
-          </button>
-        )}
-      </InlineMessage>
-    );
-  }
-
-  return null;
+      ) : null}
+    </InlineMessage>
+  );
 }

@@ -5,11 +5,15 @@ import { useParams, useRouter } from "next/navigation";
 import { ApiError } from "@/lib/auth-api";
 import { usePermissions } from "@/components/permission-provider";
 import { getAuthToken, getAuthUser, setAuthUser } from "@/lib/auth-session";
-import { getUser, updateUserPermissions } from "@/lib/crud-api";
+import { getPermissionMetadata, getUser, updateUserPermissions } from "@/lib/crud-api";
 import { PermissionsEditor } from "@/components/permissions-editor";
 import { PageHero, PageShell, InlineMessage } from "@/components/ops-ui";
 import type { UserRecord } from "@/lib/crud-api";
-import type { PermissionMatrix } from "@/lib/permissions";
+import {
+  FALLBACK_PERMISSION_METADATA,
+  type PermissionMatrix,
+  type PermissionMetadata,
+} from "@/lib/permissions";
 
 export default function UserPermissionsPage() {
   const router = useRouter();
@@ -19,6 +23,9 @@ export default function UserPermissionsPage() {
   const canSavePermissions = permissions.canUpdate("users");
 
   const [user, setUser] = useState<UserRecord | null>(null);
+  const [metadata, setMetadata] = useState<PermissionMetadata>(
+    FALLBACK_PERMISSION_METADATA,
+  );
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -33,8 +40,12 @@ export default function UserPermissionsPage() {
       if (!token) throw new Error("Authentication required");
       if (!userId || userId <= 0) throw new Error("Invalid user ID");
 
-      const userData = await getUser(token, userId);
+      const [userData, permissionMetadata] = await Promise.all([
+        getUser(token, userId),
+        getPermissionMetadata(token).catch(() => FALLBACK_PERMISSION_METADATA),
+      ]);
       setUser(userData);
+      setMetadata(permissionMetadata);
       setLoadError(null);
     } catch (err) {
       const message =
@@ -137,9 +148,7 @@ export default function UserPermissionsPage() {
         </div>
       </div>
 
-      <PageHero
-        title={`User Authorizations for ${user.name} (${user.email})`}
-      />
+      <PageHero title="User Access Control" />
 
       {loadError && <InlineMessage tone="danger">{loadError}</InlineMessage>}
       {saveError ? (
@@ -157,11 +166,16 @@ export default function UserPermissionsPage() {
       <PermissionsEditor
         userId={user.id}
         userName={user.name}
+        userEmail={user.email}
         currentRole={user.role}
         initialPermissions={user.permissions}
+        rolePermissions={user.role_permissions}
+        permissionSource={user.permission_source}
+        metadata={metadata}
         onSave={handleSavePermissions}
         isSaving={isSaving}
         canSave={canSavePermissions}
+        isCurrentUser={getAuthUser()?.id === user.id}
       />
     </PageShell>
   );

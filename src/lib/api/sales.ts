@@ -10,6 +10,7 @@ import {
   type PaginatedResult,
 } from "./core";
 import { normalizeCustomer, type CustomerRecord } from "./customers";
+import { downloadFile } from "./import-export";
 import { normalizeSeller, type SellerRecord } from "./users";
 
 // --- PAYMENT METHODS ---
@@ -146,15 +147,37 @@ export type CreateSalePayload = {
     | "cancelled";
   delivery_status?: "pending" | "in-transit" | "delivered";
   shipping_fee?: number;
+  discount?: number;
   sale_discount?: number;
   is_maintenance?: boolean;
   items: CreateSaleLineItemPayload[];
 };
 
 export type UpdateSalePayload = Partial<
-  Omit<CreateSalePayload, "line_items" | "status">
+  Omit<CreateSalePayload, "items" | "status">
 > & {
   status?: string;
+};
+
+export type SaleListSort = "newest" | "oldest" | "highest" | "lowest";
+
+export type SaleListFilters = {
+  search?: string;
+  customer_id?: number;
+  seller_id?: number;
+  payment_method_id?: number;
+  status?: string;
+  delivery_status?: string;
+  sale_type?: string;
+  is_maintenance?: boolean;
+  date_from?: string;
+  date_to?: string;
+  total_min?: number;
+  total_max?: number;
+  item_type?: "product" | "spare_part" | "maintenance_service" | "bike";
+  user_id?: number;
+  sort?: SaleListSort;
+  per_page?: number;
 };
 
 export type UpdateSaleLineItemPayload = Partial<CreateSaleLineItemPayload>;
@@ -233,21 +256,7 @@ export function normalizeSale(raw: unknown): SaleRecord {
 export async function listSales(
   token: string,
   page = 1,
-  filters?: {
-    search?: string;
-    customer_id?: number;
-    seller_id?: number;
-    payment_method_id?: number;
-    status?: string;
-    delivery_status?: string;
-    sale_type?: string;
-    is_maintenance?: boolean;
-    date_from?: string;
-    date_to?: string;
-    total_min?: number;
-    total_max?: number;
-    user_id?: number;
-  },
+  filters?: SaleListFilters,
 ): Promise<PaginatedResult<SaleRecord>> {
   const query = buildQuery({
     page,
@@ -263,7 +272,10 @@ export async function listSales(
     date_to: filters?.date_to,
     total_min: filters?.total_min,
     total_max: filters?.total_max,
+    item_type: filters?.item_type,
     user_id: filters?.user_id,
+    sort: filters?.sort,
+    per_page: filters?.per_page,
   });
 
   const payload = await authorizedFetch<unknown>(`/sales?${query}`, token);
@@ -274,6 +286,44 @@ export async function listSales(
     currentPage: meta.current_page ?? 1,
     lastPage: meta.last_page ?? 1,
   };
+}
+
+export function buildSalesExportQuery(
+  filters: SaleListFilters | undefined,
+  format: "xlsx" | "csv",
+): string {
+  const query = buildQuery({
+    search: filters?.search,
+    customer_id: filters?.customer_id,
+    seller_id: filters?.seller_id,
+    payment_method_id: filters?.payment_method_id,
+    status: filters?.status,
+    delivery_status: filters?.delivery_status,
+    type: filters?.sale_type,
+    is_maintenance: filters?.is_maintenance,
+    date_from: filters?.date_from,
+    date_to: filters?.date_to,
+    total_min: filters?.total_min,
+    total_max: filters?.total_max,
+    item_type: filters?.item_type,
+    user_id: filters?.user_id,
+    sort: filters?.sort,
+    format,
+  });
+
+  return query.toString();
+}
+
+export async function exportSales(
+  token: string,
+  filters: SaleListFilters | undefined,
+  format: "xlsx" | "csv",
+): Promise<void> {
+  const qs = buildSalesExportQuery(filters, format);
+  const ext = format === "csv" ? "csv" : "xlsx";
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const filename = `sales_export_${stamp}.${ext}`;
+  await downloadFile(`/sales/export?${qs}`, token, filename);
 }
 
 export async function getSale(token: string, id: number): Promise<SaleRecord> {
@@ -289,7 +339,7 @@ export async function createSale(
   const data = await authorizedFetch<unknown>("/sales", token, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
+    body: JSON.stringify(serializeSalePayload(payload)),
   });
   const record = asRecord(data);
   return normalizeSale(record.data ?? record);
@@ -303,10 +353,24 @@ export async function updateSale(
   const data = await authorizedFetch<unknown>(`/sales/${id}`, token, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
+    body: JSON.stringify(serializeSalePayload(payload)),
   });
   const record = asRecord(data);
   return normalizeSale(record.data ?? record);
+}
+
+function serializeSalePayload<T extends CreateSalePayload | UpdateSalePayload>(
+  payload: T,
+): T & { discount?: number } {
+  if (payload.sale_discount === undefined || payload.discount !== undefined) {
+    return payload;
+  }
+
+  const { sale_discount: saleDiscount, ...rest } = payload;
+  return {
+    ...rest,
+    discount: saleDiscount,
+  } as T & { discount?: number };
 }
 
 export async function deleteSale(token: string, id: number): Promise<void> {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { getAuthToken } from "@/lib/auth-session";
 import { usePermissions } from "@/components/permission-provider";
@@ -60,6 +61,9 @@ export default function SaleDetailsPage() {
   const canDeleteSales = permissions.canDelete("sales");
   const canUpdateSales = permissions.canUpdate("sales");
   const canExportSales = permissions.canExport("sales");
+  const canViewCustomerWorkspace =
+    permissions.canReadPage("sales") ||
+    permissions.canReadPage("maintenance");
 
   const [sale, setSale] = useState<SaleRecord | null>(null);
   const [loading, setLoading] = useState(true);
@@ -220,6 +224,16 @@ export default function SaleDetailsPage() {
       <PageHero
         eyebrow="Order Management"
         title={`Sale #${sale.id} Customer: ${sale.customer?.name || `Customer #${sale.customer_id}`}. Sale recorded on ${sale.created_at ? new Date(sale.created_at).toLocaleDateString() : "N/A"}.`}
+        meta={
+          sale.customer_id > 0 && canViewCustomerWorkspace ? (
+            <Link
+              href={`/customers/${sale.customer_id}`}
+              className="inline-flex text-sm font-semibold text-primary hover:underline"
+            >
+              View customer workspace
+            </Link>
+          ) : null
+        }
         actions={
           <>
             <ActionButton

@@ -309,6 +309,11 @@ const defaultNavSections: SidebarNavSection[] = [
         label: "Create Sale",
         icon: <CreateIcon className="h-5 w-5" />,
       },
+      {
+        href: "/customers",
+        label: "Customers",
+        icon: <UsersIcon className="h-5 w-5" />,
+      },
     ],
   },
   {

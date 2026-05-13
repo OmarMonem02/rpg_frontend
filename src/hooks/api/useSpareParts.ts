@@ -5,6 +5,8 @@ import {
   deleteSparePart,
   fetchAllPages,
   getSparePart,
+  listBikeBlueprintFilterModels,
+  listBikeBlueprintFilterYears,
   listBikeBlueprints,
   listBrands,
   listSparePartCategories,
@@ -25,6 +27,11 @@ type SparePartFilters = {
   price_range?: string;
   currency?: string;
   low_stock?: boolean;
+  bike_brand_id?: number;
+  bike_model?: string;
+  bike_year?: number;
+  bike_year_from?: number;
+  bike_year_to?: number;
 };
 
 export const sparePartsKeys = {
@@ -140,5 +147,32 @@ export function useSyncSparePartBlueprints() {
         ),
       );
     },
+  });
+}
+
+export function useGetBikeModels(brandId?: number) {
+  return useQuery({
+    queryKey: ["bike-models", brandId],
+    queryFn: () =>
+      listBikeBlueprintFilterModels(getRequiredToken(), brandId as number),
+    enabled: typeof brandId === "number" && brandId > 0,
+  });
+}
+
+export function useGetBikeYears(brandId?: number, model?: string) {
+  const modelTrimmed = model?.trim();
+  return useQuery({
+    queryKey: ["bike-years", brandId, modelTrimmed],
+    queryFn: () =>
+      listBikeBlueprintFilterYears(
+        getRequiredToken(),
+        brandId as number,
+        modelTrimmed as string,
+      ),
+    enabled:
+      typeof brandId === "number" &&
+      brandId > 0 &&
+      !!modelTrimmed &&
+      modelTrimmed.length > 0,
   });
 }

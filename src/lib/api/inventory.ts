@@ -302,7 +302,24 @@ export type UpdateSparePartPayload = {
   max_discount_value: number;
   universal?: boolean;
   notes?: string;
+  /** When set, replaces pivot links (use [] when universal). Omit to leave links unchanged. */
+  bike_blueprint_ids?: number[];
 };
+
+function coalesceBikeBlueprintIds(record: Record<string, unknown>): number[] | undefined {
+  if (Array.isArray(record.bike_blueprint_ids)) {
+    return record.bike_blueprint_ids
+      .map((item) => toNumber(item))
+      .filter((id) => id > 0);
+  }
+  if (Array.isArray(record.bike_blueprints)) {
+    const fromNested = record.bike_blueprints
+      .map((item) => toNumber(asRecord(item).id))
+      .filter((id) => id > 0);
+    return fromNested.length > 0 ? fromNested : undefined;
+  }
+  return undefined;
+}
 
 export function normalizeSparePart(raw: unknown): SparePartRecord {
   const record = asRecord(raw);
@@ -324,11 +341,7 @@ export function normalizeSparePart(raw: unknown): SparePartRecord {
     max_discount_value: toNumber(record.max_discount_value),
     universal: record.universal === true || record.universal === "true",
     notes: toText(record.notes) || undefined,
-    bike_blueprint_ids: Array.isArray(record.bike_blueprint_ids)
-      ? record.bike_blueprint_ids
-          .map((item) => toNumber(item))
-          .filter((id) => id > 0)
-      : undefined,
+    bike_blueprint_ids: coalesceBikeBlueprintIds(record),
     created_at: toText(record.created_at) || undefined,
   };
 }
@@ -343,6 +356,11 @@ export async function listSpareParts(
     price_range?: string;
     currency?: string;
     low_stock?: boolean;
+    bike_brand_id?: number;
+    bike_model?: string;
+    bike_year?: number;
+    bike_year_from?: number;
+    bike_year_to?: number;
   },
 ): Promise<PaginatedResult<SparePartRecord>> {
   const query = buildQuery({
@@ -353,6 +371,11 @@ export async function listSpareParts(
     price_range: filters?.price_range,
     currency: filters?.currency,
     low_stock: filters?.low_stock,
+    bike_brand_id: filters?.bike_brand_id,
+    bike_model: filters?.bike_model,
+    bike_year: filters?.bike_year,
+    bike_year_from: filters?.bike_year_from,
+    bike_year_to: filters?.bike_year_to,
   });
 
   const payload = await authorizedFetch<unknown>(
