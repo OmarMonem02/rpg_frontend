@@ -310,7 +310,7 @@ export function EntityForm({
 
   const shellClassName =
     variant === "drawer"
-      ? "form-modal-shell flex min-h-0 flex-1 w-full flex-col overflow-hidden"
+      ? "form-modal-shell flex min-h-0 flex-1 w-full flex-col overflow-hidden border rounded-2xl border-outline-variant/15 bg-surface-container-lowest"
       : isModalStyleChrome
         ? "form-modal-shell h-[94vh] max-h-[94vh] w-full flex flex-col overflow-hidden"
         : "w-full flex flex-col space-y-6";
