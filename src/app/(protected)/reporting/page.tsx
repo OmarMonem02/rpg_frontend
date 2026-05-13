@@ -11,6 +11,7 @@ import {
   type ExpensesReport,
   type ProfitLossReport,
 } from "@/lib/api/reporting";
+import { SUPPORTED_PRICING_CURRENCIES } from "@/lib/currencies";
 import { getAuthToken } from "@/lib/auth-session";
 import { ApiError } from "@/lib/auth-api";
 import {
@@ -88,7 +89,7 @@ export default function ReportingOverviewPage() {
     };
   }, []);
 
-  const currencies = ["EGP", "USD"] as const;
+  const currencies = SUPPORTED_PRICING_CURRENCIES;
 
   return (
     <PageShell>

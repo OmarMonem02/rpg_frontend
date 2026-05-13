@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePermissions } from "@/components/permission-provider";
 import { ApiError } from "@/lib/auth-api";
-import { getAuthToken } from "@/lib/auth-session";
+import { getAuthToken, getAuthUser } from "@/lib/auth-session";
 import { getSettings, updateSettings } from "@/lib/api/settings";
 import {
   listPaymentMethods,
@@ -21,26 +21,27 @@ import {
   ActionButton,
   EmptyState,
   InlineMessage,
+  InputGroupCard,
   PageHero,
   PageShell,
   PaginationControls,
-  StatCard,
-  StatGrid,
+  SectionHeading,
   SurfaceCard,
 } from "@/components/ops-ui";
 import type {
   SettingsResponse,
   SettingsValidationErrors,
+  UpdateSettingsPayload,
 } from "@/types/settings";
 
 type SettingsFormState = {
-  tax_rate: string;
   exchange_rate: string;
+  exchange_rate_eur: string;
 };
 
 const initialSettingsForm: SettingsFormState = {
-  tax_rate: "",
   exchange_rate: "",
+  exchange_rate_eur: "",
 };
 
 function formatNullableNumber(value: number | null): string {
@@ -48,45 +49,53 @@ function formatNullableNumber(value: number | null): string {
   return String(value);
 }
 
-function formatRateSummary(value: number | null): string {
+function formatUsdRateSummary(value: number | null): string {
   if (value === null) return "Not configured";
   return `1 USD = ${value.toFixed(2)} EGP`;
 }
 
-function validateSettingsForm(
-  form: SettingsFormState,
-): SettingsValidationErrors {
-  const errors: SettingsValidationErrors = {};
-  const taxRate = Number(form.tax_rate);
-  const exchangeRate = Number(form.exchange_rate);
+function formatEurRateSummary(value: number | null): string {
+  if (value === null) return "Not configured";
+  return `1 EUR = ${value.toFixed(2)} EGP`;
+}
 
-  if (form.tax_rate.trim() === "" || !Number.isFinite(taxRate)) {
-    errors.tax_rate = "Tax rate is required.";
-  } else if (taxRate < 0) {
-    errors.tax_rate = "Tax rate must be 0 or greater.";
+function validateRateField(
+  raw: string,
+  label: string,
+): string | undefined {
+  const trimmed = raw.trim();
+  if (trimmed === "") return `${label} is required.`;
+  const n = Number(trimmed);
+  if (!Number.isFinite(n) || n <= 0) {
+    return `${label} must be a number greater than 0.`;
   }
-
-  if (form.exchange_rate.trim() === "" || !Number.isFinite(exchangeRate)) {
-    errors.exchange_rate = "Exchange rate is required.";
-  } else if (exchangeRate <= 0) {
-    errors.exchange_rate = "Exchange rate must be greater than 0.";
-  }
-
-  return errors;
+  return undefined;
 }
 
 export default function PaymentMethodsPage() {
   const permissions = usePermissions();
+  const authUser = getAuthUser();
+  const isAdmin = authUser?.role === "admin";
+
   const [methods, setMethods] = useState<PaymentMethodRecord[]>([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [searchInput, setSearchInput] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingMethod, setEditingMethod] =
     useState<PaymentMethodRecord | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const [deleteTarget, setDeleteTarget] = useState<PaymentMethodRecord | null>(
+    null,
+  );
+  const [isDeleting, setIsDeleting] = useState(false);
+
   const [settings, setSettings] = useState<SettingsResponse | null>(null);
   const [settingsForm, setSettingsForm] =
     useState<SettingsFormState>(initialSettingsForm);
@@ -94,19 +103,34 @@ export default function PaymentMethodsPage() {
     useState<SettingsValidationErrors>({});
   const [settingsError, setSettingsError] = useState<string | null>(null);
   const [settingsSuccess, setSettingsSuccess] = useState<string | null>(null);
-  const [isSettingsLoading, setIsSettingsLoading] = useState(true);
+  const [isSettingsLoading, setIsSettingsLoading] = useState(isAdmin);
   const [isSettingsSaving, setIsSettingsSaving] = useState(false);
+
   const canCreatePaymentMethods = permissions.canCreate("payment-methods");
   const canUpdatePaymentMethods = permissions.canUpdate("payment-methods");
   const canDeletePaymentMethods = permissions.canDelete("payment-methods");
 
-  const loadMethods = async () => {
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      setDebouncedSearch(searchInput.trim());
+    }, 300);
+    return () => window.clearTimeout(t);
+  }, [searchInput]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch]);
+
+  const loadMethods = useCallback(async () => {
     try {
       setLoading(true);
       const token = getAuthToken();
       if (!token) throw new Error("Authentication required");
 
-      const result = await listPaymentMethods(token, page);
+      const result = await listPaymentMethods(token, {
+        page,
+        search: debouncedSearch || undefined,
+      });
       setMethods(result.items);
       setTotalPages(result.lastPage);
       setError(null);
@@ -117,17 +141,21 @@ export default function PaymentMethodsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, debouncedSearch]);
 
   const syncSettingsForm = (nextSettings: SettingsResponse) => {
     setSettings(nextSettings);
     setSettingsForm({
-      tax_rate: formatNullableNumber(nextSettings.tax_rate),
       exchange_rate: formatNullableNumber(nextSettings.exchange_rate),
+      exchange_rate_eur: formatNullableNumber(nextSettings.exchange_rate_eur),
     });
   };
 
   const loadSettings = async () => {
+    if (!isAdmin) {
+      setIsSettingsLoading(false);
+      return;
+    }
     try {
       setIsSettingsLoading(true);
       const token = getAuthToken();
@@ -146,32 +174,30 @@ export default function PaymentMethodsPage() {
   };
 
   useEffect(() => {
-    const run = async () => {
-      await loadMethods();
-    };
-
-    void run();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page]);
+    void loadMethods();
+  }, [loadMethods]);
 
   useEffect(() => {
-    const run = async () => {
-      await loadSettings();
-    };
+    void loadSettings();
+  }, [isAdmin]);
 
-    void run();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const hasSettingsChanges = useMemo(() => {
+  const usdDirty = useMemo(() => {
     if (!settings) return false;
-
     return (
-      settingsForm.tax_rate !== formatNullableNumber(settings.tax_rate) ||
       settingsForm.exchange_rate !==
-        formatNullableNumber(settings.exchange_rate)
+      formatNullableNumber(settings.exchange_rate)
     );
-  }, [settings, settingsForm]);
+  }, [settings, settingsForm.exchange_rate]);
+
+  const eurDirty = useMemo(() => {
+    if (!settings) return false;
+    return (
+      settingsForm.exchange_rate_eur !==
+      formatNullableNumber(settings.exchange_rate_eur)
+    );
+  }, [settings, settingsForm.exchange_rate_eur]);
+
+  const hasSettingsChanges = usdDirty || eurDirty;
 
   const handleOpenModal = (method?: PaymentMethodRecord) => {
     if (method && !canUpdatePaymentMethods) return;
@@ -199,7 +225,7 @@ export default function PaymentMethodsPage() {
       if (!token) throw new Error("Authentication required");
 
       const payload: CreatePaymentMethodPayload = {
-        name: String(formData.name),
+        name: String(formData.name).trim(),
       };
 
       if (editingMethod) {
@@ -237,14 +263,39 @@ export default function PaymentMethodsPage() {
     event: React.FormEvent<HTMLFormElement>,
   ) => {
     event.preventDefault();
-    if (!canUpdatePaymentMethods) {
-      setSettingsError("You do not have permission to update payment settings.");
+    if (!isAdmin) {
+      setSettingsError("Only administrators can update exchange rates.");
       return;
     }
-    const nextErrors = validateSettingsForm(settingsForm);
+
+    const nextErrors: SettingsValidationErrors = {};
+    const payload: UpdateSettingsPayload = {};
+
+    if (usdDirty) {
+      const err = validateRateField(
+        settingsForm.exchange_rate,
+        "USD→EGP rate",
+      );
+      if (err) nextErrors.exchange_rate = err;
+      else payload.exchange_rate = Number(settingsForm.exchange_rate);
+    }
+
+    if (eurDirty) {
+      const err = validateRateField(
+        settingsForm.exchange_rate_eur,
+        "EUR→EGP rate",
+      );
+      if (err) nextErrors.exchange_rate_eur = err;
+      else payload.exchange_rate_eur = Number(settingsForm.exchange_rate_eur);
+    }
+
     if (Object.keys(nextErrors).length > 0) {
       setSettingsErrors(nextErrors);
       setSettingsSuccess(null);
+      return;
+    }
+
+    if (Object.keys(payload).length === 0) {
       return;
     }
 
@@ -256,14 +307,11 @@ export default function PaymentMethodsPage() {
       const token = getAuthToken();
       if (!token) throw new Error("Authentication required");
 
-      const updatedSettings = await updateSettings(token, {
-        tax_rate: Number(settingsForm.tax_rate),
-        exchange_rate: Number(settingsForm.exchange_rate),
-      });
+      const updatedSettings = await updateSettings(token, payload);
 
       syncSettingsForm(updatedSettings);
       setSettingsErrors({});
-      setSettingsSuccess("Payment settings saved successfully.");
+      setSettingsSuccess("Exchange rates saved successfully.");
     } catch (err) {
       if (err instanceof ApiError) {
         const fieldErrors = (
@@ -285,23 +333,21 @@ export default function PaymentMethodsPage() {
     }
   };
 
-  const handleDelete = async (id: number) => {
-    if (!canDeletePaymentMethods) {
-      setError("You do not have permission to delete payment methods.");
-      return;
-    }
-    if (!confirm("Are you sure you want to delete this payment method?"))
-      return;
-
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget || !canDeletePaymentMethods) return;
     try {
+      setIsDeleting(true);
       const token = getAuthToken();
       if (!token) throw new Error("Authentication required");
-      await deletePaymentMethod(token, id);
+      await deletePaymentMethod(token, deleteTarget.id);
+      setDeleteTarget(null);
       await loadMethods();
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Failed to delete payment method",
       );
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -318,37 +364,20 @@ export default function PaymentMethodsPage() {
 
   return (
     <PageShell>
-      <StatGrid>
-        <StatCard
-          label="Tax Rate"
-          value={
-            settings?.tax_rate !== null && settings?.tax_rate !== undefined
-              ? `${settings.tax_rate}%`
-              : "Not set"
-          }
-          hint="Applied to totals wherever tax-aware pricing is used."
-          tone="default"
-        />
-        <StatCard
-          label="Exchange Rate"
-          value={formatRateSummary(settings?.exchange_rate ?? null)}
-          hint="Stored through the settings API and surfaced from Payments."
-          tone="primary"
-        />
-      </StatGrid>
-
       {error && <InlineMessage tone="danger">{error}</InlineMessage>}
 
-      <SurfaceCard>
-        <div className="flex flex-col gap-2 border-b border-outline-variant/15 pb-4">
-          <h2 className="text-xl font-semibold text-on-surface">
-            Payment Settings
-          </h2>
-          <p className="max-w-3xl text-sm leading-6 text-on-surface-variant">
-            Manage the shared payment configuration here, including the
-            `exchange_rate` used alongside the selected currency.
-          </p>
-        </div>
+      <div className="flex flex-col gap-4">
+        <SectionHeading
+          title="Exchange rates"
+          description="EGP amounts for sales and reporting use these rates for foreign-priced catalog lines. USD and EUR rates are stored as EGP per 1 unit of foreign currency. Only administrators can change them."
+        />
+
+        {!isAdmin ? (
+          <InlineMessage tone="primary">
+            Exchange rates are managed by an administrator. You can still manage
+            payment method names below if you have permission.
+          </InlineMessage>
+        ) : null}
 
         {settingsError ? (
           <InlineMessage tone="danger">{settingsError}</InlineMessage>
@@ -357,51 +386,60 @@ export default function PaymentMethodsPage() {
           <InlineMessage tone="primary">{settingsSuccess}</InlineMessage>
         ) : null}
 
-        {isSettingsLoading ? (
-          <div className="flex justify-center py-10">
+        {isAdmin && isSettingsLoading ? (
+          <div className="flex justify-center rounded-[1.25rem] border border-outline-variant/15 bg-surface-container-low py-12">
             <div className="h-8 w-8 animate-spin rounded-full border-4 border-outline-variant/30 border-t-primary"></div>
           </div>
-        ) : (
-          <form onSubmit={handleSettingsSubmit} className="mt-5 space-y-5">
-            <div className="grid gap-4 md:grid-cols-3">
-              <label className="space-y-2 text-sm">
-                <span className="font-medium text-on-surface">Tax Rate</span>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={settingsForm.tax_rate}
-                  onChange={(event) =>
-                    handleSettingsFieldChange("tax_rate", event.target.value)
-                  }
-                  className={`form-input-base ${settingsErrors.tax_rate ? "form-input-error" : ""}`}
-                  placeholder="14"
-                  disabled={isSettingsSaving}
-                />
-                {settingsErrors.tax_rate ? (
-                  <span className="text-xs font-medium text-error">
-                    {settingsErrors.tax_rate}
-                  </span>
-                ) : null}
-              </label>
-              <label className="space-y-2 text-sm">
-                <span className="font-medium text-on-surface">
-                  Exchange Rate
-                </span>
+        ) : isAdmin ? (
+          <form onSubmit={handleSettingsSubmit} className="flex flex-col gap-4">
+            <InputGroupCard
+              label="USD → EGP"
+              hint="Saved on the server as exchange_rate. Used when line items are priced in USD."
+              tone="primary"
+              value={formatUsdRateSummary(settings?.exchange_rate ?? null)}
+              footer={
+                <div className="flex w-full flex-wrap items-end justify-between gap-3">
+                  <p className="min-w-0 text-sm text-on-surface-variant">
+                    <span className="font-medium text-on-surface">Preview</span>
+                    {settingsForm.exchange_rate.trim() !== ""
+                      ? `: 1 USD = ${settingsForm.exchange_rate} EGP`
+                      : ": enter a positive rate."}
+                  </p>
+                  <div className="flex shrink-0 flex-wrap gap-2">
+                    <ActionButton
+                      type="button"
+                      onClick={() => settings && syncSettingsForm(settings)}
+                      disabled={!usdDirty || isSettingsSaving}
+                    >
+                      Reset USD
+                    </ActionButton>
+                    <ActionButton
+                      type="submit"
+                      tone="primary"
+                      disabled={isSettingsSaving || !hasSettingsChanges}
+                    >
+                      {isSettingsSaving ? "Saving..." : "Save rate changes"}
+                    </ActionButton>
+                  </div>
+                </div>
+              }
+            >
+              <label className="flex flex-col gap-2 text-sm">
+                <span className="font-medium text-on-surface">EGP per 1 USD</span>
                 <input
                   type="number"
                   min="0.01"
                   step="0.01"
+                  inputMode="decimal"
+                  autoComplete="off"
                   value={settingsForm.exchange_rate}
                   onChange={(event) =>
-                    handleSettingsFieldChange(
-                      "exchange_rate",
-                      event.target.value,
-                    )
+                    handleSettingsFieldChange("exchange_rate", event.target.value)
                   }
-                  className={`form-input-base ${settingsErrors.exchange_rate ? "form-input-error" : ""}`}
-                  placeholder="50.25"
+                  className={`form-input-base max-w-xs ${settingsErrors.exchange_rate ? "form-input-error" : ""}`}
+                  placeholder="e.g. 50.25"
                   disabled={isSettingsSaving}
+                  aria-invalid={Boolean(settingsErrors.exchange_rate)}
                 />
                 {settingsErrors.exchange_rate ? (
                   <span className="text-xs font-medium text-error">
@@ -409,42 +447,71 @@ export default function PaymentMethodsPage() {
                   </span>
                 ) : null}
               </label>
-            </div>
+            </InputGroupCard>
 
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-[1.25rem] border border-outline-variant/15 bg-surface px-4 py-3">
-              <p className="text-sm text-on-surface-variant">
-                {settingsForm.exchange_rate
-                  ? `Preview: 1 USD = ${settingsForm.exchange_rate} EGP`
-                  : "Enter a positive exchange rate to preview the conversion basis."}
-              </p>
-              <div className="flex gap-2">
-                <ActionButton
-                  type="button"
-                  onClick={() => settings && syncSettingsForm(settings)}
-                  disabled={
-                    !hasSettingsChanges ||
-                    isSettingsSaving ||
-                    !canUpdatePaymentMethods
+            <InputGroupCard
+              label="EUR → EGP"
+              hint="Saved on the server as exchange_rate_eur. Used when line items are priced in EUR."
+              tone="primary"
+              value={formatEurRateSummary(settings?.exchange_rate_eur ?? null)}
+              footer={
+                <div className="flex w-full flex-wrap items-end justify-between gap-3">
+                  <p className="min-w-0 text-sm text-on-surface-variant">
+                    <span className="font-medium text-on-surface">Preview</span>
+                    {settingsForm.exchange_rate_eur.trim() !== ""
+                      ? `: 1 EUR = ${settingsForm.exchange_rate_eur} EGP`
+                      : ": enter a positive rate."}
+                  </p>
+                  <div className="flex shrink-0 flex-wrap gap-2">
+                    <ActionButton
+                      type="button"
+                      onClick={() => settings && syncSettingsForm(settings)}
+                      disabled={!eurDirty || isSettingsSaving}
+                    >
+                      Reset EUR
+                    </ActionButton>
+                    <ActionButton
+                      type="submit"
+                      tone="primary"
+                      disabled={isSettingsSaving || !hasSettingsChanges}
+                    >
+                      {isSettingsSaving ? "Saving..." : "Save rate changes"}
+                    </ActionButton>
+                  </div>
+                </div>
+              }
+            >
+              <label className="flex flex-col gap-2 text-sm">
+                <span className="font-medium text-on-surface">EGP per 1 EUR</span>
+                <input
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  inputMode="decimal"
+                  autoComplete="off"
+                  value={settingsForm.exchange_rate_eur}
+                  onChange={(event) =>
+                    handleSettingsFieldChange(
+                      "exchange_rate_eur",
+                      event.target.value,
+                    )
                   }
-                >
-                  Reset
-                </ActionButton>
-                <ActionButton
-                  type="submit"
-                  tone="primary"
-                  disabled={
-                    isSettingsSaving ||
-                    !hasSettingsChanges ||
-                    !canUpdatePaymentMethods
-                  }
-                >
-                  {isSettingsSaving ? "Saving..." : "Save Settings"}
-                </ActionButton>
-              </div>
-            </div>
+                  className={`form-input-base max-w-xs ${settingsErrors.exchange_rate_eur ? "form-input-error" : ""}`}
+                  placeholder="e.g. 52.50"
+                  disabled={isSettingsSaving}
+                  aria-invalid={Boolean(settingsErrors.exchange_rate_eur)}
+                />
+                {settingsErrors.exchange_rate_eur ? (
+                  <span className="text-xs font-medium text-error">
+                    {settingsErrors.exchange_rate_eur}
+                  </span>
+                ) : null}
+              </label>
+            </InputGroupCard>
           </form>
-        )}
-      </SurfaceCard>
+        ) : null}
+      </div>
+
       <PageHero
         eyebrow="Master Data"
         title="Payment Methods"
@@ -456,6 +523,20 @@ export default function PaymentMethodsPage() {
           ) : null
         }
       />
+
+      <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <label className="flex max-w-md flex-col gap-1 text-sm">
+          <span className="font-medium text-on-surface">Search</span>
+          <input
+            type="search"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            placeholder="Filter by name…"
+            className="form-input-base"
+          />
+        </label>
+      </div>
+
       <SurfaceCard>
         {loading ? (
           <div className="flex justify-center py-12">
@@ -464,7 +545,11 @@ export default function PaymentMethodsPage() {
         ) : methods.length === 0 ? (
           <EmptyState
             title="No payment methods found"
-            description="Create the first payment method so the team can align transactions with your accepted payment channels."
+            description={
+              debouncedSearch
+                ? "Try a different search term."
+                : "Create the first payment method so the team can align transactions with your accepted payment channels."
+            }
             action={
               canCreatePaymentMethods ? (
                 <ActionButton tone="primary" onClick={() => handleOpenModal()}>
@@ -503,6 +588,7 @@ export default function PaymentMethodsPage() {
                     </td>
                     <td className="px-4 py-3 text-right">
                       <button
+                        type="button"
                         onClick={() => handleOpenModal(method)}
                         hidden={!canUpdatePaymentMethods}
                         className="text-primary hover:underline text-xs font-medium"
@@ -511,7 +597,8 @@ export default function PaymentMethodsPage() {
                       </button>
                       <span className="mx-2 text-on-surface-variant">•</span>
                       <button
-                        onClick={() => handleDelete(method.id)}
+                        type="button"
+                        onClick={() => setDeleteTarget(method)}
                         hidden={!canDeletePaymentMethods}
                         className="text-error hover:underline text-xs font-medium"
                       >
@@ -543,6 +630,38 @@ export default function PaymentMethodsPage() {
         onClose={handleCloseModal}
         onSubmit={handleSubmit}
       />
+
+      {deleteTarget ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-md rounded-[1.25rem] border border-outline-variant/20 bg-surface p-6 shadow-lg">
+            <h3 className="font-display text-lg font-semibold text-on-surface">
+              Delete payment method?
+            </h3>
+            <p className="mt-2 text-sm text-on-surface-variant">
+              Remove <span className="font-medium text-on-surface">{deleteTarget.name}</span>
+              ? This cannot be undone if the server allows deletion.
+            </p>
+            <div className="mt-6 flex justify-end gap-2">
+              <ActionButton
+                type="button"
+                variant="outline"
+                onClick={() => setDeleteTarget(null)}
+                disabled={isDeleting}
+              >
+                Cancel
+              </ActionButton>
+              <ActionButton
+                type="button"
+                tone="danger"
+                onClick={() => void handleConfirmDelete()}
+                disabled={isDeleting}
+              >
+                {isDeleting ? "Deleting…" : "Delete"}
+              </ActionButton>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </PageShell>
   );
 }

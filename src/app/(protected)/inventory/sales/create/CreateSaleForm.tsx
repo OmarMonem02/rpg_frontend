@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { getAuthToken } from "@/lib/auth-session";
 import { getSettings } from "@/lib/api/settings";
+import { egpMultiplierForPricingCurrency, toPricingCurrency } from "@/lib/currencies";
 import {
   createSale,
   listCustomers,
@@ -67,6 +68,7 @@ export function CreateSaleForm() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [exchangeRate, setExchangeRate] = useState<number>(0);
+  const [exchangeRateEur, setExchangeRateEur] = useState<number>(0);
 
   // Form header state
   const [customerId, setCustomerId] = useState<number | null>(null);
@@ -153,6 +155,7 @@ export function CreateSaleForm() {
         setSellers(sellersRes.items);
         setPaymentMethods(paymentRes.items);
         setExchangeRate(settingsRes.exchange_rate ?? 0);
+        setExchangeRateEur(settingsRes.exchange_rate_eur ?? 0);
       } catch (err) {
         setError(
           err instanceof Error ? err.message : "Failed to load dependencies",
@@ -232,9 +235,9 @@ export function CreateSaleForm() {
           selling_price: price,
           discount_amount: 0,
           quantity: 1,
-          currency: ("currency_pricing" in item
-            ? item.currency_pricing
-            : "EGP") as "EGP" | "USD",
+          currency: toPricingCurrency(
+            "currency_pricing" in item ? item.currency_pricing : "EGP",
+          ),
           catalogItem: item,
         };
       });
@@ -299,8 +302,10 @@ export function CreateSaleForm() {
         is_maintenance: isMaintenance,
         items: cartItems.map((item) => {
           // ── Currency Normalization ──────────────────────────────────────────
-          const isUSD = item.currency === "USD";
-          const rate = isUSD && exchangeRate > 0 ? exchangeRate : 1;
+          const rate = egpMultiplierForPricingCurrency(item.currency, {
+            usdToEgp: exchangeRate,
+            eurToEgp: exchangeRateEur,
+          });
           const normalizedPrice =
             Math.round(Number(item.selling_price) * rate * 100) / 100;
           const normalizedDiscount =
@@ -372,12 +377,12 @@ export function CreateSaleForm() {
 
   const saleTotal = (() => {
     const subtotal = cartItems.reduce((sum, item) => {
-      let unitEGP = item.selling_price;
-      let discEGP = item.discount_amount;
-      if (item.currency === "USD" && exchangeRate > 0) {
-        unitEGP *= exchangeRate;
-        discEGP *= exchangeRate;
-      }
+      const m = egpMultiplierForPricingCurrency(item.currency, {
+        usdToEgp: exchangeRate,
+        eurToEgp: exchangeRateEur,
+      });
+      const unitEGP = item.selling_price * m;
+      const discEGP = item.discount_amount * m;
       return sum + Math.round((item.quantity * unitEGP - discEGP) * 100) / 100;
     }, 0);
     return Math.round((subtotal + shippingFee - saleDiscount) * 100) / 100;
@@ -416,7 +421,7 @@ export function CreateSaleForm() {
       {error && (
         <div className="rounded-2xl border border-error/30 bg-error-container p-4 flex items-start gap-3 animate-in fade-in slide-in-from-top-2 shadow-sm mb-6">
           <svg
-            className="w-5 h-5 text-on-error-container flex-shrink-0 mt-0.5"
+            className="w-7 h-7 text-on-error-container flex-shrink-0 mt-0.5"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -445,18 +450,18 @@ export function CreateSaleForm() {
             <h3 className="text-center font-display text-lg font-bold text-on-surface mb-2">
               Add Items
             </h3>
-            <div className="text-center flex flex-col gap-3">
+            <div className="text-center flex flex-col gap-5">
               <button
                 type="button"
                 onClick={() => handleOpenCatalog("products")}
                 className="group relative flex items-center gap-4 w-full p-2 rounded-xl border-2 border-transparent bg-primary/5 hover:bg-primary/10 hover:border-primary/20 text-on-surface transition-all overflow-hidden"
               >
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary group-hover:scale-110 transition-transform">
-                  <CubeIcon className="w-5 h-5" />
+                  <CubeIcon className="w-7 h-7" />
                 </div>
                 <div className="flex flex-col items-start">
-                  <span className="font-semibold text-sm">Products</span>
-                </div>{" "}
+                  <span className="font-semibold text-m">Products</span>
+                </div>
               </button>
 
               <button
@@ -465,10 +470,10 @@ export function CreateSaleForm() {
                 className="group relative flex items-center gap-4 w-full p-2 rounded-xl border-2 border-transparent bg-blue-500/5 hover:bg-blue-500/10 hover:border-blue-500/20 text-on-surface transition-all overflow-hidden"
               >
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 text-blue-600 group-hover:scale-110 transition-transform">
-                  <CogIcon className="w-5 h-5" />
+                  <CogIcon className="w-7 h-7" />
                 </div>
                 <div className="flex flex-col items-start">
-                  <span className="font-semibold text-sm">Spare Parts</span>
+                  <span className="font-semibold text-m">Spare Parts</span>
                 </div>
               </button>
 
@@ -479,7 +484,7 @@ export function CreateSaleForm() {
               >
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-indigo-500/10 text-indigo-600 group-hover:scale-110 transition-transform">
                   <svg
-                    className="w-5 h-5"
+                    className="w-7 h-7"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -493,7 +498,7 @@ export function CreateSaleForm() {
                   </svg>
                 </div>
                 <div className="flex flex-col items-start">
-                  <span className="font-semibold text-sm">Bikes</span>
+                  <span className="font-semibold text-m">Bikes</span>
                 </div>
               </button>
 
@@ -503,10 +508,10 @@ export function CreateSaleForm() {
                 className="group relative flex items-center gap-4 w-full p-2 rounded-xl border-2 border-transparent bg-amber-500/5 hover:bg-amber-500/10 hover:border-amber-500/20 text-on-surface transition-all overflow-hidden"
               >
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-500/10 text-amber-600 group-hover:scale-110 transition-transform">
-                  <WrenchIcon className="w-5 h-5" />
+                  <WrenchIcon className="w-7 h-7" />
                 </div>
                 <div className="flex flex-col items-start">
-                  <span className="font-semibold text-sm">Services</span>
+                  <span className="font-semibold text-m">Services</span>
                 </div>
               </button>
             </div>
@@ -521,6 +526,7 @@ export function CreateSaleForm() {
               shippingFee={shippingFee}
               saleDiscount={saleDiscount}
               exchangeRate={exchangeRate}
+              exchangeRateEur={exchangeRateEur}
             />
           </div>
         </div>

@@ -12,6 +12,7 @@ import {
   type MaintenanceServiceSectorRecord,
   fetchAllPages,
 } from "@/lib/crud-api";
+import { CURRENCY_SELECT_OPTIONS, toPricingCurrency } from "@/lib/currencies";
 import { EntityForm, type FieldConfig } from "@/components/entity-form";
 import { PageShell } from "@/components/ops-ui";
 
@@ -52,7 +53,7 @@ export function ServiceForm({ initialData, mode }: ServiceFormProps) {
 
       const payload: CreateMaintenanceServicePayload = {
         name: String(formData.name),
-        currency_pricing: String(formData.currency_pricing) as "EGP" | "USD",
+        currency_pricing: toPricingCurrency(String(formData.currency_pricing)),
         service_price: Number(formData.service_price),
         max_discount_type: String(formData.max_discount_type) as "fixed" | "percentage",
         max_discount_value: Number(formData.max_discount_value),
@@ -118,10 +119,10 @@ export function ServiceForm({ initialData, mode }: ServiceFormProps) {
       required: true,
       section: "Pricing",
       description: "Choose the currency shown anywhere this service price is displayed.",
-      options: [
-        { value: "EGP", label: "Egyptian Pound (EGP)" },
-        { value: "USD", label: "US Dollar (USD)" },
-      ],
+      options: CURRENCY_SELECT_OPTIONS.map((o) => ({
+        value: o.value,
+        label: o.label,
+      })),
       value: initialData?.currency_pricing ?? "EGP",
     },
     {

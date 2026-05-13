@@ -9,6 +9,8 @@ import {
   buildQuery,
   type PaginatedResult,
 } from "./core";
+import type { PricingCurrency } from "@/lib/currencies";
+import { toPricingCurrency } from "@/lib/currencies";
 
 // --- MAINTENANCE SERVICE SECTORS ---
 export type MaintenanceServiceSectorRecord = {
@@ -100,7 +102,7 @@ export async function deleteMaintenanceServiceSector(
 export type MaintenanceServiceRecord = {
   id: number;
   name: string;
-  currency_pricing: "EGP" | "USD";
+  currency_pricing: PricingCurrency;
   service_price: number;
   max_discount_type: "fixed" | "percentage";
   max_discount_value: number;
@@ -110,7 +112,7 @@ export type MaintenanceServiceRecord = {
 
 export type CreateMaintenanceServicePayload = {
   name: string;
-  currency_pricing: "EGP" | "USD";
+  currency_pricing: PricingCurrency;
   service_price: number;
   max_discount_type: "fixed" | "percentage";
   max_discount_value: number;
@@ -124,7 +126,7 @@ export function normalizeMaintenanceService(raw: unknown): MaintenanceServiceRec
   return {
     id: toNumber(record.id),
     name: toText(record.name),
-    currency_pricing: toText(record.currency_pricing) as "EGP" | "USD",
+    currency_pricing: toPricingCurrency(record.currency_pricing),
     service_price: toNumber(record.service_price),
     max_discount_type: toText(record.max_discount_type) as
       | "fixed"

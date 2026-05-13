@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { ApiError } from "@/lib/auth-api";
 import { getAuthToken } from "@/lib/auth-session";
 import { getAnnualSummaryReport, type AnnualSummaryReport, type ReportingCurrency, type AnnualSummaryCurrencySection } from "@/lib/api/reporting";
+import { SUPPORTED_PRICING_CURRENCIES } from "@/lib/currencies";
 import {
   BreakdownList,
   EmptyFinanceState,
@@ -73,8 +74,11 @@ export default function AnnualStatementPage() {
             className="form-input-base"
           >
             <option value="">All currencies</option>
-            <option value="EGP">EGP</option>
-            <option value="USD">USD</option>
+            {SUPPORTED_PRICING_CURRENCIES.map((code) => (
+              <option key={code} value={code}>
+                {code}
+              </option>
+            ))}
           </select>
         </InputGroup>
       </FilterBar>

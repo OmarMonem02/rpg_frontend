@@ -81,6 +81,56 @@ export function StatCard({
     </div>
   );
 }
+export function InputGroupCard({
+  label,
+  value,
+  hint,
+  tone = "default",
+  children,
+  footer,
+  className = "",
+}: {
+  label: string;
+  value?: string;
+  hint?: string;
+  tone?: Tone;
+  children?: ReactNode;
+  footer?: ReactNode;
+  className?: string;
+}) {
+  const interactive = Boolean(children);
+
+  return (
+    <div
+      className={`group relative overflow-hidden rounded-[1.25rem] border p-4 transition-transform duration-200 hover:-translate-y-0.5 ${
+        tone === "primary" || tone === "success"
+          ? "after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-full after:rounded-b-[1.25rem] after:bg-current after:opacity-20"
+          : ""
+      } ${toneClasses[tone]} ${className}`.trim()}
+    >
+      <p className="label-caps opacity-80">{label}</p>
+      {interactive ? (
+        <>
+          {hint ? <p className="mt-1.5 text-sm opacity-80">{hint}</p> : null}
+          {value ? <p className="mono-data mt-3 text-2xl font-semibold">{value}</p> : null}
+          <div className="mt-3 min-w-0">{children}</div>
+        </>
+      ) : (
+        <>
+          {value ? <p className="mono-data mt-2 text-2xl font-semibold">{value}</p> : null}
+          {hint ? (
+            <p className={`text-sm opacity-80 ${value ? "mt-2" : "mt-1.5"}`}>{hint}</p>
+          ) : null}
+        </>
+      )}
+      {footer ? (
+        <div className="mt-4 flex flex-col gap-3 border-t border-current/10 pt-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+          {footer}
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 export function SurfaceCard({
   children,

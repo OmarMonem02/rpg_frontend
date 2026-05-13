@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import {
   EntityForm,
@@ -20,39 +20,63 @@ export type EntityDrawerProps = Omit<
   width?: "sm" | "md" | "lg" | "xl";
 };
 
+function getDocumentBody(): HTMLElement | null {
+  return typeof document !== "undefined" ? document.body : null;
+}
+
 export function EntityDrawer({
   isOpen,
   onClose,
   width = "md",
-  ...props
+  title,
+  description,
+  onSubmit,
+  ...rest
 }: EntityDrawerProps) {
-  const [mounted, setMounted] = useState(false);
+  const portalTarget = useSyncExternalStore(
+    () => () => {},
+    getDocumentBody,
+    () => null,
+  );
 
   useEffect(() => {
-    const t = setTimeout(() => setMounted(true), 0);
-    return () => clearTimeout(t);
-  }, []);
+    if (!isOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isOpen]);
 
-  if (!isOpen || !mounted) return null;
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isOpen, onClose]);
+
+  if (!isOpen || portalTarget === null) return null;
 
   const widthClasses = {
     sm: "sm:w-[400px]",
     md: "sm:w-[500px] md:w-[900px]",
-    lg: "sm:w-[600px] md:w-[750px]",
+    lg: "sm:w-[600px] md:w-[960px]",
     xl: "sm:w-[700px] md:w-[900px]",
   };
 
   return createPortal(
     <div
       className="form-modal-overlay fixed inset-0 z-[100] flex justify-end p-0 transition-opacity"
+      role="presentation"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
       <div
-        className={`form-modal-shell w-full ${widthClasses[width]} h-screen h-[100dvh] flex flex-col overflow-hidden animate-slide-in-right rounded-none sm:rounded-l-[2rem] relative`}
+        className={`form-modal-shell w-full ${widthClasses[width]} flex h-[100dvh] max-h-[100dvh] min-h-0 flex-col overflow-hidden animate-slide-in-right rounded-none sm:rounded-l-[2rem] relative`}
       >
-        {/* Premium Header - Matching CatalogPickerModal */}
         <div className="divider relative bg-surface-container-low px-4 sm:px-6 py-4 sm:py-5 flex items-start sm:items-center justify-between shrink-0">
           <div className="flex-1 pr-4">
             <h2 className="font-display text-xl font-bold text-on-surface tracking-tight flex items-center gap-2">
@@ -71,15 +95,16 @@ export function EntityDrawer({
                   />
                 </svg>
               </span>
-              {props.title}
+              {title}
             </h2>
-            {props.description && (
+            {description ? (
               <p className="text-sm font-medium text-on-surface-variant mt-1.5 ml-10">
-                {props.description}
+                {description}
               </p>
-            )}
+            ) : null}
           </div>
           <button
+            type="button"
             onClick={onClose}
             className="flex h-10 w-10 items-center justify-center rounded-xl p-2 text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors"
             aria-label="Close drawer"
@@ -88,21 +113,21 @@ export function EntityDrawer({
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto overscroll-contain p-5 md:p-6">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-5 md:p-6">
           <EntityForm
-            {...props}
-            title="" // Hide EntityForm internal title as we have it in the drawer header
-            description="" // Hide EntityForm internal description
+            {...rest}
+            title=""
+            description=""
             onCancel={onClose}
             onSubmit={async (data) => {
-              await props.onSubmit(data);
+              await onSubmit(data);
               onClose();
             }}
-            variant="modal"
+            variant="drawer"
           />
         </div>
       </div>
     </div>,
-    document.body,
+    portalTarget,
   );
 }

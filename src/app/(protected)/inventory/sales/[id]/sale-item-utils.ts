@@ -6,6 +6,8 @@ import type {
   SaleLineItemRecord,
   SparePartRecord,
 } from "@/lib/crud-api";
+import type { PricingCurrency } from "@/lib/currencies";
+import { egpMultiplierForPricingCurrency, toPricingCurrency } from "@/lib/currencies";
 
 export type CatalogType =
   | "products"
@@ -24,8 +26,8 @@ export type PendingExchangeItem = {
   label: string;
   kind: SaleLineItemRecord["sellable_type"];
   payload: CreateSaleLineItemPayload;
-  /** Native currency of the catalog item ("EGP" | "USD") */
-  currency: "EGP" | "USD";
+  /** Native currency of the catalog item */
+  currency: PricingCurrency;
 };
 
 export const money = (n: number) =>
@@ -48,13 +50,11 @@ export const labelOf = (t: SaleLineItemRecord["sellable_type"]) =>
  */
 export function normalizeToEGP(
   price: number,
-  currency: "EGP" | "USD",
-  exchangeRate: number
+  currency: PricingCurrency,
+  rates: { usdToEgp: number; eurToEgp: number },
 ): number {
-  if (currency === "USD" && exchangeRate > 0) {
-    return Math.round(price * exchangeRate * 100) / 100;
-  }
-  return Math.round(price * 100) / 100;
+  const m = egpMultiplierForPricingCurrency(currency, rates);
+  return Math.round(price * m * 100) / 100;
 }
 
 export function buildPayload(item: CatalogItem) {
@@ -76,7 +76,7 @@ export function buildPayload(item: CatalogItem) {
     return {
       label: item.name,
       kind: "products" as const,
-      currency: (item.currency_pricing ?? "EGP") as "EGP" | "USD",
+      currency: toPricingCurrency(item.currency_pricing),
       payload: {
         product_id: item.id,
         selling_price: item.sale_price,
@@ -90,7 +90,7 @@ export function buildPayload(item: CatalogItem) {
     return {
       label: item.name,
       kind: "spare_parts" as const,
-      currency: (item.currency_pricing ?? "EGP") as "EGP" | "USD",
+      currency: toPricingCurrency(item.currency_pricing),
       payload: {
         spare_part_id: item.id,
         selling_price: item.sale_price,
@@ -103,7 +103,9 @@ export function buildPayload(item: CatalogItem) {
   return {
     label: "vin" in item && item.vin ? `Bike ${item.vin}` : `Bike #${item.id}`,
     kind: "bikes" as const,
-    currency: "EGP" as const,
+    currency: toPricingCurrency(
+      "currency_pricing" in item ? item.currency_pricing : "EGP",
+    ),
     payload: {
       bike_for_sale_id: item.id,
       selling_price: item.sale_price,
