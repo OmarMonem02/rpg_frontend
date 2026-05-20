@@ -9,6 +9,7 @@ import {
   PageShell,
   PageHero,
   ActionButton,
+  ConfirmDialog,
   StatusBadge,
   SurfaceCard,
   InputGroup,
@@ -32,6 +33,49 @@ import {
 } from "@/lib/crud-api";
 import { CatalogPickerModal } from "@/components/catalog-picker-modal";
 
+function parseTicketNoteLines(notes: string): string[] {
+  return notes
+    .split(/\r?\n/)
+    .map((line) => line.replace(/^[\s•\-–—*]+/, "").trim())
+    .filter(Boolean);
+}
+
+function TicketNotesBlock({
+  notes,
+  canEdit,
+  onEdit,
+}: {
+  notes: string;
+  canEdit?: boolean;
+  onEdit?: () => void;
+}) {
+  const lines = parseTicketNoteLines(notes);
+
+  return (
+    <div className="w-full">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-lg font-semibold text-on-surface-variant">Notes</p>
+        {canEdit && onEdit ? (
+          <ActionButton variant="outline" size="sm" onClick={onEdit}>
+            {notes.trim() ? "Edit notes" : "Add notes"}
+          </ActionButton>
+        ) : null}
+      </div>
+      {lines.length > 0 ? (
+        <ul className="mt-2 list-disc space-y-1.5 pl-5 text-sm leading-relaxed text-on-surface-variant">
+          {lines.map((line, index) => (
+            <li key={index}>{line}</li>
+          ))}
+        </ul>
+      ) : (
+        <p className="mt-2 text-sm italic text-on-surface-variant/80">
+          No notes yet. Use one line per issue (e.g. oil leak, brake noise).
+        </p>
+      )}
+    </div>
+  );
+}
+
 export default function TicketDetailsPage() {
   const { id } = useParams() as { id: string };
   const router = useRouter();
@@ -49,6 +93,13 @@ export default function TicketDetailsPage() {
   // Task Management State
   const [isAddTaskModalOpen, setIsAddTaskModalOpen] = useState(false);
   const [newTaskName, setNewTaskName] = useState("");
+  const [isEditNotesOpen, setIsEditNotesOpen] = useState(false);
+  const [editNotesDraft, setEditNotesDraft] = useState("");
+  const [createTasksFromNotesOpen, setCreateTasksFromNotesOpen] = useState(false);
+  const [tasksFromNotesPreview, setTasksFromNotesPreview] = useState<{
+    toCreate: string[];
+    skippedCount: number;
+  } | null>(null);
 
   // Item Management State
   const [activeTaskId, setActiveTaskId] = useState<number | null>(null);
@@ -241,6 +292,67 @@ export default function TicketDetailsPage() {
       await fetchTicket();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to add task");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const openEditNotesModal = () => {
+    setEditNotesDraft(ticket?.notes ?? "");
+    setIsEditNotesOpen(true);
+  };
+
+  const handleSaveNotes = async () => {
+    try {
+      setIsProcessing(true);
+      setError("");
+      const updated = await ticketsApi.updateTicketNotes(Number(id), editNotesDraft);
+      setTicket(updated);
+      setIsEditNotesOpen(false);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to save notes");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const openCreateTasksFromNotesModal = () => {
+    if (!ticket?.notes?.trim()) return;
+
+    const lines = parseTicketNoteLines(ticket.notes);
+    if (lines.length === 0) return;
+
+    const existingNames = new Set(
+      (ticket.tasks ?? []).map((task) => task.name.trim().toLowerCase()),
+    );
+    const toCreate = lines.filter((line) => !existingNames.has(line.toLowerCase()));
+    const skippedCount = lines.length - toCreate.length;
+
+    if (toCreate.length === 0) {
+      setError("Every note line already has a matching task.");
+      return;
+    }
+
+    setTasksFromNotesPreview({ toCreate, skippedCount });
+    setCreateTasksFromNotesOpen(true);
+  };
+
+  const handleConfirmCreateTasksFromNotes = async () => {
+    if (!tasksFromNotesPreview) return;
+
+    const { toCreate } = tasksFromNotesPreview;
+
+    try {
+      setIsProcessing(true);
+      setError("");
+      for (const name of toCreate) {
+        await ticketsApi.addTask(Number(id), { name, status: "pending" });
+      }
+      setCreateTasksFromNotesOpen(false);
+      setTasksFromNotesPreview(null);
+      await fetchTicket();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to create tasks from notes");
     } finally {
       setIsProcessing(false);
     }
@@ -568,6 +680,8 @@ export default function TicketDetailsPage() {
   };
 
   const isEditable = ticket.status === "pending" || ticket.status === "in_progress";
+  const canEditNotes =
+    permissions.canUpdate("maintenance") && ticket.status !== "closed";
   const canEditItems = ticket.status === "in_progress";
   const authRole = getAuthUser()?.role;
   const isStaffUser = authRole === "staff";
@@ -581,7 +695,16 @@ export default function TicketDetailsPage() {
     <PageShell>
       <PageHero
         eyebrow="Ticket Management"
-        title={`Ticket #${ticket.id} ${ticket.notes ? `: ${ticket.notes}` : ""}`}
+        title={`Ticket #${ticket.id}`}
+        subtitle={
+          ticket.notes || canEditNotes ? (
+            <TicketNotesBlock
+              notes={ticket.notes ?? ""}
+              canEdit={canEditNotes}
+              onEdit={openEditNotesModal}
+            />
+          ) : undefined
+        }
         meta={
           <div className="flex flex-wrap gap-4">
             <div className="rounded-2xl border border-outline-variant/15 bg-surface p-4 text-sm min-w-[200px] shadow-sm">
@@ -730,13 +853,24 @@ export default function TicketDetailsPage() {
       )}
 
       <div className="flex flex-col gap-6">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-2xl font-bold text-on-surface">Maintenance Tasks</h2>
-          {isEditable && (
-            <ActionButton tone="primary" onClick={() => setIsAddTaskModalOpen(true)}>
-              + Add High-Level Task
-            </ActionButton>
-          )}
+          <div className="flex flex-wrap gap-2">
+            {isEditable && ticket.notes && parseTicketNoteLines(ticket.notes).length > 0 ? (
+              <ActionButton
+                tone="default"
+                onClick={openCreateTasksFromNotesModal}
+                disabled={isProcessing}
+              >
+                Create tasks from notes
+              </ActionButton>
+            ) : null}
+            {isEditable ? (
+              <ActionButton tone="primary" onClick={() => setIsAddTaskModalOpen(true)}>
+                + Add High-Level Task
+              </ActionButton>
+            ) : null}
+          </div>
         </div>
 
         {(!ticket.tasks || ticket.tasks.length === 0) ? (
@@ -883,6 +1017,77 @@ export default function TicketDetailsPage() {
           </div>
         )}
       </div>
+
+      <ConfirmDialog
+        isOpen={createTasksFromNotesOpen && tasksFromNotesPreview !== null}
+        onClose={() => {
+          setCreateTasksFromNotesOpen(false);
+          setTasksFromNotesPreview(null);
+        }}
+        title="Create tasks from notes?"
+        confirmLabel={isProcessing ? "Creating…" : "Create tasks"}
+        onConfirm={() => void handleConfirmCreateTasksFromNotes()}
+        isLoading={isProcessing}
+      >
+        {tasksFromNotesPreview ? (
+          <>
+            <p className="text-sm text-on-surface-variant">
+              This will add{" "}
+              <span className="font-medium text-on-surface">
+                {tasksFromNotesPreview.toCreate.length} maintenance task
+                {tasksFromNotesPreview.toCreate.length === 1 ? "" : "s"}
+              </span>{" "}
+              from your ticket notes:
+            </p>
+            <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-on-surface">
+              {tasksFromNotesPreview.toCreate.map((name) => (
+                <li key={name}>{name}</li>
+              ))}
+            </ul>
+            {tasksFromNotesPreview.skippedCount > 0 ? (
+              <p className="mt-3 text-sm text-on-surface-variant">
+                {tasksFromNotesPreview.skippedCount} line
+                {tasksFromNotesPreview.skippedCount === 1 ? "" : "s"} skipped because a
+                matching task already exists.
+              </p>
+            ) : null}
+          </>
+        ) : null}
+      </ConfirmDialog>
+
+      {/* Edit Notes Modal */}
+      {isEditNotesOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-md">
+          <div className="w-full max-w-lg rounded-[2.5rem] bg-surface p-8 shadow-2xl border border-outline-variant/20 animate-in zoom-in-95 duration-200">
+            <h3 className="text-2xl font-bold text-on-surface mb-2">Ticket notes</h3>
+            <p className="text-sm text-on-surface-variant mb-6">
+              One line per issue. These lines can be converted into maintenance tasks.
+            </p>
+            <InputGroup label="Issue description / technical notes">
+              <textarea
+                autoFocus
+                rows={6}
+                className="w-full rounded-2xl border border-outline-variant/30 bg-surface-container-lowest px-5 py-4 min-h-[140px] outline-none focus:border-primary transition-all shadow-inner resize-y"
+                placeholder={"Oil leak\nBrake noise\nChain needs adjustment"}
+                value={editNotesDraft}
+                onChange={(e) => setEditNotesDraft(e.target.value)}
+              />
+            </InputGroup>
+            <div className="flex justify-end gap-3 mt-8">
+              <ActionButton
+                variant="ghost"
+                onClick={() => setIsEditNotesOpen(false)}
+                disabled={isProcessing}
+              >
+                Cancel
+              </ActionButton>
+              <ActionButton tone="primary" onClick={() => void handleSaveNotes()} disabled={isProcessing}>
+                {isProcessing ? "Saving…" : "Save notes"}
+              </ActionButton>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Add Task Modal */}
       {isAddTaskModalOpen && (

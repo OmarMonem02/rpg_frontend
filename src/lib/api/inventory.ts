@@ -576,3 +576,169 @@ export async function getProduct(
   const record = asRecord(data);
   return normalizeProduct(record.data ?? record.product ?? record);
 }
+
+// --- BULK INVENTORY EDIT ---
+export type BulkPriceChangeMode = "set" | "add" | "subtract" | "percent";
+
+export type BulkStockChangeMode = "set" | "add" | "subtract";
+
+export type BulkFieldChange =
+  | { mode: BulkPriceChangeMode; value: number }
+  | { mode: BulkStockChangeMode; value: number };
+
+export type BulkInventoryChanges = {
+  sale_price?: BulkFieldChange;
+  cost_price?: BulkFieldChange;
+  stock_quantity?: BulkFieldChange;
+  low_stock_alarm?: BulkFieldChange;
+};
+
+export type BulkInventoryFilters = {
+  search?: string;
+  brand_id?: number;
+  category_id?: number;
+  currency?: string;
+};
+
+export type BulkInventoryEditPayload = {
+  ids?: number[];
+  filters?: BulkInventoryFilters;
+  changes: BulkInventoryChanges;
+};
+
+export type BulkInventoryPreviewRow = {
+  id: number;
+  name: string;
+  sku: string;
+  currency_pricing: PricingCurrency;
+  before: Partial<Record<keyof BulkInventoryChanges, number>>;
+  after: Partial<Record<keyof BulkInventoryChanges, number>>;
+  changed_fields: (keyof BulkInventoryChanges)[];
+};
+
+export type BulkInventoryPreviewResult = {
+  total: number;
+  rows: BulkInventoryPreviewRow[];
+};
+
+export type BulkInventoryApplyResult = {
+  updated: number;
+  rows: BulkInventoryPreviewRow[];
+};
+
+function normalizeBulkPreviewRow(raw: unknown): BulkInventoryPreviewRow {
+  const record = asRecord(raw);
+  const before = asRecord(record.before);
+  const after = asRecord(record.after);
+  const changed = Array.isArray(record.changed_fields)
+    ? (record.changed_fields as string[])
+    : [];
+
+  return {
+    id: toNumber(record.id),
+    name: toText(record.name),
+    sku: toText(record.sku),
+    currency_pricing: toPricingCurrency(record.currency_pricing),
+    before: {
+      sale_price: before.sale_price !== undefined ? toNumber(before.sale_price) : undefined,
+      cost_price: before.cost_price !== undefined ? toNumber(before.cost_price) : undefined,
+      stock_quantity:
+        before.stock_quantity !== undefined ? toNumber(before.stock_quantity) : undefined,
+      low_stock_alarm:
+        before.low_stock_alarm !== undefined ? toNumber(before.low_stock_alarm) : undefined,
+    },
+    after: {
+      sale_price: after.sale_price !== undefined ? toNumber(after.sale_price) : undefined,
+      cost_price: after.cost_price !== undefined ? toNumber(after.cost_price) : undefined,
+      stock_quantity:
+        after.stock_quantity !== undefined ? toNumber(after.stock_quantity) : undefined,
+      low_stock_alarm:
+        after.low_stock_alarm !== undefined ? toNumber(after.low_stock_alarm) : undefined,
+    },
+    changed_fields: changed.filter((f): f is keyof BulkInventoryChanges =>
+      ["sale_price", "cost_price", "stock_quantity", "low_stock_alarm"].includes(f),
+    ),
+  };
+}
+
+function normalizeBulkPreviewResult(raw: unknown): BulkInventoryPreviewResult {
+  const record = asRecord(raw);
+  const rows = Array.isArray(record.rows) ? record.rows : [];
+  return {
+    total: toNumber(record.total),
+    rows: rows.map(normalizeBulkPreviewRow),
+  };
+}
+
+function normalizeBulkApplyResult(raw: unknown): BulkInventoryApplyResult {
+  const record = asRecord(raw);
+  const rows = Array.isArray(record.rows) ? record.rows : [];
+  return {
+    updated: toNumber(record.updated),
+    rows: rows.map(normalizeBulkPreviewRow),
+  };
+}
+
+function cleanBulkPayload(payload: BulkInventoryEditPayload): BulkInventoryEditPayload {
+  const filters = payload.filters
+    ? Object.fromEntries(
+        Object.entries(payload.filters).filter(
+          ([, v]) => v !== undefined && v !== "" && v !== "all",
+        ),
+      )
+    : undefined;
+
+  return {
+    ids: payload.ids?.length ? payload.ids : undefined,
+    filters: filters && Object.keys(filters).length > 0 ? (filters as BulkInventoryFilters) : undefined,
+    changes: payload.changes,
+  };
+}
+
+export async function bulkPreviewProducts(
+  token: string,
+  payload: BulkInventoryEditPayload,
+): Promise<BulkInventoryPreviewResult> {
+  const data = await authorizedFetch<unknown>("/products/bulk/preview", token, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(cleanBulkPayload(payload)),
+  });
+  return normalizeBulkPreviewResult(data);
+}
+
+export async function bulkApplyProducts(
+  token: string,
+  payload: BulkInventoryEditPayload,
+): Promise<BulkInventoryApplyResult> {
+  const data = await authorizedFetch<unknown>("/products/bulk/apply", token, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(cleanBulkPayload(payload)),
+  });
+  return normalizeBulkApplyResult(data);
+}
+
+export async function bulkPreviewSpareParts(
+  token: string,
+  payload: BulkInventoryEditPayload,
+): Promise<BulkInventoryPreviewResult> {
+  const data = await authorizedFetch<unknown>("/spare_parts/bulk/preview", token, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(cleanBulkPayload(payload)),
+  });
+  return normalizeBulkPreviewResult(data);
+}
+
+export async function bulkApplySpareParts(
+  token: string,
+  payload: BulkInventoryEditPayload,
+): Promise<BulkInventoryApplyResult> {
+  const data = await authorizedFetch<unknown>("/spare_parts/bulk/apply", token, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(cleanBulkPayload(payload)),
+  });
+  return normalizeBulkApplyResult(data);
+}

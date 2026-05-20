@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
+import { useEffect, useId, useState, useSyncExternalStore, type ReactNode } from "react";
 
 type Tone = "default" | "primary" | "success" | "warning" | "danger";
 
@@ -20,11 +21,13 @@ export function PageShell({ children, className = "" }: { children: ReactNode; c
 export function PageHero({
   eyebrow,
   title,
+  subtitle,
   actions,
   meta,
 }: {
   eyebrow?: string;
   title: string;
+  subtitle?: ReactNode;
   actions?: ReactNode;
   meta?: ReactNode;
 }) {
@@ -42,6 +45,7 @@ export function PageHero({
           <h1 className="font-display text-3xl font-extrabold tracking-tight text-on-surface md:text-4xl lg:text-[2.75rem] lg:leading-[1.1]">
             {title}
           </h1>
+          {subtitle ? <div className="mt-3">{subtitle}</div> : null}
         </div>
         <div className="flex flex-col gap-4 lg:items-end">
           {meta ? <div className="grid w-full gap-3 lg:max-w-md">{meta}</div> : null}
@@ -417,5 +421,99 @@ export function TabsWrapper({
       </div>
       <div>{tabs.find((t) => t.id === activeTab)?.content}</div>
     </div>
+  );
+}
+
+function getDocumentBody(): HTMLElement | null {
+  return typeof document !== "undefined" ? document.body : null;
+}
+
+export function ConfirmDialog({
+  isOpen,
+  onClose,
+  title,
+  children,
+  confirmLabel,
+  onConfirm,
+  cancelLabel = "Cancel",
+  confirmTone = "primary",
+  isLoading = false,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  title: string;
+  children: ReactNode;
+  confirmLabel: string;
+  onConfirm: () => void;
+  cancelLabel?: string;
+  confirmTone?: Tone;
+  isLoading?: boolean;
+}) {
+  const titleId = useId();
+  const portalTarget = useSyncExternalStore(
+    () => () => {},
+    getDocumentBody,
+    () => null,
+  );
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isOpen, onClose]);
+
+  if (!isOpen || portalTarget === null) return null;
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4"
+      role="presentation"
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        className="mx-auto w-full max-w-md max-h-[min(90dvh,36rem)] overflow-y-auto rounded-[1.25rem] border border-outline-variant/20 bg-surface p-6 shadow-lg"
+      >
+        <h3 id={titleId} className="font-display text-lg font-semibold text-on-surface">
+          {title}
+        </h3>
+        <div className="mt-2">{children}</div>
+        <div className="mt-6 flex justify-end gap-2">
+          <ActionButton
+            type="button"
+            variant="outline"
+            onClick={onClose}
+            disabled={isLoading}
+          >
+            {cancelLabel}
+          </ActionButton>
+          <ActionButton
+            type="button"
+            tone={confirmTone}
+            onClick={onConfirm}
+            disabled={isLoading}
+          >
+            {confirmLabel}
+          </ActionButton>
+        </div>
+      </div>
+    </div>,
+    portalTarget,
   );
 }

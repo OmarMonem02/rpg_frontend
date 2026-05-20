@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { usePermissions } from "@/components/permission-provider";
 import { getAuthToken } from "@/lib/auth-session";
 import { useEntityFilters } from "@/hooks/useEntityFilters";
 import { useGlobalDataRefresh } from "@/hooks/useGlobalDataRefresh";
@@ -38,6 +39,8 @@ import {
 
 export default function SparePartsPage() {
   const router = useRouter();
+  const permissions = usePermissions();
+  const canUpdateSpareParts = permissions.canUpdate("spare-parts");
   const [spareParts, setSpareParts] = useState<SparePartRecord[]>([]);
   const [categories, setCategories] = useState<SparePartCategoryRecord[]>([]);
   const [allCategories, setAllCategories] = useState<SparePartCategoryRecord[]>(
@@ -511,12 +514,22 @@ export default function SparePartsPage() {
         eyebrow="Inventory Control"
         title="Spare Parts Management"
         actions={
-          <ActionButton
-            tone="primary"
-            onClick={() => router.push("/inventory/spare-parts/create")}
-          >
-            Add Spare Part
-          </ActionButton>
+          <>
+            {canUpdateSpareParts ? (
+              <ActionButton
+                variant="outline"
+                href="/inventory/spare-parts/bulk-edit"
+              >
+                Bulk edit
+              </ActionButton>
+            ) : null}
+            <ActionButton
+              tone="primary"
+              onClick={() => router.push("/inventory/spare-parts/create")}
+            >
+              Add Spare Part
+            </ActionButton>
+          </>
         }
       />
 
