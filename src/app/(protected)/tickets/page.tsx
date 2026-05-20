@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { TrashIcon } from "@heroicons/react/24/outline";
+import { usePermissions } from "@/components/permission-provider";
 import { useGlobalDataRefresh } from "@/hooks/useGlobalDataRefresh";
 import {
   PageShell,
@@ -14,10 +16,13 @@ import { ticketsApi, type Ticket } from "@/lib/tickets-api";
 import { CreateTicketModal } from "./CreateTicketModal";
 
 export default function TicketsPage() {
+  const permissions = usePermissions();
+  const canDeleteTickets = permissions.canDelete("maintenance");
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
 
   const fetchTickets = useCallback(async () => {
     try {
@@ -37,6 +42,30 @@ export default function TicketsPage() {
   }, [fetchTickets]);
 
   useGlobalDataRefresh(fetchTickets);
+
+  const handleDeleteTicket = async (ticketId: number) => {
+    if (!canDeleteTickets) {
+      setError("You do not have permission to delete tickets.");
+      return;
+    }
+    if (
+      !confirm(
+        "Are you sure you want to delete this ticket? All tasks and line items will be removed.",
+      )
+    ) {
+      return;
+    }
+    try {
+      setDeletingId(ticketId);
+      setError("");
+      await ticketsApi.deleteTicket(ticketId);
+      await fetchTickets();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to delete ticket");
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   const getStatusTone = (status: string) => {
     switch (status.toLowerCase()) {
@@ -124,9 +153,29 @@ export default function TicketsPage() {
                     <td className="mono-data px-6 py-5 font-black text-on-surface">${Number(ticket.total || 0).toFixed(2)}</td>
                     <td className="mono-data px-6 py-5 text-on-surface-variant">{new Date(ticket.created_at).toLocaleDateString()}</td>
                     <td className="px-6 py-5 text-right">
-                      <ActionButton href={`/tickets/${ticket.id}`} variant="outline" size="sm" className="group-hover:bg-primary group-hover:text-white group-hover:border-primary transition-all">
-                        View Details
-                      </ActionButton>
+                      <div className="inline-flex items-center justify-end gap-2">
+                        <ActionButton
+                          href={`/tickets/${ticket.id}`}
+                          variant="outline"
+                          size="sm"
+                          className="group-hover:bg-primary group-hover:text-white group-hover:border-primary transition-all"
+                        >
+                          View Details
+                        </ActionButton>
+                        {canDeleteTickets ? (
+                          <ActionButton
+                            variant="outline"
+                            tone="danger"
+                            size="sm"
+                            disabled={deletingId === ticket.id}
+                            className="group-hover:bg-error group-hover:text-white group-hover:border-error transition-all"
+                            onClick={() => void handleDeleteTicket(ticket.id)}
+                            title="Delete ticket"
+                          >
+                            <TrashIcon className="h-4 w-4" />
+                          </ActionButton>
+                        ) : null}
+                      </div>
                     </td>
                   </tr>
                 ))}
