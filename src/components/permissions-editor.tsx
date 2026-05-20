@@ -34,13 +34,15 @@ interface PermissionsEditorProps {
   isSaving?: boolean;
   canSave?: boolean;
   isCurrentUser?: boolean;
+  showHeader?: boolean;
 }
 
-type RowMode = "none" | "view" | "editor" | "manager";
+type RowMode = "none" | "data" | "page" | "editor" | "manager";
 
 const ACTION_LABELS: Record<ActionType, string> = {
   create: "Create",
-  read: "Read",
+  read: "Read data",
+  display: "Show page",
   update: "Update",
   delete: "Delete",
   export: "Export",
@@ -49,10 +51,21 @@ const ACTION_LABELS: Record<ActionType, string> = {
 
 const MODE_LABELS: Record<RowMode, string> = {
   none: "No access",
-  view: "View only",
+  data: "Data only",
+  page: "Page access",
   editor: "Editor",
   manager: "Manager",
 };
+
+const ACTION_DISPLAY_ORDER: ActionType[] = [
+  "read",
+  "display",
+  "create",
+  "update",
+  "delete",
+  "export",
+  "import",
+];
 
 function sortActions(actions: ActionType[], allowedActions: ActionType[]) {
   return allowedActions.filter((action) => actions.includes(action));
@@ -63,16 +76,32 @@ function getModeActions(
   allowedActions: ActionType[],
 ): ActionType[] {
   if (mode === "none") return [];
-  if (mode === "view") return allowedActions.includes("read") ? ["read"] : [];
+  if (mode === "data") {
+    return allowedActions.includes("read") ? ["read"] : [];
+  }
+  if (mode === "page") {
+    return sortActions(["read", "display"], allowedActions);
+  }
   if (mode === "editor") {
-    return sortActions(["read", "create", "update"], allowedActions);
+    return sortActions(["read", "display", "create", "update"], allowedActions);
   }
   return [...allowedActions];
 }
 
-function getRowMode(actions: ActionType[], allowedActions: ActionType[]): RowMode {
+function getRowMode(
+  actions: ActionType[],
+  allowedActions: ActionType[],
+): RowMode {
   if (actions.length === 0) return "none";
-  if (actions.length === 1 && actions[0] === "read") return "view";
+
+  const operational = actions.filter(
+    (action) => action !== "read" && action !== "display",
+  );
+  const hasRead = actions.includes("read");
+  const hasDisplay = actions.includes("display");
+
+  if (hasRead && !hasDisplay && operational.length === 0) return "data";
+  if (hasRead && hasDisplay && operational.length === 0) return "page";
   if (allowedActions.every((action) => actions.includes(action))) return "manager";
   return "editor";
 }
@@ -81,8 +110,12 @@ function countActions(matrix: PermissionMatrix) {
   return Object.values(matrix).reduce((sum, actions) => sum + actions.length, 0);
 }
 
-function countReadablePages(matrix: PermissionMatrix) {
+function countDataPages(matrix: PermissionMatrix) {
   return ALL_PAGE_PATHS.filter((page) => matrix[page].includes("read")).length;
+}
+
+function countDisplayPages(matrix: PermissionMatrix) {
+  return ALL_PAGE_PATHS.filter((page) => matrix[page].includes("display")).length;
 }
 
 function matricesEqual(left: PermissionMatrix, right: PermissionMatrix) {
@@ -102,6 +135,7 @@ export function PermissionsEditor({
   isSaving = false,
   canSave = true,
   isCurrentUser = false,
+  showHeader = true,
 }: PermissionsEditorProps) {
   const resolvedInitialPermissions = useMemo(
     () => normalizePermissionMatrixForMetadata(initialPermissions, metadata),
@@ -124,7 +158,8 @@ export function PermissionsEditor({
 
   const hasChanges = !matricesEqual(permissions, resolvedInitialPermissions);
   const totalAllowed = countActions(permissions);
-  const readablePages = countReadablePages(permissions);
+  const dataPages = countDataPages(permissions);
+  const displayPages = countDisplayPages(permissions);
   const roleTotalAllowed = countActions(normalizedRolePermissions);
 
   const visiblePages = useMemo(() => {
@@ -160,10 +195,13 @@ export function PermissionsEditor({
     const nextActions = pageActions.includes(action)
       ? pageActions.filter((candidate) => candidate !== action)
       : [...pageActions, action];
-    const withRead: ActionType[] =
-      action !== "read" && !nextActions.includes("read")
-        ? ["read", ...nextActions]
-        : nextActions;
+    const needsReadDependency =
+      action !== "read" &&
+      action !== "display" &&
+      !nextActions.includes("read");
+    const withRead: ActionType[] = needsReadDependency
+      ? ["read", ...nextActions]
+      : nextActions;
 
     setPageActions(page, sortActions(withRead, allowedActions));
   };
@@ -187,49 +225,67 @@ export function PermissionsEditor({
 
   return (
     <div className="space-y-5">
-      <SurfaceCard>
-        <div className="grid gap-5 lg:grid-cols-[1fr_auto] lg:items-center">
-          <div className="min-w-0">
-            <div className="mb-3 flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-                <ShieldCheckIcon className="h-4 w-4" />
-                {permissionSource === "custom" ? "Custom access" : "Role default"}
-              </span>
-              {hasChanges ? (
-                <span className="rounded-full border border-yellow-500/25 bg-yellow-500/10 px-3 py-1 text-xs font-semibold text-yellow-700">
-                  Unsaved changes
+      {showHeader ? (
+        <SurfaceCard>
+          <div className="grid gap-5 lg:grid-cols-[1fr_auto] lg:items-center">
+            <div className="min-w-0">
+              <div className="mb-3 flex flex-wrap items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+                  <ShieldCheckIcon className="h-4 w-4" />
+                  {permissionSource === "custom" ? "Custom access" : "Role default"}
                 </span>
-              ) : null}
+                {hasChanges ? (
+                  <span className="rounded-full border border-yellow-500/25 bg-yellow-500/10 px-3 py-1 text-xs font-semibold text-yellow-700">
+                    Unsaved changes
+                  </span>
+                ) : null}
+              </div>
+              <h2 className="text-2xl font-bold text-on-surface">{userName}</h2>
+              <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-sm text-on-surface-variant">
+                <span>{userEmail}</span>
+                <span>User ID: {userId}</span>
+                <span>Role: {currentRole || "Unknown"}</span>
+              </div>
             </div>
-            <h2 className="text-2xl font-bold text-on-surface">{userName}</h2>
-            <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-sm text-on-surface-variant">
-              <span>{userEmail}</span>
-              <span>User ID: {userId}</span>
-              <span>Role: {currentRole || "Unknown"}</span>
-            </div>
-          </div>
 
-          <div className="grid grid-cols-3 gap-2 text-center">
-            <div className="rounded-xl border border-outline-variant/15 bg-surface px-3 py-2">
-              <p className="mono-data text-lg font-bold text-on-surface">{readablePages}</p>
-              <p className="text-xs text-on-surface-variant">Pages</p>
-            </div>
-            <div className="rounded-xl border border-outline-variant/15 bg-surface px-3 py-2">
-              <p className="mono-data text-lg font-bold text-on-surface">{totalAllowed}</p>
-              <p className="text-xs text-on-surface-variant">Actions</p>
-            </div>
-            <div className="rounded-xl border border-outline-variant/15 bg-surface px-3 py-2">
-              <p className="mono-data text-lg font-bold text-on-surface">{roleTotalAllowed}</p>
-              <p className="text-xs text-on-surface-variant">Role</p>
+            <div className="grid grid-cols-2 gap-2 text-center sm:grid-cols-4">
+              <div className="rounded-xl border border-outline-variant/15 bg-surface px-3 py-2">
+                <p className="mono-data text-lg font-bold text-on-surface">{dataPages}</p>
+                <p className="text-xs text-on-surface-variant">Data</p>
+              </div>
+              <div className="rounded-xl border border-outline-variant/15 bg-surface px-3 py-2">
+                <p className="mono-data text-lg font-bold text-on-surface">{displayPages}</p>
+                <p className="text-xs text-on-surface-variant">UI pages</p>
+              </div>
+              <div className="rounded-xl border border-outline-variant/15 bg-surface px-3 py-2">
+                <p className="mono-data text-lg font-bold text-on-surface">{totalAllowed}</p>
+                <p className="text-xs text-on-surface-variant">Actions</p>
+              </div>
+              <div className="rounded-xl border border-outline-variant/15 bg-surface px-3 py-2">
+                <p className="mono-data text-lg font-bold text-on-surface">{roleTotalAllowed}</p>
+                <p className="text-xs text-on-surface-variant">Role</p>
+              </div>
             </div>
           </div>
+        </SurfaceCard>
+      ) : (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+            <ShieldCheckIcon className="h-4 w-4" />
+            {permissionSource === "custom" ? "Custom access" : "Role default"}
+          </span>
+          {hasChanges ? (
+            <span className="rounded-full border border-yellow-500/25 bg-yellow-500/10 px-3 py-1 text-xs font-semibold text-yellow-700">
+              Unsaved changes
+            </span>
+          ) : null}
         </div>
-      </SurfaceCard>
+      )}
 
       {isCurrentUser ? (
         <InlineMessage tone="warning">
           You are editing your own access. The backend will block changes that
-          remove your ability to read and update users.
+          remove your ability to read data, open the users area, or update users.
         </InlineMessage>
       ) : null}
 
@@ -339,7 +395,9 @@ export function PermissionsEditor({
                 </div>
 
                 <div className="flex flex-wrap gap-2">
-                  {allowedActions.map((action) => {
+                  {ACTION_DISPLAY_ORDER.filter((action) =>
+                    allowedActions.includes(action),
+                  ).map((action) => {
                     const checked = pageActions.includes(action);
                     return (
                       <button

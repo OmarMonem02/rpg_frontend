@@ -3,8 +3,17 @@
 import { Suspense, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { getAuthToken } from "@/lib/auth-session";
-import { listCustomers, type CustomerRecord } from "@/lib/api/customers";
+import { getAuthToken, getAuthUser } from "@/lib/auth-session";
+import {
+  listCustomers,
+  createCustomer,
+  deleteCustomer,
+  type CustomerRecord,
+  type CreateCustomerPayload,
+} from "@/lib/api/customers";
+import { usePermissions } from "@/components/permission-provider";
+import { EntityDrawer } from "@/components/entity-drawer";
+import type { FieldConfig } from "@/components/entity-form-modal";
 import {
   PageShell,
   PageHero,
@@ -12,6 +21,45 @@ import {
   DataTableCard,
   EmptyState,
 } from "@/components/ops-ui";
+
+const customerFields: FieldConfig[] = [
+  {
+    name: "name",
+    label: "Full Name",
+    type: "text",
+    required: true,
+    span: 2,
+    placeholder: "e.g. John Doe",
+  },
+  {
+    name: "phone",
+    label: "Phone Number",
+    type: "text",
+    required: true,
+    placeholder: "e.g. +20 123 456 7890",
+  },
+  {
+    name: "address",
+    label: "Physical Address",
+    type: "textarea",
+    span: 2,
+    placeholder: "Street, area, city (optional)",
+  },
+  {
+    name: "how_did_you_know_us",
+    label: "How did they find us?",
+    type: "text",
+    span: 2,
+    placeholder: "e.g. Instagram, walk-in, referral…",
+  },
+  {
+    name: "notes",
+    label: "Internal notes",
+    type: "textarea",
+    span: 2,
+    placeholder: "Optional notes for staff",
+  },
+];
 
 export default function CustomersDirectoryPage() {
   return (
@@ -32,8 +80,15 @@ export default function CustomersDirectoryPage() {
 function CustomersDirectoryContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const permissions = usePermissions();
   const page = Math.max(1, Number(searchParams.get("page")) || 1);
   const search = (searchParams.get("search") || "").trim();
+
+  const isAdmin = getAuthUser()?.role === "admin";
+  const canCreateCustomer =
+    isAdmin ||
+    permissions.canCreate("sales") ||
+    permissions.canCreate("maintenance");
 
   const [items, setItems] = useState<CustomerRecord[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
@@ -41,6 +96,11 @@ function CustomersDirectoryContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [draftSearch, setDraftSearch] = useState(search);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<CustomerRecord | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -78,6 +138,57 @@ function CustomersDirectoryContent() {
     router.push(`/customers?${q.toString()}`);
   };
 
+  async function handleCreateCustomer(data: Record<string, unknown>) {
+    const token = getAuthToken();
+    if (!token) throw new Error("Authentication required");
+    const payload: CreateCustomerPayload = {
+      name: String(data.name ?? "").trim(),
+      phone: String(data.phone ?? "").trim(),
+      address: data.address ? String(data.address).trim() : undefined,
+      how_did_you_know_us: data.how_did_you_know_us
+        ? String(data.how_did_you_know_us).trim()
+        : undefined,
+      notes: data.notes ? String(data.notes).trim() : undefined,
+    };
+    if (!payload.name || !payload.phone) {
+      throw new Error("Name and phone are required");
+    }
+    setCreating(true);
+    setCreateError(null);
+    try {
+      const customer = await createCustomer(token, payload);
+      setCreateOpen(false);
+      router.push(`/customers/${customer.id}?linkBike=1`);
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Failed to create customer";
+      setCreateError(message);
+      throw err;
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  async function handleConfirmDelete() {
+    if (!deleteTarget || !isAdmin) return;
+    const token = getAuthToken();
+    if (!token) {
+      setError("Authentication required");
+      return;
+    }
+    setDeletingId(deleteTarget.id);
+    setError(null);
+    try {
+      await deleteCustomer(token, deleteTarget.id);
+      setDeleteTarget(null);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete customer");
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
   return (
     <PageShell>
       <PageHero
@@ -88,6 +199,13 @@ function CustomersDirectoryContent() {
             Search the customer directory and open a workspace with bikes, sales
             history, and tickets.
           </p>
+        }
+        actions={
+          canCreateCustomer ? (
+            <ActionButton tone="primary" onClick={() => setCreateOpen(true)}>
+              New customer
+            </ActionButton>
+          ) : null
         }
       />
 
@@ -166,12 +284,24 @@ function CustomersDirectoryContent() {
                         {row.address || "—"}
                       </td>
                       <td className="px-6 py-4 text-right">
-                        <Link
-                          href={`/customers/${row.id}`}
-                          className="text-sm font-semibold text-primary hover:underline"
-                        >
-                          Open workspace
-                        </Link>
+                        <div className="flex items-center justify-end gap-3">
+                          <Link
+                            href={`/customers/${row.id}`}
+                            className="text-sm font-semibold text-primary hover:underline"
+                          >
+                            Open workspace
+                          </Link>
+                          {isAdmin ? (
+                            <button
+                              type="button"
+                              className="text-sm font-semibold text-error hover:underline disabled:opacity-50"
+                              disabled={deletingId === row.id}
+                              onClick={() => setDeleteTarget(row)}
+                            >
+                              {deletingId === row.id ? "Deleting…" : "Delete"}
+                            </button>
+                          ) : null}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -215,6 +345,55 @@ function CustomersDirectoryContent() {
           ) : null}
         </>
       )}
+
+      <EntityDrawer
+        isOpen={createOpen}
+        onClose={() => {
+          setCreateOpen(false);
+          setCreateError(null);
+        }}
+        title="New customer"
+        description="Create a customer profile, then link one or more bikes on their workspace."
+        fields={customerFields}
+        onSubmit={handleCreateCustomer}
+        submitLabel="Create & link bike"
+        heroLabel="New customer"
+        isLoading={creating}
+        error={createError || undefined}
+      />
+
+      {deleteTarget ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-md rounded-[1.25rem] border border-outline-variant/20 bg-surface p-6 shadow-lg">
+            <h3 className="font-display text-lg font-semibold text-on-surface">
+              Delete customer?
+            </h3>
+            <p className="mt-2 text-sm text-on-surface-variant">
+              Remove{" "}
+              <span className="font-medium text-on-surface">{deleteTarget.name}</span>
+              ? This cannot be undone if the server allows deletion.
+            </p>
+            <div className="mt-6 flex justify-end gap-2">
+              <ActionButton
+                type="button"
+                variant="outline"
+                onClick={() => setDeleteTarget(null)}
+                disabled={deletingId !== null}
+              >
+                Cancel
+              </ActionButton>
+              <ActionButton
+                type="button"
+                tone="danger"
+                onClick={() => void handleConfirmDelete()}
+                disabled={deletingId !== null}
+              >
+                {deletingId !== null ? "Deleting…" : "Delete"}
+              </ActionButton>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </PageShell>
   );
 }

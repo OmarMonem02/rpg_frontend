@@ -20,10 +20,13 @@ export type PagePath =
 export type ActionType =
   | "create"
   | "read"
+  | "display"
   | "update"
   | "delete"
   | "export"
   | "import";
+
+export const NON_OPERATIONAL_ACTIONS: ActionType[] = ["read", "display"];
 
 export type PermissionMatrix = Record<PagePath, ActionType[]>;
 
@@ -81,6 +84,7 @@ export const ALL_PAGE_PATHS: PagePath[] = [
 export const ALL_ACTIONS: ActionType[] = [
   "create",
   "read",
+  "display",
   "update",
   "delete",
   "export",
@@ -93,119 +97,119 @@ const FALLBACK_PAGE_DEFINITIONS: PermissionPageDefinition[] = [
     label: "Dashboard",
     group: "overview",
     description: "View the operational home screen and quick links.",
-    actions: ["read"],
+    actions: ["read", "display"],
   },
   {
     key: "sales",
     label: "Sales",
     group: "sales",
     description: "Create, manage, delete, and export sales records.",
-    actions: ["create", "read", "update", "delete", "export"],
+    actions: ["create", "read", "display", "update", "delete", "export"],
   },
   {
     key: "maintenance",
     label: "Maintenance",
     group: "maintenance",
     description: "Operate tickets, service tasks, and workshop activity.",
-    actions: ["create", "read", "update", "delete"],
+    actions: ["create", "read", "display", "update", "delete"],
   },
   {
     key: "inventory",
     label: "Inventory",
     group: "inventory",
     description: "Access inventory workspace navigation and summaries.",
-    actions: ["read"],
+    actions: ["read", "display"],
   },
   {
     key: "brands",
     label: "Brands",
     group: "master-data",
     description: "Maintain brand records used by products and bikes.",
-    actions: ["create", "read", "update", "delete"],
+    actions: ["create", "read", "display", "update", "delete"],
   },
   {
     key: "products",
     label: "Products",
     group: "inventory",
     description: "Manage products, pricing, stock, and catalog data.",
-    actions: ["create", "read", "update", "delete"],
+    actions: ["create", "read", "display", "update", "delete"],
   },
   {
     key: "bikes",
     label: "Bikes",
     group: "inventory",
     description: "Manage bikes for sale and bike inventory records.",
-    actions: ["create", "read", "update", "delete"],
+    actions: ["create", "read", "display", "update", "delete"],
   },
   {
     key: "spare-parts",
     label: "Spare Parts",
     group: "inventory",
     description: "Manage spare parts, compatibility links, and stock.",
-    actions: ["create", "read", "update", "delete"],
+    actions: ["create", "read", "display", "update", "delete"],
   },
   {
     key: "maintenance-services",
     label: "Maintenance Services",
     group: "maintenance",
     description: "Maintain service catalog items and pricing.",
-    actions: ["create", "read", "update", "delete"],
+    actions: ["create", "read", "display", "update", "delete"],
   },
   {
     key: "users",
     label: "Users & Access",
     group: "admin",
     description: "Create users and manage account-level permissions.",
-    actions: ["create", "read", "update", "delete"],
+    actions: ["create", "read", "display", "update", "delete"],
   },
   {
     key: "import-export",
     label: "Import / Export",
     group: "data",
     description: "Access templates, exports, and spreadsheet imports.",
-    actions: ["read", "export", "import"],
+    actions: ["read", "display", "export", "import"],
   },
   {
     key: "payment-methods",
     label: "Payment Methods",
     group: "admin",
     description: "Maintain payment methods and payment settings.",
-    actions: ["create", "read", "update", "delete"],
+    actions: ["create", "read", "display", "update", "delete"],
   },
   {
     key: "product-categories",
     label: "Product Categories",
     group: "master-data",
     description: "Maintain product classification data.",
-    actions: ["create", "read", "update", "delete"],
+    actions: ["create", "read", "display", "update", "delete"],
   },
   {
     key: "spare-part-categories",
     label: "Spare Part Categories",
     group: "master-data",
     description: "Maintain spare part classification data.",
-    actions: ["create", "read", "update", "delete"],
+    actions: ["create", "read", "display", "update", "delete"],
   },
   {
     key: "bike-blueprints",
     label: "Bike Blueprints",
     group: "master-data",
     description: "Maintain bike blueprint data and spare part links.",
-    actions: ["create", "read", "update", "delete"],
+    actions: ["create", "read", "display", "update", "delete"],
   },
   {
     key: "sellers",
     label: "Sellers",
     group: "admin",
     description: "Manage seller records and commission rates.",
-    actions: ["create", "read", "update", "delete"],
+    actions: ["create", "read", "display", "update", "delete"],
   },
   {
     key: "reporting",
     label: "Reporting & Expenses",
     group: "reporting",
     description: "View reports and manage the expense ledger.",
-    actions: ["create", "read", "update", "delete"],
+    actions: ["create", "read", "display", "update", "delete"],
   },
 ];
 
@@ -560,6 +564,27 @@ export function canReadPage(permissions: unknown, page: PagePath): boolean {
   return hasPermission(permissions, page, "read");
 }
 
+export function canDisplayPage(permissions: unknown, page: PagePath): boolean {
+  return hasPermission(permissions, page, "display");
+}
+
+/** True once any page explicitly uses the display action (post-migration matrix). */
+export function matrixUsesDisplayAction(permissions: unknown): boolean {
+  const matrix = normalizePermissionMatrix(permissions);
+  return ALL_PAGE_PATHS.some((page) => matrix[page].includes("display"));
+}
+
+/**
+ * UI route/nav access: requires display, or read on legacy matrices saved before display existed.
+ */
+export function canAccessPageUi(permissions: unknown, page: PagePath): boolean {
+  if (canDisplayPage(permissions, page)) return true;
+  if (!matrixUsesDisplayAction(permissions) && canReadPage(permissions, page)) {
+    return true;
+  }
+  return false;
+}
+
 export function canCreate(permissions: unknown, page: PagePath): boolean {
   return hasPermission(permissions, page, "create");
 }
@@ -581,8 +606,7 @@ export function canImport(permissions: unknown, page: PagePath): boolean {
 }
 
 export function getAllowedPages(permissions: unknown): PagePath[] {
-  const matrix = normalizePermissionMatrix(permissions);
-  return ALL_PAGE_PATHS.filter((page) => canReadPage(matrix, page));
+  return ALL_PAGE_PATHS.filter((page) => canAccessPageUi(permissions, page));
 }
 
 export function getRoutePermission(
@@ -591,7 +615,7 @@ export function getRoutePermission(
   const normalizedPath = normalizePathname(pathname);
 
   if (normalizedPath === "/") {
-    return { page: "dashboard", action: "read" };
+    return { page: "dashboard", action: "display" };
   }
 
   const match = ROUTE_PERMISSION_RULES.find(({ pattern }) =>
@@ -608,19 +632,25 @@ export function canAccessRoute(
   const normalizedPath = normalizePathname(pathname);
   if (/^\/customers(?:\/|$)/.test(normalizedPath)) {
     return (
-      hasPermission(permissions, "sales", "read") ||
-      hasPermission(permissions, "maintenance", "read")
+      canAccessPageUi(permissions, "sales") ||
+      canAccessPageUi(permissions, "maintenance")
     );
   }
 
   const routePermission = getRoutePermission(pathname);
   if (!routePermission) return true;
 
-  return hasPermission(
-    permissions,
-    routePermission.page,
-    routePermission.action,
-  );
+  const { page, action } = routePermission;
+
+  if (!canAccessPageUi(permissions, page)) {
+    return false;
+  }
+
+  if (action === "display") {
+    return true;
+  }
+
+  return hasPermission(permissions, page, action);
 }
 
 export function getDefaultRoute(permissions: unknown): string {

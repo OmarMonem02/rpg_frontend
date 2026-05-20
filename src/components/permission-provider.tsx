@@ -7,6 +7,7 @@ import {
   canDelete,
   canExport,
   canImport,
+  canDisplayPage,
   canReadPage,
   canUpdate,
   getAllowedPages,
@@ -29,6 +30,7 @@ type PermissionContextType = {
   hasPermission: (page: PagePath, action: ActionType) => boolean;
   hasAnyPermission: (page: PagePath, actions: ActionType[]) => boolean;
   canReadPage: (page: PagePath) => boolean;
+  canDisplayPage: (page: PagePath) => boolean;
   canAccessRoute: (pathname: string) => boolean;
   canCreate: (page: PagePath) => boolean;
   canUpdate: (page: PagePath) => boolean;
@@ -76,6 +78,7 @@ export function PermissionProvider({
       hasAnyPermission: (page, actions) =>
         hasAnyPermission(permissionMatrix, page, actions),
       canReadPage: (page) => canReadPage(permissionMatrix, page),
+      canDisplayPage: (page) => canDisplayPage(permissionMatrix, page),
       canAccessRoute: (pathname) => canAccessRoute(permissionMatrix, pathname),
       canCreate: (page) => canCreate(permissionMatrix, page),
       canUpdate: (page) => canUpdate(permissionMatrix, page),

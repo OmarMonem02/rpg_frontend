@@ -98,3 +98,50 @@ export async function createCustomer(
   const record = asRecord(data);
   return normalizeCustomer(record.data ?? record.customer ?? record);
 }
+
+export async function deleteCustomer(token: string, id: number): Promise<void> {
+  await authorizedFetch<void>(`/customers/${id}`, token, {
+    method: "DELETE",
+  });
+}
+
+export type CreateCustomerBikePayload = {
+  bike_blueprint_id: number;
+  vin?: string;
+  mileage?: number;
+  image?: string;
+  image_public_id?: string;
+  notes?: string;
+};
+
+export async function createCustomerBike(
+  token: string,
+  customerId: number,
+  payload: CreateCustomerBikePayload,
+): Promise<import("./customer-workspace").CustomerBikeRecord> {
+  const { normalizeCustomerBike } = await import("./customer-workspace");
+  const body: Record<string, string | number> = {
+    bike_blueprint_id: payload.bike_blueprint_id,
+  };
+  if (payload.vin?.trim()) body.vin = payload.vin.trim();
+  if (payload.mileage != null && !Number.isNaN(payload.mileage)) {
+    body.mileage = payload.mileage;
+  }
+  if (payload.image?.trim()) body.image = payload.image.trim();
+  if (payload.image_public_id?.trim()) {
+    body.image_public_id = payload.image_public_id.trim();
+  }
+  if (payload.notes?.trim()) body.notes = payload.notes.trim();
+
+  const data = await authorizedFetch<unknown>(
+    `/customers/${customerId}/bikes`,
+    token,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    },
+  );
+  const record = asRecord(data);
+  return normalizeCustomerBike(record.data ?? record);
+}
