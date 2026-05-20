@@ -51,15 +51,18 @@ function getPermissionSummary(record: UserRecord): string {
   const permissions = record.permissions;
   if (!permissions) return "No access data";
 
-  const readablePages = Object.values(permissions).filter((actions) =>
+  const dataPages = Object.values(permissions).filter((actions) =>
     actions.includes("read"),
+  ).length;
+  const uiPages = Object.values(permissions).filter((actions) =>
+    actions.includes("display"),
   ).length;
   const totalActions = Object.values(permissions).reduce(
     (sum, actions) => sum + actions.length,
     0,
   );
 
-  return `${readablePages} pages / ${totalActions} actions`;
+  return `${dataPages} data / ${uiPages} UI · ${totalActions} actions`;
 }
 
 function getUserInitials(name: string): string {

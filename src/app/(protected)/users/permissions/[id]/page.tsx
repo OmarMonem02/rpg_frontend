@@ -1,19 +1,48 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { ArrowLeftIcon } from "@heroicons/react/24/outline";
 import { ApiError } from "@/lib/auth-api";
 import { usePermissions } from "@/components/permission-provider";
 import { getAuthToken, getAuthUser, setAuthUser } from "@/lib/auth-session";
 import { getPermissionMetadata, getUser, updateUserPermissions } from "@/lib/crud-api";
 import { PermissionsEditor } from "@/components/permissions-editor";
-import { PageHero, PageShell, InlineMessage } from "@/components/ops-ui";
+import {
+  ActionButton,
+  PageHero,
+  PageShell,
+  InlineMessage,
+  StatCard,
+  StatGrid,
+} from "@/components/ops-ui";
 import type { UserRecord } from "@/lib/crud-api";
 import {
+  ALL_PAGE_PATHS,
   FALLBACK_PERMISSION_METADATA,
   type PermissionMatrix,
   type PermissionMetadata,
 } from "@/lib/permissions";
+
+function countDataPages(matrix: PermissionMatrix | undefined) {
+  if (!matrix) return 0;
+  return ALL_PAGE_PATHS.filter((page) => matrix[page]?.includes("read")).length;
+}
+
+function countDisplayPages(matrix: PermissionMatrix | undefined) {
+  if (!matrix) return 0;
+  return ALL_PAGE_PATHS.filter((page) => matrix[page]?.includes("display")).length;
+}
+
+function countActions(matrix: PermissionMatrix | undefined) {
+  if (!matrix) return 0;
+  return Object.values(matrix).reduce((sum, actions) => sum + actions.length, 0);
+}
+
+function getRoleLabel(role: string): string {
+  if (!role) return "Unknown";
+  return role === "Technician" ? role : `${role[0].toUpperCase()}${role.slice(1)}`;
+}
 
 export default function UserPermissionsPage() {
   const router = useRouter();
@@ -60,6 +89,17 @@ export default function UserPermissionsPage() {
     void loadUser();
   }, [loadUser]);
 
+  const stats = useMemo(() => {
+    const matrix = user?.permissions;
+    return {
+      dataPages: countDataPages(matrix),
+      displayPages: countDisplayPages(matrix),
+      totalActions: countActions(matrix),
+      source:
+        user?.permission_source === "custom" ? "Custom override" : "Role default",
+    };
+  }, [user?.permission_source, user?.permissions]);
+
   const handleSavePermissions = async (newPermissions: PermissionMatrix) => {
     try {
       setIsSaving(true);
@@ -103,7 +143,7 @@ export default function UserPermissionsPage() {
     return (
       <PageShell>
         <div className="flex min-h-[300px] items-center justify-center">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-outline-variant/30 border-t-primary"></div>
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-outline-variant/30 border-t-primary" />
         </div>
       </PageShell>
     );
@@ -122,41 +162,48 @@ export default function UserPermissionsPage() {
 
   return (
     <PageShell>
-      <div className="flex items-center gap-3 mb-6">
-        <button
-          onClick={() => router.back()}
-          className="flex items-center justify-center w-10 h-10 rounded-lg border border-outline-variant/30 hover:bg-surface-container transition-colors"
-          title="Go back"
-        >
-          <svg
-            className="w-5 h-5"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
+      <PageHero
+        eyebrow="Manage permissions"
+        title={user.name}
+        meta={
+          <p className="text-sm text-on-surface-variant">
+            {user.email} · {getRoleLabel(user.role)} · User #{user.id}
+          </p>
+        }
+        actions={
+          <ActionButton
+            type="button"
+            variant="outline"
+            onClick={() => router.push("/users")}
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M15 19l-7-7 7-7"
-            />
-          </svg>
-        </button>
-        <div>
-          <p className="text-sm text-on-surface-variant">Manage Permissions</p>
-          <h1 className="text-2xl font-bold text-on-surface">{user.name}</h1>
-        </div>
-      </div>
+            <ArrowLeftIcon className="h-4 w-4" />
+            Back to users
+          </ActionButton>
+        }
+      />
 
-      <PageHero title="User Access Control" />
+      <StatGrid>
+        <StatCard label="Access source" value={stats.source} />
+        <StatCard
+          label="Data (API)"
+          value={String(stats.dataPages)}
+          hint="Pages with read data permission"
+        />
+        <StatCard
+          label="UI pages"
+          value={String(stats.displayPages)}
+          hint="Pages visible in navigation"
+        />
+        <StatCard label="Total actions" value={String(stats.totalActions)} />
+      </StatGrid>
 
-      {loadError && <InlineMessage tone="danger">{loadError}</InlineMessage>}
+      {loadError ? <InlineMessage tone="danger">{loadError}</InlineMessage> : null}
       {saveError ? (
         <InlineMessage tone={saveErrorStatus === 403 ? "danger" : "warning"}>
           {saveError}
         </InlineMessage>
       ) : null}
-      {success && <InlineMessage tone="success">{success}</InlineMessage>}
+      {success ? <InlineMessage tone="success">{success}</InlineMessage> : null}
       {!canSavePermissions ? (
         <InlineMessage tone="warning">
           Your account can read users, but it cannot update permissions.
@@ -176,6 +223,7 @@ export default function UserPermissionsPage() {
         isSaving={isSaving}
         canSave={canSavePermissions}
         isCurrentUser={getAuthUser()?.id === user.id}
+        showHeader={false}
       />
     </PageShell>
   );

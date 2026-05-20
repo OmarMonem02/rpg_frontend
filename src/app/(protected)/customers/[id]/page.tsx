@@ -1,10 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
-import { getAuthToken } from "@/lib/auth-session";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { getAuthToken, getAuthUser } from "@/lib/auth-session";
 import { usePermissions } from "@/components/permission-provider";
+import { deleteCustomer } from "@/lib/api/customers";
+import { LinkCustomerBikeModal } from "@/components/customers/LinkCustomerBikeModal";
 import {
   getCustomerWorkspace,
   type CustomerWorkspacePayload,
@@ -51,8 +53,25 @@ function saleStatusTone(
 }
 
 export default function CustomerWorkspacePage() {
+  return (
+    <Suspense
+      fallback={
+        <PageShell>
+          <div className="flex h-48 items-center justify-center text-on-surface-variant">
+            Loading…
+          </div>
+        </PageShell>
+      }
+    >
+      <CustomerWorkspaceContent />
+    </Suspense>
+  );
+}
+
+function CustomerWorkspaceContent() {
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
   const permissions = usePermissions();
   const customerId = Number(params?.id);
 
@@ -63,7 +82,13 @@ export default function CustomerWorkspacePage() {
   const [error, setError] = useState<string | null>(null);
   const [salesPage, setSalesPage] = useState(1);
   const [ticketsPage, setTicketsPage] = useState(1);
+  const [linkBikeOpen, setLinkBikeOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
+  const isAdmin = getAuthUser()?.role === "admin";
+  const canLinkBike =
+    permissions.canCreate("maintenance") || permissions.canCreate("sales");
   const canSales = permissions.canReadPage("sales");
   const canTickets = permissions.canReadPage("maintenance");
 
@@ -98,6 +123,32 @@ export default function CustomerWorkspacePage() {
     void load();
   }, [load]);
 
+  useEffect(() => {
+    if (searchParams.get("linkBike") === "1") {
+      setLinkBikeOpen(true);
+    }
+  }, [searchParams]);
+
+  async function handleDeleteCustomer() {
+    if (!isAdmin || !customerId) return;
+    const token = getAuthToken();
+    if (!token) {
+      setError("Authentication required");
+      return;
+    }
+    setDeleting(true);
+    setError(null);
+    try {
+      await deleteCustomer(token, customerId);
+      router.push("/customers");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete customer");
+    } finally {
+      setDeleting(false);
+      setDeleteOpen(false);
+    }
+  }
+
   if (!customerId) {
     return (
       <PageShell>
@@ -117,9 +168,25 @@ export default function CustomerWorkspacePage() {
           </p>
         }
         actions={
-          <ActionButton variant="outline" onClick={() => router.push("/customers")}>
-            Back to directory
-          </ActionButton>
+          <>
+            {canLinkBike ? (
+              <ActionButton tone="primary" onClick={() => setLinkBikeOpen(true)}>
+                Link bike
+              </ActionButton>
+            ) : null}
+            {isAdmin ? (
+              <ActionButton
+                tone="danger"
+                variant="outline"
+                onClick={() => setDeleteOpen(true)}
+              >
+                Delete customer
+              </ActionButton>
+            ) : null}
+            <ActionButton variant="outline" onClick={() => router.push("/customers")}>
+              Back to directory
+            </ActionButton>
+          </>
         }
       />
 
@@ -220,11 +287,34 @@ export default function CustomerWorkspacePage() {
           </div>
 
           <section>
-            <h2 className="mb-3 text-xl font-bold text-on-surface">Linked bikes</h2>
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+              <h2 className="text-xl font-bold text-on-surface">Linked bikes</h2>
+              {canLinkBike ? (
+                <ActionButton
+                  size="sm"
+                  tone="primary"
+                  variant="outline"
+                  onClick={() => setLinkBikeOpen(true)}
+                >
+                  + Link another bike
+                </ActionButton>
+              ) : null}
+            </div>
             {workspace.bikes.length === 0 ? (
               <EmptyState
                 title="No bikes on file"
-                description="Register a customer bike from the maintenance ticket flow."
+                description={
+                  canLinkBike
+                    ? "Link the first bike for this customer. You can add more bikes anytime."
+                    : "No bikes registered for this customer yet."
+                }
+                action={
+                  canLinkBike ? (
+                    <ActionButton tone="primary" onClick={() => setLinkBikeOpen(true)}>
+                      Link first bike
+                    </ActionButton>
+                  ) : undefined
+                }
               />
             ) : (
               <DataTableCard className="overflow-hidden border-outline-variant/10">
@@ -455,6 +545,51 @@ export default function CustomerWorkspacePage() {
                 </DataTableCard>
               )}
             </section>
+        </div>
+      ) : null}
+
+      {linkBikeOpen && workspace ? (
+        <LinkCustomerBikeModal
+          customerId={customerId}
+          customerName={workspace.customer.name}
+          onClose={() => setLinkBikeOpen(false)}
+          onSuccess={() => void load()}
+        />
+      ) : null}
+
+      {deleteOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-md rounded-[1.25rem] border border-outline-variant/20 bg-surface p-6 shadow-lg">
+            <h3 className="font-display text-lg font-semibold text-on-surface">
+              Delete customer?
+            </h3>
+            <p className="mt-2 text-sm text-on-surface-variant">
+              Permanently remove{" "}
+              <span className="font-medium text-on-surface">
+                {workspace?.customer.name || `Customer #${customerId}`}
+              </span>
+              ? Related sales and tickets may block deletion if the server rejects
+              it.
+            </p>
+            <div className="mt-6 flex justify-end gap-2">
+              <ActionButton
+                type="button"
+                variant="outline"
+                onClick={() => setDeleteOpen(false)}
+                disabled={deleting}
+              >
+                Cancel
+              </ActionButton>
+              <ActionButton
+                type="button"
+                tone="danger"
+                onClick={() => void handleDeleteCustomer()}
+                disabled={deleting}
+              >
+                {deleting ? "Deleting…" : "Delete"}
+              </ActionButton>
+            </div>
+          </div>
         </div>
       ) : null}
     </PageShell>

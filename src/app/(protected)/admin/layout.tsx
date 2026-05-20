@@ -14,12 +14,12 @@ export default function AdminLayout({
   const permissions = usePermissions();
 
   useEffect(() => {
-    if (!permissions.canReadPage("users")) {
+    if (!permissions.canDisplayPage("users")) {
       router.replace(permissions.getDefaultRoute());
     }
   }, [permissions, router]);
 
-  if (!permissions.canReadPage("users")) {
+  if (!permissions.canDisplayPage("users")) {
     return <WorkspaceLoadingCard />;
   }
 
