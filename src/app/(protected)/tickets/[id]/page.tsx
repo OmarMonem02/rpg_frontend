@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
+import { TrashIcon } from "@heroicons/react/24/outline";
 import { useParams, useRouter } from "next/navigation";
 import { usePermissions } from "@/components/permission-provider";
 import {
@@ -12,8 +13,18 @@ import {
   SurfaceCard,
   InputGroup,
 } from "@/components/ops-ui";
-import { InvoiceTemplate } from "@/components/invoice-template";
-import { ticketsApi, type Ticket } from "@/lib/tickets-api";
+import {
+  PaymentCloseModal,
+  AdminPasswordReopenModal,
+  TicketInvoiceModal,
+} from "@/components/tickets/ticket-workflow-modals";
+import { ticketsApi, ticketItemName, type Ticket, type TicketItem } from "@/lib/tickets-api";
+import { getAuthUser } from "@/lib/auth-session";
+import {
+  clampTicketItemDiscount,
+  formatTicketMaxDiscountHint,
+  ticketItemMaxDiscount,
+} from "@/lib/ticket-item-discount";
 import {
   type SaleRecord,
   type SparePartRecord,
@@ -28,6 +39,8 @@ export default function TicketDetailsPage() {
   const canViewCustomerWorkspace =
     permissions.canReadPage("sales") ||
     permissions.canReadPage("maintenance");
+  const canSendTracking = permissions.canUpdate("maintenance");
+  const canDeleteTickets = permissions.canDelete("maintenance");
   const [ticket, setTicket] = useState<Ticket | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -44,9 +57,17 @@ export default function TicketDetailsPage() {
 
   // Close ticket payment state
   const [isClosing, setIsClosing] = useState(false);
+  const [closeModalError, setCloseModalError] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("cash");
+  const [amountPaidInput, setAmountPaidInput] = useState("");
+  const [isReopenAuthOpen, setIsReopenAuthOpen] = useState(false);
+  const [reopenPassword, setReopenPassword] = useState("");
+  const [reopenModalError, setReopenModalError] = useState("");
   const [isInvoiceOpen, setIsInvoiceOpen] = useState(false);
   const [isExportingInvoice, setIsExportingInvoice] = useState(false);
+  const [trackingUrl, setTrackingUrl] = useState<string | null>(null);
+  const [trackingBusy, setTrackingBusy] = useState(false);
+  const [trackingMessage, setTrackingMessage] = useState("");
 
   const fetchTicket = useCallback(async () => {
     try {
@@ -64,31 +85,145 @@ export default function TicketDetailsPage() {
     fetchTicket();
   }, [fetchTicket]);
 
-  const handleUpdateStatus = async (action: "start" | "end" | "reopen" | "close") => {
+  useEffect(() => {
+    if (!ticket?.public_token || typeof window === "undefined") return;
+    setTrackingUrl(`${window.location.origin}/track/${ticket.public_token}`);
+  }, [ticket?.public_token]);
+
+  const handleSendTrackingLink = async () => {
+    if (!ticket?.customer?.phone?.trim()) {
+      setError("Customer must have a phone number before sending a tracking link.");
+      return;
+    }
+    try {
+      setTrackingBusy(true);
+      setTrackingMessage("");
+      const res = await ticketsApi.sendTrackingLink(Number(id));
+      setTrackingUrl(res.tracking_url);
+      setTrackingMessage("Tracking link sent via WhatsApp.");
+      await fetchTicket();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to send tracking link");
+    } finally {
+      setTrackingBusy(false);
+    }
+  };
+
+  const handleCopyTrackingLink = async () => {
+    if (!trackingUrl) return;
+    try {
+      await navigator.clipboard.writeText(trackingUrl);
+      setTrackingMessage("Tracking link copied to clipboard.");
+    } catch {
+      setError("Could not copy link to clipboard.");
+    }
+  };
+
+  const handleRegenerateTrackingLink = async () => {
+    if (!confirm("Regenerate tracking link? Old links shared with the customer will stop working.")) return;
+    try {
+      setTrackingBusy(true);
+      setTrackingMessage("");
+      const res = await ticketsApi.regenerateTrackingToken(Number(id));
+      setTrackingUrl(res.tracking_url);
+      setTrackingMessage(res.message);
+      await fetchTicket();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to regenerate tracking link");
+    } finally {
+      setTrackingBusy(false);
+    }
+  };
+
+  const isClosedAndFullyPaid = (ticketData: Ticket) =>
+    ticketData.status === "closed" &&
+    Number(ticketData.amount_paid ?? 0) >= Number(ticketData.total ?? 0);
+
+  const openCloseModal = () => {
+    const total = Number(ticket?.total ?? 0);
+    setPaymentMethod("cash");
+    setAmountPaidInput(total.toFixed(2));
+    setCloseModalError("");
+    setIsClosing(true);
+  };
+
+  const handleCloseTicket = async () => {
+    if (!ticket) return;
+    const amountPaid = Number(amountPaidInput);
+    const total = Number(ticket.total ?? 0);
+    if (!Number.isFinite(amountPaid) || amountPaid < total) {
+      setCloseModalError("Full payment is required before closing this ticket.");
+      return;
+    }
+
     try {
       setIsProcessing(true);
+      setCloseModalError("");
+      await ticketsApi.closeTicket(Number(id), {
+        payment_method: paymentMethod,
+        amount_paid: amountPaid,
+      });
+      setIsClosing(false);
+      await fetchTicket();
+      setIsInvoiceOpen(true);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to close ticket";
+      setCloseModalError(message);
+      setError(message);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleReopenTicket = async (adminPassword?: string) => {
+    try {
+      setIsProcessing(true);
+      setReopenModalError("");
+      setError("");
+      await ticketsApi.reopenTicket(
+        Number(id),
+        adminPassword ? { admin_password: adminPassword } : undefined,
+      );
+      setIsReopenAuthOpen(false);
+      setReopenPassword("");
+      await fetchTicket();
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to reopen ticket";
+      setReopenModalError(message);
+      setError(message);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleReopenClick = () => {
+    if (!ticket) return;
+    setReopenModalError("");
+    setReopenPassword("");
+
+    if (isClosedAndFullyPaid(ticket)) {
+      const authUser = getAuthUser();
+      if (authUser?.role !== "admin") {
+        setError("Only administrators can reopen a closed ticket that was paid in full.");
+        return;
+      }
+      setIsReopenAuthOpen(true);
+      return;
+    }
+
+    void handleReopenTicket();
+  };
+
+  const handleUpdateStatus = async (action: "start" | "end") => {
+    try {
+      setIsProcessing(true);
+      setError("");
       if (action === "start") {
-        // Prompt doesn't have a direct 'start' endpoint in the reference but it says PATCH status
-        // or we can just use the PATCH status endpoint if available.
-        // The API reference says PATCH /api/tickets/{ticketId}/status
-        // But the ticketsApi object has endTicket, reopenTicket, closeTicket.
-        // Let's assume start = reopen or we add a start method.
-        // Actually, let's use PATCH status for generic updates if we have it.
-        // Wait, the prompt says POST /api/tickets/{ticketId}/reopen Sets status to in_progress.
-        // So 'start' is basically the same as 'reopen' if we are moving from pending to in_progress.
         await ticketsApi.reopenTicket(Number(id));
       } else if (action === "end") {
         await ticketsApi.endTicket(Number(id));
-      } else if (action === "reopen") {
-        await ticketsApi.reopenTicket(Number(id));
-      } else if (action === "close") {
-        await ticketsApi.closeTicket(Number(id), { payment_method: paymentMethod, amount_paid: ticket?.total || 0 });
-        setIsClosing(false);
       }
       await fetchTicket();
-      if (action === "close") {
-        setIsInvoiceOpen(true);
-      }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : `Failed to ${action} ticket`);
     } finally {
@@ -124,6 +259,29 @@ export default function TicketDetailsPage() {
     }
   };
 
+  const handleDeleteTicket = async () => {
+    if (!canDeleteTickets) {
+      setError("You do not have permission to delete tickets.");
+      return;
+    }
+    if (
+      !confirm(
+        "Are you sure you want to delete this ticket? All tasks and line items will be removed.",
+      )
+    ) {
+      return;
+    }
+    try {
+      setIsProcessing(true);
+      await ticketsApi.deleteTicket(Number(id));
+      router.push("/tickets");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to delete ticket");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   const taskPickerPrice = (item: SparePartRecord | MaintenanceServiceRecord) =>
     "sale_price" in item ? item.sale_price : item.service_price;
 
@@ -131,7 +289,7 @@ export default function TicketDetailsPage() {
     taskId: number,
     item: SparePartRecord | MaintenanceServiceRecord,
   ) => {
-    if (!canEditItems) {
+    if (ticket?.status !== "in_progress") {
       setError("Start work before adding parts or services to this ticket.");
       return;
     }
@@ -149,6 +307,34 @@ export default function TicketDetailsPage() {
       await fetchTicket();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to add item");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleUpdateItemDiscount = async (
+    taskId: number,
+    item: TicketItem,
+    rawDiscount: number,
+    applyCatalogCap: boolean,
+  ) => {
+    if (ticket?.status !== "in_progress") {
+      setError("Start work before editing parts or services on this ticket.");
+      return;
+    }
+
+    const discount = clampTicketItemDiscount(item, rawDiscount, { applyCatalogCap });
+    if (discount === Number(item.discount)) {
+      return;
+    }
+
+    try {
+      setIsProcessing(true);
+      setError("");
+      await ticketsApi.updateItemInTask(Number(id), taskId, item.id, { discount });
+      await fetchTicket();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to update discount");
     } finally {
       setIsProcessing(false);
     }
@@ -190,8 +376,8 @@ export default function TicketDetailsPage() {
         quantity: item.qty,
         returned_qty: 0,
         remaining_qty: item.qty,
-        item_label: item.item_name ?? (item.spare_part_id ? "Spare Part" : "Maintenance Service"),
-        item_name: item.item_name ?? (item.spare_part_id ? "Spare Part" : "Maintenance Service"),
+        item_label: ticketItemName(item),
+        item_name: ticketItemName(item),
       })) ?? [],
     ) ?? [];
 
@@ -200,13 +386,14 @@ export default function TicketDetailsPage() {
       card: "Card",
       bank_transfer: "Bank Transfer",
     };
+    const invoicePaymentMethod = ticketData.payment_method || paymentMethod;
 
     return {
       id: ticketData.id,
       customer_id: ticketData.customer_id,
       seller_id: 0,
       payment_method_id: 0,
-      payment_method_name: paymentMethodLabels[paymentMethod] || paymentMethod,
+      payment_method_name: paymentMethodLabels[invoicePaymentMethod] || invoicePaymentMethod,
       user_id: 0,
       sale_type: "maintenance",
       status: ticketData.status,
@@ -382,6 +569,13 @@ export default function TicketDetailsPage() {
 
   const isEditable = ticket.status === "pending" || ticket.status === "in_progress";
   const canEditItems = ticket.status === "in_progress";
+  const authRole = getAuthUser()?.role;
+  const isStaffUser = authRole === "staff";
+  const isAdminUser = authRole === "admin";
+  const canEditLineDiscount = canEditItems && (isStaffUser || isAdminUser);
+  const applyStaffDiscountCap = isStaffUser;
+  const isClosed = ticket.status === "closed";
+  const ticketFullyPaid = isClosedAndFullyPaid(ticket);
 
   return (
     <PageShell>
@@ -418,6 +612,12 @@ export default function TicketDetailsPage() {
               <div className="mt-2">
                 <p className="text-on-surface-variant font-medium mb-1">Total Amount</p>
                 <p className="text-2xl font-bold text-primary">${Number(ticket.total || 0).toFixed(2)}</p>
+                {isClosed ? (
+                  <p className="mt-1 text-xs text-on-surface-variant">
+                    Paid ${Number(ticket.amount_paid ?? 0).toFixed(2)}
+                    {ticket.payment_method ? ` · ${ticket.payment_method.replace("_", " ")}` : ""}
+                  </p>
+                ) : null}
               </div>
             </div>
           </div>
@@ -439,19 +639,95 @@ export default function TicketDetailsPage() {
             )}
             {ticket.status === "completed" && (
               <>
-                <ActionButton variant="outline" onClick={() => handleUpdateStatus("reopen")} disabled={isProcessing}>
+                <ActionButton variant="outline" onClick={handleReopenClick} disabled={isProcessing}>
                   Reopen
                 </ActionButton>
-                <ActionButton tone="primary" onClick={() => setIsClosing(true)} disabled={isProcessing}>
-                  Close & Pay
+                <ActionButton tone="primary" onClick={openCloseModal} disabled={isProcessing}>
+                  Close Ticket
                 </ActionButton>
               </>
             )}
+            {isClosed && (
+              <>
+                <ActionButton variant="outline" onClick={() => setIsInvoiceOpen(true)}>
+                  View Invoice
+                </ActionButton>
+                <ActionButton
+                  variant="outline"
+                  onClick={handleReopenClick}
+                  disabled={isProcessing || (ticketFullyPaid && getAuthUser()?.role !== "admin")}
+                  title={
+                    ticketFullyPaid && getAuthUser()?.role !== "admin"
+                      ? "Administrator password required to reopen a fully paid closed ticket"
+                      : undefined
+                  }
+                >
+                  Reopen Ticket
+                </ActionButton>
+              </>
+            )}
+            {canDeleteTickets ? (
+              <ActionButton
+                variant="outline"
+                tone="danger"
+                onClick={() => void handleDeleteTicket()}
+                disabled={isProcessing}
+                className="gap-2"
+              >
+                <TrashIcon className="h-4 w-4" />
+                Delete
+              </ActionButton>
+            ) : null}
           </div>
         }
       />
 
       {error && <div className="rounded-xl bg-error/10 p-4 text-error mb-6 animate-in fade-in slide-in-from-top-2">{error}</div>}
+
+      {canSendTracking && (
+        <SurfaceCard className="mb-6 border-outline-variant/10">
+          <h3 className="text-lg font-bold text-on-surface mb-1">Customer tracking link</h3>
+          <p className="text-sm text-on-surface-variant mb-4">
+            Send a WhatsApp message with a secure link so the customer can verify their phone and view ticket progress, parts, services, and total.
+          </p>
+          {!ticket.customer?.phone ? (
+            <p className="text-sm text-error">Add a customer phone number before sending a tracking link.</p>
+          ) : null}
+          {trackingUrl ? (
+            <p className="mb-3 break-all rounded-lg bg-surface-container-low px-3 py-2 font-mono text-xs text-on-surface-variant">
+              {trackingUrl}
+            </p>
+          ) : null}
+          {ticket.tracking_link_sent_at ? (
+            <p className="mb-3 text-xs text-on-surface-variant">
+              Last sent: {new Date(ticket.tracking_link_sent_at).toLocaleString()}
+              {ticket.tracking_link_send_count ? ` · ${ticket.tracking_link_send_count} time(s)` : ""}
+            </p>
+          ) : null}
+          {trackingMessage ? (
+            <p className="mb-3 text-sm font-medium text-primary">{trackingMessage}</p>
+          ) : null}
+          <div className="flex flex-wrap gap-2">
+            <ActionButton
+              tone="primary"
+              onClick={() => void handleSendTrackingLink()}
+              disabled={trackingBusy || !ticket.customer?.phone}
+            >
+              {trackingBusy ? 'Sending…' : 'Send via WhatsApp'}
+            </ActionButton>
+            {trackingUrl ? (
+              <ActionButton variant="outline" onClick={() => void handleCopyTrackingLink()} disabled={trackingBusy}>
+                Copy link
+              </ActionButton>
+            ) : null}
+            {ticket.public_token ? (
+              <ActionButton variant="outline" onClick={() => void handleRegenerateTrackingLink()} disabled={trackingBusy}>
+                Regenerate link
+              </ActionButton>
+            ) : null}
+          </div>
+        </SurfaceCard>
+      )}
 
       <div className="flex flex-col gap-6">
         <div className="flex items-center justify-between">
@@ -526,6 +802,7 @@ export default function TicketDetailsPage() {
                     <thead className="bg-surface-container-low text-on-surface-variant">
                       <tr>
                         <th className="px-4 py-3 font-semibold">Item Name</th>
+                        <th className="px-4 py-3 font-semibold">Type</th>
                         <th className="px-4 py-3 font-semibold">Price</th>
                         <th className="px-4 py-3 font-semibold">Qty</th>
                         <th className="px-4 py-3 font-semibold">Discount</th>
@@ -536,10 +813,48 @@ export default function TicketDetailsPage() {
                     <tbody className="divide-y divide-outline-variant/5">
                       {task.items?.map((item) => (
                         <tr key={item.id} className="hover:bg-surface-container-lowest transition-colors">
-                          <td className="px-4 py-3 font-medium text-on-surface">{item.item_name || (item.spare_part_id ? "Spare Part" : "Service")}</td>
+                          <td className="px-4 py-3 font-medium text-on-surface">{ticketItemName(item)}</td>
+                          <td className="px-4 py-3 font-medium text-on-surface">{(item.spare_part_id ? "Spare Part" : "Service")}</td>
                           <td className="px-4 py-3">${Number(item.price_snapshot).toFixed(2)}</td>
                           <td className="px-4 py-3">{item.qty}</td>
-                          <td className="px-4 py-3 text-error">-${Number(item.discount).toFixed(2)}</td>
+                          <td className="px-4 py-3">
+                            {canEditLineDiscount ? (
+                              <div className="flex flex-col items-start gap-0.5">
+                                <input
+                                  type="number"
+                                  min={0}
+                                  max={ticketItemMaxDiscount(item, {
+                                    applyCatalogCap: applyStaffDiscountCap,
+                                  })}
+                                  step="0.01"
+                                  defaultValue={Number(item.discount).toFixed(2)}
+                                  key={`${item.id}-${item.discount}`}
+                                  disabled={isProcessing}
+                                  onBlur={(e) => {
+                                    void handleUpdateItemDiscount(
+                                      task.id,
+                                      item,
+                                      Number(e.target.value),
+                                      applyStaffDiscountCap,
+                                    );
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") {
+                                      e.currentTarget.blur();
+                                    }
+                                  }}
+                                  className="w-24 rounded-lg border border-outline-variant/30 bg-surface px-2 py-1 text-right text-sm text-error outline-none focus:border-primary"
+                                />
+                                {applyStaffDiscountCap ? (
+                                  <span className="text-[10px] font-medium text-on-surface-variant">
+                                    {formatTicketMaxDiscountHint(item)}
+                                  </span>
+                                ) : null}
+                              </div>
+                            ) : (
+                              <span className="text-error">-${Number(item.discount).toFixed(2)}</span>
+                            )}
+                          </td>
                           <td className="px-4 py-3 font-bold">${Number(item.subtotal).toFixed(2)}</td>
                           {isEditable && (
                             <td className="px-4 py-3 text-right">
@@ -607,67 +922,51 @@ export default function TicketDetailsPage() {
         }}
       />
 
-      {/* Payment Modal */}
-      {isClosing && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-md">
-          <div className="w-full max-w-sm rounded-[2.5rem] bg-surface p-8 shadow-2xl border border-outline-variant/20">
-            <h3 className="text-2xl font-bold text-on-surface mb-4">Process Payment</h3>
-            <div className="mb-6 p-4 rounded-2xl bg-primary/5 border border-primary/10">
-              <p className="text-sm text-on-surface-variant">Total Amount Due</p>
-              <p className="text-3xl font-black text-primary">${Number(ticket.total || 0).toFixed(2)}</p>
-            </div>
-            
-            <InputGroup label="Payment Method" className="mb-8">
-              <select 
-                className="w-full rounded-2xl border border-outline-variant/30 bg-surface px-5 py-3 outline-none focus:border-primary transition-all"
-                value={paymentMethod}
-                onChange={(e) => setPaymentMethod(e.target.value)}
-              >
-                <option value="cash">Cash</option>
-                <option value="card">Card</option>
-                <option value="bank_transfer">Bank Transfer</option>
-              </select>
-            </InputGroup>
+      <PaymentCloseModal
+        isOpen={isClosing}
+        onClose={() => {
+          setIsClosing(false);
+          setCloseModalError("");
+        }}
+        total={Number(ticket.total || 0)}
+        paymentMethod={paymentMethod}
+        amountPaid={amountPaidInput}
+        onPaymentMethodChange={setPaymentMethod}
+        onAmountPaidChange={setAmountPaidInput}
+        onConfirm={() => void handleCloseTicket()}
+        isProcessing={isProcessing}
+        error={closeModalError}
+      />
 
-            <div className="flex flex-col gap-2">
-              <ActionButton tone="success" className="w-full py-4 text-lg" onClick={() => handleUpdateStatus("close")} disabled={isProcessing}>
-                Confirm & Close Ticket
-              </ActionButton>
-              <ActionButton variant="ghost" className="w-full" onClick={() => setIsClosing(false)}>Cancel</ActionButton>
-            </div>
-          </div>
-        </div>
-      )}
+      <AdminPasswordReopenModal
+        isOpen={isReopenAuthOpen}
+        onClose={() => {
+          setIsReopenAuthOpen(false);
+          setReopenPassword("");
+          setReopenModalError("");
+        }}
+        ticketId={ticket.id}
+        total={Number(ticket.total || 0)}
+        amountPaid={Number(ticket.amount_paid ?? 0)}
+        password={reopenPassword}
+        onPasswordChange={setReopenPassword}
+        onConfirm={() => void handleReopenTicket(reopenPassword)}
+        isProcessing={isProcessing}
+        error={reopenModalError}
+      />
 
-      {/* Invoice Modal */}
-      {isInvoiceOpen && ticketInvoice && (
-        <div className="fixed inset-0 z-[60] flex items-start justify-center overflow-auto bg-black/60 p-6 backdrop-blur-md">
-          <div className="w-full max-w-5xl rounded-[2.5rem] bg-surface p-6 shadow-2xl border border-outline-variant/20">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between mb-6">
-              <div>
-                <h3 className="text-2xl font-bold text-on-surface">Ticket Invoice</h3>
-                <p className="text-on-surface-variant">Invoice generated from ticket #{ticket.id}</p>
-              </div>
-              <div className="flex flex-wrap gap-3">
-                <ActionButton tone="primary" onClick={handlePrintInvoice}>
-                  Print Invoice
-                </ActionButton>
-                <ActionButton tone="default" onClick={handleExportInvoicePDF} disabled={isExportingInvoice}>
-                  {isExportingInvoice ? "Exporting..." : "Export PDF"}
-                </ActionButton>
-                <ActionButton variant="ghost" onClick={() => setIsInvoiceOpen(false)}>
-                  Close
-                </ActionButton>
-              </div>
-            </div>
-            <div className="overflow-hidden rounded-[2rem] border border-outline-variant/10 bg-white">
-              <div id="invoice-export-root">
-                <InvoiceTemplate sale={ticketInvoice} />
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {ticketInvoice ? (
+        <TicketInvoiceModal
+          isOpen={isInvoiceOpen}
+          onClose={() => setIsInvoiceOpen(false)}
+          ticketId={ticket.id}
+          invoice={ticketInvoice}
+          onPrint={handlePrintInvoice}
+          onExportPdf={() => void handleExportInvoicePDF()}
+          isExporting={isExportingInvoice}
+        />
+      ) : null}
+
     </PageShell>
   );
 }
