@@ -219,7 +219,7 @@ export default function TicketDetailsPage() {
       setIsProcessing(true);
       setError("");
       if (action === "start") {
-        await ticketsApi.reopenTicket(Number(id));
+        await ticketsApi.updateTicketStatus(Number(id), "in_progress");
       } else if (action === "end") {
         await ticketsApi.endTicket(Number(id));
       }

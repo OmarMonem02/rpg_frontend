@@ -1,7 +1,7 @@
 import { getApiUrl } from "@/lib/config";
 import { getAuthToken } from "@/lib/auth-session";
 import { ApiError } from "@/lib/auth-api";
-import { asRecord, toNumber, toText } from "@/lib/api/core";
+import { asRecord, parseErrorMessage, toNumber, toText } from "@/lib/api/core";
 import type { MaxDiscountType } from "@/lib/max-discount";
 
 export async function authorizedFetch<T>(
@@ -25,11 +25,7 @@ export async function authorizedFetch<T>(
   });
 
   if (!response.ok) {
-    let errorMsg = "Request failed";
-    try {
-      const errorJson = await response.json();
-      errorMsg = errorJson.message || errorMsg;
-    } catch {}
+    const errorMsg = await parseErrorMessage(response);
     throw new ApiError(errorMsg, response.status);
   }
 
@@ -350,6 +346,17 @@ export const ticketsApi = {
     await authorizedFetch<void>(`/tickets/${ticketId}/tasks/${taskId}/items/${itemId}`, {
       method: "DELETE",
     });
+  },
+  updateTicketStatus: async (
+    ticketId: number,
+    status: "pending" | "in_progress" | "completed",
+  ) => {
+    const res = await authorizedFetch<Ticket>(`/tickets/${ticketId}/status`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status }),
+    });
+    return normalizeTicket(res);
   },
   endTicket: async (ticketId: number) => {
     const res = await authorizedFetch<{ message: string; status: string }>(`/tickets/${ticketId}/end`, { method: "POST" });
