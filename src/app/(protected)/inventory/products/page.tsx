@@ -516,14 +516,24 @@ export default function ProductsPage() {
         eyebrow="Inventory Control"
         title="Products Management"
         actions={
-          canCreateProducts ? (
-            <ActionButton
-              tone="primary"
-              onClick={() => router.push("/inventory/products/create")}
-            >
-              Add Product
-            </ActionButton>
-          ) : null
+          <>
+            {canUpdateProducts ? (
+              <ActionButton
+                variant="outline"
+                href="/inventory/products/bulk-edit"
+              >
+                Bulk edit
+              </ActionButton>
+            ) : null}
+            {canCreateProducts ? (
+              <ActionButton
+                tone="primary"
+                onClick={() => router.push("/inventory/products/create")}
+              >
+                Add Product
+              </ActionButton>
+            ) : null}
+          </>
         }
       />
 

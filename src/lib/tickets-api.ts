@@ -358,6 +358,14 @@ export const ticketsApi = {
     });
     return normalizeTicket(res);
   },
+  updateTicketNotes: async (ticketId: number, notes: string) => {
+    const res = await authorizedFetch<unknown>(`/tickets/${ticketId}/notes`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ notes }),
+    });
+    return normalizeTicket(res);
+  },
   endTicket: async (ticketId: number) => {
     const res = await authorizedFetch<{ message: string; status: string }>(`/tickets/${ticketId}/end`, { method: "POST" });
     return res;

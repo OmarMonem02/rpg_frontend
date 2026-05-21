@@ -342,6 +342,10 @@ const ROUTE_PERMISSION_RULES: Array<{
     permission: { page: "spare-parts", action: "update" },
   },
   {
+    pattern: /^\/inventory\/spare-parts\/bulk-edit(?:\/|$)/,
+    permission: { page: "spare-parts", action: "update" },
+  },
+  {
     pattern: /^\/inventory\/spare-parts(?:\/|$)/,
     permission: { page: "spare-parts", action: "read" },
   },
@@ -351,6 +355,10 @@ const ROUTE_PERMISSION_RULES: Array<{
   },
   {
     pattern: /^\/inventory\/products\/edit(?:\/|$)/,
+    permission: { page: "products", action: "update" },
+  },
+  {
+    pattern: /^\/inventory\/products\/bulk-edit(?:\/|$)/,
     permission: { page: "products", action: "update" },
   },
   {
