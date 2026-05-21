@@ -1,36 +1,151 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# RPG Frontend
+
+Next.js client for the Real Performance Garage ERP system. The frontend provides staff workspaces for inventory, sales, maintenance, customers, users, permissions, reporting, and public customer ticket tracking.
+
+## Tech Stack
+
+- Next.js 16 with the App Router
+- React 19
+- TypeScript
+- Tailwind CSS 4
+- TanStack Query for server state
+- Recharts for reporting visuals
+- Vitest and Testing Library for unit tests
+- jsPDF and html2canvas for printable/exportable documents
+
+## Core Features
+
+- Protected staff workspace with session-aware routing
+- Inventory management for bikes, products, spare parts, brands, categories, and maintenance services
+- Sales workflows with catalog selection, returns, exchanges, receipts, and invoices
+- Maintenance ticket management with tasks, parts, notes, payment state, and tracking-link actions
+- Public `/track/[token]` customer tracking page with phone verification
+- Customer profiles and workspaces
+- User administration and permission editing
+- Reporting dashboards for profit/loss, annual summaries, balance sheet, and expenses
+- Import/export screens for operational data
+
+## Requirements
+
+- Node.js 20 or newer
+- npm
+- Running RPG backend API
 
 ## Getting Started
 
-First, run the development server:
+Install dependencies:
+
+```bash
+npm install
+```
+
+Create a local environment file:
+
+```bash
+cp .env.example .env.local
+```
+
+Configure the backend API URL:
+
+```env
+NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000/api
+```
+
+Start the development server:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open `http://localhost:3000`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Environment Variables
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Variable | Purpose |
+| --- | --- |
+| `NEXT_PUBLIC_API_BASE_URL` | Base URL for the Laravel API. Defaults to `http://127.0.0.1:8000/api` in development when unset. |
 
-## Learn More
+Production builds use the configured environment value when present. If it is omitted, the app falls back to the production API URL defined in `src/lib/config.ts`.
 
-To learn more about Next.js, take a look at the following resources:
+## Available Scripts
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+npm run dev
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Starts the local Next.js development server.
 
-## Deploy on Vercel
+```bash
+npm run build
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Creates a production build.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+npm run start
+```
+
+Serves the production build.
+
+```bash
+npm run lint
+```
+
+Runs ESLint.
+
+```bash
+npm run test
+```
+
+Runs the Vitest test suite once.
+
+```bash
+npm run test:watch
+```
+
+Runs Vitest in watch mode.
+
+## Project Structure
+
+```text
+src/app
+  App Router routes, layouts, protected pages, and public tracking pages
+
+src/components
+  Shared UI, workspace components, tickets, reporting, history, imports, and printable views
+
+src/hooks
+  Reusable hooks for API data and workspace refresh behavior
+
+src/lib
+  API clients, auth/session helpers, permissions, formatting, and domain utilities
+
+src/types
+  Shared TypeScript API and domain types
+```
+
+## Backend Integration
+
+The app communicates with the Laravel API through typed helpers under `src/lib/api` and shared request utilities in `src/lib/crud-api.ts`.
+
+Authentication is token-based. Protected screens depend on the backend `/api/me` endpoint and permission metadata to determine available navigation and actions.
+
+Customer ticket tracking uses the public backend endpoints under `/api/public/tickets/{token}`. The public page is available at:
+
+```text
+/track/[token]
+```
+
+## Testing
+
+Run frontend tests:
+
+```bash
+npm run test
+```
+
+The current test setup uses Vitest, jsdom, Testing Library, and shared setup from `src/test/setup.ts`.
+
+## Related Project
+
+The matching Laravel API is located at `../rpg_backend`.
