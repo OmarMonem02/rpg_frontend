@@ -79,7 +79,13 @@ export function PermissionProvider({
         hasAnyPermission(permissionMatrix, page, actions),
       canReadPage: (page) => canReadPage(permissionMatrix, page),
       canDisplayPage: (page) => canDisplayPage(permissionMatrix, page),
-      canAccessRoute: (pathname) => canAccessRoute(permissionMatrix, pathname),
+      canAccessRoute: (pathname) => {
+        const normalized = pathname.replace(/\/+$/, "") || "/";
+        if (/^\/history(?:\/|$)/.test(normalized)) {
+          return authUser?.role === "admin";
+        }
+        return canAccessRoute(permissionMatrix, pathname);
+      },
       canCreate: (page) => canCreate(permissionMatrix, page),
       canUpdate: (page) => canUpdate(permissionMatrix, page),
       canDelete: (page) => canDelete(permissionMatrix, page),
@@ -88,7 +94,7 @@ export function PermissionProvider({
       getAllowedPages: () => getAllowedPages(permissionMatrix),
       getDefaultRoute: () => getDefaultRoute(permissionMatrix),
     }),
-    [permissionMatrix],
+    [authUser?.role, permissionMatrix],
   );
 
   return (
