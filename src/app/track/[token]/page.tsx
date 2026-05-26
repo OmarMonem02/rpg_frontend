@@ -14,7 +14,6 @@ import {
   TrackingRefreshBar,
   TrackingShell,
   TrackingStatusSummary,
-  TrackingTotalInline,
   TrackingVerifyLayout,
 } from "@/components/ticket-tracking/tracking-ui";
 import { TicketMessengerChat } from "@/components/tickets/ticket-messenger-chat";
@@ -221,7 +220,7 @@ export default function TrackTicketPage() {
       <TrackingHeader
         shopName={shop.name}
         tagline={shop.tagline}
-        logoUrl={shop.logo_url}
+        logoUrl={"/logo.ico"}
         ticketNumber={meta.ticket.ticket_number}
         status={headerStatus}
         statusLabel={headerStatusLabel}

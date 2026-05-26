@@ -157,7 +157,7 @@ function ShopLogo({ name, logoUrl }: { name: string; logoUrl?: string | null }) 
         <img
           src={logoUrl!}
           alt={`${name} logo`}
-          className="h-full w-full object-contain p-1.5"
+          className="h-full w-full object-contain"
           onError={() => setFailed(true)}
         />
       ) : (
