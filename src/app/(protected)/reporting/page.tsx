@@ -162,7 +162,7 @@ export default function ReportingOverviewPage() {
                 </StatGrid>
 
                 <div className="grid gap-4 xl:grid-cols-3">
-                  <SurfaceCard className="border-emerald-500/10 bg-[linear-gradient(180deg,rgba(236,253,245,0.75),rgba(255,255,255,0.98))] shadow-[0_18px_40px_rgba(15,23,42,0.05)] transition-transform duration-300 ease-out hover:-translate-y-0.5">
+                  <SurfaceCard className="border-success/15 bg-success-container/30 transition-transform duration-300 ease-out hover:-translate-y-0.5">
                     <p className="text-xs font-semibold uppercase tracking-[0.2em] text-on-surface-variant">
                       Revenue Mix
                     </p>
@@ -171,7 +171,7 @@ export default function ReportingOverviewPage() {
                         ([type, amount]) => (
                           <div
                             key={type}
-                            className="rounded-2xl border border-outline-variant/10 bg-white/85 px-4 py-3"
+                            className="rounded-2xl border border-outline-variant/10 bg-surface-container-lowest/85 px-4 py-3"
                           >
                             <div className="flex items-center justify-between gap-3">
                               <span className="text-sm font-medium capitalize text-on-surface">
@@ -187,7 +187,7 @@ export default function ReportingOverviewPage() {
                     </div>
                   </SurfaceCard>
 
-                  <SurfaceCard className="border-emerald-500/10 bg-white/95 shadow-[0_18px_40px_rgba(15,23,42,0.05)] transition-transform duration-300 ease-out hover:-translate-y-0.5">
+                  <SurfaceCard className="transition-transform duration-300 ease-out hover:-translate-y-0.5">
                     <p className="text-xs font-semibold uppercase tracking-[0.2em] text-on-surface-variant">
                       Asset Structure
                     </p>
@@ -221,12 +221,12 @@ export default function ReportingOverviewPage() {
                     </div>
                   </SurfaceCard>
 
-                  <SurfaceCard className="border-amber-500/15 bg-[linear-gradient(180deg,rgba(255,251,235,0.8),rgba(255,255,255,0.98))] shadow-[0_18px_40px_rgba(15,23,42,0.05)] transition-transform duration-300 ease-out hover:-translate-y-0.5">
+                  <SurfaceCard className="border-warning/15 bg-warning-container/30 transition-transform duration-300 ease-out hover:-translate-y-0.5">
                     <p className="text-xs font-semibold uppercase tracking-[0.2em] text-on-surface-variant">
                       Expense Pressure
                     </p>
                     <div className="mt-4 space-y-3">
-                      <div className="rounded-2xl border border-outline-variant/10 bg-white/85 px-4 py-3">
+                      <div className="rounded-2xl border border-outline-variant/10 bg-surface-container-lowest/85 px-4 py-3">
                         <p className="text-sm text-on-surface-variant">
                           Total expenses
                         </p>
@@ -239,7 +239,7 @@ export default function ReportingOverviewPage() {
                         .map(([category, amount]) => (
                           <div
                             key={category}
-                            className="flex items-center justify-between gap-3 rounded-2xl border border-outline-variant/10 bg-white/85 px-4 py-3"
+                            className="flex items-center justify-between gap-3 rounded-2xl border border-outline-variant/10 bg-surface-container-lowest/85 px-4 py-3"
                           >
                             <span className="text-sm font-medium capitalize text-on-surface">
                               {category.replace(/_/g, " ")}

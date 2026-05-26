@@ -9,8 +9,8 @@ type Tone = "default" | "primary" | "success" | "warning" | "danger";
 const toneClasses: Record<Tone, string> = {
   default: "border-outline-variant/15 bg-surface text-on-surface",
   primary: "border-primary/15 bg-primary-container text-on-primary-container",
-  success: "border-green-500/20 bg-green-500/10 text-green-700",
-  warning: "border-yellow-500/20 bg-yellow-500/10 text-yellow-700",
+  success: "border-success/20 bg-success/10 text-on-success-container",
+  warning: "border-warning/20 bg-warning/10 text-on-warning-container",
   danger: "border-error/20 bg-error/10 text-error",
 };
 
@@ -42,7 +42,7 @@ export function PageHero({
               </span>
             </div>
           ) : null}
-          <h1 className="font-display text-3xl font-extrabold tracking-tight text-on-surface md:text-4xl lg:text-[2.75rem] lg:leading-[1.1]">
+          <h1 className="text-display-lg text-on-surface">
             {title}
           </h1>
           {subtitle ? <div className="mt-3">{subtitle}</div> : null}
@@ -216,7 +216,7 @@ export function ActionButton({
       ? tone === "primary"
         ? "bg-primary text-on-primary shadow-md shadow-primary/15 hover:-translate-y-px hover:shadow-lg hover:shadow-primary/25"
         : tone === "danger"
-          ? "bg-error text-white hover:bg-error/90"
+          ? "bg-error text-on-primary hover:bg-error/90"
           : "border border-outline-variant/20 bg-surface text-on-surface hover:bg-surface-container"
       : variant === "ghost"
         ? "hover:bg-surface-container-high text-on-surface-variant hover:text-on-surface"
@@ -291,7 +291,16 @@ export function InlineMessage({
   tone?: Tone;
   children: ReactNode;
 }) {
-  const borderTone = tone === "danger" ? "border-l-error" : tone === "primary" ? "border-l-primary" : tone === "success" ? "border-l-green-600" : tone === "warning" ? "border-l-yellow-600" : "border-l-outline-variant";
+  const borderTone =
+    tone === "danger"
+      ? "border-l-error"
+      : tone === "primary"
+        ? "border-l-primary"
+        : tone === "success"
+          ? "border-l-success"
+          : tone === "warning"
+            ? "border-l-warning"
+            : "border-l-outline-variant";
 
   return <div className={`rounded-2xl border border-l-4 px-4 py-3 text-sm ${borderTone} ${toneClasses[tone]}`}>{children}</div>;
 }
@@ -393,21 +402,59 @@ export function PaginationControls({
     </div>
   );
 }
+export type Tab = {
+  id: string;
+  label: string;
+  content: ReactNode;
+};
+
 export function TabsWrapper({
   tabs,
   defaultTabId,
+  variant = "pills",
+  className = "",
 }: {
-  tabs: { id: string; label: string; content: ReactNode }[];
-  defaultTabId: string;
+  tabs: Tab[];
+  defaultTabId?: string;
+  variant?: "pills" | "card";
+  className?: string;
 }) {
-  const [activeTab, setActiveTab] = useState(defaultTabId);
+  const [activeTab, setActiveTab] = useState(defaultTabId ?? tabs[0]?.id ?? "");
+  const activeContent = tabs.find((t) => t.id === activeTab)?.content;
+
+  if (variant === "card") {
+    return (
+      <div
+        className={`overflow-hidden rounded-[1.5rem] border border-outline-variant/15 bg-surface-container-low ${className}`.trim()}
+      >
+        <div className="flex flex-wrap gap-2 border-b border-outline-variant/15 p-3 md:p-4">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveTab(tab.id)}
+              className={`rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors ${
+                activeTab === tab.id
+                  ? "bg-primary text-on-primary"
+                  : "bg-surface text-on-surface-variant hover:bg-surface-container hover:text-on-surface"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+        <div className="p-4 md:p-5">{activeContent}</div>
+      </div>
+    );
+  }
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex gap-1 rounded-2xl border border-outline-variant/15 bg-surface-container-low p-1.5 overflow-x-auto no-scrollbar">
+    <div className={`flex flex-col gap-6 ${className}`.trim()}>
+      <div className="no-scrollbar flex gap-1 overflow-x-auto rounded-2xl border border-outline-variant/15 bg-surface-container-low p-1.5">
         {tabs.map((tab) => (
           <button
             key={tab.id}
+            type="button"
             onClick={() => setActiveTab(tab.id)}
             className={`flex-none rounded-xl px-4 py-2 text-sm font-semibold transition-all ${
               activeTab === tab.id
@@ -419,7 +466,7 @@ export function TabsWrapper({
           </button>
         ))}
       </div>
-      <div>{tabs.find((t) => t.id === activeTab)?.content}</div>
+      <div>{activeContent}</div>
     </div>
   );
 }
@@ -478,7 +525,7 @@ export function ConfirmDialog({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4"
+      className="form-modal-overlay fixed inset-0 z-[100] flex items-center justify-center p-4"
       role="presentation"
       onClick={(event) => {
         if (event.target === event.currentTarget) onClose();

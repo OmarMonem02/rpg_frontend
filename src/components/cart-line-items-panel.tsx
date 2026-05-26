@@ -10,6 +10,10 @@ import {
   MaintenanceServiceRecord,
 } from "@/lib/crud-api";
 import { EmptyState } from "@/components/ops-ui";
+import {
+  computeCartTotalsBreakdown,
+  SaleTotalsSummary,
+} from "@/components/sale-totals-summary";
 import { TrashIcon, PencilSquareIcon, CheckIcon, XMarkIcon } from "@heroicons/react/24/outline";
 
 export type SaleLineItem = {
@@ -47,20 +51,51 @@ export function CartLineItemsPanel({
   const [editingRowId, setEditingRowId] = useState<string | number | null>(null);
   const [editValues, setEditValues] = useState<{ qty: number; price: number; discount: number }>({ qty: 1, price: 0, discount: 0 });
 
+  const getMaxQty = (item: SaleLineItem): number | undefined => {
+    if (item.sellable_type === "bikes" || item.sellable_type === "maintenance_services") return 1;
+    // Products + spare parts come from inventory and have stock_quantity
+    if (
+      item.sellable_type === "products" ||
+      item.sellable_type === "spare_parts"
+    ) {
+      const stock = (item.catalogItem as { stock_quantity?: number }).stock_quantity;
+      if (typeof stock === "number" && Number.isFinite(stock) && stock >= 0) return Math.trunc(stock);
+    }
+    return undefined;
+  };
+
+  const normalizeQty = (item: SaleLineItem, raw: number): number => {
+    const max = getMaxQty(item);
+    const n = Number.isFinite(raw) ? Math.trunc(raw) : 0;
+    const clampedMin = Math.max(1, n);
+    // If stock is 0, we still keep qty >= 1 but UI will prevent saving.
+    if (max === 0) return clampedMin;
+    return typeof max === "number" ? Math.min(clampedMin, max) : clampedMin;
+  };
+
+  const normalizeDiscount = (item: SaleLineItem, raw: number): number => {
+    const max = calculateMaxDiscount(item);
+    const n = Number.isFinite(raw) ? raw : 0;
+    return Math.max(0, Math.min(n, max));
+  };
+
   const handleEditClick = (item: SaleLineItem) => {
     setEditingRowId(item.id || item.sellable_id);
     setEditValues({
-      qty: item.quantity,
+      qty: normalizeQty(item, item.quantity),
       price: item.selling_price,
-      discount: item.discount_amount,
+      discount: normalizeDiscount(item, item.discount_amount),
     });
   };
 
   const handleSaveEdit = (itemId: string | number) => {
+    const item = items.find((i) => (i.id || i.sellable_id) === itemId);
+    const qty = item ? normalizeQty(item, editValues.qty) : Math.max(1, Math.trunc(editValues.qty || 0));
+    const discount = item ? normalizeDiscount(item, editValues.discount) : Math.max(0, editValues.discount || 0);
     onUpdateItem(itemId, {
-      quantity: editValues.qty,
+      quantity: qty,
       selling_price: editValues.price,
-      discount_amount: editValues.discount,
+      discount_amount: discount,
     });
     setEditingRowId(null);
   };
@@ -134,7 +169,12 @@ export function CartLineItemsPanel({
     return Math.round((item.quantity * unitEGP - discEGP) * 100) / 100;
   };
 
-  const subtotal = items.reduce((sum, item) => sum + calculateLineSubtotal(item), 0);
+  const totalsBreakdown = computeCartTotalsBreakdown(
+    items,
+    exchangeRate,
+    exchangeRateEur,
+  );
+  const subtotal = totalsBreakdown.netSubtotal;
   const total = Math.round((subtotal + shippingFee - saleDiscount) * 100) / 100;
 
   return (
@@ -174,14 +214,24 @@ export function CartLineItemsPanel({
                   <th className="label-caps px-5 py-3 text-center">Type</th>
                   <th className="label-caps px-5 py-3 text-right">Price</th>
                   <th className="label-caps px-5 py-3 text-right">Qty</th>
-                  <th className="label-caps px-5 py-3 text-right">Disc</th>
+                  <th
+                    className="label-caps px-5 py-3 text-right"
+                    title="Discount for this line only (not the overall sale discount)"
+                  >
+                    Line disc.
+                  </th>
                   <th className="label-caps px-5 py-3 text-right">Total</th>
                   <th className="label-caps px-5 py-3 text-center">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-outline-variant/10">
                 {items.map((item, index) => {
-                  const isEditing = editingRowId === (item.id || item.sellable_id);
+                  const rowId = item.id || item.sellable_id;
+                  const isEditing = editingRowId === rowId;
+                  const maxQty = getMaxQty(item);
+                  const isStockLimited = item.sellable_type === "products" || item.sellable_type === "spare_parts";
+                  const isOutOfStock = isStockLimited && typeof maxQty === "number" && maxQty === 0;
+                  const maxDiscount = calculateMaxDiscount(item);
                   return (
                     <tr
                       key={index}
@@ -197,7 +247,7 @@ export function CartLineItemsPanel({
 
                       {/* Item Type */}
                       <td className="px-5 py-4 text-center">
-                        <span className="form-chip rounded-lg bg-primary/8 text-primary border-primary/15 font-mono text-[10px]">
+                        <span className="form-chip rounded-lg bg-primary/8 text-primary border-primary/15 font-mono text-caption">
                           {item.sellable_type === "products" && "PRODUCT"}
                           {item.sellable_type === "spare_parts" && "SPARE PART"}
                           {item.sellable_type === "bikes" && "BIKE"}
@@ -212,11 +262,11 @@ export function CartLineItemsPanel({
                           return (
                             <div className="flex flex-col items-end">
                               <p className="mono-data font-semibold text-on-surface">
-                                {priceInfo.amount.toLocaleString()} <span className="form-chip bg-primary/8 text-primary border-primary/15 font-mono text-[10px]">{priceInfo.currency}</span>
+                                {priceInfo.amount.toLocaleString()} <span className="form-chip bg-primary/8 text-primary border-primary/15 font-mono text-caption">{priceInfo.currency}</span>
                               </p>
                               {priceInfo.converted && (
-                                <p className="mono-data mt-0.5 text-[11px] font-medium text-on-surface-variant">
-                                  ≈ {priceInfo.converted.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <span className="text-[10px] uppercase">EGP</span>
+                                <p className="mono-data mt-0.5 text-caption font-medium text-on-surface-variant">
+                                  ≈ {priceInfo.converted.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <span className="text-caption uppercase">EGP</span>
                                 </p>
                               )}
                             </div>
@@ -227,18 +277,52 @@ export function CartLineItemsPanel({
                       {/* Quantity */}
                       <td className="px-5 py-4 text-right">
                         {isEditing ? (
-                          <input
-                            type="number"
-                            value={editValues.qty}
-                            onChange={(e) =>
-                              setEditValues({
-                                ...editValues,
-                                qty: Math.max(1, Number(e.target.value)),
-                              })
-                            }
-                            disabled={item.sellable_type === "bikes"}
-                            className="form-input-base mono-data w-16 py-1.5 text-right text-sm"
-                          />
+                          <div className="flex flex-col items-end gap-1">
+                            <input
+                              type="number"
+                              value={editValues.qty}
+                              onChange={(e) =>
+                                setEditValues({
+                                  ...editValues,
+                                  qty: normalizeQty(item, Number(e.target.value)),
+                                })
+                              }
+                              onBlur={() =>
+                                setEditValues((v) => ({
+                                  ...v,
+                                  qty: normalizeQty(item, v.qty),
+                                }))
+                              }
+                              min={1}
+                              max={maxQty}
+                              step={1}
+                              inputMode="numeric"
+                              onWheel={(e) => (e.currentTarget as HTMLInputElement).blur()}
+                              disabled={
+                                isOutOfStock ||
+                                item.sellable_type === "bikes" ||
+                                item.sellable_type === "maintenance_services"
+                              }
+                              className="form-input-base mono-data w-16 py-1.5 text-right text-sm"
+                              aria-label="Quantity"
+                            />
+                            {isOutOfStock ? (
+                              <span className="label-caps text-error">
+                                Out of stock
+                              </span>
+                            ) : (
+                              isStockLimited && typeof maxQty === "number" && (
+                                <span className="label-caps">
+                                  Max: {maxQty}
+                                </span>
+                              )
+                            )}
+                            {(item.sellable_type === "bikes" || item.sellable_type === "maintenance_services") && (
+                              <span className="label-caps">
+                                Fixed qty: 1
+                              </span>
+                            )}
+                          </div>
                         ) : (
                           <span className="mono-data inline-flex h-8 min-w-[2rem] items-center justify-center rounded-lg border border-outline-variant/20 bg-surface-container-lowest px-2 font-semibold text-on-surface shadow-sm">
                             {item.quantity}
@@ -256,23 +340,30 @@ export function CartLineItemsPanel({
                               onChange={(e) =>
                                 setEditValues({
                                   ...editValues,
-                                  discount: Math.max(0, Math.min(Number(e.target.value), calculateMaxDiscount(item))),
+                                  discount: normalizeDiscount(item, Number(e.target.value)),
                                 })
                               }
-                              max={calculateMaxDiscount(item)}
+                              onBlur={() =>
+                                setEditValues((v) => ({
+                                  ...v,
+                                  discount: normalizeDiscount(item, v.discount),
+                                }))
+                              }
+                              max={maxDiscount}
                               className="form-input-base mono-data w-20 py-1.5 text-right text-sm"
+                              aria-label="Line item discount amount"
                             />
-                            <span className="text-[10px] font-semibold tracking-wider text-on-surface-variant uppercase">
-                              Max: {calculateMaxDiscount(item).toFixed(0)} {item.currency}
+                            <span className="label-caps">
+                              Max: {maxDiscount.toFixed(0)} {item.currency}
                             </span>
                           </div>
                         ) : (
                           <div className="flex flex-col items-end">
                             <p className={`mono-data font-semibold ${item.discount_amount > 0 ? 'text-error' : 'text-on-surface-variant opacity-50'}`}>
-                              {item.discount_amount > 0 ? `-${item.discount_amount.toLocaleString()}` : "0"} <span className="text-[11px] uppercase">{item.currency}</span>
+                              {item.discount_amount > 0 ? `-${item.discount_amount.toLocaleString()}` : "0"} <span className="text-caption uppercase">{item.currency}</span>
                             </p>
                             {item.currency === "USD" && item.discount_amount > 0 && exchangeRate > 0 && (
-                              <p className="mono-data mt-0.5 text-[11px] text-on-surface-variant/60">
+                              <p className="mono-data mt-0.5 text-caption text-on-surface-variant/60">
                                 ≈ -{toEGPDiscount(item).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} EGP
                               </p>
                             )}
@@ -283,10 +374,10 @@ export function CartLineItemsPanel({
                       {/* Subtotal — always EGP */}
                       <td className="px-5 py-4 text-right">
                         <p className="mono-data font-bold text-primary">
-                          {calculateLineSubtotal(item).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <span className="text-[11px] uppercase">EGP</span>
+                          {calculateLineSubtotal(item).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <span className="text-caption uppercase">EGP</span>
                         </p>
                         {item.currency === "USD" && (
-                          <p className="mono-data mt-0.5 text-[10px] text-on-surface-variant/50">Converted @ {exchangeRate}x</p>
+                          <p className="mono-data mt-0.5 text-caption text-on-surface-variant/50">Converted @ {exchangeRate}x</p>
                         )}
                       </td>
 
@@ -296,9 +387,15 @@ export function CartLineItemsPanel({
                           <div className="flex items-center justify-center gap-1.5">
                             <button
                               type="button"
-                              onClick={() => handleSaveEdit(item.id || item.sellable_id)}
-                              className="rounded-lg p-1.5 text-green-600 transition-colors hover:bg-green-500/10"
+                              onClick={() => handleSaveEdit(rowId)}
+                              disabled={isOutOfStock}
+                              className={`rounded-lg p-1.5 transition-colors ${
+                                isOutOfStock
+                                  ? "cursor-not-allowed text-on-surface-variant/40"
+                                  : "text-on-success-container hover:bg-success/10"
+                              }`}
                               title="Save Changes"
+                              aria-label="Save changes"
                             >
                               <CheckIcon className="h-5 w-5" />
                             </button>
@@ -307,6 +404,7 @@ export function CartLineItemsPanel({
                               onClick={handleCancelEdit}
                               className="rounded-lg p-1.5 text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface"
                               title="Cancel"
+                              aria-label="Cancel editing"
                             >
                               <XMarkIcon className="h-5 w-5" />
                             </button>
@@ -318,14 +416,16 @@ export function CartLineItemsPanel({
                               onClick={() => handleEditClick(item)}
                               className="flex h-8 w-8 items-center justify-center rounded-lg bg-surface-container-lowest text-on-surface-variant shadow-sm ring-1 ring-inset ring-outline-variant/20 transition-all hover:bg-surface-container-low hover:text-on-surface"
                               title="Edit Row"
+                              aria-label="Edit row"
                             >
                               <PencilSquareIcon className="h-4 w-4" />
                             </button>
                             <button
                               type="button"
-                              onClick={() => onDeleteItem(item.id || item.sellable_id)}
+                              onClick={() => onDeleteItem(rowId)}
                               className="rounded-lg p-1.5 text-error/60 transition-colors hover:bg-error/5 hover:text-error"
                               title="Delete Item"
+                              aria-label="Delete item"
                             >
                               <TrashIcon className="h-4 w-4" />
                             </button>
@@ -343,38 +443,15 @@ export function CartLineItemsPanel({
 
       {/* Totals Summary */}
       <div className="mt-auto border-t border-outline-variant/20 bg-surface-container-low px-5 py-5 sm:px-6">
-        <div className="ml-auto w-full max-w-sm rounded-2xl border border-outline-variant/15 bg-surface-container p-4 space-y-2">
-          <div className="flex items-center justify-between text-sm">
-            <span className="label-caps">Subtotal</span>
-            <span className="mono-data font-bold text-on-surface">{subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-          </div>
-
-          {shippingFee > 0 && (
-            <div className="flex items-center justify-between text-sm">
-              <span className="label-caps">Shipping Fee</span>
-              <span className="mono-data font-bold text-on-surface">+{shippingFee.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-            </div>
-          )}
-
-          {saleDiscount > 0 && (
-            <div className="flex items-center justify-between text-sm">
-              <span className="label-caps">Extra Discount</span>
-              <span className="mono-data font-bold text-error">-{saleDiscount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-            </div>
-          )}
-
-          <div className="relative mt-4">
-            <div className="divider absolute inset-x-0 -top-4" />
-            <div className="flex items-end justify-between pt-2">
-              <span className="font-display text-lg font-bold text-on-surface">Total</span>
-              <div className="text-right">
-                <span className="mono-data text-lg font-black text-primary">
-                  {total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </span>
-                <span className="ml-1 text-sm font-bold uppercase text-primary/70">EGP</span>
-              </div>
-            </div>
-          </div>
+        <div className="ml-auto w-full max-w-md rounded-2xl border border-outline-variant/15 bg-surface-container p-4">
+          <SaleTotalsSummary
+            compact
+            breakdown={totalsBreakdown}
+            shippingFee={shippingFee}
+            showShipping={shippingFee > 0}
+            overallDiscount={saleDiscount}
+            saleTotal={total}
+          />
         </div>
       </div>
     </div>

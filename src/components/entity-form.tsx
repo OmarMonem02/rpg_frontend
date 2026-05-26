@@ -342,7 +342,7 @@ export function EntityForm({
               <span className="form-chip">{requiredFieldsCount} required</span>
             </div>
             <h2
-              className={`${isModalStyleChrome ? "text-2xl" : "text-3xl md:text-4xl"} font-display font-bold tracking-tight text-on-surface`}
+              className={`${isModalStyleChrome ? "text-2xl" : "text-display-md"} font-bold tracking-tight text-on-surface`}
             >
               {title}
             </h2>
@@ -403,7 +403,7 @@ export function EntityForm({
               } disabled:opacity-40 disabled:cursor-not-allowed`}
             >
               <span
-                className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[9px] font-bold transition-colors ${
+                className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-caption font-bold transition-colors ${
                   getSectionStatus(index) === "complete"
                     ? "bg-primary text-on-primary"
                     : index === currentSectionIndex
@@ -416,7 +416,7 @@ export function EntityForm({
                   : String(index + 1).padStart(2, "0")}
               </span>
               <span
-                className={`truncate text-[10px] font-bold transition-colors ${index === currentSectionIndex ? "text-on-surface" : "text-on-surface-variant group-hover:text-on-surface"}`}
+                className={`truncate text-caption font-bold transition-colors ${index === currentSectionIndex ? "text-on-surface" : "text-on-surface-variant group-hover:text-on-surface"}`}
               >
                 {section.name}
               </span>
@@ -446,7 +446,7 @@ export function EntityForm({
                     {currentSection.name}
                   </h3>
                   {currentSection.description ? (
-                    <p className="mt-1 text-[11px] leading-relaxed text-on-surface-variant/70">
+                    <p className="mt-1 text-caption leading-relaxed text-on-surface-variant/70">
                       {currentSection.description}
                     </p>
                   ) : null}
@@ -508,7 +508,7 @@ export function EntityForm({
                               {field.label}
                             </span>
                             {field.description && (
-                              <p className="mt-1 text-[11px] leading-relaxed text-on-surface-variant/70">
+                              <p className="mt-1 text-caption leading-relaxed text-on-surface-variant/70">
                                 {field.description}
                               </p>
                             )}

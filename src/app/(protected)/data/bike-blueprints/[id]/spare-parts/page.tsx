@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { EntityFormModal, type FieldConfig } from "@/components/entity-form-modal";
+import { PageShell } from "@/components/ops-ui";
 import { getAuthToken } from "@/lib/auth-session";
 import {
   assignSparePartToBikeBlueprint,
@@ -62,14 +63,14 @@ function BlueprintQuickAssignModal({
             <span className="form-chip">{multiple ? "Bulk Assign" : "Quick Assign"}</span>
             <span className="form-chip">{selectedIds.length} selected</span>
           </div>
-          <h1 className="font-display text-3xl font-semibold text-on-surface">{title}</h1>
+          <h1 className="text-display-md font-semibold text-on-surface">{title}</h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-on-surface-variant">{description}</p>
         </div>
 
         <div className="grid gap-5 lg:grid-cols-[1.3fr_0.8fr]">
           <section className="rounded-[1.5rem] border border-outline-variant/15 bg-surface-container-low p-4">
             <div className="mb-4">
-              <label className="text-xs uppercase tracking-[0.18em] text-on-surface-variant">Find spare parts</label>
+              <label className="label-caps">Find spare parts</label>
               <input
                 type="text"
                 value={searchValue}
@@ -549,61 +550,61 @@ export default function BikeBlueprintSparePartsPage() {
   ];
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6 p-4">
-      <div className="space-y-4 rounded-[1.75rem] border border-outline-variant/15 bg-surface-container-low p-5 md:p-6">
-        <Link
-          href="/data/bike-blueprints"
-          className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline"
-        >
-          <span aria-hidden="true">←</span>
-          Back to Bike Blueprints
-        </Link>
+    <PageShell>
+      <section className="overflow-hidden rounded-[1.75rem] border border-outline-variant/15 bg-surface-container-low shadow-ambient">
+        <div className="space-y-4 p-5 md:p-6">
+          <Link
+            href="/data/bike-blueprints"
+            className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline"
+          >
+            <span aria-hidden="true">←</span>
+            Back to Bike Blueprints
+          </Link>
 
-        <div className="grid gap-4 lg:grid-cols-[1.4fr_0.9fr]">
-          <div>
-            <div className="mb-3 flex flex-wrap items-center gap-2">
-              <span className="form-chip">Blueprint Spare Parts</span>
-              <span className="form-chip">{assignedRows.length} visible</span>
+          <div className="grid gap-4 lg:grid-cols-[1.4fr_0.9fr]">
+            <div>
+              <div className="mb-3 flex flex-wrap items-center gap-2">
+                <span className="form-chip">Blueprint Spare Parts</span>
+                <span className="form-chip">{assignedRows.length} visible</span>
+              </div>
+              <h1 className="text-display-md font-semibold text-on-surface">{blueprintLabel}</h1>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-on-surface-variant">
+                Manage the spare parts that match this bike blueprint. You can assign existing items quickly, bulk link several parts, or create and assign a new spare part through the guided flow.
+              </p>
             </div>
-            <h1 className="font-display text-3xl font-semibold leading-tight text-on-surface md:text-[2.5rem]">
-              {blueprintLabel}
-            </h1>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-on-surface-variant">
-              Manage the spare parts that match this bike blueprint. You can assign existing items quickly, bulk link several parts, or create and assign a new spare part through the guided flow.
-            </p>
-          </div>
 
-          <div className="grid gap-3">
-            <button
-              type="button"
-              onClick={() => openAssignModal("single")}
-              className="rounded-2xl border border-outline-variant/15 bg-surface px-4 py-4 text-left transition-colors hover:border-outline-variant/30"
-            >
-              <p className="text-sm font-semibold text-on-surface">Assign Existing</p>
-              <p className="mt-1 text-xs leading-5 text-on-surface-variant">Link one existing spare part through a quick searchable picker.</p>
-            </button>
-            <button
-              type="button"
-              onClick={() => openAssignModal("bulk")}
-              className="rounded-2xl border border-outline-variant/15 bg-surface px-4 py-4 text-left transition-colors hover:border-outline-variant/30"
-            >
-              <p className="text-sm font-semibold text-on-surface">Bulk Assign</p>
-              <p className="mt-1 text-xs leading-5 text-on-surface-variant">Select several existing spare parts and assign them in one action.</p>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setCreateAssignError(null);
-                setModalMode("create");
-              }}
-              className="rounded-2xl bg-primary px-4 py-4 text-left text-on-primary transition-opacity hover:opacity-90"
-            >
-              <p className="text-sm font-semibold">Create & Assign</p>
-              <p className="mt-1 text-xs leading-5 text-on-primary/80">Create a new spare part with the guided premium flow and link it immediately.</p>
-            </button>
+            <div className="grid gap-3">
+              <button
+                type="button"
+                onClick={() => openAssignModal("single")}
+                className="rounded-2xl border border-outline-variant/15 bg-surface px-4 py-4 text-left transition-colors hover:border-outline-variant/30"
+              >
+                <p className="text-sm font-semibold text-on-surface">Assign Existing</p>
+                <p className="mt-1 text-xs leading-5 text-on-surface-variant">Link one existing spare part through a quick searchable picker.</p>
+              </button>
+              <button
+                type="button"
+                onClick={() => openAssignModal("bulk")}
+                className="rounded-2xl border border-outline-variant/15 bg-surface px-4 py-4 text-left transition-colors hover:border-outline-variant/30"
+              >
+                <p className="text-sm font-semibold text-on-surface">Bulk Assign</p>
+                <p className="mt-1 text-xs leading-5 text-on-surface-variant">Select several existing spare parts and assign them in one action.</p>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setCreateAssignError(null);
+                  setModalMode("create");
+                }}
+                className="rounded-2xl bg-primary px-4 py-4 text-left text-on-primary transition-opacity hover:opacity-90"
+              >
+                <p className="text-sm font-semibold">Create & Assign</p>
+                <p className="mt-1 text-xs leading-5 text-on-primary/80">Create a new spare part with the guided premium flow and link it immediately.</p>
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      </section>
 
       {error && <div className="rounded-2xl border border-error/20 bg-error/10 p-4 text-sm text-error">{error}</div>}
 
@@ -656,7 +657,7 @@ export default function BikeBlueprintSparePartsPage() {
         </div>
       ) : assignedRows.length === 0 ? (
         <div className="rounded-[1.5rem] border border-outline-variant/15 bg-surface-container p-10 text-center">
-          <h2 className="font-display text-2xl font-semibold text-on-surface">No spare parts assigned yet</h2>
+          <h2 className="text-xl font-semibold text-on-surface">No spare parts assigned yet</h2>
           <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-on-surface-variant">
             Start by assigning an existing spare part or create a new one directly for this blueprint.
           </p>
@@ -757,6 +758,6 @@ export default function BikeBlueprintSparePartsPage() {
         onSubmit={handleCreateAndAssign}
         submitLabel="Create & Assign"
       />
-    </div>
+    </PageShell>
   );
 }

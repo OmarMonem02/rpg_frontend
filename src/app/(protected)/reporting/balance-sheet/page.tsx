@@ -104,7 +104,7 @@ export default function BalanceSheetPage() {
               />
 
               <div className="grid gap-4 xl:grid-cols-3">
-                <SurfaceCard className="border-emerald-500/10 bg-white/95 shadow-[0_18px_40px_rgba(15,23,42,0.05)] transition-transform duration-300 ease-out hover:-translate-y-0.5">
+                <SurfaceCard className="transition-transform duration-300 ease-out hover:-translate-y-0.5">
                   <h3 className="text-base font-semibold text-on-surface">Asset Breakdown</h3>
                   <div className="mt-4 space-y-3">
                     {[
@@ -135,7 +135,7 @@ export default function BalanceSheetPage() {
                 />
               </div>
 
-              <SurfaceCard className="shadow-[0_18px_40px_rgba(15,23,42,0.05)]">
+              <SurfaceCard className="shadow-ambient">
                 <h3 className="text-base font-semibold text-on-surface">Inventory Valuation</h3>
                 <p className="mt-1 text-sm leading-6 text-on-surface-variant">
                   Current stock value uses the present cost basis stored for products, spare parts, and unsold bikes.

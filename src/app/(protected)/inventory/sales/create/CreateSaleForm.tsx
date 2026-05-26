@@ -1,8 +1,16 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import {
+  useEffect,
+  useState,
+  useCallback,
+  useMemo,
+  type ReactNode,
+  type ComponentType,
+} from "react";
 import { useRouter } from "next/navigation";
-import { getAuthToken } from "@/lib/auth-session";
+import { getAuthToken, getAuthUser } from "@/lib/auth-session";
+import { verifyAdminPassword } from "@/lib/auth-api";
 import { getSettings } from "@/lib/api/settings";
 import { egpMultiplierForPricingCurrency, toPricingCurrency } from "@/lib/currencies";
 import {
@@ -10,6 +18,8 @@ import {
   listCustomers,
   listSellers,
   listPaymentMethods,
+  listProducts,
+  listSpareParts,
   createCustomer,
   type CreateCustomerPayload,
   type CustomerRecord,
@@ -28,6 +38,11 @@ import {
   type SaleLineItem,
 } from "@/components/cart-line-items-panel";
 import { EntityDrawer, type FieldConfig } from "@/components/entity-drawer";
+import { AdminPasswordConfirmModal } from "@/components/admin-password-confirm-modal";
+import {
+  computeCartTotalsBreakdown,
+  SaleTotalsSummary,
+} from "@/components/sale-totals-summary";
 import {
   PageShell,
   ActionButton,
@@ -49,7 +64,208 @@ import {
   TruckIcon,
   CurrencyDollarIcon,
   TagIcon,
+  CheckIcon,
+  ChevronDownIcon,
+  GlobeAltIcon,
 } from "@heroicons/react/24/outline";
+
+function formatEgp(amount: number) {
+  return amount.toLocaleString("en-US", { minimumFractionDigits: 2 });
+}
+
+function FormSectionDivider({ title }: { title: string }) {
+  return (
+    <div className="col-span-full pt-1">
+      <div className="flex items-center gap-4">
+        <div className="h-px flex-1 bg-outline-variant/15" />
+        <span className="whitespace-nowrap label-caps text-on-surface-variant">
+          {title}
+        </span>
+        <div className="h-px flex-1 bg-outline-variant/15" />
+      </div>
+    </div>
+  );
+}
+
+function ReadyChip({ done, label }: { done: boolean; label: string }) {
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 label-caps transition-colors ${
+        done
+          ? "border-success/25 bg-success/10 text-on-success-container"
+          : "border-outline-variant/20 bg-surface-container-high text-on-surface-variant"
+      }`}
+    >
+      {done ? (
+        <CheckIcon className="h-3 w-3 shrink-0" aria-hidden />
+      ) : (
+        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-outline-variant" />
+      )}
+      {label}
+    </span>
+  );
+}
+
+function FormSelect({
+  id,
+  label,
+  icon: Icon,
+  required,
+  value,
+  onChange,
+  disabled,
+  hint,
+  headerAction,
+  children,
+}: {
+  id: string;
+  label: string;
+  icon: ComponentType<{ className?: string }>;
+  required?: boolean;
+  value: string | number;
+  onChange: (value: string) => void;
+  disabled?: boolean;
+  hint?: string;
+  headerAction?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <div className={`space-y-2 ${disabled ? "opacity-70" : ""}`}>
+      <div className="flex items-center justify-between gap-2">
+        <label
+          htmlFor={id}
+          className="flex items-center gap-2 label-caps"
+        >
+          <Icon className="h-4 w-4 shrink-0" aria-hidden />
+          {label}
+          {required ? <span className="text-error">*</span> : null}
+        </label>
+        {headerAction}
+      </div>
+      <div
+        className={`relative rounded-2xl border border-outline-variant/30 bg-surface shadow-sm transition-shadow focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/20 ${
+          disabled ? "cursor-not-allowed bg-surface-container/50" : "hover:shadow-md"
+        }`}
+      >
+        <select
+          id={id}
+          required={required}
+          disabled={disabled}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          aria-describedby={hint ? `${id}-hint` : undefined}
+          className="w-full appearance-none bg-transparent py-3.5 pl-4 pr-10 text-sm font-medium text-on-surface outline-none disabled:cursor-not-allowed"
+        >
+          {children}
+        </select>
+        <ChevronDownIcon
+          className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-on-surface-variant"
+          aria-hidden
+        />
+      </div>
+      {hint ? (
+        <p id={`${id}-hint`} className="text-xs text-on-surface-variant/90">
+          {hint}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function FormMoneyInput({
+  id,
+  label,
+  icon: Icon,
+  prefix,
+  suffix = "EGP",
+  value,
+  onChange,
+  onBlur,
+  disabled,
+  hint,
+  tone = "default",
+}: {
+  id: string;
+  label: string;
+  icon: ComponentType<{ className?: string }>;
+  prefix: string;
+  suffix?: string;
+  value: number;
+  onChange: (value: number) => void;
+  onBlur?: () => void;
+  disabled?: boolean;
+  hint?: string;
+  tone?: "default" | "discount";
+}) {
+  const isDiscount = tone === "discount";
+  return (
+    <div className={`space-y-2 ${disabled ? "opacity-70" : ""}`}>
+      <label
+        htmlFor={id}
+        className={`flex items-center gap-2 text-xs font-bold uppercase tracking-wider ${
+          isDiscount ? "text-on-surface-variant" : "text-on-surface-variant"
+        }`}
+      >
+        <Icon className="h-4 w-4 shrink-0" aria-hidden />
+        {label}
+      </label>
+      <div
+        className={`relative rounded-2xl border border-outline-variant/30 bg-surface shadow-sm transition-shadow focus-within:ring-2 ${
+          isDiscount
+            ? "focus-within:border-error/50 focus-within:ring-error/20"
+            : "focus-within:border-primary/50 focus-within:ring-primary/20"
+        } ${disabled ? "cursor-not-allowed bg-surface-container/50" : "hover:shadow-md"}`}
+      >
+        <span
+          className={`pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 font-bold ${
+            isDiscount ? "text-error" : "text-on-surface-variant"
+          }`}
+        >
+          {prefix}
+        </span>
+        <input
+          id={id}
+          type="number"
+          step="0.01"
+          min="0"
+          disabled={disabled}
+          value={value || ""}
+          onChange={(e) => onChange(Number(e.target.value) || 0)}
+          onBlur={onBlur}
+          placeholder="0.00"
+          className="w-full appearance-none bg-transparent py-3.5 pl-10 pr-14 text-sm font-medium text-on-surface outline-none disabled:cursor-not-allowed"
+        />
+        <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-xs text-on-surface-variant">
+          {suffix}
+        </span>
+      </div>
+      {hint ? (
+        <p className="text-xs text-on-surface-variant/90">{hint}</p>
+      ) : null}
+    </div>
+  );
+}
+
+const SALE_TYPE_OPTIONS = [
+  {
+    value: "site" as const,
+    label: "In-store",
+    description: "Completed at the shop",
+    icon: ShoppingCartIcon,
+  },
+  {
+    value: "online" as const,
+    label: "Online",
+    description: "Web or phone order",
+    icon: GlobeAltIcon,
+  },
+  {
+    value: "delivery" as const,
+    label: "Delivery",
+    description: "Ship to customer",
+    icon: TruckIcon,
+  },
+];
 
 type CatalogType =
   | "products"
@@ -82,12 +298,34 @@ export function CreateSaleForm() {
   >("completed");
   const [deliveryStatus, setDeliveryStatus] = useState("pending");
   const [shippingFee, setShippingFee] = useState(0);
-  const [saleDiscount, setSaleDiscount] = useState(0);
+  type DiscountApproval = { amount: number; password: string };
+  const [discountApproval, setDiscountApproval] =
+    useState<DiscountApproval | null>(null);
+  const [discountDraft, setDiscountDraft] = useState(0);
+  const [discountModalOpen, setDiscountModalOpen] = useState(false);
+  const [pendingDiscount, setPendingDiscount] = useState(0);
+  const [discountPassword, setDiscountPassword] = useState("");
+  const [discountVerifying, setDiscountVerifying] = useState(false);
+  const [discountModalError, setDiscountModalError] = useState<string | null>(
+    null,
+  );
+  const [discountFieldError, setDiscountFieldError] = useState<string | null>(
+    null,
+  );
+
+  const approvedDiscount = discountApproval?.amount ?? 0;
   const [isMaintenance, setIsMaintenance] = useState(false);
+
+  const isAdmin = getAuthUser()?.role === "admin";
 
   // Cart state
   const [cartItems, setCartItems] = useState<SaleLineItem[]>([]);
   const [tempItemCounter, setTempItemCounter] = useState(0);
+
+  // Barcode / SKU quick add
+  const [barcodeValue, setBarcodeValue] = useState("");
+  const [barcodeBusy, setBarcodeBusy] = useState(false);
+  const [barcodeError, setBarcodeError] = useState<string | null>(null);
 
   // Quick Customer state
   const [customerModalOpen, setCustomerModalOpen] = useState(false);
@@ -248,6 +486,99 @@ export function CreateSaleForm() {
     [tempItemCounter],
   );
 
+  const addOrIncrementCatalogItem = useCallback(
+    (item: ProductRecord | SparePartRecord) => {
+      const sellableType: "products" | "spare_parts" =
+        "stock_quantity" in item && "products_category_id" in item
+          ? "products"
+          : "spare_parts";
+
+      setCartItems((prev) => {
+        const existingIdx = prev.findIndex(
+          (x) => x.sellable_type === sellableType && x.sellable_id === item.id,
+        );
+        if (existingIdx >= 0) {
+          const next = [...prev];
+          const existing = next[existingIdx];
+          next[existingIdx] = {
+            ...existing,
+            quantity: (Number(existing.quantity) || 0) + 1,
+          };
+          return next;
+        }
+        return prev;
+      });
+
+      // If it wasn't found, append via existing mapper (keeps currency/pricing rules consistent)
+      setCartItems((prev) => {
+        const exists = prev.some(
+          (x) => x.sellable_type === sellableType && x.sellable_id === item.id,
+        );
+        if (exists) return prev;
+        return [
+          ...prev,
+          {
+            id: `temp_${tempItemCounter}_${item.id}`,
+            sellable_id: item.id,
+            sellable_type: sellableType,
+            item_name: item.name,
+            selling_price: item.sale_price,
+            discount_amount: 0,
+            quantity: 1,
+            currency: toPricingCurrency(item.currency_pricing),
+            catalogItem: item,
+          },
+        ];
+      });
+      setTempItemCounter((prev) => prev + 1);
+    },
+    [tempItemCounter],
+  );
+
+  const handleBarcodeSubmit = useCallback(async () => {
+    const code = barcodeValue.trim();
+    if (!code || barcodeBusy) return;
+
+    try {
+      setBarcodeBusy(true);
+      setBarcodeError(null);
+
+      const token = getAuthToken();
+      if (!token) throw new Error("Authentication required");
+
+      const [productsRes, spareRes] = await Promise.all([
+        listProducts(token, 1, { search: code }),
+        listSpareParts(token, 1, { search: code }),
+      ]);
+
+      const normalized = code.toLowerCase();
+      const productMatch =
+        productsRes.items.find(
+          (p) =>
+            p.sku?.toLowerCase() === normalized ||
+            p.part_number?.toLowerCase() === normalized,
+        ) ?? null;
+      const spareMatch =
+        spareRes.items.find(
+          (s) =>
+            s.sku?.toLowerCase() === normalized ||
+            s.part_number?.toLowerCase() === normalized,
+        ) ?? null;
+
+      const match = productMatch ?? spareMatch;
+      if (!match) {
+        throw new Error(`No product/spare part found for "${code}"`);
+      }
+
+      addOrIncrementCatalogItem(match);
+      setBarcodeValue("");
+    } catch (err) {
+      setBarcodeError(err instanceof Error ? err.message : "Scan failed");
+    } finally {
+      setBarcodeBusy(false);
+    }
+  }, [barcodeBusy, barcodeValue, addOrIncrementCatalogItem]);
+
   const handleUpdateItem = (
     itemId: string | number,
     updates: Partial<SaleLineItem>,
@@ -267,6 +598,142 @@ export function CreateSaleForm() {
     );
   };
 
+  const cartTotalsBreakdown = useMemo(
+    () => computeCartTotalsBreakdown(cartItems, exchangeRate, exchangeRateEur),
+    [cartItems, exchangeRate, exchangeRateEur],
+  );
+
+  const cartSubtotal = cartTotalsBreakdown.netSubtotal;
+
+  const saleTotal = useMemo(
+    () =>
+      Math.round((cartSubtotal + shippingFee - approvedDiscount) * 100) / 100,
+    [cartSubtotal, shippingFee, approvedDiscount],
+  );
+
+  const normalizeDiscountAmount = (value: number) =>
+    Math.round(Math.max(0, value) * 100) / 100;
+
+  const revertDiscountDraft = useCallback(() => {
+    setDiscountDraft(approvedDiscount);
+  }, [approvedDiscount]);
+
+  const requestDiscountApproval = useCallback(
+    (rawAmount: number) => {
+      const amount = normalizeDiscountAmount(rawAmount);
+      setDiscountDraft(amount);
+      setDiscountFieldError(null);
+
+      if (amount <= 0) {
+        setDiscountApproval(null);
+        setDiscountModalOpen(false);
+        setDiscountModalError(null);
+        return;
+      }
+
+      if (!isAdmin) {
+        setDiscountFieldError(
+          "Only administrators can apply an overall sale discount.",
+        );
+        revertDiscountDraft();
+        return;
+      }
+
+      if (cartSubtotal <= 0) {
+        setDiscountFieldError("Add items to the cart before applying a discount.");
+        revertDiscountDraft();
+        return;
+      }
+
+      if (amount > cartSubtotal) {
+        setDiscountFieldError(
+          `Discount cannot exceed the items subtotal (${formatEgp(cartSubtotal)} EGP).`,
+        );
+        revertDiscountDraft();
+        return;
+      }
+
+      if (discountApproval?.amount === amount) {
+        return;
+      }
+
+      setPendingDiscount(amount);
+      setDiscountPassword("");
+      setDiscountModalError(null);
+      setDiscountModalOpen(true);
+    },
+    [cartSubtotal, discountApproval, isAdmin, revertDiscountDraft],
+  );
+
+  const tryCommitDiscountDraft = useCallback(() => {
+    requestDiscountApproval(discountDraft);
+  }, [discountDraft, requestDiscountApproval]);
+
+  const handleConfirmDiscount = async () => {
+    if (!discountPassword.trim()) {
+      setDiscountModalError("Administrator password is required.");
+      return;
+    }
+
+    if (pendingDiscount > cartSubtotal) {
+      setDiscountModalError(
+        `Discount cannot exceed the items subtotal (${formatEgp(cartSubtotal)} EGP).`,
+      );
+      return;
+    }
+
+    try {
+      setDiscountVerifying(true);
+      setDiscountModalError(null);
+
+      const token = getAuthToken();
+      if (!token) throw new Error("Authentication required");
+
+      await verifyAdminPassword(token, discountPassword.trim());
+
+      setDiscountApproval({
+        amount: pendingDiscount,
+        password: discountPassword.trim(),
+      });
+      setDiscountDraft(pendingDiscount);
+      setDiscountModalOpen(false);
+      setDiscountPassword("");
+      setDiscountFieldError(null);
+    } catch (err) {
+      setDiscountModalError(
+        err instanceof Error ? err.message : "Password verification failed",
+      );
+    } finally {
+      setDiscountVerifying(false);
+    }
+  };
+
+  const handleCancelDiscount = () => {
+    setDiscountModalOpen(false);
+    revertDiscountDraft();
+    setDiscountPassword("");
+    setDiscountModalError(null);
+  };
+
+  const clearApprovedDiscount = () => {
+    setDiscountApproval(null);
+    setDiscountDraft(0);
+    setDiscountFieldError(null);
+    setDiscountModalOpen(false);
+    setDiscountModalError(null);
+    setDiscountPassword("");
+  };
+
+  useEffect(() => {
+    if (discountApproval && discountApproval.amount > cartSubtotal) {
+      setDiscountApproval(null);
+      setDiscountDraft(0);
+      setDiscountFieldError(
+        "Discount was cleared because the cart subtotal changed.",
+      );
+    }
+  }, [cartSubtotal, discountApproval]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -280,8 +747,23 @@ export function CreateSaleForm() {
       if (cartItems.length === 0)
         throw new Error("Please add at least one item");
       if (shippingFee < 0) throw new Error("Shipping fee cannot be negative");
-      if (saleDiscount < 0)
+      const draftAmount = normalizeDiscountAmount(discountDraft);
+      if (draftAmount > 0 && draftAmount !== approvedDiscount) {
+        requestDiscountApproval(draftAmount);
+        throw new Error(
+          "Confirm the overall discount with your administrator password before finalizing.",
+        );
+      }
+
+      if (approvedDiscount < 0)
         throw new Error("Overall discount cannot be negative");
+      if (approvedDiscount > 0 && !discountApproval?.password.trim()) {
+        setPendingDiscount(approvedDiscount);
+        setDiscountModalOpen(true);
+        throw new Error(
+          "Administrator password is required to apply an overall discount.",
+        );
+      }
 
       const token = getAuthToken();
       if (!token) throw new Error("Authentication required");
@@ -298,7 +780,10 @@ export function CreateSaleForm() {
           | "in-transit"
           | "delivered",
         shipping_fee: Number(shippingFee) || 0,
-        sale_discount: Number(saleDiscount) || 0,
+        sale_discount: approvedDiscount,
+        ...(approvedDiscount > 0 && discountApproval?.password
+          ? { admin_password: discountApproval.password }
+          : {}),
         is_maintenance: isMaintenance,
         items: cartItems.map((item) => {
           // ── Currency Normalization ──────────────────────────────────────────
@@ -375,18 +860,16 @@ export function CreateSaleForm() {
     }
   };
 
-  const saleTotal = (() => {
-    const subtotal = cartItems.reduce((sum, item) => {
-      const m = egpMultiplierForPricingCurrency(item.currency, {
-        usdToEgp: exchangeRate,
-        eurToEgp: exchangeRateEur,
-      });
-      const unitEGP = item.selling_price * m;
-      const discEGP = item.discount_amount * m;
-      return sum + Math.round((item.quantity * unitEGP - discEGP) * 100) / 100;
-    }, 0);
-    return Math.round((subtotal + shippingFee - saleDiscount) * 100) / 100;
-  })();
+  const selectedCustomer = useMemo(
+    () => customers.find((c) => c.id === customerId) ?? null,
+    [customers, customerId],
+  );
+
+  const isRemoteSale = saleType === "online" || saleType === "delivery";
+  const cartItemCount = cartItems.reduce(
+    (n, item) => n + (Number(item.quantity) || 0),
+    0,
+  );
 
   if (loading) {
     return (
@@ -467,9 +950,9 @@ export function CreateSaleForm() {
               <button
                 type="button"
                 onClick={() => handleOpenCatalog("spare_parts")}
-                className="group relative flex items-center gap-4 w-full p-2 rounded-xl border-2 border-transparent bg-blue-500/5 hover:bg-blue-500/10 hover:border-blue-500/20 text-on-surface transition-all overflow-hidden"
+                className="group relative flex items-center gap-4 w-full p-2 rounded-xl border-2 border-transparent bg-primary/5 hover:bg-primary/10 hover:border-primary/20 text-on-surface transition-all overflow-hidden"
               >
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 text-blue-600 group-hover:scale-110 transition-transform">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary group-hover:scale-110 transition-transform">
                   <CogIcon className="w-7 h-7" />
                 </div>
                 <div className="flex flex-col items-start">
@@ -480,9 +963,9 @@ export function CreateSaleForm() {
               <button
                 type="button"
                 onClick={() => handleOpenCatalog("bikes")}
-                className="group relative flex items-center gap-4 w-full p-2 rounded-xl border-2 border-transparent bg-indigo-500/5 hover:bg-indigo-500/10 hover:border-indigo-500/20 text-on-surface transition-all overflow-hidden"
+                className="group relative flex items-center gap-4 w-full p-2 rounded-xl border-2 border-transparent bg-info/5 hover:bg-info/10 hover:border-info/20 text-on-surface transition-all overflow-hidden"
               >
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-indigo-500/10 text-indigo-600 group-hover:scale-110 transition-transform">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-info/10 text-on-info-container group-hover:scale-110 transition-transform">
                   <svg
                     className="w-7 h-7"
                     fill="none"
@@ -505,9 +988,9 @@ export function CreateSaleForm() {
               <button
                 type="button"
                 onClick={() => handleOpenCatalog("maintenance_services")}
-                className="group relative flex items-center gap-4 w-full p-2 rounded-xl border-2 border-transparent bg-amber-500/5 hover:bg-amber-500/10 hover:border-amber-500/20 text-on-surface transition-all overflow-hidden"
+                className="group relative flex items-center gap-4 w-full p-2 rounded-xl border-2 border-transparent bg-warning/5 hover:bg-warning/10 hover:border-warning/20 text-on-surface transition-all overflow-hidden"
               >
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-500/10 text-amber-600 group-hover:scale-110 transition-transform">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-warning/10 text-on-warning-container group-hover:scale-110 transition-transform">
                   <WrenchIcon className="w-7 h-7" />
                 </div>
                 <div className="flex flex-col items-start">
@@ -519,398 +1002,386 @@ export function CreateSaleForm() {
 
           {/* Cart Panel */}
           <div className="lg:col-span-3 xl:col-span-4 self-stretch">
+          <div className="text-left mb-4">
+                <label className="label-capsr text-on-surface-variant flex items-center gap-2 mb-2">
+                  <TagIcon className="w-4 h-4" />
+                  Scan barcode / SKU
+                </label>
+                <div className="relative rounded-2xl border border-outline-variant/30 bg-surface shadow-sm hover:shadow-md transition-shadow focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/20">
+                  <input
+                    value={barcodeValue}
+                    onChange={(e) => setBarcodeValue(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleBarcodeSubmit();
+                      }
+                    }}
+                    placeholder="Scan then press Enter"
+                    className="w-full appearance-none bg-transparent py-3 pl-4 pr-4 text-sm font-medium text-on-surface outline-none"
+                    inputMode="numeric"
+                    autoComplete="off"
+                  />
+                </div>
+                {barcodeError && (
+                  <p className="mt-2 text-xs font-medium text-error">
+                    {barcodeError}
+                  </p>
+                )}
+                {barcodeBusy && (
+                  <p className="mt-2 text-xs font-medium text-on-surface-variant">
+                    Looking up item…
+                  </p>
+                )}
+              </div>
             <CartLineItemsPanel
               items={cartItems}
               onUpdateItem={handleUpdateItem}
               onDeleteItem={handleDeleteItem}
               shippingFee={shippingFee}
-              saleDiscount={saleDiscount}
+              saleDiscount={approvedDiscount}
               exchangeRate={exchangeRate}
               exchangeRateEur={exchangeRateEur}
             />
           </div>
         </div>
         {/* Transaction Details */}
-        <SurfaceCard className="p-6 md:p-8 animate-in fade-in slide-in-from-bottom-4 duration-500 shadow-sm border-outline-variant/20 relative overflow-hidden">
-          {/* Decorative background element */}
-          <div className="absolute top-0 right-0 -mr-20 -mt-20 w-64 h-64 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
+        <SurfaceCard className="relative overflow-hidden border-outline-variant/20 p-6 shadow-sm animate-in fade-in slide-in-from-bottom-4 duration-500 md:p-8">
+          <div className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-primary/5 blur-3xl" />
 
-          <div className="relative">
-            <div className="mb-8 pb-4 border-b border-outline-variant/15 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary shadow-inner">
-                  <BanknotesIcon className="w-6 h-6" />
+          <div className="relative space-y-8">
+            <div className="flex flex-col gap-5 border-b border-outline-variant/15 pb-6 lg:flex-row lg:items-end lg:justify-between">
+              <div className="flex items-start gap-3">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary shadow-inner">
+                  <BanknotesIcon className="h-6 w-6" aria-hidden />
                 </div>
                 <div>
-                  <h2 className="font-display font-bold text-2xl text-on-surface tracking-tight">
+                  <h2 className="text-xl font-bold tracking-tight text-on-surface">
                     Transaction Details
                   </h2>
+                  <p className="mt-1 max-w-xl text-sm text-on-surface-variant">
+                    Customer, payment, fulfillment, and pricing for this sale.
+                  </p>
                 </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <ReadyChip done={!!customerId} label="Customer" />
+                <ReadyChip done={!!sellerId} label="Seller" />
+                <ReadyChip done={!!paymentMethodId} label="Payment" />
+                <ReadyChip done={cartItems.length > 0} label={`${cartItemCount} items`} />
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-4">
-              {/* Customer */}
-              <div className="space-y-3 group">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold uppercase tracking-wider text-on-surface-variant flex items-center gap-2 group-focus-within:text-primary transition-colors">
-                    <UserIcon className="w-4 h-4" />
-                    Customer <span className="text-error">*</span>
-                  </label>
+            <div className="grid grid-cols-1 gap-x-8 gap-y-6 md:grid-cols-2 lg:grid-cols-3">
+              <FormSelect
+                id="sale-customer"
+                label="Customer"
+                icon={UserIcon}
+                required
+                value={customerId || ""}
+                onChange={(v) => setCustomerId(Number(v) || null)}
+                headerAction={
                   <button
                     type="button"
                     onClick={() => setCustomerModalOpen(true)}
-                    className="text-[10px] font-bold uppercase tracking-wider text-primary hover:text-primary/80 flex items-center gap-1 transition-colors px-2 py-1 rounded-md hover:bg-primary/10"
+                    className="flex items-center gap-1 rounded-md px-2 py-1 label-capsr text-primary transition-colors hover:bg-primary/10 hover:text-primary/80"
                   >
-                    <PlusIcon className="w-3 h-3" />
-                    New Customer
+                    <PlusIcon className="h-3 w-3" aria-hidden />
+                    New
                   </button>
-                </div>
-                <div className="relative rounded-2xl border border-outline-variant/30 bg-surface shadow-sm hover:shadow-md transition-shadow group-focus-within:border-primary/50 group-focus-within:ring-2 group-focus-within:ring-primary/20">
-                  <select
-                    required
-                    value={customerId || ""}
-                    onChange={(e) =>
-                      setCustomerId(Number(e.target.value) || null)
-                    }
-                    className="w-full appearance-none bg-transparent py-3.5 pl-4 pr-10 text-sm font-medium text-on-surface outline-none"
-                  >
-                    <option value="" disabled>
-                      Select a customer...
-                    </option>
-                    {customers.map((customer) => (
-                      <option key={customer.id} value={customer.id}>
-                        {customer.name}
-                      </option>
-                    ))}
-                  </select>
-                  <div className="absolute inset-y-0 right-0 flex items-center px-4 pointer-events-none text-on-surface-variant">
-                    <svg
-                      className="w-4 h-4 transition-transform group-focus-within:rotate-180"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth="2"
-                        d="M19 9l-7 7-7-7"
-                      />
-                    </svg>
-                  </div>
-                </div>
-              </div>
+                }
+              >
+                <option value="" disabled>
+                  Select a customer…
+                </option>
+                {customers.map((customer) => (
+                  <option key={customer.id} value={customer.id}>
+                    {customer.phone
+                      ? `${customer.name} · ${customer.phone}`
+                      : customer.name}
+                  </option>
+                ))}
+              </FormSelect>
 
-              {/* Seller */}
-              <div className="space-y-3 group">
-                <label className="text-xs font-bold uppercase tracking-wider text-on-surface-variant flex items-center gap-2 group-focus-within:text-primary transition-colors">
-                  <UserCircleIcon className="w-4 h-4" />
-                  Seller <span className="text-error">*</span>
-                </label>
-                <div className="relative rounded-2xl border border-outline-variant/30 bg-surface shadow-sm hover:shadow-md transition-shadow group-focus-within:border-primary/50 group-focus-within:ring-2 group-focus-within:ring-primary/20">
-                  <select
-                    required
-                    value={sellerId || ""}
-                    onChange={(e) =>
-                      setSellerId(Number(e.target.value) || null)
-                    }
-                    className="w-full appearance-none bg-transparent py-3.5 pl-4 pr-10 text-sm font-medium text-on-surface outline-none"
-                  >
-                    <option value="" disabled>
-                      Assign a seller...
-                    </option>
-                    {sellers.map((seller) => (
-                      <option key={seller.id} value={seller.id}>
-                        {seller.name}
-                      </option>
-                    ))}
-                  </select>
-                  <div className="absolute inset-y-0 right-0 flex items-center px-4 pointer-events-none text-on-surface-variant">
-                    <svg
-                      className="w-4 h-4 transition-transform group-focus-within:rotate-180"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth="2"
-                        d="M19 9l-7 7-7-7"
-                      />
-                    </svg>
-                  </div>
-                </div>
-              </div>
+              <FormSelect
+                id="sale-seller"
+                label="Seller"
+                icon={UserCircleIcon}
+                required
+                value={sellerId || ""}
+                onChange={(v) => setSellerId(Number(v) || null)}
+              >
+                <option value="" disabled>
+                  Assign a seller…
+                </option>
+                {sellers.map((seller) => (
+                  <option key={seller.id} value={seller.id}>
+                    {seller.name}
+                  </option>
+                ))}
+              </FormSelect>
 
-              {/* Payment Method */}
-              <div className="space-y-3 group">
-                <label className="text-xs font-bold uppercase tracking-wider text-on-surface-variant flex items-center gap-2 group-focus-within:text-primary transition-colors">
-                  <CreditCardIcon className="w-4 h-4" />
-                  Payment Method <span className="text-error">*</span>
-                </label>
-                <div className="relative rounded-2xl border border-outline-variant/30 bg-surface shadow-sm hover:shadow-md transition-shadow group-focus-within:border-primary/50 group-focus-within:ring-2 group-focus-within:ring-primary/20">
-                  <select
-                    required
-                    value={paymentMethodId || ""}
-                    onChange={(e) =>
-                      setPaymentMethodId(Number(e.target.value) || null)
-                    }
-                    className="w-full appearance-none bg-transparent py-3.5 pl-4 pr-10 text-sm font-medium text-on-surface outline-none"
-                  >
-                    <option value="" disabled>
-                      Choose payment type...
-                    </option>
-                    {paymentMethods.map((method) => (
-                      <option key={method.id} value={method.id}>
-                        {method.name}
-                      </option>
-                    ))}
-                  </select>
-                  <div className="absolute inset-y-0 right-0 flex items-center px-4 pointer-events-none text-on-surface-variant">
-                    <svg
-                      className="w-4 h-4 transition-transform group-focus-within:rotate-180"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth="2"
-                        d="M19 9l-7 7-7-7"
-                      />
-                    </svg>
-                  </div>
-                </div>
-              </div>
+              <FormSelect
+                id="sale-payment"
+                label="Payment method"
+                icon={CreditCardIcon}
+                required
+                value={paymentMethodId || ""}
+                onChange={(v) => setPaymentMethodId(Number(v) || null)}
+              >
+                <option value="" disabled>
+                  Choose payment type…
+                </option>
+                {paymentMethods.map((method) => (
+                  <option key={method.id} value={method.id}>
+                    {method.name}
+                  </option>
+                ))}
+              </FormSelect>
 
-              <div className="col-span-1 md:col-span-2 lg:col-span-3">
-                <div className="flex items-center gap-4 py-2">
-                  <div className="h-px bg-outline-variant/15 flex-1" />
-                  <span className="text-[10px] uppercase font-bold tracking-widest text-on-surface-variant">
-                    Fulfillment Details
-                  </span>
-                  <div className="h-px bg-outline-variant/15 flex-1" />
-                </div>
-              </div>
-
-              {/* Sale Type */}
-              <div className="space-y-3 group">
-                <label className="text-xs font-bold uppercase tracking-wider text-on-surface-variant flex items-center gap-2 group-focus-within:text-primary transition-colors">
-                  <ShoppingCartIcon className="w-4 h-4" />
-                  Sale Type
-                </label>
-                <div className="relative rounded-2xl border border-outline-variant/30 bg-surface shadow-sm hover:shadow-md transition-shadow group-focus-within:border-primary/50 group-focus-within:ring-2 group-focus-within:ring-primary/20">
-                  <select
-                    value={saleType}
-                    onChange={(e) =>
-                      setSaleType(
-                        e.target.value as "site" | "online" | "delivery",
-                      )
-                    }
-                    className="w-full appearance-none bg-transparent py-3.5 pl-4 pr-10 text-sm font-medium text-on-surface outline-none"
-                  >
-                    <option value="site">In-store (Site)</option>
-                    <option value="online">Online Order</option>
-                    <option value="delivery">Delivery</option>
-                  </select>
-                  <div className="absolute inset-y-0 right-0 flex items-center px-4 pointer-events-none text-on-surface-variant">
-                    <svg
-                      className="w-4 h-4 transition-transform group-focus-within:rotate-180"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth="2"
-                        d="M19 9l-7 7-7-7"
-                      />
-                    </svg>
-                  </div>
-                </div>
-              </div>
-
-              {/* Sale Status */}
-              <div className="space-y-3 group">
-                <label className="text-xs font-bold uppercase tracking-wider text-on-surface-variant flex items-center gap-2 group-focus-within:text-primary transition-colors">
-                  <ShieldCheckIcon className="w-4 h-4" />
-                  Sale Status
-                </label>
-                <div
-                  className={`relative rounded-2xl border border-outline-variant/30 bg-surface shadow-sm transition-shadow group-focus-within:border-primary/50 group-focus-within:ring-2 group-focus-within:ring-primary/20 ${saleType === "site" ? "opacity-60 bg-surface-container/50 cursor-not-allowed" : "hover:shadow-md"}`}
-                >
-                  <select
-                    value={saleStatus}
-                    onChange={(e) =>
-                      setSaleStatus(
-                        e.target.value as "pending" | "partial" | "completed",
-                      )
-                    }
-                    className="w-full appearance-none bg-transparent py-3.5 pl-4 pr-10 text-sm font-medium text-on-surface outline-none disabled:cursor-not-allowed"
-                    disabled={saleType === "site"}
-                  >
-                    <option value="pending">Pending</option>
-                    <option value="partial">Partial</option>
-                    <option value="completed">Completed</option>
-                  </select>
-                  <div className="absolute inset-y-0 right-0 flex items-center px-4 pointer-events-none text-on-surface-variant">
-                    <svg
-                      className="w-4 h-4 transition-transform group-focus-within:rotate-180"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth="2"
-                        d="M19 9l-7 7-7-7"
-                      />
-                    </svg>
-                  </div>
-                </div>
-              </div>
-
-              {/* Delivery Status */}
-              <div className="space-y-3 group">
-                <label className="text-xs font-bold uppercase tracking-wider text-on-surface-variant flex items-center gap-2 group-focus-within:text-primary transition-colors">
-                  <TruckIcon className="w-4 h-4" />
-                  Delivery Status
-                </label>
-                <div
-                  className={`relative rounded-2xl border border-outline-variant/30 bg-surface shadow-sm transition-shadow group-focus-within:border-primary/50 group-focus-within:ring-2 group-focus-within:ring-primary/20 ${saleType === "site" ? "opacity-60 bg-surface-container/50 cursor-not-allowed" : "hover:shadow-md"}`}
-                >
-                  <select
-                    value={deliveryStatus}
-                    onChange={(e) => setDeliveryStatus(e.target.value)}
-                    className="w-full appearance-none bg-transparent py-3.5 pl-4 pr-10 text-sm font-medium text-on-surface outline-none disabled:cursor-not-allowed"
-                    disabled={saleType === "site"}
-                  >
-                    <option value="pending">Pending</option>
-                    <option value="in-transit">In Transit</option>
-                    <option value="delivered">Delivered</option>
-                  </select>
-                  <div className="absolute inset-y-0 right-0 flex items-center px-4 pointer-events-none text-on-surface-variant">
-                    <svg
-                      className="w-4 h-4 transition-transform group-focus-within:rotate-180"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth="2"
-                        d="M19 9l-7 7-7-7"
-                      />
-                    </svg>
-                  </div>
-                </div>
-              </div>
-
-              <div className="col-span-1 md:col-span-2 lg:col-span-3">
-                <div className="flex items-center gap-4 py-2">
-                  <div className="h-px bg-outline-variant/15 flex-1" />
-                  <span className="text-[10px] uppercase font-bold tracking-widest text-on-surface-variant">
-                    Financial Adjustments
-                  </span>
-                  <div className="h-px bg-outline-variant/15 flex-1" />
-                </div>
-              </div>
-
-              {/* Shipping Fee */}
-              {(saleType === "delivery" || saleType === "online") && (
-                <div className="space-y-3 group">
-                  <label className="text-xs font-bold uppercase tracking-wider text-on-surface-variant flex items-center gap-2 group-focus-within:text-primary transition-colors">
-                    <CurrencyDollarIcon className="w-4 h-4" />
-                    Shipping Fee (EGP)
-                  </label>
-                  <div
-                    className={`relative rounded-2xl border border-outline-variant/30 bg-surface shadow-sm transition-shadow group-focus-within:border-primary/50 group-focus-within:ring-2 group-focus-within:ring-primary/20 ${saleType === "delivery" || saleType === "online"
-                      ? "hover:shadow-md"
-                      : "opacity-60 bg-surface-container/50 cursor-not-allowed"
-                      }`}
-                  >
-                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-on-surface-variant font-bold">
-                      +
+              {selectedCustomer ? (
+                <div className="col-span-full flex flex-col gap-1 rounded-2xl border border-primary/15 bg-primary/5 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                      <UserIcon className="h-5 w-5" aria-hidden />
                     </div>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={shippingFee}
-                      onChange={(e) => setShippingFee(Number(e.target.value) || 0)}
-                      className="w-full appearance-none bg-transparent py-3.5 pl-10 pr-4 text-sm font-medium text-on-surface outline-none disabled:cursor-not-allowed"
-                      disabled={saleType !== "delivery" && saleType !== "online"}
-                    />
-                    <div className="absolute inset-y-0 right-0 flex items-center px-4 pointer-events-none text-on-surface-variant text-xs">
-                      EGP
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-bold text-on-surface">
+                        {selectedCustomer.name}
+                      </p>
+                      {selectedCustomer.phone ? (
+                        <p className="text-xs text-on-surface-variant">
+                          {selectedCustomer.phone}
+                        </p>
+                      ) : null}
                     </div>
                   </div>
+                  {selectedCustomer.address ? (
+                    <p className="text-xs text-on-surface-variant sm:max-w-[45%] sm:text-right truncate">
+                      {selectedCustomer.address}
+                    </p>
+                  ) : null}
                 </div>
-              )}
-              <div className="space-y-3 group">
-                <label className="text-xs font-bold uppercase tracking-wider text-on-surface-variant flex items-center gap-2 group-focus-within:text-error transition-colors">
-                  <TagIcon className="w-4 h-4" />
-                  Overall Discount (EGP)
-                </label>
-                <div className="relative rounded-2xl border border-outline-variant/30 bg-surface shadow-sm hover:shadow-md transition-shadow group-focus-within:border-error/50 group-focus-within:ring-2 group-focus-within:ring-error/20">
-                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-error font-bold">
-                    -
-                  </div>
-                  <input
-                    type="number"
-                    value={saleDiscount || ""}
-                    onChange={(e) => setSaleDiscount(Number(e.target.value))}
-                    min="0"
-                    step="0.01"
-                    className="w-full appearance-none bg-transparent py-3.5 pl-10 pr-4 text-sm font-medium text-on-surface outline-none"
-                    placeholder="0.00"
-                  />
+              ) : null}
+
+              <FormSectionDivider title="Fulfillment" />
+
+              <div className="col-span-full space-y-3">
+                <span className="flex items-center gap-2 label-caps">
+                  <ShoppingCartIcon className="h-4 w-4 shrink-0" aria-hidden />
+                  Sale channel
+                </span>
+                <div
+                  className="grid grid-cols-1 gap-2 sm:grid-cols-3"
+                  role="radiogroup"
+                  aria-label="Sale channel"
+                >
+                  {SALE_TYPE_OPTIONS.map((option) => {
+                    const active = saleType === option.value;
+                    const Icon = option.icon;
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        role="radio"
+                        aria-checked={active}
+                        onClick={() => setSaleType(option.value)}
+                        className={`flex items-start gap-3 rounded-2xl border p-3.5 text-left transition-all ${
+                          active
+                            ? "border-primary bg-primary/10 shadow-sm ring-2 ring-primary/20"
+                            : "border-outline-variant/30 bg-surface hover:border-primary/30 hover:bg-primary/5"
+                        }`}
+                      >
+                        <div
+                          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
+                            active
+                              ? "bg-primary text-on-primary"
+                              : "bg-surface-container-high text-on-surface-variant"
+                          }`}
+                        >
+                          <Icon className="h-5 w-5" aria-hidden />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-bold text-on-surface">
+                            {option.label}
+                          </p>
+                          <p className="mt-0.5 text-caption leading-snug text-on-surface-variant">
+                            {option.description}
+                          </p>
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
-              {/* Is Maintenance Checkbox */}
-              <div className="space-y-3 flex items-end">
-                <label className="relative flex cursor-pointer items-center p-3.5 rounded-2xl border border-outline-variant/30 hover:border-primary/50 hover:bg-primary/5 transition-all w-full bg-surface shadow-sm group">
-                  <input
-                    type="checkbox"
-                    checked={isMaintenance}
-                    onChange={(e) => setIsMaintenance(e.target.checked)}
-                    className="peer sr-only"
-                  />
-                  <div className="h-6 w-6 rounded-md border-2 border-outline-variant peer-checked:border-primary peer-checked:bg-primary transition-all flex items-center justify-center shadow-sm">
-                    <svg
-                      className="w-4 h-4 text-white scale-0 peer-checked:scale-100 transition-transform"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={3}
-                        d="M5 13l4 4L19 7"
-                      />
-                    </svg>
-                  </div>
-                  <div className="ml-3 flex flex-col">
-                    <span className="text-sm font-bold text-on-surface group-hover:text-primary transition-colors">
-                      Maintenance Operation
-                    </span>
-                    <span className="text-[10px] text-on-surface-variant mt-0.5">
-                      Mark if this sale includes repair services
-                    </span>
-                  </div>
+              <FormSelect
+                id="sale-status"
+                label="Sale status"
+                icon={ShieldCheckIcon}
+                value={saleStatus}
+                disabled={!isRemoteSale}
+                hint={
+                  !isRemoteSale
+                    ? "In-store sales are marked completed automatically."
+                    : undefined
+                }
+                onChange={(v) =>
+                  setSaleStatus(v as "pending" | "partial" | "completed")
+                }
+              >
+                <option value="pending">Pending</option>
+                <option value="partial">Partial</option>
+                <option value="completed">Completed</option>
+              </FormSelect>
 
-                  <div className="ml-auto flex items-center justify-center w-8 h-8 rounded-full bg-amber-500/10 text-amber-600 opacity-0 group-hover:opacity-100 peer-checked:opacity-100 transition-opacity">
-                    <WrenchIcon className="w-4 h-4" />
-                  </div>
-                </label>
+              <FormSelect
+                id="sale-delivery-status"
+                label="Delivery status"
+                icon={TruckIcon}
+                value={deliveryStatus}
+                disabled={!isRemoteSale}
+                hint={
+                  !isRemoteSale
+                    ? "Delivery tracking applies to online and delivery orders."
+                    : undefined
+                }
+                onChange={setDeliveryStatus}
+              >
+                <option value="pending">Pending</option>
+                <option value="in-transit">In transit</option>
+                <option value="delivered">Delivered</option>
+              </FormSelect>
+
+              <FormSectionDivider title="Financial adjustments" />
+
+              <div
+                className={`grid grid-cols-1 gap-6 ${
+                  isRemoteSale
+                    ? "col-span-full md:grid-cols-2 lg:col-span-2"
+                    : "col-span-full md:col-span-2 lg:col-span-2"
+                }`}
+              >
+                {isRemoteSale ? (
+                  <FormMoneyInput
+                    id="sale-shipping"
+                    label="Shipping fee"
+                    icon={CurrencyDollarIcon}
+                    prefix="+"
+                    value={shippingFee}
+                    onChange={setShippingFee}
+                  />
+                ) : null}
+
+                <div className="space-y-3">
+                  <FormMoneyInput
+                    id="sale-discount"
+                    label="Overall discount (whole sale)"
+                    icon={TagIcon}
+                    prefix="-"
+                    value={discountDraft}
+                    onChange={setDiscountDraft}
+                    onBlur={tryCommitDiscountDraft}
+                    tone="discount"
+                    disabled={!isAdmin || cartItems.length === 0}
+                    hint={
+                      !isAdmin
+                        ? "Only administrators can apply an overall discount."
+                        : cartItems.length === 0
+                          ? "Add cart items before applying a discount."
+                          : "Extra amount off the whole sale (after line discounts). Apply requires admin password."
+                    }
+                  />
+                  {isAdmin && cartItems.length > 0 ? (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <ActionButton
+                        type="button"
+                        size="sm"
+                        tone="primary"
+                        variant="outline"
+                        onClick={tryCommitDiscountDraft}
+                        disabled={
+                          discountVerifying ||
+                          normalizeDiscountAmount(discountDraft) ===
+                            approvedDiscount
+                        }
+                      >
+                        Apply discount
+                      </ActionButton>
+                      {approvedDiscount > 0 ? (
+                        <>
+                          <span className="label-caps inline-flex items-center gap-1.5 rounded-full border border-success/25 bg-success/10 px-2.5 py-1 text-on-success-container">
+                            <CheckIcon className="h-3 w-3 shrink-0" aria-hidden />
+                            Approved · {formatEgp(approvedDiscount)} EGP
+                          </span>
+                          <button
+                            type="button"
+                            onClick={clearApprovedDiscount}
+                            className="label-capsr text-on-surface-variant underline-offset-2 hover:text-error hover:underline"
+                          >
+                            Remove
+                          </button>
+                        </>
+                      ) : null}
+                      {normalizeDiscountAmount(discountDraft) > 0 &&
+                      normalizeDiscountAmount(discountDraft) !==
+                        approvedDiscount ? (
+                        <span className="label-caps text-on-warning-container">
+                          Pending approval
+                        </span>
+                      ) : null}
+                    </div>
+                  ) : null}
+                  {discountFieldError ? (
+                    <p className="text-xs font-medium text-error">
+                      {discountFieldError}
+                    </p>
+                  ) : null}
+                </div>
+              </div>
+
+              <label className="group/check col-span-full flex cursor-pointer items-center gap-3 rounded-2xl border border-outline-variant/30 bg-surface p-4 shadow-sm transition-all hover:border-primary/40 hover:bg-primary/5 has-[:checked]:border-primary/40 has-[:checked]:bg-primary/5 lg:col-span-1 lg:self-end">
+                <input
+                  type="checkbox"
+                  checked={isMaintenance}
+                  onChange={(e) => setIsMaintenance(e.target.checked)}
+                  className="sr-only"
+                />
+                <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border-2 border-outline-variant shadow-sm transition-all group-has-[:checked]/check:border-primary group-has-[:checked]/check:bg-primary">
+                  <CheckIcon
+                    className="h-4 w-4 scale-0 text-on-primary transition-transform group-has-[:checked]/check:scale-100"
+                    aria-hidden
+                  />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <span className="text-sm font-bold text-on-surface">
+                    Maintenance operation
+                  </span>
+                  <p className="mt-0.5 text-caption text-on-surface-variant">
+                    Includes repair or workshop services
+                  </p>
+                </div>
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-warning/10 text-on-warning-container opacity-70 group-has-[:checked]/check:opacity-100">
+                  <WrenchIcon className="h-4 w-4" aria-hidden />
+                </div>
+              </label>
+
+              <div className="col-span-full rounded-2xl border border-outline-variant/20 bg-surface-container-lowest/90 p-4 md:p-5">
+                <p className="mb-3 label-caps text-on-surface-variant">
+                  Live total preview
+                </p>
+                <SaleTotalsSummary
+                  breakdown={cartTotalsBreakdown}
+                  shippingFee={shippingFee}
+                  showShipping={isRemoteSale}
+                  overallDiscount={approvedDiscount}
+                  overallDiscountDraft={
+                    normalizeDiscountAmount(discountDraft) !== approvedDiscount
+                      ? normalizeDiscountAmount(discountDraft)
+                      : null
+                  }
+                  saleTotal={saleTotal}
+                />
               </div>
             </div>
           </div>
@@ -932,7 +1403,7 @@ export function CreateSaleForm() {
                 <span className="text-sm font-bold uppercase tracking-widest text-primary/80">
                   Total
                 </span>
-                <span className="text-md font-black text-primary font-mono tracking-tight">
+                <span className="text-base font-black text-primary font-mono tracking-tight">
                   {saleTotal.toLocaleString("en-US", { minimumFractionDigits: 2 })}
                 </span>
                 <span className="text-sm font-bold text-primary/70 uppercase">EGP</span>
@@ -962,7 +1433,7 @@ export function CreateSaleForm() {
               {submitting ? (
                 <>
                   <svg
-                    className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+                    className="animate-spin -ml-1 mr-2 h-4 w-4 text-on-primary"
                     xmlns="http://www.w3.org/2000/svg"
                     fill="none"
                     viewBox="0 0 24 24"
@@ -1010,6 +1481,43 @@ export function CreateSaleForm() {
         onSubmit={handleCreateCustomer}
         submitLabel="Register & Select"
         heroLabel="New Customer"
+      />
+
+      <AdminPasswordConfirmModal
+        isOpen={discountModalOpen}
+        onClose={handleCancelDiscount}
+        title="Authorize overall discount"
+        description="Enter your administrator password to authorize this discount change. A new password is required for every change."
+        password={discountPassword}
+        onPasswordChange={setDiscountPassword}
+        onConfirm={() => void handleConfirmDiscount()}
+        isProcessing={discountVerifying}
+        error={discountModalError}
+        confirmLabel="Authorize discount"
+        summary={
+          <div className="rounded-2xl border border-outline-variant/20 bg-surface-container-low p-4 text-sm">
+            <div className="flex items-center justify-between gap-4">
+              <span className="text-on-surface-variant">Current</span>
+              <span className="mono-data font-semibold text-on-surface">
+                {approvedDiscount > 0
+                  ? `−${formatEgp(approvedDiscount)} EGP`
+                  : "None"}
+              </span>
+            </div>
+            <div className="mt-2 flex items-center justify-between gap-4 border-t border-outline-variant/15 pt-2">
+              <span className="font-medium text-on-surface">New discount</span>
+              <span className="mono-data text-lg font-bold text-error">
+                −{formatEgp(pendingDiscount)} EGP
+              </span>
+            </div>
+            <p className="mt-3 text-xs text-on-surface-variant">
+              Subtotal after discount:{" "}
+              <span className="mono-data font-semibold text-on-surface">
+                {formatEgp(Math.max(0, cartSubtotal - pendingDiscount))} EGP
+              </span>
+            </p>
+          </div>
+        }
       />
     </PageShell>
   );

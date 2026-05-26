@@ -93,7 +93,7 @@ export function WorkspaceLauncher({
                     )}
                   </span>
                 </span>
-                <span className="max-w-[7.5rem] text-center text-[0.8125rem] font-medium leading-snug text-on-surface group-hover:text-primary transition-colors">
+                <span className="text-body-sm max-w-[7.5rem] text-center font-medium leading-snug text-on-surface transition-colors group-hover:text-primary">
                   {item.label}
                 </span>
               </Link>

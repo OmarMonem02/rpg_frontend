@@ -34,7 +34,7 @@ type ModalShellProps = {
   align?: "center" | "top";
 };
 
-function ModalShell({
+export function ModalShell({
   isOpen,
   onClose,
   title,
@@ -217,7 +217,7 @@ export function PaymentCloseModal({
           ${balanceDue.toFixed(2)} remaining — full payment is required to close.
         </p>
       ) : (
-        <p className="mb-4 text-sm text-green-700">Payment covers the full ticket total.</p>
+        <p className="mb-4 text-sm text-on-success-container">Payment covers the full ticket total.</p>
       )}
 
       <InputGroup label="Payment method" className="mb-2">
@@ -350,7 +350,7 @@ export function TicketInvoiceModal({
         </div>
       }
     >
-      <div className="overflow-hidden rounded-[1.5rem] border border-outline-variant/10 bg-white">
+      <div className="overflow-hidden rounded-[1.5rem] border border-outline-variant/10 bg-surface-container-lowest">
         <div id="invoice-export-root">
           <InvoiceTemplate sale={invoice} />
         </div>

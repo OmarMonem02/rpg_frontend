@@ -25,13 +25,13 @@ export function HistoryChangeDiff({ changes }: { changes: HistoryChangeEntry[] }
           </div>
           <div className="grid gap-px bg-outline-variant/10 md:grid-cols-2">
             <div className="bg-error-container/30 px-3 py-2.5">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-on-surface-variant">
+              <p className="label-caps">
                 Before
               </p>
               <p className="mono-data mt-1 text-sm text-on-surface break-words">{change.before}</p>
             </div>
             <div className="bg-primary-container/40 px-3 py-2.5">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-on-surface-variant">
+              <p className="label-caps">
                 After
               </p>
               <p className="mono-data mt-1 text-sm text-on-surface break-words">{change.after}</p>

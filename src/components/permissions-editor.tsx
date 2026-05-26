@@ -235,7 +235,7 @@ export function PermissionsEditor({
                   {permissionSource === "custom" ? "Custom access" : "Role default"}
                 </span>
                 {hasChanges ? (
-                  <span className="rounded-full border border-yellow-500/25 bg-yellow-500/10 px-3 py-1 text-xs font-semibold text-yellow-700">
+                  <span className="rounded-full border border-warning/25 bg-warning/10 px-3 py-1 text-xs font-semibold text-on-warning-container">
                     Unsaved changes
                   </span>
                 ) : null}
@@ -275,7 +275,7 @@ export function PermissionsEditor({
             {permissionSource === "custom" ? "Custom access" : "Role default"}
           </span>
           {hasChanges ? (
-            <span className="rounded-full border border-yellow-500/25 bg-yellow-500/10 px-3 py-1 text-xs font-semibold text-yellow-700">
+            <span className="rounded-full border border-warning/25 bg-warning/10 px-3 py-1 text-xs font-semibold text-on-warning-container">
               Unsaved changes
             </span>
           ) : null}

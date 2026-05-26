@@ -68,6 +68,12 @@ export function formatDate(value?: string): string {
   return date.toLocaleDateString();
 }
 
+export function metricToneClass(value: number): string {
+  if (value > 0) return "text-positive";
+  if (value < 0) return "text-negative";
+  return "text-neutral-metric";
+}
+
 export function FinanceHero({
   title,
   active,
@@ -77,37 +83,30 @@ export function FinanceHero({
   active: "overview" | "profit-loss" | "balance-sheet" | "annual" | "expenses";
 }) {
   return (
-    <section className="relative overflow-hidden rounded-[2rem] border border-emerald-900/5 bg-emerald-900/5 p-5 text-white shadow-2xl md:p-7">
-      <div className="absolute inset-0 opacity-20 [background-image:linear-gradient(rgba(255,255,255,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.08)_1px,transparent_1px)] [background-size:28px_28px]" />
-      <div className="absolute right-[-4rem] top-[-5rem] h-40 w-40 rounded-full border border-white/10 bg-white/5 blur-2xl" />
+    <section className="animate-fade-in overflow-hidden rounded-[1.75rem] border border-outline-variant/15 bg-surface-container-low shadow-ambient">
+      <div className="flex flex-col gap-6 p-5 md:p-7">
+        <h1 className="text-display-lg text-on-surface">{title}</h1>
 
-      <div className="relative flex flex-col gap-6">
-        <div className="flex flex-col gap-1 lg:flex-row lg:items-end lg:justify-between">
-          <h1 className="mt-2 font-display text-4xl font-bold leading-[1.5] tracking-tight text-black md:text-5xl lg:text-6xl animate-app-shell-enter">
-            <span className="inline-block bg-gradient-to-b from-slate-950 via-black to-black/70 bg-clip-text text-transparent">
-              {title}
-            </span>
-          </h1>
-        </div>
-
-        <div className="flex flex-wrap items-center justify-evenly gap-2 rounded-[1.6rem] border border-black/10 bg-black/5 p-2 backdrop-blur-xl">
-          {financeNavItems.map((item, index) => (
+        <nav
+          aria-label="Finance reporting"
+          className="flex flex-wrap gap-2 rounded-[1.6rem] border border-outline-variant/15 bg-surface/95 p-2"
+        >
+          {financeNavItems.map((item) => (
             <Link
               key={item.href}
               href={item.href}
               aria-current={active === item.key ? "page" : undefined}
               className={[
-                "rounded-full px-4 py-2.5 text-sm font-semibold transition-all duration-300 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/70",
+                "rounded-full px-4 py-2.5 text-sm font-semibold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30",
                 active === item.key
-                  ? "bg-white text-slate-950 shadow-lg shadow-black/15"
-                  : "border border-black/10 bg-transparent text-black/90 hover:-translate-y-0.5 hover:bg-black/14 hover:text-black",
+                  ? "bg-primary text-on-primary shadow-sm"
+                  : "border border-outline-variant/15 bg-transparent text-on-surface-variant hover:bg-surface-container hover:text-on-surface",
               ].join(" ")}
-              style={{ animationDelay: `${index * 70}ms` }}
             >
               {item.label}
             </Link>
           ))}
-        </div>
+        </nav>
       </div>
     </section>
   );
@@ -131,10 +130,10 @@ export function FinanceFilterBar({
   extra?: React.ReactNode;
 }) {
   return (
-    <FilterBar className="border-emerald-500/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.94),rgba(240,253,244,0.92))] shadow-[0_12px_32px_rgba(15,23,42,0.06)]">
+    <FilterBar>
       <div className="md:col-span-12  flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-on-surface-variant">
+          <p className="label-caps">
             Statement Filters
           </p>
           <p className="mt-1 text-sm text-on-surface-variant">
@@ -208,7 +207,7 @@ export function FinanceSectionTitle({
 
 export function CurrencyChip({ currency }: { currency: string }) {
   return (
-    <span className="inline-flex items-center rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">
+    <span className="label-caps inline-flex items-center rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-primary">
       {currency}
     </span>
   );
@@ -252,7 +251,7 @@ export function BreakdownList({
   const rows = Object.entries(values).filter(([, amount]) => amount > 0);
 
   return (
-    <SurfaceCard className="border-emerald-500/10 bg-white/90 shadow-[0_18px_40px_rgba(15,23,42,0.05)] transition-transform duration-300 ease-out hover:-translate-y-0.5">
+    <SurfaceCard>
       <div className="flex items-center justify-between gap-3">
         <h3 className="text-base font-semibold text-on-surface">{title}</h3>
         <CurrencyChip currency={currency} />
@@ -289,17 +288,14 @@ export function FinanceLoadingCard({
   label?: string;
 }) {
   return (
-    <SurfaceCard className="relative flex min-h-[280px] items-center justify-center overflow-hidden border-emerald-500/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(240,253,244,0.88))]">
-      <div className="absolute inset-0 opacity-20 [background-image:linear-gradient(rgba(16,185,129,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(16,185,129,0.08)_1px,transparent_1px)] [background-size:24px_24px]" />
+    <SurfaceCard className="relative flex min-h-[280px] items-center justify-center overflow-hidden">
       <div className="relative flex flex-col items-center gap-4 text-center">
         <div className="relative h-14 w-14">
-          <div className="absolute inset-0 rounded-full border-4 border-emerald-500/15" />
-          <div className="absolute inset-0 animate-spin rounded-full border-4 border-transparent border-t-emerald-600 border-r-emerald-400" />
+          <div className="absolute inset-0 rounded-full border-4 border-primary/15" />
+          <div className="absolute inset-0 animate-spin rounded-full border-4 border-transparent border-t-primary border-r-primary/40" />
         </div>
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-on-surface-variant">
-            Finance Engine
-          </p>
+          <p className="label-caps">Finance Engine</p>
           <p className="mt-2 text-base font-semibold text-on-surface">
             {label}
           </p>

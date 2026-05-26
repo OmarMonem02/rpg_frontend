@@ -300,7 +300,7 @@ export default function ExpensesPage() {
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
-        <SurfaceCard className="border-emerald-500/10 bg-[linear-gradient(180deg,rgba(240,253,244,0.6),rgba(255,255,255,0.98))] shadow-[0_20px_40px_rgba(15,23,42,0.06)] xl:sticky xl:top-24 xl:self-start">
+        <SurfaceCard className="xl:sticky xl:top-24 xl:self-start">
           <FinanceSectionTitle
             title={editingExpense ? "Edit expense entry" : "Add expense entry"}
             description="Record what happened, when it happened, and whether it has been paid so the statements stay trustworthy."
@@ -499,7 +499,7 @@ export default function ExpensesPage() {
         </SurfaceCard>
 
         <div className="space-y-4">
-          <SurfaceCard className="shadow-[0_18px_40px_rgba(15,23,42,0.05)]">
+          <SurfaceCard className="shadow-ambient">
             <FinanceSectionTitle
               title="Filter expenses"
               description="Narrow the ledger by time, currency, payment state, or category when reconciling a specific period."
@@ -608,7 +608,7 @@ export default function ExpensesPage() {
               {expenses.map((expense) => (
                 <SurfaceCard
                   key={expense.id}
-                  className="border-emerald-500/10 bg-white/95 p-4"
+                  className="border-outline-variant/15 bg-surface-container-lowest p-4"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex min-w-0 items-start gap-3">

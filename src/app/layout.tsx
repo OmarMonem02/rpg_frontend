@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { QueryProvider } from "@/app/providers/QueryProvider";
+import { fontSans, fontVariables } from "@/lib/fonts";
 
 export const metadata: Metadata = {
   title: "RPG Hub",
@@ -13,8 +14,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="h-full antialiased">
-      <body className="min-h-full flex flex-col">
+    <html lang="en" className={`h-full antialiased ${fontVariables}`}>
+      <body className={`${fontSans.className} min-h-full flex flex-col`}>
         <QueryProvider>{children}</QueryProvider>
       </body>
     </html>

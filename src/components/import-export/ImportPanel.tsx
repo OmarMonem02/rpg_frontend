@@ -228,7 +228,7 @@ export function ImportPanel({ entity }: { entity: ImportExportEntity }) {
                           <ul className="space-y-1 text-on-surface-variant">
                             {row.issues.map((issue, index) => (
                               <li key={`${issue.code}-${index}`} className="flex gap-2">
-                                <ExclamationTriangleIcon className="mt-0.5 h-4 w-4 shrink-0 text-yellow-600" />
+                                <ExclamationTriangleIcon className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
                                 <span>{issue.message}</span>
                               </li>
                             ))}
@@ -262,8 +262,8 @@ function PreviewStat({
 }) {
   const toneClass = {
     default: "border-outline-variant/15 bg-surface-container-low text-on-surface",
-    success: "border-green-500/20 bg-green-500/10 text-green-700",
-    warning: "border-yellow-500/20 bg-yellow-500/10 text-yellow-700",
+    success: "border-success/20 bg-success/10 text-on-success-container",
+    warning: "border-warning/20 bg-warning/10 text-on-warning-container",
     danger: "border-error/20 bg-error/10 text-error",
   }[tone];
 

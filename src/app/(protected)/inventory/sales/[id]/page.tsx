@@ -209,7 +209,7 @@ export default function SaleDetailsPage() {
   // ─── Print Mode — Fullscreen template, no chrome ────────────────────────────
   if (isPrinting) {
     return (
-      <div className="bg-white min-h-screen p-8">
+      <div className="min-h-screen bg-surface-container-lowest p-8">
         <div id="invoice-export-root">
           <InvoiceTemplate sale={sale} />
         </div>
@@ -445,7 +445,7 @@ export default function SaleDetailsPage() {
             label: "Invoice Preview",
             content: (
               <SurfaceCard className="flex flex-col items-center bg-surface-container p-6 md:p-12 overflow-hidden">
-                <div className="w-full max-w-[210mm] bg-white shadow-2xl rounded-sm overflow-hidden scale-[0.85] sm:scale-100 origin-top">
+                <div className="w-full max-w-[210mm] origin-top scale-[0.85] overflow-hidden rounded-sm bg-surface-container-lowest shadow-ambient sm:scale-100">
                   <div id="invoice-export-root">
                     <InvoiceTemplate sale={sale} />
                   </div>

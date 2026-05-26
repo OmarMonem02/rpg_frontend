@@ -273,7 +273,7 @@ function TimelineStepHorizontal({
         {step.label}
       </p>
       {step.state === "current" ? (
-        <p className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-accent">Current</p>
+        <p className="label-caps mt-1 text-accent">Current</p>
       ) : null}
     </li>
   );

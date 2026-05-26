@@ -167,7 +167,7 @@ export function AppSidebar({
             )}
           </div>
           {!isCollapsed && (
-            <p className="text-[11px] text-on-surface-variant/60 leading-relaxed">
+            <p className="text-caption leading-relaxed text-on-surface-variant/60">
               Sales, inventory, master data, and admin control.
             </p>
           )}
@@ -225,7 +225,7 @@ export function AppSidebar({
                       ].join(" ")}
                     >
                       {item.icon ?? (
-                        <span className="inline-flex h-6 w-6 items-center justify-center rounded-lg bg-surface-container text-[10px] font-semibold text-on-surface-variant">
+                        <span className="text-caption inline-flex h-6 w-6 items-center justify-center rounded-lg bg-surface-container font-semibold text-on-surface-variant">
                           {item.label.charAt(0)}
                         </span>
                       )}
@@ -254,7 +254,7 @@ export function AppSidebar({
           <button
             type="button"
             className={[
-              "flex items-center justify-center rounded-xl border border-error/20 bg-error/8 text-xs font-bold text-error transition-colors duration-150 hover:bg-error hover:text-white",
+              "flex items-center justify-center rounded-xl border border-error/20 bg-error/8 text-xs font-bold text-error transition-colors duration-150 hover:bg-error hover:text-on-primary",
               isCollapsed ? "h-11 w-11 mx-auto p-0" : "w-full px-4 py-3",
             ].join(" ")}
             onClick={onLogout}

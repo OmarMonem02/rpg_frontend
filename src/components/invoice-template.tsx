@@ -56,621 +56,221 @@ export function InvoiceTemplate({
   });
 
   return (
-    <>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Barlow+Condensed:wght@700;800&display=swap');
-
-        :root {
-          --primary-red: #c0392b;
-          --primary-red-glow: #ff1900;
-          --dark-bg: #0f0f0f;
-          --surface-light: #ffffff;
-          --border-color: #efefef;
-          --text-main: #1a1a1a;
-          --text-muted: #464646;
-        }
-
-        .receipt-wrapper { 
-          background: transparent; 
-          padding: 24px 12px; 
-          font-family: 'Outfit', sans-serif; 
-          display: flex; 
-          justify-content: center; 
-          width: 100%; 
-          color: var(--text-main);
-          animation: fadeIn 0.8s ease-out;
-          overflow-x: hidden;
-        }
-        
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(10px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-
-        .receipt-page { 
-          width: 210mm;
-          min-height: 297mm;
-          margin: 0 auto; 
-          background: var(--surface-light); 
-          position: relative; 
-          overflow: hidden; 
-          box-shadow: 0 20px 50px rgba(0,0,0,0.08); 
-          border-radius: 12px;
-          border: 1px solid var(--border-color);
-          box-sizing: border-box;
-        }
-
-        .receipt-page::before { 
-          content: ''; 
-          position: absolute; 
-          top: 0; 
-          left: 0; 
-          right: 0; 
-          height: 8px; 
-          background: linear-gradient(90deg, var(--primary-red) 0%, var(--primary-red-glow) 50%, var(--primary-red) 100%); 
-          z-index: 2; 
-        }
-
-        .receipt-page::after { 
-          content: 'RPG'; 
-          position: absolute; 
-          top: 50%; 
-          left: 50%; 
-          transform: translate(-50%, -50%) rotate(-20deg); 
-          font-family: 'Barlow Condensed', sans-serif; 
-          font-size: clamp(180px, 28vw, 380px); 
-          font-weight: 800; 
-          color: rgba(0,0,0,0.05); 
-          pointer-events: none; 
-          user-select: none; 
-          z-index: 0;
-          white-space: nowrap;
-        }
-        
-        .ri { position: relative; z-index: 1; padding: clamp(18px, 3vw, 48px); }
-
-        .receipt-header { 
-          display: flex; 
-          align-items: flex-start; 
-          justify-content: space-between;
-          padding-bottom: 32px; 
-          border-bottom: 1px solid var(--border-color);
-          margin-bottom: 32px;
-        }
-
-        .brand-section { display: flex; align-items: center; gap: 20px; }
-        
-        .logo-box { 
-          width: 72px; 
-          height: 72px; 
-          background: var(--dark-bg); 
-          border-radius: 14px; 
-          display: flex; 
-          align-items: center; 
-          justify-content: center; 
-          flex-shrink: 0; 
-          overflow: hidden; 
-          box-shadow: 0 8px 16px rgba(0,0,0,0.1);
-          transition: transform 0.3s ease;
-        }
-        
-        .logo-box:hover { transform: scale(1.05); }
-
-        .logo-box span { 
-          font-family: 'Barlow Condensed', sans-serif; 
-          font-weight: 800; 
-          font-size: 24px; 
-          color: var(--primary-red); 
-          letter-spacing: 1px; 
-        }
-
-        .htext { }
-        .htitle { 
-          font-size: 28px; 
-          font-weight: 800; 
-          color: var(--dark-bg); 
-          line-height: 1.1; 
-          letter-spacing: -0.5px;
-        }
-        .hsub { 
-          font-size: 13px; 
-          font-weight: 500; 
-          color: var(--text-muted); 
-          text-transform: uppercase; 
-          letter-spacing: 2px;
-          margin-top: 6px; 
-        }
-
-        .hmeta { text-align: right; }
-        .rnum { 
-          font-family: 'Barlow Condensed', sans-serif; 
-          font-size: 32px; 
-          font-weight: 700; 
-          color: var(--dark-bg); 
-          line-height: 1;
-        }
-        .rnum span { color: var(--primary-red); opacity: 0.8; margin-right: 2px; }
-        .rdate { font-size: 13px; color: var(--text-muted); margin-top: 8px; font-weight: 500; }
-        .rby { font-size: 11px; color: var(--text-muted); margin-top: 4px; text-transform: uppercase; letter-spacing: 1px; }
-
-        .slabel { 
-          font-family: 'Barlow Condensed', sans-serif; 
-          font-size: 12px; 
-          font-weight: 800; 
-          letter-spacing: 3px; 
-          text-transform: uppercase; 
-          color: var(--text-muted);
-          margin-bottom: 12px;
-          display: flex;
-          align-items: center;
-          gap: 10px;
-        }
-        
-        .slabel::after {
-          content: '';
-          height: 1px;
-          flex: 1;
-          background: var(--border-color);
-        }
-
-        .mgrid { 
-          display: grid; 
-          grid-template-columns: repeat(4, 1fr); 
-          gap: 1px;
-          background: var(--border-color);
-          border-radius: 12px;
-          overflow: hidden;
-          border: 1px solid var(--border-color);
-          margin-bottom: 32px;
-        }
-        
-        .mcell { 
-          padding: 20px; 
-          background: #fff;
-          transition: background 0.2s ease;
-        }
-        
-        .mcell:hover { background: #fafafa; }
-
-        .mlabel { 
-          font-size: 11px; 
-          font-weight: 700; 
-          letter-spacing: 1.5px; 
-          text-transform: uppercase; 
-          color: var(--text-muted); 
-          margin-bottom: 8px; 
-        }
-        
-        .mvalue { font-size: 14px; font-weight: 600; color: var(--dark-bg); }
-
-        .receipt-badge { 
-          display: inline-flex; 
-          align-items: center;
-          padding: 4px 12px; 
-          border-radius: 6px; 
-          font-size: 11px; 
-          font-weight: 700; 
-          letter-spacing: 0.5px; 
-          text-transform: uppercase; 
-        }
-        
-        .bcomp { background: #ecfdf5; color: #059669; }
-        .bpend { background: #fffbeb; color: #d97706; }
-        .breturn { background: #fef2f2; color: #dc2626; }
-        .bpartial { background: #f0f9ff; color: #0284c7; }
-        .bcard { background: #f5f3ff; color: #7c3aed; }
-
-        .table-section { margin-bottom: 40px; }
-        .table-responsive { width: 100%; overflow: hidden; }
-        .receipt-wrapper table { width: 100%; border-collapse: separate; border-spacing: 0; }
-        .receipt-wrapper thead th { 
-          padding: 16px; 
-          text-align: left; 
-          font-size: 11px; 
-          font-weight: 700; 
-          text-transform: uppercase; 
-          letter-spacing: 2px; 
-          color: var(--text-muted);
-          border-bottom: 2px solid var(--dark-bg);
-        }
-        .receipt-wrapper th.r { text-align: right; }
-        
-        .receipt-wrapper tbody tr { transition: background 0.2s ease; }
-        .receipt-wrapper tbody tr:hover { background: #fcfcfc; }
-        .receipt-wrapper td { padding: 16px; vertical-align: middle; border-bottom: 1px solid var(--border-color); }
-        .receipt-wrapper td.r { text-align: right;}
-        
-        .iname { font-weight: 700; font-size: 15px; color: var(--dark-bg); }
-        .isub { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
-        .istotal { font-weight: 700; color: var(--dark-bg); font-size: 15px; }
-
-        .totals-area { 
-          display: flex; 
-          justify-content: flex-end; 
-          gap: 48px;
-          padding-top: 24px;
-        }
-
-        .totals-table { width: 100%; max-width: 320px; }
-        .trow { 
-          display: flex; 
-          justify-content: space-between; 
-          padding: 10px 0; 
-          font-size: 14px; 
-        }
-        .trow .lbl { color: var(--text-muted); font-weight: 500; }
-        .trow .amt { font-weight: 600; color: var(--dark-bg); }
-        .trow.disc .amt { color: var(--primary-red); }
-        
-        .trow.grand { 
-          margin-top: 16px; 
-          padding: 20px; 
-          background: var(--dark-bg);
-          border-radius: 12px;
-          color: #fff;
-        }
-        .trow.grand .lbl { 
-          font-size: 13px; 
-          font-weight: 700; 
-          text-transform: uppercase; 
-          letter-spacing: 2px; 
-          color: rgba(255,255,255,0.6); 
-        }
-        .trow.grand .amt { 
-          font-size: 26px; 
-          font-weight: 800; 
-          color: #fff; 
-        }
-
-        .official-seal {
-          position: absolute;
-          bottom: 100px;
-          right: 50px;
-          width: 120px;
-          height: 120px;
-          border: 4px double var(--primary-red);
-          border-radius: 50%;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          opacity: 0.15;
-          transform: rotate(-15deg);
-          pointer-events: none;
-        }
-        
-        .official-seal span {
-          font-family: 'Barlow Condensed', sans-serif;
-          font-weight: 800;
-          font-size: 14px;
-          color: var(--primary-red);
-          text-transform: uppercase;
-          letter-spacing: 1px;
-        }
-
-        .receipt-footer { 
-          margin-top: 64px; 
-          padding-top: 32px; 
-          border-top: 1px solid var(--border-color); 
-          display: flex; 
-          justify-content: space-between; 
-          align-items: center;
-        }
-        
-        .footer-l { font-size: 12px; color: var(--text-muted); line-height: 1.6; }
-        .footer-r { text-align: right; }
-        .fthanks { font-weight: 800; font-size: 16px; color: var(--dark-bg); text-transform: uppercase; letter-spacing: 1px; }
-        .ftagline { font-size: 11px; color: var(--text-muted); margin-top: 4px; font-weight: 500; }
-
-
-        @media print {
-          @page {
-            size: A4;
-            margin: 0;
-          }
-          body {
-            -webkit-print-color-adjust: exact !important;
-            print-color-adjust: exact !important;
-          }
-          .receipt-wrapper { 
-            padding: 0 !important; 
-            background: #fff !important;
-            display: block !important;
-          }
-          .receipt-page { 
-            width: 210mm !important;
-            max-width: 210mm !important;
-            min-height: 297mm !important;
-            box-shadow: none !important; 
-            border: none !important; 
-            margin: 0 auto !important;
-            border-radius: 0 !important;
-            overflow: visible !important;
-          }
-          .ri { padding: 12mm 12mm 10mm !important; }
-          .official-seal { opacity: 0.12 !important; }
-          .trow.grand { background: #000 !important; color: #fff !important; }
-          .receipt-footer,
-          .receipt-header,
-          .totals-area {
-            page-break-inside: avoid;
-          }
-        }
-
-        /* PDF Export Mode - Matches Print Rules */
-        .pdf-export .receipt-wrapper { 
-          padding: 0 !important; 
-          background: #fff !important;
-          display: block !important;
-          animation: none !important;
-        }
-        .pdf-export .receipt-page { 
-          width: 210mm !important;
-          max-width: 210mm !important;
-          min-height: 297mm !important;
-          box-shadow: none !important; 
-          border: none !important; 
-          margin: 0 auto !important;
-          border-radius: 0 !important;
-          overflow: visible !important;
-        }
-        .pdf-export .ri { padding: 12mm 12mm 10mm !important; }
-        .pdf-export .official-seal { opacity: 0.12 !important; }
-        .pdf-export .trow.grand { background: #000 !important; color: #fff !important; }
-      `}</style>
-
-      <div className="receipt-wrapper invoice-template pdf-capture-safe">
-        <div className="receipt-page">
-          <div className="h-1 bg-accent" aria-hidden="true" />
-          <div className="ri">
-            <div className="receipt-header">
-              <div className="brand-section">
-                <div className="logo-box">
-                  <img
-                    src="/logo.ico"
-                    alt="RPG"
-                    className="w-full h-full object-contain"
-                    onError={(e) => {
-                      e.currentTarget.style.display = "none";
-                      if (e.currentTarget.parentElement)
-                        e.currentTarget.parentElement.innerHTML =
-                          "<span>RPG</span>";
-                    }}
-                  />
-                </div>
-                <div className="htext">
-                  <div className="htitle font-display font-black">{companyName}</div>
-                  <div className="hsub">{companyEmail}</div>
-                </div>
+    <div className="receipt-wrapper invoice-template pdf-capture-safe">
+      <div className="receipt-page">
+        <div className="h-1 bg-accent" aria-hidden="true" />
+        <div className="ri">
+          <div className="receipt-header">
+            <div className="brand-section">
+              <div className="logo-box">
+                <img
+                  src="/logo.ico"
+                  alt="RPG"
+                  className="h-full w-full object-contain"
+                  onError={(e) => {
+                    e.currentTarget.style.display = "none";
+                    if (e.currentTarget.parentElement)
+                      e.currentTarget.parentElement.innerHTML =
+                        "<span>RPG</span>";
+                  }}
+                />
               </div>
-              <div className="hmeta">
-                <div className="rnum mono-data">
-                  <span>#</span>
-                  {padId(sale.id)}
-                </div>
-                <div className="rdate">
-                  {formattedDate} — {formattedTime}
-                </div>
-                <div className="rby">
-                  Processed by{" "}
-                  {sale.seller?.name || "Seller #" + sale.seller_id}
-                </div>
+              <div className="htext">
+                <div className="htitle">{companyName}</div>
+                <div className="hsub">{companyEmail}</div>
               </div>
             </div>
-
-            <div className="slabel">Transaction Details</div>
-            <div className="mgrid">
-              <div className="mcell">
-                <div className="mlabel">Customer</div>
-                <div className="mvalue">
-                  {sale.customer?.name || "Walk-in Customer"}
-                </div>
+            <div className="hmeta">
+              <div className="rnum mono-data">
+                <span>#</span>
+                {padId(sale.id)}
               </div>
-              <div className="mcell">
-                <div className="mlabel">Contact</div>
-                <div className="mvalue">{sale.customer?.phone || "N/A"}</div>
+              <div className="rdate">
+                {formattedDate} — {formattedTime}
               </div>
-              <div className="mcell">
-                <div className="mlabel">Method</div>
-                <div className="mvalue">
-                  <span className="receipt-badge bcard">
-                    {sale.payment_method_name || `ID #${sale.payment_method_id}`}
-                  </span>
-                </div>
-              </div>
-              <div className="mcell">
-                <div className="mlabel">Status</div>
-                <div className="mvalue">
-                  <span
-                    className={"receipt-badge " + getStatusTone(sale.status)}
-                  >
-                    {sale.status}
-                  </span>
-                </div>
+              <div className="rby">
+                Processed by{" "}
+                {sale.seller?.name || "Seller #" + sale.seller_id}
               </div>
             </div>
+          </div>
 
-            <div className="table-section">
-              <div className="slabel">Purchased Items</div>
-              <div className="table-responsive">
-                <table>
-                  <thead>
+          <div className="slabel">Transaction Details</div>
+          <div className="mgrid">
+            <div className="mcell">
+              <div className="mlabel">Customer</div>
+              <div className="mvalue">
+                {sale.customer?.name || "Walk-in Customer"}
+              </div>
+            </div>
+            <div className="mcell">
+              <div className="mlabel">Contact</div>
+              <div className="mvalue">{sale.customer?.phone || "N/A"}</div>
+            </div>
+            <div className="mcell">
+              <div className="mlabel">Method</div>
+              <div className="mvalue">
+                <span className="receipt-badge bcard">
+                  {sale.payment_method_name || `ID #${sale.payment_method_id}`}
+                </span>
+              </div>
+            </div>
+            <div className="mcell">
+              <div className="mlabel">Status</div>
+              <div className="mvalue">
+                <span
+                  className={"receipt-badge " + getStatusTone(sale.status)}
+                >
+                  {sale.status}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="table-section">
+            <div className="slabel">Purchased Items</div>
+            <div className="table-responsive">
+              <table>
+                <thead>
+                  <tr>
+                    <th className="label-caps">Item</th>
+                    <th className="label-caps">Type</th>
+                    <th className="label-caps r">Qty</th>
+                    <th className="label-caps r">Price</th>
+                    <th className="label-caps r">Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {!sale.line_items || sale.line_items.length === 0 ? (
                     <tr>
-                      <th className="label-caps">Item</th>
-                      <th className="label-caps">Type</th>
-                      <th className="label-caps r">Qty</th>
-                      <th className="label-caps r">Price</th>
-                      <th className="label-caps r">Amount</th>
+                      <td colSpan={5} className="empty-row">
+                        No items in this transaction
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {!sale.line_items || sale.line_items.length === 0 ? (
-                      <tr>
-                        <td
-                          colSpan={5}
-                          className="text-center"
-                          style={{ color: "#aaa", padding: "40px" }}
-                        >
-                          No items in this transaction
+                  ) : (
+                    sale.line_items.map((item) => (
+                      <tr
+                        key={item.id}
+                        className={
+                          item.remaining_qty === 0
+                            ? "item-fully-returned"
+                            : ""
+                        }
+                      >
+                        <td>
+                          <div className="iname">
+                            {item.item_name || item.item_label}
+                            {item.remaining_qty === 0 && (
+                              <span className="returned-tag">RETURNED</span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="cell-muted">
+                          {item.sellable_type.replace(/_/g, " ")}
+                        </td>
+                        <td className="r mono-data font-semibold">
+                          {item.remaining_qty}
+                          {item.returned_qty > 0 && item.remaining_qty > 0 && (
+                            <div className="cell-subtle">Of {item.quantity}</div>
+                          )}
+                        </td>
+                        <td className="r mono-data">
+                          EGP{" "}
+                          {item.selling_price.toLocaleString(undefined, {
+                            minimumFractionDigits: 2,
+                          })}
+                        </td>
+                        <td className="r istotal mono-data">
+                          EGP{" "}
+                          {(
+                            item.remaining_qty * item.selling_price -
+                            (item.discount_amount / item.quantity) *
+                              item.remaining_qty
+                          ).toLocaleString(undefined, {
+                            minimumFractionDigits: 2,
+                          })}
+                          {item.discount_amount > 0 &&
+                            item.remaining_qty > 0 && (
+                              <div className="discount-note">
+                                -
+                                {(
+                                  (item.discount_amount / item.quantity) *
+                                  item.remaining_qty
+                                ).toFixed(2)}
+                              </div>
+                            )}
                         </td>
                       </tr>
-                    ) : (
-                      sale.line_items.map((item) => (
-                        <tr
-                          key={item.id}
-                          className={
-                            item.remaining_qty === 0
-                              ? "item-fully-returned"
-                              : ""
-                          }
-                        >
-                          <td>
-                            <div className="iname">
-                              {item.item_name || item.item_label}
-                              {item.remaining_qty === 0 && (
-                                <span
-                                  style={{
-                                    marginLeft: "8px",
-                                    fontSize: "10px",
-                                    color: "var(--primary-red)",
-                                    border: "1px solid",
-                                    padding: "1px 4px",
-                                    borderRadius: "4px",
-                                  }}
-                                >
-                                  RETURNED
-                                </span>
-                              )}
-                            </div>
-                          </td>
-                          <td
-                            style={{
-                              fontSize: "12px",
-                              color: "var(--text-muted)",
-                              textTransform: "capitalize",
-                            }}
-                          >
-                            {item.sellable_type.replace(/_/g, " ")}
-                          </td>
-                          <td className="r mono-data" style={{ fontWeight: 600 }}>
-                            {item.remaining_qty}
-                            {item.returned_qty > 0 &&
-                              item.remaining_qty > 0 && (
-                                <div
-                                  style={{
-                                    fontSize: "10px",
-                                    fontWeight: 400,
-                                    color: "#888",
-                                  }}
-                                >
-                                  Of {item.quantity}
-                                </div>
-                              )}
-                          </td>
-                          <td className="r mono-data">
-                            EGP{" "}
-                            {item.selling_price.toLocaleString(undefined, {
-                              minimumFractionDigits: 2,
-                            })}
-                          </td>
-                          <td className="r istotal mono-data">
-                            EGP{" "}
-                            {(
-                              item.remaining_qty * item.selling_price -
-                              (item.discount_amount / item.quantity) *
-                                item.remaining_qty
-                            ).toLocaleString(undefined, {
-                              minimumFractionDigits: 2,
-                            })}
-                            {item.discount_amount > 0 &&
-                              item.remaining_qty > 0 && (
-                                <div
-                                  style={{
-                                    color: "var(--primary-red)",
-                                    fontSize: "10px",
-                                    fontWeight: 500,
-                                  }}
-                                >
-                                  -
-                                  {(
-                                    (item.discount_amount / item.quantity) *
-                                    item.remaining_qty
-                                  ).toFixed(2)}
-                                </div>
-                              )}
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
+                    ))
+                  )}
+                </tbody>
+              </table>
             </div>
+          </div>
 
-            <div className="totals-area">
-              <div className="totals-table">
+          <div className="totals-area">
+            <div className="totals-table">
+              <div className="trow">
+                <span className="lbl">Subtotal</span>
+                <span className="amt mono-data">
+                  EGP{" "}
+                  {itemsSubtotal.toLocaleString(undefined, {
+                    minimumFractionDigits: 2,
+                  })}
+                </span>
+              </div>
+
+              {shippingFee > 0 && (
                 <div className="trow">
-                  <span className="lbl">Subtotal</span>
+                  <span className="lbl">Handling & Shipping</span>
                   <span className="amt mono-data">
                     EGP{" "}
-                    {itemsSubtotal.toLocaleString(undefined, {
+                    {shippingFee.toLocaleString(undefined, {
                       minimumFractionDigits: 2,
                     })}
                   </span>
                 </div>
+              )}
 
-                {shippingFee > 0 && (
-                  <div className="trow">
-                    <span className="lbl">Handling & Shipping</span>
-                    <span className="amt mono-data">
-                      EGP{" "}
-                      {shippingFee.toLocaleString(undefined, {
-                        minimumFractionDigits: 2,
-                      })}
-                    </span>
-                  </div>
-                )}
-
-                {saleDiscount > 0 && (
-                  <div className="trow disc">
-                    <span className="lbl">Promotional Discount</span>
-                    <span className="amt mono-data">
-                      −EGP{" "}
-                      {saleDiscount.toLocaleString(undefined, {
-                        minimumFractionDigits: 2,
-                      })}
-                    </span>
-                  </div>
-                )}
-
-                <div className="trow grand">
-                  <span className="lbl">Total Amount</span>
+              {saleDiscount > 0 && (
+                <div className="trow disc">
+                  <span className="lbl">Promotional Discount</span>
                   <span className="amt mono-data">
-                    EGP{" "}
-                    {netTotal.toLocaleString(undefined, {
+                    −EGP{" "}
+                    {saleDiscount.toLocaleString(undefined, {
                       minimumFractionDigits: 2,
                     })}
                   </span>
                 </div>
+              )}
+
+              <div className="trow grand">
+                <span className="lbl">Total Amount</span>
+                <span className="amt mono-data">
+                  EGP{" "}
+                  {netTotal.toLocaleString(undefined, {
+                    minimumFractionDigits: 2,
+                  })}
+                </span>
               </div>
             </div>
-            <div className="receipt-footer">
-              <div className="footer-l">
-                <div>
-                  Items returnable within 30 days with original receipt.
-                </div>
-                <div>Warranty void if seal is broken or tampered with.</div>
+          </div>
+          <div className="receipt-footer">
+            <div className="footer-l">
+              <div>
+                Items returnable within 30 days with original receipt.
               </div>
-              <div className="footer-r">
-                <div className="fthanks">Thank you for Choosing RPG</div>
-                <div className="ftagline">
-                  Crafting the Ultimate Ride — {new Date().getFullYear()}
-                </div>
+              <div>Warranty void if seal is broken or tampered with.</div>
+            </div>
+            <div className="footer-r">
+              <div className="fthanks">Thank you for Choosing RPG</div>
+              <div className="ftagline">
+                Crafting the Ultimate Ride — {new Date().getFullYear()}
               </div>
             </div>
           </div>
         </div>
       </div>
-    </>
+    </div>
   );
 }

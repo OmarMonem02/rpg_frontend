@@ -344,7 +344,7 @@ export function CreateTicketModal({
                               </div>
                             </div>
                             <div className={`h-6 w-6 rounded-full border-2 flex items-center justify-center transition-all ${selectedBike?.id === b.id ? "bg-primary border-primary" : "border-outline-variant"}`}>
-                              {selectedBike?.id === b.id && <span className="text-white text-xs">✓</span>}
+                              {selectedBike?.id === b.id && <span className="text-xs text-on-primary">✓</span>}
                             </div>
                           </div>
                         </div>

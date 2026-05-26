@@ -11,6 +11,14 @@ import {
   type CreateCategoryPayload,
 } from "@/lib/crud-api";
 import { EntityFormModal, type FieldConfig } from "@/components/entity-form-modal";
+import {
+  ActionButton,
+  EmptyState,
+  PageHero,
+  PageShell,
+  PaginationControls,
+  SurfaceCard,
+} from "@/components/ops-ui";
 
 export default function ProductCategoriesPage() {
   const [categories, setCategories] = useState<ProductCategoryRecord[]>([]);
@@ -41,7 +49,7 @@ export default function ProductCategoriesPage() {
   };
 
   useEffect(() => {
-    loadCategories();
+    void loadCategories();
   }, [page]);
 
   const handleOpenModal = (category?: ProductCategoryRecord) => {
@@ -105,87 +113,92 @@ export default function ProductCategoriesPage() {
   ];
 
   return (
-    <div className="max-w-6xl mx-auto p-4">
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-6">
-        <h1 className="font-display text-2xl font-semibold text-on-surface">Product Categories</h1>
-        <button
-          onClick={() => handleOpenModal()}
-          className="rounded bg-primary px-4 py-2 text-on-primary hover:opacity-90"
-        >
-          + Add Category
-        </button>
-      </div>
+    <PageShell>
+      <PageHero
+        eyebrow="Master Data"
+        title="Product Categories"
+        actions={
+          <ActionButton tone="primary" onClick={() => handleOpenModal()}>
+            Add Category
+          </ActionButton>
+        }
+      />
 
-      {error && <div className="mb-4 rounded bg-error/20 p-4 text-error">{error}</div>}
+      {error ? (
+        <div className="rounded-2xl border border-error/20 bg-error/10 p-4 text-sm text-error">
+          {error}
+        </div>
+      ) : null}
 
-      {loading ? (
-        <div className="flex justify-center py-12">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-outline-variant/30 border-t-primary"></div>
-        </div>
-      ) : categories.length === 0 ? (
-        <div className="rounded border border-outline-variant/15 bg-surface-container p-8 text-center text-on-surface-variant">
-          No categories found. Create your first category!
-        </div>
-      ) : (
-        <div className="overflow-x-auto rounded border border-ghost-border">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-outline-variant/15 bg-surface-container">
-                <th className="px-4 py-3 text-left font-semibold text-on-surface">Name</th>
-                <th className="px-4 py-3 text-left font-semibold text-on-surface">Created</th>
-                <th className="px-4 py-3 text-right font-semibold text-on-surface">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {categories.map((category) => (
-                <tr key={category.id} className="border-b border-outline-variant/10 hover:bg-surface-container-low">
-                  <td className="px-4 py-3 text-on-surface">{category.name}</td>
-                  <td className="px-4 py-3 text-on-surface-variant text-xs">
-                    {category.created_at ? new Date(category.created_at).toLocaleDateString() : "-"}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <button
-                      onClick={() => handleOpenModal(category)}
-                      className="text-primary hover:underline text-xs font-medium"
-                    >
-                      Edit
-                    </button>
-                    <span className="mx-2 text-on-surface-variant">•</span>
-                    <button
-                      onClick={() => handleDelete(category.id)}
-                      className="text-error hover:underline text-xs font-medium"
-                    >
-                      Delete
-                    </button>
-                  </td>
+      <SurfaceCard>
+        {loading ? (
+          <div className="flex justify-center py-12">
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-outline-variant/30 border-t-primary" />
+          </div>
+        ) : categories.length === 0 ? (
+          <EmptyState
+            title="No categories found"
+            description="Create your first product category to organize the catalog."
+            action={
+              <ActionButton tone="primary" onClick={() => handleOpenModal()}>
+                Create Category
+              </ActionButton>
+            }
+          />
+        ) : (
+          <div className="overflow-x-auto rounded-[1.5rem] border border-outline-variant/15 bg-surface-container-lowest">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-outline-variant/15 bg-surface-container-low">
+                  <th className="px-4 py-3 text-left font-semibold text-on-surface">Name</th>
+                  <th className="px-4 py-3 text-left font-semibold text-on-surface">Created</th>
+                  <th className="px-4 py-3 text-right font-semibold text-on-surface">Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+              </thead>
+              <tbody>
+                {categories.map((category) => (
+                  <tr
+                    key={category.id}
+                    className="border-b border-outline-variant/10 hover:bg-surface-container-low"
+                  >
+                    <td className="px-4 py-3 text-on-surface">{category.name}</td>
+                    <td className="px-4 py-3 text-xs text-on-surface-variant">
+                      {category.created_at
+                        ? new Date(category.created_at).toLocaleDateString()
+                        : "-"}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <button
+                        type="button"
+                        onClick={() => handleOpenModal(category)}
+                        className="text-xs font-medium text-primary hover:underline"
+                      >
+                        Edit
+                      </button>
+                      <span className="mx-2 text-on-surface-variant">•</span>
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(category.id)}
+                        className="text-xs font-medium text-error hover:underline"
+                      >
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </SurfaceCard>
 
-      {totalPages > 1 && (
-        <div className="mt-4 flex justify-center gap-2">
-          <button
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-            disabled={page === 1}
-            className="rounded px-3 py-2 text-sm hover:bg-surface-container disabled:opacity-50"
-          >
-            Previous
-          </button>
-          <span className="px-3 py-2 text-sm text-on-surface-variant">
-            Page {page} of {totalPages}
-          </span>
-          <button
-            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-            disabled={page === totalPages}
-            className="rounded px-3 py-2 text-sm hover:bg-surface-container disabled:opacity-50"
-          >
-            Next
-          </button>
-        </div>
-      )}
+      <PaginationControls
+        page={page}
+        totalPages={totalPages}
+        onPageChange={setPage}
+        onPrevious={() => setPage((p) => Math.max(1, p - 1))}
+        onNext={() => setPage((p) => Math.min(totalPages, p + 1))}
+      />
 
       <EntityFormModal
         title={editingCategory ? "Edit Category" : "Create Category"}
@@ -196,6 +209,6 @@ export default function ProductCategoriesPage() {
         onClose={handleCloseModal}
         onSubmit={handleSubmit}
       />
-    </div>
+    </PageShell>
   );
 }

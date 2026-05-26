@@ -15,11 +15,18 @@ import {
   InputGroup,
 } from "@/components/ops-ui";
 import {
+  ModalShell,
   PaymentCloseModal,
   AdminPasswordReopenModal,
   TicketInvoiceModal,
 } from "@/components/tickets/ticket-workflow-modals";
-import { ticketsApi, ticketItemName, type Ticket, type TicketItem } from "@/lib/tickets-api";
+import {
+  buildTicketTrackingUrl,
+  ticketsApi,
+  ticketItemName,
+  type Ticket,
+  type TicketItem,
+} from "@/lib/tickets-api";
 import { getAuthUser } from "@/lib/auth-session";
 import {
   clampTicketItemDiscount,
@@ -100,6 +107,7 @@ export default function TicketDetailsPage() {
     toCreate: string[];
     skippedCount: number;
   } | null>(null);
+  const [deleteTaskId, setDeleteTaskId] = useState<number | null>(null);
 
   // Item Management State
   const [activeTaskId, setActiveTaskId] = useState<number | null>(null);
@@ -116,30 +124,55 @@ export default function TicketDetailsPage() {
   const [reopenModalError, setReopenModalError] = useState("");
   const [isInvoiceOpen, setIsInvoiceOpen] = useState(false);
   const [isExportingInvoice, setIsExportingInvoice] = useState(false);
-  const [trackingUrl, setTrackingUrl] = useState<string | null>(null);
   const [trackingBusy, setTrackingBusy] = useState(false);
+  const [trackingLinkEnsuring, setTrackingLinkEnsuring] = useState(false);
   const [trackingMessage, setTrackingMessage] = useState("");
+
+  const refreshTicket = useCallback(async () => {
+    const data = await ticketsApi.getTicket(Number(id));
+    setTicket(data);
+    return data;
+  }, [id]);
 
   const fetchTicket = useCallback(async () => {
     try {
       setLoading(true);
-      const data = await ticketsApi.getTicket(Number(id));
-      setTicket(data);
+      await refreshTicket();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to load ticket");
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [refreshTicket]);
 
   useEffect(() => {
-    fetchTicket();
+    void fetchTicket();
   }, [fetchTicket]);
 
   useEffect(() => {
-    if (!ticket?.public_token || typeof window === "undefined") return;
-    setTrackingUrl(`${window.location.origin}/track/${ticket.public_token}`);
-  }, [ticket?.public_token]);
+    if (!canSendTracking || !ticket?.id || !ticket.customer?.phone?.trim()) return;
+    if (ticket.public_token) return;
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        setTrackingLinkEnsuring(true);
+        const res = await ticketsApi.ensureTrackingLink(ticket.id);
+        if (cancelled) return;
+        setTicket((prev) =>
+          prev ? { ...prev, public_token: res.public_token } : prev,
+        );
+      } catch {
+        // Link can still be created when sending via WhatsApp.
+      } finally {
+        if (!cancelled) setTrackingLinkEnsuring(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [canSendTracking, ticket?.id, ticket?.customer?.phone, ticket?.public_token]);
 
   const handleSendTrackingLink = async () => {
     if (!ticket?.customer?.phone?.trim()) {
@@ -149,10 +182,24 @@ export default function TicketDetailsPage() {
     try {
       setTrackingBusy(true);
       setTrackingMessage("");
+      setError("");
       const res = await ticketsApi.sendTrackingLink(Number(id));
-      setTrackingUrl(res.tracking_url);
-      setTrackingMessage("Tracking link sent via WhatsApp.");
-      await fetchTicket();
+      setTicket((prev) =>
+        prev
+          ? {
+              ...prev,
+              public_token: res.public_token,
+              tracking_link_sent_at: res.sent_at,
+              tracking_link_send_count: (prev.tracking_link_send_count ?? 0) + 1,
+            }
+          : prev,
+      );
+      setTrackingMessage("Tracking link queued for WhatsApp delivery.");
+      try {
+        await refreshTicket();
+      } catch {
+        // Keep optimistic UI when background refresh fails.
+      }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to send tracking link");
     } finally {
@@ -161,9 +208,9 @@ export default function TicketDetailsPage() {
   };
 
   const handleCopyTrackingLink = async () => {
-    if (!trackingUrl) return;
+    if (!ticket?.public_token) return;
     try {
-      await navigator.clipboard.writeText(trackingUrl);
+      await navigator.clipboard.writeText(buildTicketTrackingUrl(ticket.public_token));
       setTrackingMessage("Tracking link copied to clipboard.");
     } catch {
       setError("Could not copy link to clipboard.");
@@ -175,10 +222,15 @@ export default function TicketDetailsPage() {
     try {
       setTrackingBusy(true);
       setTrackingMessage("");
+      setError("");
       const res = await ticketsApi.regenerateTrackingToken(Number(id));
-      setTrackingUrl(res.tracking_url);
+      setTicket((prev) => (prev ? { ...prev, public_token: res.public_token } : prev));
       setTrackingMessage(res.message);
-      await fetchTicket();
+      try {
+        await refreshTicket();
+      } catch {
+        // Keep regenerated token visible when refresh fails.
+      }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to regenerate tracking link");
     } finally {
@@ -358,11 +410,13 @@ export default function TicketDetailsPage() {
     }
   };
 
-  const handleDeleteTask = async (taskId: number) => {
-    if (!confirm("Are you sure you want to delete this task? All items within it will be removed.")) return;
+  const handleConfirmDeleteTask = async () => {
+    if (deleteTaskId === null) return;
     try {
       setIsProcessing(true);
-      await ticketsApi.deleteTask(Number(id), taskId);
+      setError("");
+      await ticketsApi.deleteTask(Number(id), deleteTaskId);
+      setDeleteTaskId(null);
       await fetchTicket();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to delete task");
@@ -690,6 +744,9 @@ export default function TicketDetailsPage() {
   const applyStaffDiscountCap = isStaffUser;
   const isClosed = ticket.status === "closed";
   const ticketFullyPaid = isClosedAndFullyPaid(ticket);
+  const trackingUrl = ticket.public_token
+    ? buildTicketTrackingUrl(ticket.public_token)
+    : null;
 
   return (
     <PageShell>
@@ -816,9 +873,16 @@ export default function TicketDetailsPage() {
           {!ticket.customer?.phone ? (
             <p className="text-sm text-error">Add a customer phone number before sending a tracking link.</p>
           ) : null}
+          {trackingLinkEnsuring ? (
+            <p className="mb-3 text-sm text-on-surface-variant">Preparing tracking link…</p>
+          ) : null}
           {trackingUrl ? (
             <p className="mb-3 break-all rounded-lg bg-surface-container-low px-3 py-2 font-mono text-xs text-on-surface-variant">
               {trackingUrl}
+            </p>
+          ) : ticket.customer?.phone && !trackingLinkEnsuring ? (
+            <p className="mb-3 text-sm text-on-surface-variant">
+              Tracking link could not be prepared. Refresh the page or use Send via WhatsApp.
             </p>
           ) : null}
           {ticket.tracking_link_sent_at ? (
@@ -923,7 +987,7 @@ export default function TicketDetailsPage() {
                         >
                           {task.status === "completed" ? "Reopen Task" : "Complete Task"}
                         </ActionButton>
-                        <ActionButton variant="ghost" size="sm" tone="danger" onClick={() => handleDeleteTask(task.id)}>
+                        <ActionButton variant="ghost" size="sm" tone="danger" onClick={() => setDeleteTaskId(task.id)}>
                           Delete
                         </ActionButton>
                       </>
@@ -980,7 +1044,7 @@ export default function TicketDetailsPage() {
                                   className="w-24 rounded-lg border border-outline-variant/30 bg-surface px-2 py-1 text-right text-sm text-error outline-none focus:border-primary"
                                 />
                                 {applyStaffDiscountCap ? (
-                                  <span className="text-[10px] font-medium text-on-surface-variant">
+                                  <span className="text-caption font-medium text-on-surface-variant">
                                     {formatTicketMaxDiscountHint(item)}
                                   </span>
                                 ) : null}
@@ -1017,6 +1081,24 @@ export default function TicketDetailsPage() {
           </div>
         )}
       </div>
+
+      <ConfirmDialog
+        isOpen={deleteTaskId !== null}
+        onClose={() => setDeleteTaskId(null)}
+        title="Delete task?"
+        confirmLabel={isProcessing ? "Deleting…" : "Delete task"}
+        confirmTone="danger"
+        onConfirm={() => void handleConfirmDeleteTask()}
+        isLoading={isProcessing}
+      >
+        <p className="text-sm text-on-surface-variant">
+          Are you sure you want to delete{" "}
+          <span className="font-medium text-on-surface">
+            {ticket?.tasks?.find((t) => t.id === deleteTaskId)?.name ?? "this task"}
+          </span>
+          ? All items within it will be removed.
+        </p>
+      </ConfirmDialog>
 
       <ConfirmDialog
         isOpen={createTasksFromNotesOpen && tasksFromNotesPreview !== null}
@@ -1089,30 +1171,37 @@ export default function TicketDetailsPage() {
         </div>
       )}
 
-      {/* Add Task Modal */}
-      {isAddTaskModalOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-md">
-          <div className="w-full max-w-md rounded-[2.5rem] bg-surface p-8 shadow-2xl border border-outline-variant/20 animate-in zoom-in-95 duration-200">
-            <h3 className="text-2xl font-bold text-on-surface mb-6">New Maintenance Task</h3>
-            <InputGroup label="Task Name (e.g. Engine Repair, Periodic Service)">
-              <input
-                autoFocus
-                className="w-full rounded-2xl border border-outline-variant/30 bg-surface px-5 py-3 outline-none focus:border-primary transition-all shadow-inner"
-                placeholder="Enter task name..."
-                value={newTaskName}
-                onChange={(e) => setNewTaskName(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleAddTask()}
-              />
-            </InputGroup>
-            <div className="flex justify-end gap-3 mt-8">
-              <ActionButton variant="ghost" onClick={() => setIsAddTaskModalOpen(false)}>Cancel</ActionButton>
-              <ActionButton tone="primary" onClick={handleAddTask} disabled={!newTaskName.trim() || isProcessing}>
-                Create Task
-              </ActionButton>
-            </div>
+      <ModalShell
+        isOpen={isAddTaskModalOpen}
+        onClose={() => setIsAddTaskModalOpen(false)}
+        title="New Maintenance Task"
+        size="md"
+        footer={
+          <div className="flex justify-end gap-3">
+            <ActionButton variant="ghost" onClick={() => setIsAddTaskModalOpen(false)}>
+              Cancel
+            </ActionButton>
+            <ActionButton
+              tone="primary"
+              onClick={() => void handleAddTask()}
+              disabled={!newTaskName.trim() || isProcessing}
+            >
+              {isProcessing ? "Creating…" : "Create Task"}
+            </ActionButton>
           </div>
-        </div>
-      )}
+        }
+      >
+        <InputGroup label="Task Name (e.g. Engine Repair, Periodic Service)">
+          <input
+            autoFocus
+            className="w-full rounded-2xl border border-outline-variant/30 bg-surface px-5 py-3 outline-none focus:border-primary transition-all shadow-inner"
+            placeholder="Enter task name..."
+            value={newTaskName}
+            onChange={(e) => setNewTaskName(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && void handleAddTask()}
+          />
+        </InputGroup>
+      </ModalShell>
 
       {/* Item Picker */}
       <CatalogPickerModal

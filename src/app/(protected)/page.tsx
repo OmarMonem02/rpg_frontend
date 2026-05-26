@@ -27,7 +27,7 @@ export default function HomePage() {
     <PageShell className="gap-1">
       <header className="space-y-2 items-center justify-center">
         <p className="label-caps text-on-surface-variant text-center">Workspace</p>
-        <h1 className="font-display text-3xl font-extrabold tracking-tight text-on-surface md:text-4xl text-center">
+        <h1 className="text-display-md text-center">
           {greeting}
         </h1>
       </header>

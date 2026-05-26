@@ -63,7 +63,7 @@ export default function AnnualStatementPage() {
         active="annual"
       />
 
-      <FilterBar className="border-emerald-500/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(240,253,244,0.92))]">
+      <FilterBar>
         <div className="md:col-span-4">
           <YearPicker year={year} onChange={setYear} />
         </div>
@@ -114,7 +114,7 @@ export default function AnnualStatementPage() {
               <div className="grid gap-4 xl:grid-cols-3">
                 <BreakdownList title="Revenue Mix" values={section.revenue_mix} currency={code} />
                 <BreakdownList title="Expense Categories" values={section.expense_categories} currency={code} />
-                <SurfaceCard className="border-emerald-500/10 bg-white/95 shadow-[0_18px_40px_rgba(15,23,42,0.05)] transition-transform duration-300 ease-out hover:-translate-y-0.5">
+                <SurfaceCard className="transition-transform duration-300 ease-out hover:-translate-y-0.5">
                   <h3 className="text-base font-semibold text-on-surface">Channel Balance</h3>
                   <div className="mt-4 space-y-3">
                     {[
@@ -135,7 +135,7 @@ export default function AnnualStatementPage() {
                 </SurfaceCard>
               </div>
 
-              <SurfaceCard className="overflow-hidden p-0 shadow-[0_18px_40px_rgba(15,23,42,0.05)]">
+              <SurfaceCard className="overflow-hidden p-0 shadow-ambient">
                 <div className="border-b border-outline-variant/12 px-4 py-4 md:px-5">
                   <h3 className="text-base font-semibold text-on-surface">Monthly trend table</h3>
                   <p className="mt-1 text-sm text-on-surface-variant">

@@ -222,6 +222,18 @@ export type Ticket = {
   tracking_link_send_count?: number;
 };
 
+export function buildTicketTrackingUrl(publicToken: string): string {
+  if (typeof window === "undefined") {
+    return `/track/${publicToken}`;
+  }
+  return `${window.location.origin}/track/${publicToken}`;
+}
+
+export type EnsureTrackingLinkResponse = {
+  tracking_url: string;
+  public_token: string;
+};
+
 export type SendTrackingLinkResponse = {
   sent_at: string;
   tracking_url: string;
@@ -394,6 +406,12 @@ export const ticketsApi = {
       },
     );
     return res;
+  },
+  ensureTrackingLink: async (ticketId: number) => {
+    return authorizedFetch<EnsureTrackingLinkResponse>(
+      `/tickets/${ticketId}/ensure-tracking-link`,
+      { method: "POST" },
+    );
   },
   sendTrackingLink: async (ticketId: number) => {
     return authorizedFetch<SendTrackingLinkResponse>(`/tickets/${ticketId}/send-tracking-link`, {

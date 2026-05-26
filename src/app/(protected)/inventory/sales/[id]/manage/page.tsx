@@ -410,7 +410,7 @@ export default function ManageSaleItemsPage() {
                       }
                       className="w-full rounded-xl border border-outline-variant/30 px-4 py-3 text-lg font-semibold tabular-nums focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all bg-surface"
                     />
-                    <div className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-bold text-on-surface-variant/40 uppercase tracking-widest">
+                    <div className="label-caps absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant/40">
                       Units
                     </div>
                   </div>
@@ -487,7 +487,7 @@ export default function ManageSaleItemsPage() {
                             </div>
                             <StatusBadge
                               tone={getItemTypeTone(row.kind)}
-                              className="mt-1 px-1.5 py-0.5 text-[10px]"
+                              className="text-caption mt-1 px-1.5 py-0.5"
                             >
                               {labelOf(row.kind)}
                             </StatusBadge>

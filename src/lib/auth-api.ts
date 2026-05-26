@@ -24,7 +24,17 @@ export class ApiError extends Error {
 
 async function parseErrorMessage(response: Response): Promise<string> {
   try {
-    const json = (await response.json()) as { message?: string };
+    const json = (await response.json()) as {
+      message?: string;
+      errors?: Record<string, string[] | string>;
+    };
+    if (json.errors && typeof json.errors === "object") {
+      const passwordErrors = json.errors.password;
+      if (Array.isArray(passwordErrors) && passwordErrors[0]) {
+        return passwordErrors[0];
+      }
+      if (typeof passwordErrors === "string") return passwordErrors;
+    }
     if (json.message) return json.message;
   } catch {
     // Ignore parse errors and use fallback message.
@@ -90,6 +100,25 @@ export async function getMe(token: string): Promise<AuthUser> {
 
   const data = await parseJson<{ user: AuthUser }>(response);
   return normalizeAuthUser(data.user);
+}
+
+export async function verifyAdminPassword(
+  token: string,
+  password: string,
+): Promise<void> {
+  const response = await fetch(getApiUrl("/auth/verify-admin-password"), {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ password }),
+  });
+
+  if (!response.ok) {
+    throw new ApiError(await parseErrorMessage(response), response.status);
+  }
 }
 
 export async function logout(token: string): Promise<void> {

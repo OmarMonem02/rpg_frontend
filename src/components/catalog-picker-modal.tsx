@@ -369,7 +369,7 @@ export function CatalogPickerModal({
         <div className="relative border-b border-outline-variant/15 bg-surface-container-low px-4 sm:px-6 py-4 sm:py-5 flex items-start sm:items-center justify-between shrink-0">
           <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent" />
           <div className="flex-1 pr-4">
-            <h2 className="text-xl sm:text-2xl font-display font-bold text-on-surface tracking-tight flex items-center gap-2">
+            <h2 className="flex items-center gap-2 text-xl font-bold tracking-tight text-on-surface sm:text-2xl">
               <span className="flex shrink-0 items-center justify-center w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-primary/10 text-primary">
                 <svg
                   className="w-5 h-5"
@@ -422,7 +422,7 @@ export function CatalogPickerModal({
                 <span className="font-display text-sm font-bold tracking-tight text-on-surface sm:text-base">
                   Refine results
                 </span>
-                <span className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-on-surface-variant sm:text-xs">
+                <span className="mt-0.5 line-clamp-2 text-caption leading-snug text-on-surface-variant sm:text-xs">
                   {filtersExpanded
                     ? "Filters below scroll separately from the catalog list."
                     : activeFilterCount > 0
@@ -431,7 +431,7 @@ export function CatalogPickerModal({
                 </span>
               </span>
               {activeFilterCount > 0 ? (
-                <span className="hidden shrink-0 items-center rounded-full border border-primary/30 bg-primary/12 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary sm:inline-flex">
+                <span className="label-caps hidden shrink-0 items-center rounded-full border border-primary/30 bg-primary/12 px-2 py-0.5 text-primary sm:inline-flex">
                   {activeFilterCount}
                 </span>
               ) : null}
@@ -892,7 +892,7 @@ export function CatalogPickerModal({
 
         {/* Pagination Header (Mobile only) / Overlay Footer */}
         {totalPages > 1 && (
-          <div className="border-t border-outline-variant/15 px-6 py-3 flex items-center justify-between bg-surface-container shadow-[0_-4px_12px_rgba(0,0,0,0.02)] relative z-10 shrink-0">
+          <div className="relative z-10 flex shrink-0 items-center justify-between border-t border-outline-variant/15 bg-surface-container px-6 py-3 shadow-ambient">
             <ActionButton
               variant="outline"
               size="sm"

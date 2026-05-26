@@ -945,7 +945,7 @@ function SalesPageContent() {
                             <span className="mono-data text-xs text-on-surface-variant">
                               {formatDate(sale.created_at)}
                             </span>
-                            <span className="form-chip mt-1 w-max rounded-md text-[10px]">
+                            <span className="form-chip text-caption mt-1 w-max rounded-md">
                               {titleCase(sale.sale_type)}
                             </span>
                           </div>

@@ -158,7 +158,7 @@ export default function TicketsPage() {
                           href={`/tickets/${ticket.id}`}
                           variant="outline"
                           size="sm"
-                          className="group-hover:bg-primary group-hover:text-white group-hover:border-primary transition-all"
+                          className="group-hover:border-primary group-hover:bg-primary group-hover:text-on-primary transition-all"
                         >
                           View Details
                         </ActionButton>
@@ -168,7 +168,7 @@ export default function TicketsPage() {
                             tone="danger"
                             size="sm"
                             disabled={deletingId === ticket.id}
-                            className="group-hover:bg-error group-hover:text-white group-hover:border-error transition-all"
+                            className="group-hover:border-error group-hover:bg-error group-hover:text-on-primary transition-all"
                             onClick={() => void handleDeleteTicket(ticket.id)}
                             title="Delete ticket"
                           >

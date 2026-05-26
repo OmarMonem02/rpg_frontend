@@ -77,7 +77,7 @@ export default function LoginPage() {
               className="w-full h-full object-cover"
             />
           </div>
-          <h1 className="font-display text-4xl font-black tracking-tight text-on-surface">
+          <h1 className="text-display-md font-black text-on-surface">
             RPG Workshop
           </h1>
           <p className="label-caps mt-2 text-on-surface-variant/70">
@@ -85,7 +85,7 @@ export default function LoginPage() {
           </p>
         </div>
 
-        <section className="bg-surface-container-lowest border border-outline-variant/20 rounded-3xl p-8 shadow-[0_20px_60px_rgba(0,83,220,0.07)]">
+        <section className="rounded-3xl border border-outline-variant/20 bg-surface-container-lowest p-8 shadow-ambient">
           <form className="space-y-6" onSubmit={onSubmit}>
             <div className="space-y-2">
               <label className="label-caps ml-1" htmlFor="email">

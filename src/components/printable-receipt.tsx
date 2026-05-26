@@ -32,65 +32,45 @@ export function ReceiptTemplate({
   const totalAmount = (sale.total || 0).toFixed(2);
 
   return (
-    <div className="receipt-template pdf-capture-safe w-80 bg-white text-on-surface font-mono text-xs print:w-full print:max-w-none">
-      <style>{`
-        @media print {
-          body {
-            margin: 0;
-            padding: 0;
-            background: white;
-          }
-          .receipt-container {
-            width: 80mm;
-            margin: 0 auto;
-            padding: 0;
-            background: white;
-            box-shadow: none;
-          }
-          .no-print {
-            display: none !important;
-          }
-        }
-      `}</style>
-
-      <div className="receipt-container p-4 print:p-2 space-y-3">
+    <div className="receipt-template pdf-capture-safe print-body w-80 bg-surface-container-lowest text-on-surface print:w-full print:max-w-none">
+      <div className="receipt-container space-y-3 p-4 print:p-2">
         <div className="h-1 bg-accent" aria-hidden="true" />
         {/* Header */}
-        <div className="text-center border-b border-on-surface/20 pb-3">
-          <p className="font-display font-black text-sm mb-1">{companyName}</p>
-          <p className="text-[10px] text-on-surface-variant">{companyEmail}</p>
-          <p className="text-[10px] text-on-surface-variant">{companyPhone}</p>
+        <div className="border-b border-outline-variant/20 pb-3 text-center">
+          <p className="print-heading mb-1 text-sm">{companyName}</p>
+          <p className="text-caption text-on-surface-variant">{companyEmail}</p>
+          <p className="text-caption text-on-surface-variant">{companyPhone}</p>
         </div>
 
         {/* Receipt Number & Date */}
-        <div className="text-center border-b border-on-surface/20 pb-2 space-y-1 text-[10px]">
+        <div className="text-caption space-y-1 border-b border-outline-variant/20 pb-2 text-center">
           <p className="mono-data">Receipt #{sale.id}</p>
           <p>{new Date(sale.created_at || "").toLocaleDateString()}</p>
           <p>{new Date(sale.created_at || "").toLocaleTimeString()}</p>
         </div>
 
         {/* Customer Info */}
-        <div className="text-[10px] space-y-1 pb-2 border-b border-on-surface/20">
+        <div className="text-caption space-y-1 border-b border-outline-variant/20 pb-2">
           <p>Customer: #{sale.customer_id}</p>
           <p>Seller: #{sale.seller_id}</p>
           <p className="uppercase">Status: {sale.status}</p>
         </div>
 
         {/* Items */}
-        <div className="space-y-1 text-[10px] pb-2 border-b border-on-surface/20">
+        <div className="text-caption space-y-1 border-b border-outline-variant/20 pb-2">
           {sale.line_items && sale.line_items.length > 0 ? (
             sale.line_items.map((item) => (
               <div key={item.id}>
                 <div className="flex justify-between">
                   <span className="flex-1 truncate">{item.item_label || `Item ${item.id}`}</span>
-                  <span className="mono-data ml-1 flex-shrink-0">${calculateLineItemSubtotal(item.quantity, item.selling_price, item.discount_amount)}</span>
+                  <span className="mono-data ml-1 shrink-0">${calculateLineItemSubtotal(item.quantity, item.selling_price, item.discount_amount)}</span>
                 </div>
-                <div className="flex justify-between text-on-surface-variant text-[9px]">
+                <div className="text-caption flex justify-between text-on-surface-variant">
                   <span>{item.sellable_type} x{item.quantity}</span>
                   <span className="mono-data">@${item.selling_price.toFixed(2)}</span>
                 </div>
                 {item.discount_amount > 0 && (
-                  <div className="flex justify-between text-red-600 text-[9px] ml-2">
+                  <div className="text-caption flex justify-between text-negative ml-2">
                     <span>Discount</span>
                     <span>-${item.discount_amount.toFixed(2)}</span>
                   </div>
@@ -103,7 +83,7 @@ export function ReceiptTemplate({
         </div>
 
         {/* Totals */}
-        <div className="space-y-1 text-[10px] border-b border-on-surface/20 pb-2">
+        <div className="text-caption space-y-1 border-b border-outline-variant/20 pb-2">
           <div className="flex justify-between">
             <span>Subtotal:</span>
             <span className="mono-data">${itemsSubtotal}</span>
@@ -115,37 +95,37 @@ export function ReceiptTemplate({
             </div>
           )}
           {Number(saleDiscount) > 0 && (
-            <div className="flex justify-between text-red-600">
+            <div className="flex justify-between text-negative">
               <span>Discount:</span>
               <span className="mono-data">-${saleDiscount}</span>
             </div>
           )}
-          <div className="flex justify-between font-bold pt-1 border-t border-on-surface/20">
+          <div className="flex justify-between border-t border-outline-variant/20 pt-1 font-bold">
             <span>TOTAL:</span>
             <span className="mono-data font-bold">${totalAmount}</span>
           </div>
         </div>
 
         {/* Payment Method */}
-        <div className="text-center text-[10px] text-on-surface-variant space-y-1">
+        <div className="text-caption space-y-1 text-center text-on-surface-variant">
           <p>Payment: Method #{sale.payment_method_id}</p>
           <p className="capitalize">Delivery: {sale.delivery_status}</p>
           {sale.is_maintenance && (
-            <p className="text-primary">⚙️ Maintenance Service</p>
+            <p className="text-primary">Maintenance Service</p>
           )}
         </div>
 
         {/* Footer */}
-        <div className="text-center text-[9px] text-on-surface-variant border-t border-on-surface/20 pt-2 space-y-1">
+        <div className="text-caption space-y-1 border-t border-outline-variant/20 pt-2 text-center text-on-surface-variant">
           <p>Thank you for your purchase!</p>
-          <p className="text-[8px]">{new Date().toLocaleString()}</p>
-          <p className="text-[8px]">Please retain this receipt</p>
+          <p>{new Date().toLocaleString()}</p>
+          <p>Please retain this receipt</p>
         </div>
 
         {/* QR Code Placeholder */}
-        <div className="text-center pt-2 border-t border-on-surface/20">
-          <div className="inline-block p-2 border border-on-surface/20 rounded">
-            <div className="w-16 h-16 flex items-center justify-center text-[8px] text-on-surface-variant">
+        <div className="border-t border-outline-variant/20 pt-2 text-center">
+          <div className="inline-block rounded border border-outline-variant/20 p-2">
+            <div className="text-caption flex h-16 w-16 items-center justify-center text-on-surface-variant">
               [QR: #{sale.id}]
             </div>
           </div>

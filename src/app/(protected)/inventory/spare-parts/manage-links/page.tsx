@@ -248,12 +248,14 @@ export default function SparePartsManageLinkingPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center p-8">
-        <div className="text-center">
-          <div className="mb-4 inline-block h-8 w-8 animate-spin rounded-full border-4 border-gray-300 border-t-blue-600"></div>
-          <p className="text-gray-600">Loading spare parts and blueprints...</p>
+      <PageShell>
+        <div className="flex items-center justify-center py-16">
+          <div className="text-center">
+            <div className="mb-4 inline-block h-8 w-8 animate-spin rounded-full border-4 border-outline-variant/30 border-t-primary" />
+            <p className="text-on-surface-variant">Loading spare parts and blueprints...</p>
+          </div>
         </div>
-      </div>
+      </PageShell>
     );
   }
 
@@ -295,22 +297,22 @@ export default function SparePartsManageLinkingPage() {
               spareParts.map((part) => (
                 <label
                   key={part.id}
-                  className="flex items-center space-x-3 p-2 hover:bg-gray-50"
+                  className="flex items-center space-x-3 p-2 hover:bg-surface-container-low"
                 >
                   <input
                     type="checkbox"
                     checked={selected.spareParts.includes(part.id)}
                     onChange={() => toggleSparePart(part.id)}
-                    className="accent-blue-600"
+                    className="accent-primary"
                   />
                   <div className="flex-1">
-                    <div className="font-medium text-gray-900">{part.name}</div>
-                    <div className="text-sm text-gray-500">SKU: {part.sku}</div>
+                    <div className="font-medium text-on-surface">{part.name}</div>
+                    <div className="text-sm text-on-surface-variant">SKU: {part.sku}</div>
                   </div>
                 </label>
               ))
             ) : (
-              <p className="text-center text-gray-500">No spare parts found</p>
+              <p className="text-center text-on-surface-variant">No spare parts found</p>
             )}
           </div>
 
@@ -333,23 +335,23 @@ export default function SparePartsManageLinkingPage() {
                 blueprints.map((blueprint) => (
                   <label
                     key={blueprint.id}
-                    className="flex items-center space-x-3 p-2 hover:bg-gray-50"
+                    className="flex items-center space-x-3 p-2 hover:bg-surface-container-low"
                   >
                     <input
                       type="checkbox"
                       checked={selected.blueprints.includes(blueprint.id)}
                       onChange={() => toggleBlueprint(blueprint.id)}
-                      className="accent-blue-600"
+                      className="accent-primary"
                     />
                     <div>
-                      <div className="font-medium text-gray-900">
+                      <div className="font-medium text-on-surface">
                         {blueprint.model} {blueprint.year}
                       </div>
                     </div>
                   </label>
                 ))
               ) : (
-                <p className="col-span-2 text-center text-gray-500">
+                <p className="col-span-2 text-center text-on-surface-variant">
                   No blueprints available
                 </p>
               )}
