@@ -1,14 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
+import {
+  ArrowPathIcon,
+  ChatBubbleLeftRightIcon,
+  LockClosedIcon,
+  ShieldCheckIcon,
+  WrenchScrewdriverIcon,
+} from "@heroicons/react/24/outline";
 import type { PublicTicketTracking, TrackingTimelineStep } from "@/lib/public-tracking-api";
 import { formatMoney } from "@/lib/public-tracking-api";
 
-type TicketStatus = "pending" | "in_progress" | "completed" | string;
+type TicketStatus = "pending" | "in_progress" | "completed" | "closed" | string;
 
-function statusTone(status: TicketStatus): "default" | "primary" | "accent" {
+function statusTone(status: TicketStatus): "default" | "primary" | "accent" | "closed" {
   if (status === "completed") return "primary";
   if (status === "in_progress") return "accent";
+  if (status === "closed") return "closed";
   return "default";
 }
 
@@ -17,30 +25,77 @@ const statusToneClasses = {
     "border-outline-variant/20 bg-surface-container text-on-surface-variant",
   primary: "border-primary/20 bg-primary-container text-on-primary-container",
   accent: "border-accent/25 bg-accent/10 text-accent",
+  closed: "border-outline-variant/25 bg-surface-container-high text-on-surface-variant",
 } as const;
+
+function TrackingCard({
+  children,
+  className = "",
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <section className={`tracking-card overflow-hidden ${className}`.trim()}>{children}</section>
+  );
+}
+
+function SectionTitle({
+  children,
+  action,
+}: {
+  children: React.ReactNode;
+  action?: React.ReactNode;
+}) {
+  return (
+    <div className="mb-4 flex items-center justify-between gap-3">
+      <h2 className="label-caps">{children}</h2>
+      {action}
+    </div>
+  );
+}
 
 export function TrackingShell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="tracking-page min-h-screen bg-background text-on-surface">
+    <div className="tracking-page tracking-page-bg min-h-screen text-on-surface">
+      <div className="tracking-grid-overlay pointer-events-none fixed inset-0" aria-hidden />
       <div
-        className="pointer-events-none fixed inset-x-0 top-0 h-72 bg-[radial-gradient(ellipse_at_top,_color-mix(in_srgb,var(--color-primary)_14%,transparent)_0%,transparent_68%)]"
+        className="pointer-events-none fixed inset-x-0 top-0 h-80 bg-[radial-gradient(ellipse_at_top,_color-mix(in_srgb,var(--color-primary)_18%,transparent)_0%,transparent_65%)] lg:h-96"
         aria-hidden
       />
-      <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-xl flex-col px-4 py-6 pb-32 sm:px-6 sm:py-8">
+      <div className="tracking-shell-inner relative z-10 flex min-h-screen flex-col px-4 py-5 pb-[calc(var(--tracking-footer-h)+1.5rem)] sm:px-6 sm:py-7 lg:px-8 lg:pb-10">
         {children}
       </div>
     </div>
   );
 }
 
+export function TrackingVerifyLayout({ children }: { children: React.ReactNode }) {
+  return <div className="tracking-verify-grid tracking-stagger">{children}</div>;
+}
+
+export function TrackingDashboardLayout({
+  main,
+  aside,
+}: {
+  main: ReactNode;
+  aside: ReactNode;
+}) {
+  return (
+    <div className="tracking-dashboard-grid tracking-stagger">
+      <div className="tracking-dashboard-main min-w-0">{main}</div>
+      <aside className="tracking-dashboard-aside">{aside}</aside>
+    </div>
+  );
+}
+
 export function TrackingLoadingState() {
   return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-4 py-24">
-      <span
-        className="h-10 w-10 animate-spin rounded-full border-2 border-outline-variant/30 border-t-primary"
-        aria-hidden
-      />
-      <p className="text-sm text-on-surface-variant">Loading your ticket…</p>
+    <div className="grid flex-1 gap-4 py-8 lg:grid-cols-2">
+      <div className="tracking-card h-36 animate-pulse bg-surface-container-low" />
+      <div className="tracking-card h-28 animate-pulse bg-surface-container-low lg:col-span-2" />
+      <div className="tracking-card h-48 animate-pulse bg-surface-container-low lg:col-span-2" />
+      <p className="text-center text-sm text-on-surface-variant lg:col-span-2">Loading your ticket…</p>
     </div>
   );
 }
@@ -48,15 +103,35 @@ export function TrackingLoadingState() {
 export function TrackingErrorState({ message }: { message: string }) {
   return (
     <div className="flex flex-1 flex-col items-center justify-center py-16 animate-fade-in">
-      <div className="w-full max-w-md rounded-[1.5rem] border border-dashed border-outline-variant/25 bg-surface-container p-10 text-center">
-        <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl border border-error/20 bg-error-container text-error">
-          <svg aria-hidden viewBox="0 0 24 24" className="h-7 w-7" fill="none" stroke="currentColor" strokeWidth="2">
+      <TrackingCard className="w-full max-w-md p-10 text-center">
+        <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl border border-error/20 bg-error-container text-error">
+          <svg aria-hidden viewBox="0 0 24 24" className="h-8 w-8" fill="none" stroke="currentColor" strokeWidth="2">
             <circle cx="12" cy="12" r="10" />
             <path d="M12 8v5M12 16h.01" strokeLinecap="round" />
           </svg>
         </div>
-        <h1 className="font-display text-2xl font-semibold text-on-surface">Link unavailable</h1>
-        <p className="mx-auto mt-3 max-w-sm text-sm leading-6 text-on-surface-variant">{message}</p>
+        <h1 className="font-display text-2xl font-bold text-on-surface">Link unavailable</h1>
+        <p className="mx-auto mt-3 max-w-sm text-sm leading-relaxed text-on-surface-variant">{message}</p>
+        <p className="mt-6 text-xs text-on-surface-variant/80">
+          If you received this link by WhatsApp, ask the shop to send a new one.
+        </p>
+      </TrackingCard>
+    </div>
+  );
+}
+
+export function TrackingClosedBanner() {
+  return (
+    <div
+      className="mb-4 flex items-start gap-3 rounded-2xl border border-outline-variant/20 bg-surface-container-high/80 px-4 py-3.5 backdrop-blur-sm"
+      role="status"
+    >
+      <LockClosedIcon className="mt-0.5 h-5 w-5 shrink-0 text-on-surface-variant" aria-hidden />
+      <div>
+        <p className="text-sm font-semibold text-on-surface">Ticket closed</p>
+        <p className="mt-0.5 text-xs leading-relaxed text-on-surface-variant">
+          You can still view progress and message history. New messages are disabled.
+        </p>
       </div>
     </div>
   );
@@ -76,9 +151,9 @@ function ShopLogo({ name, logoUrl }: { name: string; logoUrl?: string | null }) 
   const showImage = Boolean(logoUrl) && !failed;
 
   return (
-    <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-outline-variant/15 bg-surface-container-lowest shadow-sm">
+    <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-outline-variant/15 bg-surface shadow-sm ring-2 ring-primary/5">
       {showImage ? (
-        // eslint-disable-next-line @next/next/no-img-element -- logo URL is configurable (relative or external)
+        // eslint-disable-next-line @next/next/no-img-element -- logo URL is configurable
         <img
           src={logoUrl!}
           alt={`${name} logo`}
@@ -114,32 +189,43 @@ export function TrackingHeader({
   const tone = statusTone(status);
 
   return (
-    <header className="mb-6 animate-app-shell-enter">
-      <div className="overflow-hidden rounded-[1.75rem] border border-outline-variant/15 bg-surface-container-lowest shadow-[var(--shadow-ambient)]">
-        <div className="border-b border-outline-variant/10 bg-primary/5 px-5 py-4 sm:px-6">
-          <div className="flex items-start gap-4">
+    <header className="mb-5 animate-app-shell-enter">
+      <TrackingCard>
+        <div className="relative overflow-hidden border-b border-outline-variant/10 bg-gradient-to-br from-primary/8 via-surface-container-lowest to-surface-container-lowest px-5 py-5 sm:px-6">
+          <div
+            className="pointer-events-none absolute -right-8 -top-8 h-32 w-32 rounded-full bg-primary/10 blur-2xl"
+            aria-hidden
+          />
+          <div className="relative flex items-start gap-4">
             <ShopLogo name={shopName} logoUrl={logoUrl} />
             <div className="min-w-0 flex-1">
-              <p className="label-caps text-primary">Maintenance tracking</p>
-              <h1 className="mt-2 font-display text-2xl font-extrabold tracking-tight text-on-surface sm:text-3xl">
+              <p className="label-caps text-primary">Service tracking</p>
+              <h1 className="mt-1.5 font-display text-2xl font-extrabold tracking-tight text-on-surface sm:text-[1.65rem]">
                 {shopName}
               </h1>
-              <p className="mt-1 text-sm text-on-surface-variant">{tagline}</p>
+              {tagline ? (
+                <p className="mt-1 text-sm leading-snug text-on-surface-variant">{tagline}</p>
+              ) : null}
             </div>
           </div>
         </div>
 
-        <div className="grid gap-4 px-5 py-5 sm:grid-cols-[1fr_auto] sm:items-center sm:px-6">
+        <div className="flex flex-col gap-4 px-5 py-4 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between sm:px-6">
           <div>
-            <p className="label-caps">Ticket number</p>
-            <p className="mono-data mt-1 text-2xl font-bold text-on-surface">#{ticketNumber}</p>
+            <p className="label-caps">Ticket</p>
+            <p className=" mt-1 text-2xl font-bold tracking-tight text-on-surface lg:text-xl">
+              #{ticketNumber}
+            </p>
             {updatedAtHuman ? (
-              <p className="mt-1 text-xs text-on-surface-variant">Updated {updatedAtHuman}</p>
+              <p className="mt-1.5 flex items-center gap-1.5 text-xs text-on-surface-variant">
+                <span className="inline-block h-1.5 w-1.5 rounded-full bg-primary/60" aria-hidden />
+                Updated {updatedAtHuman}
+              </p>
             ) : null}
           </div>
           <StatusPill status={status} label={statusLabel} tone={tone} />
         </div>
-      </div>
+      </TrackingCard>
     </header>
   );
 }
@@ -151,86 +237,119 @@ export function StatusPill({
 }: {
   status: string;
   label?: string;
-  tone?: "default" | "primary" | "accent";
+  tone?: "default" | "primary" | "accent" | "closed";
 }) {
   const resolvedTone = tone ?? statusTone(status);
   const display = label ?? status.replace(/_/g, " ");
 
   return (
     <span
-      className={`inline-flex items-center rounded-full border px-3 py-1.5 text-xs font-semibold capitalize before:mr-2 before:inline-block before:h-1.5 before:w-1.5 before:rounded-full before:bg-current ${statusToneClasses[resolvedTone]}`}
+      className={`inline-flex items-center rounded-full border px-3.5 py-2 text-xs font-bold capitalize shadow-sm before:mr-2 before:inline-block before:h-2 before:w-2 before:rounded-full before:bg-current ${statusToneClasses[resolvedTone]}`}
     >
       {display}
     </span>
   );
 }
 
-export function TasksProgressBar({
-  completed,
-  total,
-  percent,
-}: {
-  completed: number;
-  total: number;
-  percent: number;
-}) {
+function ProgressRing({ percent }: { percent: number }) {
+  const radius = 36;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference - (percent / 100) * circumference;
+
   return (
-    <section className="mb-6 rounded-[1.25rem] border border-outline-variant/15 bg-surface-container-lowest p-4 shadow-[var(--shadow-ambient)]">
-      <div className="mb-3 flex items-end justify-between gap-3">
-        <div>
-          <h2 className="text-sm font-semibold text-on-surface">Work progress</h2>
-          <p className="mt-0.5 text-xs text-on-surface-variant">
-            {completed} of {total} tasks completed
+    <svg className="h-[5.25rem] w-[5.25rem] shrink-0" viewBox="0 0 88 88" aria-hidden>
+      <circle
+        cx="44"
+        cy="44"
+        r={radius}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="6"
+        className="text-surface-container"
+      />
+      <circle
+        cx="44"
+        cy="44"
+        r={radius}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="6"
+        strokeLinecap="round"
+        className="tracking-progress-ring text-primary transition-[stroke-dashoffset] duration-700 ease-out"
+        style={{
+          strokeDasharray: circumference,
+          strokeDashoffset: offset,
+        }}
+      />
+    </svg>
+  );
+}
+
+export function TrackingStatusSummary({ data }: { data: PublicTicketTracking }) {
+  const { ticket, progress } = data;
+  const tone = statusTone(ticket.status);
+
+  return (
+    <TrackingCard className="mb-2 p-2 lg:p-5">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center lg:gap-2">
+        <div className="relative mx-auto flex shrink-0 items-center justify-center sm:mx-0">
+          <ProgressRing percent={progress.tasks_percent} />
+          <span className="absolute font-display text-lg font-extrabold text-primary lg:text-xl">
+            {progress.tasks_percent}%
+          </span>
+        </div>
+        <div className="min-w-0 flex-1 text-center sm:text-left">
+          <p className="text-sm font-semibold text-on-surface lg:text-base">Overall progress</p>
+          <p className="mt-0.5 text-xs text-on-surface-variant lg:text-sm">
+            {progress.tasks_completed} of {progress.tasks_total} tasks done
           </p>
         </div>
-        <span className="mono-data rounded-lg bg-primary px-2.5 py-1 text-xs font-bold text-on-primary">
-          {percent}%
-        </span>
       </div>
-      <div
-        className="h-2 overflow-hidden rounded-full bg-surface-container"
-        role="progressbar"
-        aria-valuenow={percent}
-        aria-valuemin={0}
-        aria-valuemax={100}
-      >
-        <div
-          className="h-full rounded-full bg-primary transition-[width] duration-500 ease-out"
-          style={{ width: `${percent}%` }}
-        />
+
+      <div className="mt-5 grid grid-cols-2 gap-3 border-t border-outline-variant/10 pt-2 lg:mt-2">
+        <div className="rounded-xl bg-surface-container-low px-3 py-2.5">
+          <p className="label-caps">Tasks</p>
+            {progress.tasks_completed}/{progress.tasks_total}
+          <p className=" mt-1 text-lg font-bold text-on-surface">
+          </p>
+        </div>
+        <div className="rounded-xl bg-primary/5 px-3 py-2.5 ring-1 ring-primary/10">
+          <p className="label-caps text-primary">Est. total</p>
+          <p className=" mt-1 text-lg font-bold text-primary">{formatMoney(ticket.total)}</p>
+        </div>
       </div>
-    </section>
+    </TrackingCard>
   );
 }
 
 export function ProgressTimeline({ steps }: { steps: TrackingTimelineStep[] }) {
   return (
-    <section className="mb-6 rounded-[1.25rem] border border-outline-variant/15 bg-surface-container-lowest p-5 shadow-[var(--shadow-ambient)]">
-      <h2 className="label-caps mb-5">Service status</h2>
+    <TrackingCard className="mb-5 p-5">
+      <SectionTitle>Service journey</SectionTitle>
 
-      <ol className="hidden gap-2 sm:grid sm:grid-cols-3">
+      <ol className="hidden gap-1 md:grid md:grid-cols-3">
         {steps.map((step, index) => (
           <TimelineStepHorizontal key={step.key} step={step} index={index} isLast={index === steps.length - 1} />
         ))}
       </ol>
 
-      <ol className="space-y-0 sm:hidden">
+      <ol className="space-y-0 md:hidden">
         {steps.map((step, index) => (
           <TimelineStepVertical key={step.key} step={step} index={index} isLast={index === steps.length - 1} />
         ))}
       </ol>
-    </section>
+    </TrackingCard>
   );
 }
 
 function stepIndicatorClasses(state: TrackingTimelineStep["state"]): string {
   if (state === "done") {
-    return "border-primary bg-primary text-on-primary";
+    return "border-primary bg-primary text-on-primary shadow-sm shadow-primary/20";
   }
   if (state === "current") {
-    return "border-accent bg-accent/15 text-accent ring-4 ring-accent/10";
+    return "border-accent bg-accent text-on-primary ring-4 ring-accent/15";
   }
-  return "border-outline-variant/25 bg-surface-container text-on-surface-variant/50";
+  return "border-outline-variant/25 bg-surface-container text-on-surface-variant/45";
 }
 
 function CheckIcon() {
@@ -251,29 +370,27 @@ function TimelineStepHorizontal({
   isLast: boolean;
 }) {
   return (
-    <li className="relative flex flex-col items-center text-center">
+    <li className="relative flex flex-col items-center px-1 text-center">
       {!isLast ? (
         <span
-          className={`absolute left-[calc(50%+1.25rem)] top-4 h-0.5 w-[calc(100%-2.5rem)] ${
-            step.state === "done" ? "bg-primary/40" : "bg-outline-variant/20"
-          }`}
+          className={`absolute left-[calc(50%+1.25rem)] top-4 h-0.5 w-[calc(100%-2.5rem)] ${step.state === "done" ? "bg-primary/50" : "bg-outline-variant/15"
+            }`}
           aria-hidden
         />
       ) : null}
       <span
-        className={`relative z-10 flex h-8 w-8 items-center justify-center rounded-full border text-xs font-bold ${stepIndicatorClasses(step.state)}`}
+        className={`relative z-10 flex h-9 w-9 items-center justify-center rounded-full border-2 text-xs font-bold ${stepIndicatorClasses(step.state)}`}
       >
         {step.state === "done" ? <CheckIcon /> : index + 1}
       </span>
       <p
-        className={`mt-3 text-xs font-semibold leading-snug ${
-          step.state === "upcoming" ? "text-on-surface-variant/60" : "text-on-surface"
-        }`}
+        className={`mt-3 text-[11px] font-semibold leading-snug ${step.state === "upcoming" ? "text-on-surface-variant/55" : "text-on-surface"
+          }`}
       >
         {step.label}
       </p>
       {step.state === "current" ? (
-        <p className="label-caps mt-1 text-accent">Current</p>
+        <p className="label-caps mt-1 text-accent">Now</p>
       ) : null}
     </li>
   );
@@ -292,28 +409,26 @@ function TimelineStepVertical({
     <li className="flex gap-4">
       <div className="flex flex-col items-center">
         <span
-          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-xs font-bold ${stepIndicatorClasses(step.state)}`}
+          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 text-xs font-bold ${stepIndicatorClasses(step.state)}`}
         >
           {step.state === "done" ? <CheckIcon /> : index + 1}
         </span>
         {!isLast ? (
           <span
-            className={`my-1 min-h-6 w-0.5 flex-1 ${
-              step.state === "done" ? "bg-primary/35" : "bg-outline-variant/20"
-            }`}
+            className={`my-1 min-h-7 w-0.5 flex-1 rounded-full ${step.state === "done" ? "bg-primary/40" : "bg-outline-variant/15"
+              }`}
           />
         ) : null}
       </div>
-      <div className="pb-5 pt-0.5">
+      <div className="pb-6 pt-1">
         <p
-          className={`text-sm font-semibold ${
-            step.state === "upcoming" ? "text-on-surface-variant/55" : "text-on-surface"
-          }`}
+          className={`text-sm font-semibold ${step.state === "upcoming" ? "text-on-surface-variant/55" : "text-on-surface"
+            }`}
         >
           {step.label}
         </p>
         {step.state === "current" ? (
-          <p className="mt-0.5 text-xs font-medium text-accent">Current stage</p>
+          <p className="mt-0.5 text-xs font-semibold text-accent">Current stage</p>
         ) : null}
       </div>
     </li>
@@ -334,27 +449,42 @@ export function PhoneVerificationCard({
   error: string;
 }) {
   return (
-    <section className="form-section-card animate-fade-in shadow-[var(--shadow-ambient)]">
-      <div className="form-section-header">
+    <TrackingCard className="animate-fade-in p-5 sm:p-6">
+      <div className="mb-6 flex items-start gap-4">
+        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary text-on-primary shadow-md shadow-primary/20">
+          <ShieldCheckIcon className="h-6 w-6" aria-hidden />
+        </span>
         <div>
-          <h2 className="text-lg font-semibold text-on-surface">Verify your phone</h2>
-          <p className="mt-1 text-sm leading-6 text-on-surface-variant">
-            Enter the phone number on your service record to view parts, services, and totals.
+          <h2 className="font-display text-xl font-bold text-on-surface">Verify your phone</h2>
+          <p className="mt-1.5 text-sm leading-relaxed text-on-surface-variant">
+            Enter the number on your service record to unlock your ticket, parts list, and live updates.
           </p>
         </div>
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-primary/15 bg-primary/5 text-primary">
-          <svg aria-hidden viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2">
-            <path
-              d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </span>
       </div>
 
+      <ol className="mb-6 flex gap-2 text-[11px] font-medium text-on-surface-variant">
+        <li className="flex flex-1 items-center gap-2 rounded-xl bg-primary/10 px-3 py-2 text-primary">
+          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-on-primary">
+            1
+          </span>
+          Verify
+        </li>
+        <li className="flex flex-1 items-center gap-2 rounded-xl bg-surface-container px-3 py-2">
+          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-surface-container-high text-[10px] font-bold">
+            2
+          </span>
+          View ticket
+        </li>
+      </ol>
+
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (!loading && phone.trim()) onSubmit();
+        }}
+      >
       <label className="block">
-        <span className="label-caps mb-2 block">Phone number</span>
+        <span className="label-caps mb-2 block">Mobile number</span>
         <input
           type="tel"
           inputMode="tel"
@@ -362,21 +492,21 @@ export function PhoneVerificationCard({
           placeholder="e.g. 01001234567"
           value={phone}
           onChange={(e) => onPhoneChange(e.target.value)}
-          className={`form-input-base ${error ? "form-input-error" : ""}`}
+          disabled={loading}
+          className={`form-input-base text-base ${error ? "form-input-error" : ""}`}
         />
       </label>
 
       {error ? (
-        <p className="mt-3 rounded-xl border border-error/20 bg-error-container px-3 py-2 text-sm text-error">
+        <p className="mt-3 rounded-xl border border-error/20 bg-error-container px-3 py-2.5 text-sm text-error">
           {error}
         </p>
       ) : null}
 
       <button
-        type="button"
-        onClick={onSubmit}
+        type="submit"
         disabled={loading || !phone.trim()}
-        className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3.5 text-sm font-semibold text-on-primary shadow-md shadow-primary/15 transition-all hover:-translate-y-px hover:shadow-lg hover:shadow-primary/20 disabled:pointer-events-none disabled:opacity-50"
+        className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-primary px-4 py-4 text-sm font-bold text-on-primary shadow-lg shadow-primary/20 transition-all hover:-translate-y-0.5 hover:shadow-xl hover:shadow-primary/25 disabled:pointer-events-none disabled:opacity-50"
       >
         {loading ? (
           <>
@@ -387,71 +517,71 @@ export function PhoneVerificationCard({
           "View my ticket"
         )}
       </button>
-    </section>
+      </form>
+
+      <p className="mt-4 flex items-center justify-center gap-1.5 text-center text-[11px] text-on-surface-variant/90">
+        <LockClosedIcon className="h-3.5 w-3.5 shrink-0" aria-hidden />
+        Secure link · Phone must match shop records
+      </p>
+    </TrackingCard>
   );
 }
-
 export function TicketTrackingDashboard({ data }: { data: PublicTicketTracking }) {
-  const { ticket, customer, bike, tasks, progress } = data;
+  const { customer, bike, tasks, progress } = data;
 
   return (
     <>
-      <TasksProgressBar
-        completed={progress.tasks_completed}
-        total={progress.tasks_total}
-        percent={progress.tasks_percent}
-      />
-
-      <ProgressTimeline steps={progress.timeline} />
-
-      {(customer.name || bike) && (
-        <section className="mb-6 rounded-[1.25rem] border border-outline-variant/15 bg-surface-container-lowest p-5 shadow-[var(--shadow-ambient)]">
-          <h2 className="label-caps mb-4">Service details</h2>
+      {(customer.name || bike) ? (
+        <TrackingCard className="mb-5 p-5">
+          <SectionTitle>Your service</SectionTitle>
           {customer.name ? (
-            <p className="text-base font-semibold text-on-surface">{customer.name}</p>
+            <p className="text-lg font-bold text-on-surface">{customer.name}</p>
           ) : null}
           {bike ? (
-            <p className="mt-2 text-sm text-on-surface-variant">
-              {[bike.brand, bike.model, bike.year].filter(Boolean).join(" · ")}
-              {bike.vin ? (
-                <span className="mono-data mt-2 block text-xs text-on-surface-variant/80">
-                  VIN {bike.vin}
-                </span>
-              ) : null}
-            </p>
+            <div className="mt-3 flex items-st  art gap-3 rounded-xl bg-surface-container-low p-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface-container-high text-on-surface-variant">
+                <WrenchScrewdriverIcon className="h-5 w-5" aria-hidden />
+              </span>
+              <div className="min-w-0">
+                <p className="font-semibold text-on-surface">
+                  {[bike.brand, bike.model, bike.year].filter(Boolean).join(" · ") || "Your bike"}
+                </p>
+                {bike.vin ? (
+                  <p className=" mt-1 text-xs text-on-surface-variant">VIN {bike.vin}</p>
+                ) : null}
+              </div>
+            </div>
           ) : null}
-        </section>
-      )}
-
-      {ticket.customer_notes ? (
-        <section className="mb-6 rounded-[1.25rem] border border-accent/20 bg-accent/5 p-4">
-          <p className="label-caps text-accent">Shop note</p>
-          <p className="mt-2 text-sm leading-6 text-on-surface">{ticket.customer_notes}</p>
-        </section>
+        </TrackingCard>
       ) : null}
 
-      <section className="mb-6">
-        <div className="divider mb-4 flex items-center justify-between gap-3 pb-4">
-          <h2 className="text-sm font-semibold text-on-surface">Work &amp; items</h2>
-          <span className="form-chip">
-            {progress.tasks_completed}/{progress.tasks_total} tasks
-          </span>
-        </div>
+      <div className="mb-5">
+        <SectionTitle
+          action={
+            <span className="form-chip py-0.5">
+              {progress.tasks_completed}/{progress.tasks_total}
+            </span>
+          }
+        >
+          Work &amp; parts
+        </SectionTitle>
 
         {tasks.length === 0 ? (
-          <p className="rounded-[1.25rem] border border-dashed border-outline-variant/25 bg-surface-container p-6 text-center text-sm text-on-surface-variant">
-            No work items listed yet.
-          </p>
+          <div className="rounded-2xl border border-dashed border-outline-variant/25 bg-surface-container-low/50 px-6 py-10 text-center">
+            <WrenchScrewdriverIcon className="mx-auto h-8 w-8 text-on-surface-variant/40" aria-hidden />
+            <p className="mt-3 text-sm text-on-surface-variant">No work items listed yet.</p>
+            <p className="mt-1 text-xs text-on-surface-variant/70">Check back after the shop updates your ticket.</p>
+          </div>
         ) : (
-          <div className="space-y-3">
+          <div className="tracking-tasks-grid">
             {tasks.map((task) => (
               <TaskCard key={task.id} task={task} />
             ))}
           </div>
         )}
-      </section>
+      </div>
 
-      <TrackingTotalFooter total={ticket.total} />
+      <TrackingTotalFooter total={data.ticket.total} className="lg:hidden" />
     </>
   );
 }
@@ -460,15 +590,14 @@ function TaskCard({ task }: { task: PublicTicketTracking["tasks"][number] }) {
   const isDone = task.status === "completed";
 
   return (
-    <article className="overflow-hidden rounded-[1.25rem] border border-outline-variant/15 bg-surface-container-lowest shadow-[var(--shadow-ambient)]">
-      <div className="flex items-center justify-between gap-3 border-b border-outline-variant/10 bg-surface-container-low px-4 py-3">
+    <article className="tracking-card overflow-hidden transition-shadow hover:shadow-[0_16px_40px_rgba(44,52,55,0.08)]">
+      <div className="flex items-center justify-between gap-3 border-b border-outline-variant/10 bg-gradient-to-r from-surface-container-low to-surface-container-lowest px-4 py-3.5">
         <div className="flex min-w-0 items-center gap-3">
           <span
-            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-xs font-bold ${
-              isDone
-                ? "border-primary/25 bg-primary-container text-on-primary-container"
-                : "border-outline-variant/20 bg-surface-container text-on-surface-variant"
-            }`}
+            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border text-xs font-bold ${isDone
+              ? "border-primary/30 bg-primary text-on-primary"
+              : "border-outline-variant/20 bg-surface-container text-on-surface-variant"
+              }`}
           >
             {isDone ? <CheckIcon /> : "·"}
           </span>
@@ -477,45 +606,72 @@ function TaskCard({ task }: { task: PublicTicketTracking["tasks"][number] }) {
             <p className="text-xs text-on-surface-variant">{task.status_label}</p>
           </div>
         </div>
-        <span className="mono-data shrink-0 text-sm font-semibold text-on-surface">
+        <span className=" shrink-0 rounded-lg bg-surface-container px-2 py-1 text-sm font-bold text-on-surface">
           {formatMoney(task.subtotal)}
         </span>
       </div>
 
       {task.items.length > 0 ? (
-        <ul>
+        <ul className="divide-y divide-outline-variant/8">
           {task.items.map((item) => (
-            <li key={item.id} className="data-row flex items-start justify-between gap-3 px-4 py-3 text-sm">
+            <li key={item.id} className="flex items-start justify-between gap-3 px-4 py-3 text-sm">
               <div className="min-w-0">
                 <p className="font-medium text-on-surface">{item.label}</p>
                 <p className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-on-surface-variant">
-                  <span className="form-chip py-0.5 uppercase">{item.type}</span>
-                  <span>Qty {item.qty}</span>
-                  {item.discount > 0 ? <span>Disc. {formatMoney(item.discount)}</span> : null}
+                  <span
+                    className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${item.type === "part"
+                      ? "bg-accent/10 text-accent"
+                      : "bg-primary/10 text-primary"
+                      }`}
+                  >
+                    {item.type}
+                  </span>
+                  <span>×{item.qty}</span>
+                  {item.discount > 0 ? <span>−{formatMoney(item.discount)}</span> : null}
                 </p>
               </div>
-              <span className="mono-data shrink-0 font-semibold text-on-surface">
+              <span className=" shrink-0 font-semibold text-on-surface">
                 {formatMoney(item.subtotal)}
               </span>
             </li>
           ))}
         </ul>
       ) : (
-        <p className="px-4 py-3 text-xs text-on-surface-variant">No parts or services yet.</p>
+        <p className="px-4 py-3 text-xs text-on-surface-variant">No parts or services on this task yet.</p>
       )}
     </article>
   );
 }
 
-function TrackingTotalFooter({ total }: { total: number }) {
+export function TrackingTotalInline({ total }: { total: number }) {
   return (
-    <footer className="fixed bottom-0 left-0 right-0 z-20 border-t border-outline-variant/15 glass px-4 py-4 shadow-[var(--shadow-ambient)]">
-      <div className="mx-auto flex max-w-xl items-center justify-between gap-4">
+    <TrackingCard className="p-5">
+      <div className="flex items-end justify-between gap-4">
         <div>
           <p className="label-caps">Estimated total</p>
-          <p className="mt-0.5 text-xs text-on-surface-variant">Includes all listed work</p>
+          <p className="mt-1 text-m text-on-surface-variant">All listed work &amp; parts</p>
         </div>
-        <span className="mono-data text-2xl font-bold text-primary">{formatMoney(total)}</span>
+        <span className="text-xl font-extrabold tracking-tight text-primary">
+          {formatMoney(total)}
+        </span>
+      </div>
+    </TrackingCard>
+  );
+}
+
+function TrackingTotalFooter({ total, className = "" }: { total: number; className?: string }) {
+  return (
+    <footer
+      className={`tracking-footer-safe fixed bottom-0 left-0 right-0 z-20 border-t border-outline-variant/15 glass ${className}`.trim()}
+    >
+      <div className="tracking-shell-inner flex items-center justify-between gap-4 px-4 py-3.5 sm:px-6">
+        <div>
+          <p className="label-caps">Estimated total</p>
+          <p className="mt-0.5 text-[11px] text-on-surface-variant">All listed work &amp; parts</p>
+        </div>
+        <span className=" text-2xl font-extrabold tracking-tight text-primary">
+          {formatMoney(total)}
+        </span>
       </div>
     </footer>
   );
@@ -539,35 +695,25 @@ export function TrackingRefreshBar({
   const autoEnabled = autoRefreshMinutes > 0;
 
   return (
-    <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-      <p className="text-xs text-on-surface-variant">
-        {autoEnabled ? (
-          <>Auto-updates every {autoRefreshMinutes} min</>
-        ) : (
-          <>Manual refresh only</>
-        )}
+    <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-outline-variant/12 bg-surface-container-lowest/90 px-3 py-2.5 backdrop-blur-sm">
+      <div className="min-w-0 flex-1">
+        <p className="text-xs font-medium text-on-surface">
+          {autoEnabled ? `Auto-refresh · every ${autoRefreshMinutes} min` : "Tap refresh for latest updates"}
+        </p>
         {lastRefreshedAt ? (
-          <span className="text-on-surface-variant/70"> · Last checked {formatLastRefreshed(lastRefreshedAt)}</span>
+          <p className="mt-0.5 text-[11px] text-on-surface-variant">
+            Last checked {formatLastRefreshed(lastRefreshedAt)}
+          </p>
         ) : null}
-      </p>
+      </div>
       <button
         type="button"
         onClick={onRefresh}
         disabled={loading}
-        className="inline-flex items-center gap-2 rounded-xl border border-outline-variant/20 bg-surface-container-lowest px-3 py-2 text-xs font-semibold text-on-surface-variant transition-colors hover:border-primary/25 hover:bg-surface-container hover:text-on-surface disabled:opacity-50"
+        className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-primary px-3.5 py-2 text-xs font-bold text-on-primary shadow-sm shadow-primary/15 transition-all hover:shadow-md disabled:opacity-50"
       >
-        <svg
-          aria-hidden
-          viewBox="0 0 24 24"
-          className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2.5"
-        >
-          <path d="M21 12a9 9 0 1 1-2.64-6.36" strokeLinecap="round" />
-          <path d="M21 3v6h-6" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-        {loading ? "Refreshing…" : "Refresh now"}
+        <ArrowPathIcon className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} aria-hidden />
+        {loading ? "Updating…" : "Refresh"}
       </button>
     </div>
   );

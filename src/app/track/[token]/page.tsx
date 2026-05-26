@@ -1,17 +1,23 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import {
   PhoneVerificationCard,
   ProgressTimeline,
   TicketTrackingDashboard,
+  TrackingClosedBanner,
+  TrackingDashboardLayout,
   TrackingErrorState,
   TrackingHeader,
   TrackingLoadingState,
   TrackingRefreshBar,
   TrackingShell,
+  TrackingStatusSummary,
+  TrackingTotalInline,
+  TrackingVerifyLayout,
 } from "@/components/ticket-tracking/tracking-ui";
+import { TicketMessengerChat } from "@/components/tickets/ticket-messenger-chat";
 import {
   clearTrackingSession,
   getStoredTrackingSession,
@@ -34,6 +40,7 @@ export default function TrackTicketPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [lastRefreshedAt, setLastRefreshedAt] = useState<Date | null>(null);
   const refreshInFlight = useRef(false);
+  const verifyInFlight = useRef(false);
 
   const loadTicketWithSession = useCallback(async () => {
     const session = getStoredTrackingSession(token);
@@ -133,11 +140,15 @@ export default function TrackTicketPage() {
     };
   }, [view, autoRefreshMinutes, refreshTicket]);
 
-  const handleVerify = async () => {
+  const handleVerify = useCallback(async () => {
+    const trimmedPhone = phone.trim();
+    if (!trimmedPhone || verifyInFlight.current || verifying) return;
+
+    verifyInFlight.current = true;
     setVerifying(true);
     setError("");
     try {
-      const res = await publicTrackingApi.verify(token, phone.trim());
+      const res = await publicTrackingApi.verify(token, trimmedPhone);
       storeTrackingSession(token, res.tracking_session);
       setTicket(res.ticket);
       setLastRefreshedAt(new Date());
@@ -145,9 +156,33 @@ export default function TrackTicketPage() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Verification failed.");
     } finally {
+      verifyInFlight.current = false;
       setVerifying(false);
     }
-  };
+  }, [phone, token, verifying]);
+
+  const trackingSession = useMemo(
+    () => (typeof window !== "undefined" ? getStoredTrackingSession(token) : null),
+    [token, view, ticket],
+  );
+
+  const loadPublicMessages = useCallback(async () => {
+    const session = getStoredTrackingSession(token);
+    if (!session) return [];
+    return publicTrackingApi.getMessages(token, session);
+  }, [token]);
+
+  const sendPublicMessage = useCallback(
+    async (payload: Parameters<typeof publicTrackingApi.sendMessage>[2]) => {
+      const session = getStoredTrackingSession(token);
+      if (!session) throw new Error("Verification required.");
+      await publicTrackingApi.sendMessage(token, session, payload);
+    },
+    [token],
+  );
+
+  const customerCanSend = ticket?.ticket.status !== "closed";
+  const isClosed = ticket?.ticket.status === "closed";
 
   if (view === "loading") {
     return (
@@ -169,6 +204,18 @@ export default function TrackTicketPage() {
   const headerStatusLabel = ticket?.ticket.status_label ?? meta.ticket.status_label;
   const shop = ticket?.shop ?? meta.shop;
 
+  const chatProps = trackingSession
+    ? {
+      canSend: customerCanSend,
+      sendDisabledReason: customerCanSend
+        ? undefined
+        : "This ticket is closed — you can view messages but not send new ones.",
+      loadMessages: loadPublicMessages,
+      sendMessage: sendPublicMessage,
+      customerNotesFallback: ticket?.ticket.customer_notes ?? null,
+    }
+    : null;
+
   return (
     <TrackingShell>
       <TrackingHeader
@@ -182,7 +229,7 @@ export default function TrackTicketPage() {
       />
 
       {view === "verify" ? (
-        <>
+        <TrackingVerifyLayout>
           <ProgressTimeline steps={meta.progress.timeline} />
           <PhoneVerificationCard
             phone={phone}
@@ -191,16 +238,50 @@ export default function TrackTicketPage() {
             loading={verifying}
             error={error}
           />
-        </>
+        </TrackingVerifyLayout>
       ) : ticket ? (
         <>
-          <TrackingRefreshBar
-            onRefresh={() => void refreshTicket()}
-            loading={refreshing}
-            autoRefreshMinutes={shop.auto_refresh_minutes}
-            lastRefreshedAt={lastRefreshedAt}
+          <TrackingDashboardLayout
+            main={
+              <>
+                {isClosed ? <TrackingClosedBanner /> : null}
+
+                <TrackingRefreshBar
+                  onRefresh={() => void refreshTicket()}
+                  loading={refreshing}
+                  autoRefreshMinutes={shop.auto_refresh_minutes}
+                  lastRefreshedAt={lastRefreshedAt}
+                />
+
+                <div className="lg:hidden">
+                  <TrackingStatusSummary data={ticket} />
+                  <ProgressTimeline steps={ticket.progress.timeline} />
+                </div>
+                <TicketTrackingDashboard data={ticket} />
+              </>
+            }
+            aside={
+              <>
+                <div className="hidden lg:block">
+                  <TrackingStatusSummary data={ticket} />
+                  <ProgressTimeline steps={ticket.progress.timeline} />
+                </div>
+              </>
+            }
           />
-          <TicketTrackingDashboard data={ticket} />
+
+          {chatProps ? (
+            <TicketMessengerChat
+              partnerName={shop.name}
+              partnerSubtitle={`Ticket #${meta.ticket.ticket_number}`}
+              unreadFrom="staff"
+              popupHint="Message the shop — text or photos welcome."
+              fabAriaLabel="Open shop chat"
+              fabPositionClassName="bottom-[5.75rem] right-4 sm:right-6 lg:bottom-6 lg:right-8"
+              popupPositionClassName="bottom-[8.25rem] right-4 sm:right-6 lg:bottom-24 lg:right-8"
+              {...chatProps}
+            />
+          ) : null}
         </>
       ) : null}
     </TrackingShell>

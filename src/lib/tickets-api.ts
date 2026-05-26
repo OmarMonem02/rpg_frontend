@@ -246,6 +246,42 @@ export type RegenerateTrackingTokenResponse = {
   message: string;
 };
 
+export type TicketMessage = {
+  id: number;
+  body: string;
+  image_url?: string | null;
+  image_public_id?: string | null;
+  sender_type: "customer" | "staff";
+  created_at: string;
+  user?: { id: number; name: string };
+};
+
+export type SendTicketMessagePayload = {
+  body?: string;
+  image_url?: string;
+  image_public_id?: string;
+};
+
+export const TICKET_CHAT_IMAGE_FOLDER = "rpg-system/ticket-chat";
+
+export function normalizeTicketMessage(raw: unknown): TicketMessage {
+  const record = asRecord(raw);
+  const userRaw = record.user ? asRecord(record.user) : null;
+  const senderType = toText(record.sender_type);
+
+  return {
+    id: toNumber(record.id),
+    body: toText(record.body),
+    image_url: toText(record.image_url) || null,
+    image_public_id: toText(record.image_public_id) || null,
+    sender_type: senderType === "staff" ? "staff" : "customer",
+    created_at: toText(record.created_at),
+    user: userRaw
+      ? { id: toNumber(userRaw.id), name: toText(userRaw.name) }
+      : undefined,
+  };
+}
+
 export const ticketsApi = {
   searchCustomers: async (search: string) => {
     const res = await authorizedFetch<{ data: Customer[] }>(`/customers?search=${encodeURIComponent(search)}`);
@@ -428,5 +464,20 @@ export const ticketsApi = {
     await authorizedFetch<void>(`/tickets/${ticketId}`, {
       method: "DELETE",
     });
+  },
+  getMessages: async (ticketId: number): Promise<TicketMessage[]> => {
+    const res = await authorizedFetch<{ data: unknown[] }>(`/tickets/${ticketId}/messages`);
+    return Array.isArray(res.data) ? res.data.map(normalizeTicketMessage) : [];
+  },
+  sendMessage: async (
+    ticketId: number,
+    payload: SendTicketMessagePayload,
+  ): Promise<TicketMessage> => {
+    const res = await authorizedFetch<unknown>(`/tickets/${ticketId}/messages`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    return normalizeTicketMessage(res);
   },
 };

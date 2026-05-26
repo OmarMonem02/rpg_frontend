@@ -1,4 +1,9 @@
 import { getApiUrl } from "@/lib/config";
+import {
+  normalizeTicketMessage,
+  type SendTicketMessagePayload,
+  type TicketMessage,
+} from "@/lib/tickets-api";
 
 const SESSION_HEADER = "X-Tracking-Session";
 
@@ -112,11 +117,19 @@ async function publicFetch<T>(
 
   if (!response.ok) {
     let message = "Something went wrong. Please try again.";
+    if (response.status === 429) {
+      message = "Too many verification attempts. Please wait about a minute, then try again.";
+    }
     try {
-      const body = await response.json();
-      if (typeof body.message === "string") message = body.message;
+      const body = (await response.json()) as { message?: string };
+      if (typeof body.message === "string" && body.message.trim()) {
+        message = body.message;
+      }
     } catch {
       /* ignore */
+    }
+    if (response.status === 429 && !message.toLowerCase().includes("too many")) {
+      message = "Too many verification attempts. Please wait about a minute, then try again.";
     }
     throw new Error(message);
   }
@@ -144,7 +157,35 @@ export const publicTrackingApi = {
       undefined,
       session,
     ),
+
+  getMessages: async (token: string, session: string): Promise<TicketMessage[]> => {
+    const res = await publicFetch<{ data: unknown[] }>(
+      `/public/tickets/${encodeURIComponent(token)}/messages`,
+      undefined,
+      session,
+    );
+    return Array.isArray(res.data) ? res.data.map(normalizeTicketMessage) : [];
+  },
+
+  sendMessage: async (
+    token: string,
+    session: string,
+    payload: SendTicketMessagePayload,
+  ): Promise<TicketMessage> => {
+    const res = await publicFetch<unknown>(
+      `/public/tickets/${encodeURIComponent(token)}/messages`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      },
+      session,
+    );
+    return normalizeTicketMessage(res);
+  },
 };
+
+export type { SendTicketMessagePayload, TicketMessage };
 
 export function formatMoney(amount: number): string {
   return new Intl.NumberFormat("en-EG", {

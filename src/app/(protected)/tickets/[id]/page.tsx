@@ -20,6 +20,7 @@ import {
   AdminPasswordReopenModal,
   TicketInvoiceModal,
 } from "@/components/tickets/ticket-workflow-modals";
+import { TicketMessengerChat } from "@/components/tickets/ticket-messenger-chat";
 import {
   buildTicketTrackingUrl,
   ticketsApi,
@@ -128,11 +129,25 @@ export default function TicketDetailsPage() {
   const [trackingLinkEnsuring, setTrackingLinkEnsuring] = useState(false);
   const [trackingMessage, setTrackingMessage] = useState("");
 
+  const ticketId = Number(id);
+
   const refreshTicket = useCallback(async () => {
-    const data = await ticketsApi.getTicket(Number(id));
+    const data = await ticketsApi.getTicket(ticketId);
     setTicket(data);
     return data;
-  }, [id]);
+  }, [ticketId]);
+
+  const loadTicketMessages = useCallback(
+    () => ticketsApi.getMessages(ticketId),
+    [ticketId],
+  );
+
+  const sendTicketMessage = useCallback(
+    async (payload: Parameters<typeof ticketsApi.sendMessage>[1]) => {
+      await ticketsApi.sendMessage(ticketId, payload);
+    },
+    [ticketId],
+  );
 
   const fetchTicket = useCallback(async () => {
     try {
@@ -748,8 +763,10 @@ export default function TicketDetailsPage() {
     ? buildTicketTrackingUrl(ticket.public_token)
     : null;
 
+  const canSendChat = permissions.canUpdate("maintenance");
+
   return (
-    <PageShell>
+    <PageShell className="pb-24">
       <PageHero
         eyebrow="Ticket Management"
         title={`Ticket #${ticket.id}`}
@@ -915,6 +932,20 @@ export default function TicketDetailsPage() {
           </div>
         </SurfaceCard>
       )}
+
+      <TicketMessengerChat
+        partnerName={ticket.customer?.name || "Customer"}
+        partnerSubtitle={`Ticket #${ticket.id}`}
+        unreadFrom="customer"
+        canSend={canSendChat}
+        sendDisabledReason={
+          canSendChat
+            ? undefined
+            : "You do not have permission to send messages on this ticket."
+        }
+        loadMessages={loadTicketMessages}
+        sendMessage={sendTicketMessage}
+      />
 
       <div className="flex flex-col gap-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
