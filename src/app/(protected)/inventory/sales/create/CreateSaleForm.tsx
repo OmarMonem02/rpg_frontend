@@ -13,6 +13,7 @@ import { getAuthToken, getAuthUser } from "@/lib/auth-session";
 import { verifyAdminPassword } from "@/lib/auth-api";
 import { getSettings } from "@/lib/api/settings";
 import { egpMultiplierForPricingCurrency, toPricingCurrency } from "@/lib/currencies";
+import { REFRESH_ALL_DATA_EVENT } from "@/components/refetch-all-data-button";
 import {
   createSale,
   listCustomers,
@@ -819,6 +820,8 @@ export function CreateSaleForm() {
 
       const sale = await createSale(token, payload);
 
+      window.dispatchEvent(new Event(REFRESH_ALL_DATA_EVENT));
+      router.refresh();
       router.push(`/inventory/sales/${sale.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create sale");

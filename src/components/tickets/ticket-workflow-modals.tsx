@@ -350,9 +350,13 @@ export function TicketInvoiceModal({
         </div>
       }
     >
-      <div className="overflow-hidden rounded-[1.5rem] border border-outline-variant/10 bg-surface-container-lowest">
-        <div id="invoice-export-root">
-          <InvoiceTemplate sale={invoice} />
+      <div className="overflow-x-auto rounded-[1.5rem] border border-outline-variant/10 bg-surface-container-lowest">
+        <div id="invoice-export-root" className="min-w-0">
+          <InvoiceTemplate
+            sale={invoice}
+            documentTitle="Maintenance Invoice"
+            referenceLabel="Ticket #"
+          />
         </div>
       </div>
     </ModalShell>

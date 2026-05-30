@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { usePermissions } from "@/components/permission-provider";
 import { getAuthToken } from "@/lib/auth-session";
 import { useEntityFilters } from "@/hooks/useEntityFilters";
-import { useGlobalDataRefresh } from "@/hooks/useGlobalDataRefresh";
+import { useLiveDataRefresh } from "@/hooks/useLiveDataRefresh";
 import {
   listSpareParts,
   listSparePartCategories,
@@ -131,7 +131,7 @@ export default function SparePartsPage() {
     loadData();
   }, [loadData]);
 
-  useGlobalDataRefresh(loadData);
+  useLiveDataRefresh(loadData);
 
   const handleDeleteSparePart = async (id: number) => {
     if (!confirm("Are you sure you want to delete this spare part?")) return;

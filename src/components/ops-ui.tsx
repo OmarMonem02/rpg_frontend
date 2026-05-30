@@ -411,16 +411,55 @@ export type Tab = {
 export function TabsWrapper({
   tabs,
   defaultTabId,
+  activeTabId,
+  onTabChange,
+  keepMountedTabIds,
   variant = "pills",
   className = "",
 }: {
   tabs: Tab[];
   defaultTabId?: string;
+  activeTabId?: string;
+  onTabChange?: (tabId: string) => void;
+  keepMountedTabIds?: string[];
   variant?: "pills" | "card";
   className?: string;
 }) {
-  const [activeTab, setActiveTab] = useState(defaultTabId ?? tabs[0]?.id ?? "");
-  const activeContent = tabs.find((t) => t.id === activeTab)?.content;
+  const [internalTab, setInternalTab] = useState(defaultTabId ?? tabs[0]?.id ?? "");
+  const activeTab = activeTabId ?? internalTab;
+  const selectTab = (tabId: string) => {
+    onTabChange?.(tabId);
+    if (activeTabId === undefined) setInternalTab(tabId);
+  };
+  const keepMountedSet = new Set(keepMountedTabIds ?? []);
+
+  const renderTabPanels = (panelClassName = "") => (
+    <>
+      {tabs.map((tab) => {
+        const isActive = tab.id === activeTab;
+        const keepMounted = keepMountedSet.has(tab.id);
+        if (!isActive && !keepMounted) return null;
+
+        if (!isActive && keepMounted) {
+          return (
+            <div
+              key={tab.id}
+              className="pointer-events-none fixed left-[-10000px] top-0 z-[-1] w-[210mm] overflow-hidden opacity-0"
+              aria-hidden="true"
+            >
+              {tab.content}
+            </div>
+          );
+        }
+
+        return (
+          <div key={tab.id} className={panelClassName}>
+            {tab.content}
+          </div>
+        );
+      })}
+    </>
+  );
 
   if (variant === "card") {
     return (
@@ -432,7 +471,7 @@ export function TabsWrapper({
             <button
               key={tab.id}
               type="button"
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => selectTab(tab.id)}
               className={`rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors ${
                 activeTab === tab.id
                   ? "bg-primary text-on-primary"
@@ -443,7 +482,7 @@ export function TabsWrapper({
             </button>
           ))}
         </div>
-        <div className="p-4 md:p-5">{activeContent}</div>
+        <div className="p-4 md:p-5">{renderTabPanels()}</div>
       </div>
     );
   }
@@ -455,7 +494,7 @@ export function TabsWrapper({
           <button
             key={tab.id}
             type="button"
-            onClick={() => setActiveTab(tab.id)}
+            onClick={() => selectTab(tab.id)}
             className={`flex-none rounded-xl px-4 py-2 text-sm font-semibold transition-all ${
               activeTab === tab.id
                 ? "bg-primary text-on-primary shadow-sm"
@@ -466,7 +505,7 @@ export function TabsWrapper({
           </button>
         ))}
       </div>
-      <div>{activeContent}</div>
+      {renderTabPanels()}
     </div>
   );
 }

@@ -193,6 +193,76 @@ export type SaleListFilters = {
 
 export type UpdateSaleLineItemPayload = Partial<CreateSaleLineItemPayload>;
 
+const API_ITEM_TYPE_TO_SELLABLE: Record<
+  string,
+  SaleLineItemRecord["sellable_type"]
+> = {
+  product: "products",
+  products: "products",
+  spare_part: "spare_parts",
+  spare_parts: "spare_parts",
+  bike: "bikes",
+  bikes: "bikes",
+  maintenance_service: "maintenance_services",
+  maintenance_services: "maintenance_services",
+};
+
+export function saleLineItemTypeLabel(
+  type: SaleLineItemRecord["sellable_type"] | string,
+): string {
+  const labels: Record<SaleLineItemRecord["sellable_type"], string> = {
+    products: "Product",
+    spare_parts: "Spare Part",
+    bikes: "Bike",
+    maintenance_services: "Service",
+  };
+  const normalized = resolveLineItemSellableType(asRecord({ sellable_type: type }));
+  return labels[normalized] ?? "Item";
+}
+
+function resolveLineItemSellableType(
+  record: Record<string, unknown>,
+): SaleLineItemRecord["sellable_type"] {
+  const raw =
+    toText(record.sellable_type) ||
+    toText(record.item_type) ||
+    toText(record.type);
+
+  if (raw) {
+    const key = raw.toLowerCase().replace(/-/g, "_");
+    const mapped = API_ITEM_TYPE_TO_SELLABLE[key];
+    if (mapped) return mapped;
+  }
+
+  if (toNumber(record.product_id) > 0) return "products";
+  if (toNumber(record.spare_part_id) > 0) return "spare_parts";
+  if (toNumber(record.bike_for_sale_id) > 0) return "bikes";
+  if (toNumber(record.maintenance_service_id) > 0) return "maintenance_services";
+
+  return "products";
+}
+
+function resolveLineItemSellableId(
+  record: Record<string, unknown>,
+  sellableType: SaleLineItemRecord["sellable_type"],
+): number {
+  const explicit = toNumber(record.sellable_id);
+  if (explicit > 0) return explicit;
+
+  switch (sellableType) {
+    case "products":
+      return toNumber(record.product_id);
+    case "spare_parts":
+      return toNumber(record.spare_part_id);
+    case "bikes":
+      return toNumber(record.bike_for_sale_id);
+    case "maintenance_services":
+      return toNumber(record.maintenance_service_id);
+    default:
+      return 0;
+  }
+}
+
 /** Strips known type prefixes the backend prepends to item_label (e.g. "product ", "spare part "). */
 export function stripItemTypePrefix(label: string): string {
   const prefixes = ["maintenance service ", "spare part ", "product ", "bike "];
@@ -209,15 +279,12 @@ export function normalizeSaleLineItem(raw: unknown): SaleLineItemRecord {
   const qty = toNumber(record.quantity || record.qty || 0);
   const returned = toNumber(record.returned_qty || 0);
   const rawLabel = toText(record.item_label) || undefined;
+  const sellableType = resolveLineItemSellableType(record);
   return {
     id: toNumber(record.id),
     sale_id: toNumber(record.sale_id),
-    sellable_type: toText(record.sellable_type) as
-      | "products"
-      | "spare_parts"
-      | "bikes"
-      | "maintenance_services",
-    sellable_id: toNumber(record.sellable_id),
+    sellable_type: sellableType,
+    sellable_id: resolveLineItemSellableId(record, sellableType),
     selling_price: toNumber(record.selling_price || record.sale_price || 0),
     discount_amount: toNumber(record.discount_amount || record.discount || 0),
     quantity: qty,

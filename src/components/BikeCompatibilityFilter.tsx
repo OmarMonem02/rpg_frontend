@@ -1,8 +1,12 @@
 "use client";
 
-import { useMemo } from "react";
-import type { BrandRecord } from "@/lib/crud-api";
-import { useGetBikeModels, useGetBikeYears } from "@/hooks/api/useSpareParts";
+import { useEffect, useMemo, useState } from "react";
+import { getAuthToken } from "@/lib/auth-session";
+import {
+  listBikeBlueprintFilterModels,
+  listBikeBlueprintFilterYears,
+  type BrandRecord,
+} from "@/lib/crud-api";
 
 interface BikeCompatibilityFilterProps {
   brands: BrandRecord[];
@@ -25,13 +29,90 @@ export function BikeCompatibilityFilter({
   selectedYear,
   isLoading = false,
 }: BikeCompatibilityFilterProps) {
+  const [models, setModels] = useState<{ value: string; label: string }[]>([]);
+  const [years, setYears] = useState<{ value: number; label: string }[]>([]);
+  const [modelsLoading, setModelsLoading] = useState(false);
+  const [yearsLoading, setYearsLoading] = useState(false);
+
   const bikeBrands = useMemo(
     () => brands.filter((b) => b.type === "bikes"),
     [brands],
   );
 
-  const { data: models, isLoading: modelsLoading } = useGetBikeModels(selectedBrandId);
-  const { data: years, isLoading: yearsLoading } = useGetBikeYears(selectedBrandId, selectedModel);
+  useEffect(() => {
+    if (!selectedBrandId || selectedBrandId <= 0) {
+      setModels([]);
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadModels = async () => {
+      setModelsLoading(true);
+      try {
+        const token = getAuthToken();
+        if (!token) return;
+        const result = await listBikeBlueprintFilterModels(token, selectedBrandId);
+        if (!cancelled) {
+          setModels(result);
+        }
+      } catch {
+        if (!cancelled) {
+          setModels([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setModelsLoading(false);
+        }
+      }
+    };
+
+    void loadModels();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedBrandId]);
+
+  useEffect(() => {
+    const modelTrimmed = selectedModel?.trim();
+    if (!selectedBrandId || selectedBrandId <= 0 || !modelTrimmed) {
+      setYears([]);
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadYears = async () => {
+      setYearsLoading(true);
+      try {
+        const token = getAuthToken();
+        if (!token) return;
+        const result = await listBikeBlueprintFilterYears(
+          token,
+          selectedBrandId,
+          modelTrimmed,
+        );
+        if (!cancelled) {
+          setYears(result);
+        }
+      } catch {
+        if (!cancelled) {
+          setYears([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setYearsLoading(false);
+        }
+      }
+    };
+
+    void loadYears();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedBrandId, selectedModel]);
 
   const handleBrandChange = (brandId: string) => {
     const id = brandId ? Number(brandId) : undefined;
@@ -92,7 +173,7 @@ export function BikeCompatibilityFilter({
           className="mt-1 w-full rounded border border-outline bg-surface px-3 py-2 text-sm text-foreground disabled:opacity-50"
         >
           <option value="">Select a model</option>
-          {models?.map((model: { value: string; label: string }) => (
+          {models.map((model) => (
             <option key={model.value} value={model.value}>
               {model.label}
             </option>
@@ -112,7 +193,7 @@ export function BikeCompatibilityFilter({
           className="mt-1 w-full rounded border border-outline bg-surface px-3 py-2 text-sm text-foreground disabled:opacity-50"
         >
           <option value="">Select a year</option>
-          {years?.map((year: { value: number; label: string }) => (
+          {years.map((year) => (
             <option key={year.value} value={year.value}>
               {year.label}
             </option>

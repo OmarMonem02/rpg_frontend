@@ -1,13 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
 import { ArrowPathIcon } from "@heroicons/react/24/outline";
 
 export const REFRESH_ALL_DATA_EVENT = "rpg:refresh-all-data";
 
 export function RefetchAllDataButton() {
-  const queryClient = useQueryClient();
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const handleRefresh = async () => {
@@ -15,8 +13,6 @@ export function RefetchAllDataButton() {
 
     try {
       window.dispatchEvent(new Event(REFRESH_ALL_DATA_EVENT));
-      await queryClient.invalidateQueries();
-      await queryClient.refetchQueries({ type: "active" });
     } finally {
       setIsRefreshing(false);
     }

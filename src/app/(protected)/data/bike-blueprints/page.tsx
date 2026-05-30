@@ -1,14 +1,17 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePermissions } from "@/components/permission-provider";
 import { useEntityFilters } from "@/hooks/useEntityFilters";
+import { getAuthToken } from "@/lib/auth-session";
 import {
-  useBikeBlueprints,
-  useBikeBrandOptions,
-  useDeleteBikeBlueprint,
-} from "@/hooks/api/useBikeBlueprints";
+  deleteBikeBlueprint,
+  listBikeBlueprints,
+  listBrands,
+  type BikeBlueprintRecord,
+  type BrandRecord,
+} from "@/lib/crud-api";
 import { AdvancedFilters } from "@/components/advanced-filters";
 import {
   ActionButton,
@@ -32,11 +35,15 @@ export default function BikeBlueprintsPage() {
   const router = useRouter();
   const permissions = usePermissions();
   const [localError, setLocalError] = useState<string | null>(null);
+  const [blueprints, setBlueprints] = useState<BikeBlueprintRecord[]>([]);
+  const [brands, setBrands] = useState<BrandRecord[]>([]);
+  const [totalPages, setTotalPages] = useState(1);
+  const [loading, setLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
   const canCreateBlueprints = permissions.canCreate("bike-blueprints");
   const canUpdateBlueprints = permissions.canUpdate("bike-blueprints");
   const canDeleteBlueprints = permissions.canDelete("bike-blueprints");
 
-  // Use custom filter hook
   const {
     filters,
     page,
@@ -49,26 +56,37 @@ export default function BikeBlueprintsPage() {
     setCurrency,
   } = useEntityFilters();
   const cleanFilters = getCleanFilters() as BikeBlueprintFilters;
-  const blueprintQuery = useBikeBlueprints(page, cleanFilters);
-  const bikeBrandsQuery = useBikeBrandOptions();
-  const deleteMutation = useDeleteBikeBlueprint();
 
-  const blueprints = blueprintQuery.data?.items ?? [];
-  const totalPages = blueprintQuery.data?.lastPage ?? 1;
-  const loading = blueprintQuery.isLoading || bikeBrandsQuery.isLoading;
-  const bikeBrandItems = useMemo(
-    () => bikeBrandsQuery.data?.items ?? [],
-    [bikeBrandsQuery.data?.items],
-  );
-  const brands = useMemo(
-    () => bikeBrandItems.filter((b) => b.type === "bikes"),
-    [bikeBrandItems],
-  );
-  const error =
-    localError ??
-    (blueprintQuery.error instanceof Error
-      ? blueprintQuery.error.message
-      : null);
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    setLocalError(null);
+
+    try {
+      const token = getAuthToken();
+      if (!token) return;
+
+      const [blueprintResult, brandResult] = await Promise.all([
+        listBikeBlueprints(token, page, cleanFilters),
+        listBrands(token, 1, { type: "bikes" }),
+      ]);
+
+      setBlueprints(blueprintResult.items);
+      setTotalPages(blueprintResult.lastPage);
+      setBrands(brandResult.items.filter((b) => b.type === "bikes"));
+    } catch (err) {
+      setLocalError(
+        err instanceof Error ? err.message : "Failed to load bike blueprints",
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [page, cleanFilters]);
+
+  useEffect(() => {
+    void loadData();
+  }, [loadData]);
+
+  const error = localError;
 
   const handleDelete = async (id: number) => {
     if (!canDeleteBlueprints) {
@@ -79,12 +97,17 @@ export default function BikeBlueprintsPage() {
 
     try {
       setLocalError(null);
-      await deleteMutation.mutateAsync(id);
-      await blueprintQuery.refetch();
+      setDeletingId(id);
+      const token = getAuthToken();
+      if (!token) throw new Error("Authentication required");
+      await deleteBikeBlueprint(token, id);
+      await loadData();
     } catch (err) {
       setLocalError(
         err instanceof Error ? err.message : "Failed to delete blueprint",
       );
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -246,7 +269,8 @@ export default function BikeBlueprintsPage() {
                       {canDeleteBlueprints && (
                         <button
                           onClick={() => handleDelete(blueprint.id)}
-                          className="text-error hover:underline text-xs font-medium"
+                          disabled={deletingId === blueprint.id}
+                          className="text-error hover:underline text-xs font-medium disabled:opacity-50"
                         >
                           Delete
                         </button>

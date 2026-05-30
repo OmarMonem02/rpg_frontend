@@ -106,6 +106,7 @@ export async function authorizedFetch<T>(
 
   const response = await fetch(getApiUrl(path), {
     ...init,
+    cache: "no-store",
     headers: {
       Accept: "application/json",
       Authorization: `Bearer ${token}`,

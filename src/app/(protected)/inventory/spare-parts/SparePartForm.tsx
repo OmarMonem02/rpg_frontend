@@ -9,15 +9,18 @@ import {
   type SparePartCategoryRecord,
   type BrandRecord,
   type BikeBlueprintRecord,
+  listSparePartCategories,
+  listBrands,
+  listBikeBlueprints,
+  createSparePart,
+  updateSparePart,
+  assignSparePartToBikeBlueprint,
+  removeSparePartFromBikeBlueprint,
+  fetchAllPages,
 } from "@/lib/crud-api";
+import { getAuthToken } from "@/lib/auth-session";
 import { CURRENCY_SELECT_OPTIONS, toPricingCurrency } from "@/lib/currencies";
 import { EntityForm, type FieldConfig } from "@/components/entity-form";
-import {
-  useCreateSparePart,
-  useSparePartFormDependencies,
-  useSyncSparePartBlueprints,
-  useUpdateSparePart,
-} from "@/hooks/api/useSpareParts";
 
 interface SparePartFormProps {
   mode: "create" | "edit";
@@ -28,23 +31,50 @@ export function SparePartForm({ mode, initialData }: SparePartFormProps) {
   const router = useRouter();
   const [currentBlueprintIds, setCurrentBlueprintIds] = useState<number[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const createMutation = useCreateSparePart();
-  const updateMutation = useUpdateSparePart();
-  const syncBlueprintsMutation = useSyncSparePartBlueprints();
-  const { categories, brands, bikeBlueprints } = useSparePartFormDependencies();
+  const [categoryRows, setCategoryRows] = useState<SparePartCategoryRecord[]>([]);
+  const [brandRows, setBrandRows] = useState<BrandRecord[]>([]);
+  const [blueprints, setBlueprints] = useState<BikeBlueprintRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const categoryRows: SparePartCategoryRecord[] = useMemo(
-    () => categories.data ?? [],
-    [categories.data],
-  );
-  const brandRows: BrandRecord[] = useMemo(
-    () => brands.data ?? [],
-    [brands.data],
-  );
-  const blueprints: BikeBlueprintRecord[] = useMemo(
-    () => bikeBlueprints.data ?? [],
-    [bikeBlueprints.data],
-  );
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadDependencies = async () => {
+      setLoading(true);
+      try {
+        const token = getAuthToken();
+        if (!token) return;
+
+        const [categories, brands, blueprintRows] = await Promise.all([
+          fetchAllPages((page) => listSparePartCategories(token, page)),
+          fetchAllPages((page) => listBrands(token, page)),
+          fetchAllPages((page) => listBikeBlueprints(token, page)),
+        ]);
+
+        if (!cancelled) {
+          setCategoryRows(categories);
+          setBrandRows(brands);
+          setBlueprints(blueprintRows);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Failed to load form data");
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    };
+
+    void loadDependencies();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const sparePartBrands = useMemo(
     () => brandRows.filter((item) => item.type === "spare_parts"),
     [brandRows],
@@ -53,12 +83,6 @@ export function SparePartForm({ mode, initialData }: SparePartFormProps) {
     () => brandRows.filter((item) => item.type === "bikes"),
     [brandRows],
   );
-  const loading =
-    categories.isLoading || brands.isLoading || bikeBlueprints.isLoading;
-  const isSubmitting =
-    createMutation.isPending ||
-    updateMutation.isPending ||
-    syncBlueprintsMutation.isPending;
 
   useEffect(() => {
     if (mode === "edit" && initialData) {
@@ -86,9 +110,39 @@ export function SparePartForm({ mode, initialData }: SparePartFormProps) {
     return Number.isFinite(parsed) ? parsed : undefined;
   };
 
+  const syncSparePartBlueprints = async (
+    sparePart: SparePartRecord,
+    currentIds: number[],
+    selectedIds: number[],
+  ) => {
+    const token = getAuthToken();
+    if (!token) throw new Error("Authentication required");
+
+    const toAdd = selectedIds.filter((id) => !currentIds.includes(id));
+    const toRemove = currentIds.filter((id) => !selectedIds.includes(id));
+
+    await Promise.all(
+      toRemove.map((blueprintId) =>
+        removeSparePartFromBikeBlueprint(token, blueprintId, sparePart.id),
+      ),
+    );
+
+    await Promise.all(
+      toAdd.map((blueprintId) =>
+        assignSparePartToBikeBlueprint(token, blueprintId, {
+          spare_part_id: sparePart.id,
+        }),
+      ),
+    );
+  };
+
   const handleSubmit = async (formData: Record<string, unknown>) => {
     try {
       setError(null);
+      setIsSubmitting(true);
+
+      const token = getAuthToken();
+      if (!token) throw new Error("Authentication required");
 
       const yearFrom = parseOptionalNumber(formData.blueprint_year_from);
       const yearTo = parseOptionalNumber(formData.blueprint_year_to);
@@ -139,13 +193,9 @@ export function SparePartForm({ mode, initialData }: SparePartFormProps) {
       let sparePart: SparePartRecord;
       const selectedBlueprints = isUniversal ? [] : selectedBlueprintsRaw;
       if (mode === "edit" && initialData) {
-        sparePart = await updateMutation.mutateAsync({
-          id: initialData.id,
-          payload: {
-            ...basePayload,
-            // Same request as universal toggle so SparePartRequest validation passes; controller syncs pivot.
-            bike_blueprint_ids: selectedBlueprints,
-          },
+        sparePart = await updateSparePart(token, initialData.id, {
+          ...basePayload,
+          bike_blueprint_ids: selectedBlueprints,
         });
       } else {
         const createPayload = {
@@ -153,21 +203,19 @@ export function SparePartForm({ mode, initialData }: SparePartFormProps) {
           bike_blueprint_ids:
             selectedBlueprints.length > 0 ? selectedBlueprints : undefined,
         } as CreateSparePartPayload;
-        sparePart = await createMutation.mutateAsync(createPayload);
+        sparePart = await createSparePart(token, createPayload);
       }
 
       if (mode !== "edit") {
-        await syncBlueprintsMutation.mutateAsync({
-          sparePart,
-          currentBlueprintIds: [],
-          selectedBlueprintIds: selectedBlueprints,
-        });
+        await syncSparePartBlueprints(sparePart, [], selectedBlueprints);
       }
 
       router.push("/inventory/spare-parts");
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save spare part");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 

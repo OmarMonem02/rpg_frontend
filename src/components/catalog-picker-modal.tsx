@@ -26,6 +26,7 @@ import type { PricingCurrency } from "@/lib/currencies";
 import { SUPPORTED_PRICING_CURRENCIES } from "@/lib/currencies";
 import { ActionButton, StatusBadge } from "@/components/ops-ui";
 import { BikeCompatibilityFilter } from "@/components/BikeCompatibilityFilter";
+import { useLiveDataRefresh } from "@/hooks/useLiveDataRefresh";
 import {
   XMarkIcon,
   FunnelIcon,
@@ -298,6 +299,12 @@ export function CatalogPickerModal({
       loadItems();
     }
   }, [isOpen, catalogType, page, memoizedFilters, loadItems]);
+
+  useLiveDataRefresh(() => {
+    if (isOpen) {
+      return loadItems();
+    }
+  });
 
   useEffect(() => {
     if (isOpen) {

@@ -36,13 +36,7 @@ export const money = (n: number) =>
     maximumFractionDigits: 2,
   });
 
-export const labelOf = (t: SaleLineItemRecord["sellable_type"]) =>
-  ({
-    products: "Product",
-    spare_parts: "Spare Part",
-    bikes: "Bike",
-    maintenance_services: "Service",
-  })[t];
+export { saleLineItemTypeLabel as labelOf } from "@/lib/api/sales";
 
 /**
  * Converts a price to EGP using the provided exchange rate.

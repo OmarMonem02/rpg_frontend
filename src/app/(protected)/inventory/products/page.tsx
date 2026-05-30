@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { usePermissions } from "@/components/permission-provider";
 import { getAuthToken } from "@/lib/auth-session";
 import { useEntityFilters } from "@/hooks/useEntityFilters";
-import { useGlobalDataRefresh } from "@/hooks/useGlobalDataRefresh";
+import { useLiveDataRefresh } from "@/hooks/useLiveDataRefresh";
 import {
   listProducts,
   listProductCategories,
@@ -133,7 +133,7 @@ export default function ProductsPage() {
     loadData();
   }, [loadData]);
 
-  useGlobalDataRefresh(loadData);
+  useLiveDataRefresh(loadData);
 
   const handleDeleteProduct = async (id: number) => {
     if (!canDeleteProducts) {

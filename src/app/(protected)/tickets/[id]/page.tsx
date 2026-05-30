@@ -40,6 +40,7 @@ import {
   type MaintenanceServiceRecord,
 } from "@/lib/crud-api";
 import { CatalogPickerModal } from "@/components/catalog-picker-modal";
+import { printInvoiceElement } from "@/lib/pdf-export";
 
 function parseTicketNoteLines(notes: string): string[] {
   return notes
@@ -603,59 +604,18 @@ export default function TicketDetailsPage() {
   const handlePrintInvoice = () => {
     const invoiceElement = document.getElementById("invoice-export-root");
     if (!invoiceElement) {
-      window.print();
+      setError("Invoice not found");
       return;
     }
 
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) {
-      // Fallback if popup blocker is enabled
-      window.print();
-      return;
+    try {
+      printInvoiceElement(
+        invoiceElement,
+        `Invoice #${ticketInvoice?.id || id}`,
+      );
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to print invoice");
     }
-
-    // Get all stylesheets and style tags to ensure exact same styling
-    const styles = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]'))
-      .map(node => node.outerHTML)
-      .join('\n');
-
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Invoice #${ticketInvoice?.id || id}</title>
-          ${styles}
-          <style>
-            @media print {
-              body {
-                -webkit-print-color-adjust: exact !important;
-                print-color-adjust: exact !important;
-                background-color: white !important;
-              }
-              @page {
-                size: A4;
-                margin: 0;
-              }
-            }
-          </style>
-        </head>
-        <body class="bg-white m-0 p-0">
-          <div class="pdf-export w-full flex justify-center">
-            ${invoiceElement.innerHTML}
-          </div>
-          <script>
-            // Wait a brief moment for styles to apply before printing
-            setTimeout(() => {
-              window.focus();
-              window.print();
-              // Optional: close window after print dialog closes
-              // window.close(); 
-            }, 500);
-          </script>
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
   };
 
   const handleExportInvoicePDF = async () => {
@@ -666,43 +626,9 @@ export default function TicketDetailsPage() {
       const invoiceElement = document.getElementById("invoice-export-root");
       if (!invoiceElement) throw new Error("Invoice element not found");
 
-      invoiceElement.classList.add("pdf-export");
-      const { default: html2canvas } = await import("html2canvas");
-      const jspdfModule = await import("jspdf");
-      const JsPDF =
-        "jsPDF" in jspdfModule && typeof jspdfModule.jsPDF === "function"
-          ? jspdfModule.jsPDF
-          : jspdfModule.default;
-      if (typeof JsPDF !== "function") {
-        throw new Error("jsPDF constructor not available");
-      }
-
-      const canvas = await html2canvas(invoiceElement, {
-        scale: 3,
-        useCORS: true,
-        backgroundColor: "#ffffff",
-      });
-      invoiceElement.classList.remove("pdf-export");
-
-      const imgData = canvas.toDataURL("image/jpeg", 1.0);
-      const pdf = new JsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-      const imgWidth = 210;
-      const pageHeight = 297;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      let heightLeft = imgHeight;
-      let position = 0;
-
-      pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
-      heightLeft -= pageHeight;
-      while (heightLeft >= 0) {
-        position = heightLeft - imgHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
-        heightLeft -= pageHeight;
-      }
-
+      const { exportHtmlElementToPdf } = await import("@/lib/pdf-export");
       const filename = `Invoice-Ticket-${ticketInvoice.id}-${new Date().toISOString().split("T")[0]}.pdf`;
-      pdf.save(filename);
+      await exportHtmlElementToPdf(invoiceElement, filename);
     } catch (err: unknown) {
       console.error("PDF Export Error:", err);
       const message =
@@ -710,8 +636,6 @@ export default function TicketDetailsPage() {
       alert(message);
       setError(message);
     } finally {
-      const invoiceElement = document.getElementById("invoice-export-root");
-      if (invoiceElement) invoiceElement.classList.remove("pdf-export");
       setIsExportingInvoice(false);
     }
   };

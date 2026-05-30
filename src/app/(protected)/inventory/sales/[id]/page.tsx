@@ -18,6 +18,7 @@ import {
   StatusBadge,
 } from "@/components/ops-ui";
 import { InvoiceTemplate } from "@/components/invoice-template";
+import { printInvoiceElement } from "@/lib/pdf-export";
 import {
   ArrowLeftIcon,
   ArrowPathRoundedSquareIcon,
@@ -69,8 +70,8 @@ export default function SaleDetailsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [isPrinting, setIsPrinting] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [activeTab, setActiveTab] = useState("items");
 
   const loadSale = useCallback(async () => {
     try {
@@ -127,11 +128,22 @@ export default function SaleDetailsPage() {
   };
 
   const handlePrint = () => {
-    setIsPrinting(true);
-    setTimeout(() => {
-      window.print();
-      setTimeout(() => setIsPrinting(false), 500);
-    }, 150);
+    if (!sale) return;
+
+    const invoiceElement = document.getElementById("invoice-export-root");
+    if (!invoiceElement) {
+      setError("Invoice not ready to print.");
+      return;
+    }
+
+    try {
+      printInvoiceElement(
+        invoiceElement,
+        `Invoice #${String(sale.id).padStart(6, "0")}`,
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to print invoice");
+    }
   };
 
   const handleExportPDF = async () => {
@@ -141,45 +153,12 @@ export default function SaleDetailsPage() {
       const invoiceElement = document.getElementById("invoice-export-root");
       if (!invoiceElement) throw new Error("Invoice element not found");
 
-      invoiceElement.classList.add("pdf-export");
-      const { default: html2canvas } = await import("html2canvas");
-      const jspdf = await import("jspdf").then((m) => m.jsPDF);
-
-      const canvas = await html2canvas(invoiceElement, {
-        scale: 3,
-        useCORS: true,
-        backgroundColor: "#ffffff",
-      });
-      invoiceElement.classList.remove("pdf-export");
-
-      const imgData = canvas.toDataURL("image/jpeg", 1.0);
-      const pdf = new jspdf({
-        orientation: "portrait",
-        unit: "mm",
-        format: "a4",
-      });
-      const imgWidth = 210;
-      const pageHeight = 297;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      let heightLeft = imgHeight;
-      let position = 0;
-
-      pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
-      heightLeft -= pageHeight;
-      while (heightLeft >= 0) {
-        position = heightLeft - imgHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
-        heightLeft -= pageHeight;
-      }
-
+      const { exportHtmlElementToPdf } = await import("@/lib/pdf-export");
       const filename = `Invoice-${sale.id}-${new Date().toISOString().split("T")[0]}.pdf`;
-      pdf.save(filename);
+      await exportHtmlElementToPdf(invoiceElement, filename);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to export PDF");
     } finally {
-      const invoiceElement = document.getElementById("invoice-export-root");
-      if (invoiceElement) invoiceElement.classList.remove("pdf-export");
       setExporting(false);
     }
   };
@@ -206,33 +185,24 @@ export default function SaleDetailsPage() {
     );
   }
 
-  // ─── Print Mode — Fullscreen template, no chrome ────────────────────────────
-  if (isPrinting) {
-    return (
-      <div className="min-h-screen bg-surface-container-lowest p-8">
-        <div id="invoice-export-root">
-          <InvoiceTemplate sale={sale} />
-        </div>
-      </div>
-    );
-  }
-
-  // ─── Normal Page View ─────────────────────────────────────────────────────────
   return (
     <PageShell>
       {/* ── Page Hero ── */}
       <PageHero
-        eyebrow="Order Management"
-        title={`Sale #${sale.id} Customer: ${sale.customer?.name || `Customer #${sale.customer_id}`}. Sale recorded on ${sale.created_at ? new Date(sale.created_at).toLocaleDateString() : "N/A"}.`}
-        meta={
-          sale.customer_id > 0 && canViewCustomerWorkspace ? (
-            <Link
-              href={`/customers/${sale.customer_id}`}
-              className="inline-flex text-sm font-semibold text-primary hover:underline"
-            >
-              View customer workspace
-            </Link>
-          ) : null
+        eyebrow={`Order Management for Sale #${sale.id}`}
+        title={`Customer: ${sale.customer?.name || `Customer #${sale.customer_id}`}`}
+        subtitle={
+          <p className="text-sm text-on-surface-variant flex items-center gap-2">
+            {'Sale recorded on ' + (sale.created_at ? new Date(sale.created_at).toLocaleDateString() : "N/A")}
+            {sale.customer_id > 0 && canViewCustomerWorkspace ? (
+              <Link
+                href={`/customers/${sale.customer_id}`}
+                className="inline-flex text-sm font-semibold text-primary hover:underline"
+              >
+                View customer history
+              </Link>
+            ) : null}
+          </p>
         }
         actions={
           <>
@@ -315,6 +285,9 @@ export default function SaleDetailsPage() {
       {/* ── Main Content Tabs ── */}
       <TabsWrapper
         defaultTabId="items"
+        activeTabId={activeTab}
+        onTabChange={setActiveTab}
+        keepMountedTabIds={["invoice"]}
         tabs={[
           {
             id: "items",
@@ -444,13 +417,14 @@ export default function SaleDetailsPage() {
             id: "invoice",
             label: "Invoice Preview",
             content: (
-              <SurfaceCard className="flex flex-col items-center bg-surface-container p-6 md:p-12 overflow-hidden">
-                <div className="w-full max-w-[210mm] origin-top scale-[0.85] overflow-hidden rounded-sm bg-surface-container-lowest shadow-ambient sm:scale-100">
-                  <div id="invoice-export-root">
-                    <InvoiceTemplate sale={sale} />
-                  </div>
-                </div>
-              </SurfaceCard>
+              <div
+                id="invoice-export-root"
+                className={`mx-auto w-full min-w-0 max-w-[210mm] overflow-x-auto rounded-sm bg-surface-container-lowest shadow-ambient${
+                  activeTab === "invoice" ? " a4-sheet-preview" : ""
+                }`}
+              >
+                <InvoiceTemplate sale={sale} />
+              </div>
             ),
           },
         ]}
