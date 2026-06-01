@@ -276,7 +276,9 @@ export default function SellersPage() {
   }
 
   function renderSellerActions(record: SellerRecord, align: "start" | "end" = "start") {
-    if (!canReadSales && !canUpdateSellers && !canDeleteSellers) {
+    const canViewHistory = permissions.canReadPage("sellers");
+
+    if (!canViewHistory && !canReadSales && !canUpdateSellers && !canDeleteSellers) {
       return (
         <span className="text-xs font-medium text-on-surface-variant">
           Read only
@@ -286,6 +288,18 @@ export default function SellersPage() {
 
     return (
       <div className={`flex flex-wrap gap-2 ${align === "end" ? "justify-end" : ""}`.trim()}>
+        {canViewHistory ? (
+          <ActionButton
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={deletingId === record.id}
+            className="border-primary/20 bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary"
+            onClick={() => router.push(`/sellers/${record.id}/history`)}
+          >
+            View seller history
+          </ActionButton>
+        ) : null}
         {canReadSales ? (
           <ActionButton
             type="button"
@@ -556,7 +570,7 @@ export default function SellersPage() {
 
                   <div className="mt-4 grid gap-2 rounded-xl border border-outline-variant/10 bg-surface px-3 py-2">
                     <div>
-                      <p className="label-caps">Completed Sales</p>
+                      <p className="label-caps">Completed Sales (this month)</p>
                       <p className="mono-data mt-1 text-sm font-semibold text-on-surface">
                         {record.completed_sales_count}
                       </p>
@@ -568,13 +582,13 @@ export default function SellersPage() {
                       </p>
                     </div>
                     <div>
-                      <p className="label-caps">Sales Base</p>
+                      <p className="label-caps">Sales Base (this month)</p>
                       <p className="mono-data mt-1 text-sm font-semibold text-on-surface">
                         {formatMoney(record.commission_base)}
                       </p>
                     </div>
                     <div>
-                      <p className="label-caps">Earned Commission</p>
+                      <p className="label-caps">Earned (this month)</p>
                       <p className="mono-data mt-1 text-sm font-semibold text-primary">
                         {formatMoney(record.commission_amount)}
                       </p>
@@ -600,9 +614,24 @@ export default function SellersPage() {
                   <tr className="border-b border-outline-variant/15 bg-surface-container-low">
                     <th className="label-caps px-4 py-3">Seller</th>
                     <th className="label-caps px-4 py-3">Rate</th>
-                    <th className="label-caps px-4 py-3">Completed Sales</th>
-                    <th className="label-caps px-4 py-3">Sales Base</th>
-                    <th className="label-caps px-4 py-3">Earned</th>
+                    <th className="label-caps px-4 py-3">
+                      <span>Completed Sales</span>
+                      <span className="mt-0.5 block text-[10px] font-medium normal-case tracking-normal text-on-surface-variant/80">
+                        This month
+                      </span>
+                    </th>
+                    <th className="label-caps px-4 py-3">
+                      <span>Sales Base</span>
+                      <span className="mt-0.5 block text-[10px] font-medium normal-case tracking-normal text-on-surface-variant/80">
+                        This month
+                      </span>
+                    </th>
+                    <th className="label-caps px-4 py-3">
+                      <span>Earned</span>
+                      <span className="mt-0.5 block text-[10px] font-medium normal-case tracking-normal text-on-surface-variant/80">
+                        This month
+                      </span>
+                    </th>
                     <th className="label-caps px-4 py-3">Contact</th>
                     <th className="label-caps px-4 py-3 text-right">Actions</th>
                   </tr>

@@ -89,6 +89,34 @@ export type UpsertSellerPayload = {
   phone: string;
 };
 
+export type SellerMonthlyPeriod = {
+  period: string;
+  label: string;
+  completedSalesCount: number;
+  commissionBase: number;
+  commissionAmount: number;
+  isCurrent: boolean;
+};
+
+export type SellerMonthlyHistoryTotals = {
+  completedSalesCount: number;
+  commissionBase: number;
+  commissionAmount: number;
+};
+
+export type SellerMonthlyHistory = {
+  seller: {
+    id: number;
+    name: string;
+    phone: string;
+    commissionRate: number;
+  };
+  year: number;
+  currentPeriod: string;
+  months: SellerMonthlyPeriod[];
+  yearTotals: SellerMonthlyHistoryTotals;
+};
+
 export function normalizeUser(raw: unknown): UserRecord {
   const record = asRecord(raw);
   return {
@@ -271,4 +299,54 @@ export async function updateSeller(
 
 export async function deleteSeller(token: string, id: number): Promise<void> {
   await authorizedFetch<void>(`/sellers/${id}`, token, { method: "DELETE" });
+}
+
+function normalizeSellerMonthlyPeriod(raw: unknown): SellerMonthlyPeriod {
+  const record = asRecord(raw);
+  return {
+    period: toText(record.period),
+    label: toText(record.label),
+    completedSalesCount: toNumber(record.completed_sales_count),
+    commissionBase: toNumber(record.commission_base),
+    commissionAmount: toNumber(record.commission_amount),
+    isCurrent: record.is_current === true,
+  };
+}
+
+function normalizeSellerMonthlyHistoryTotals(raw: unknown): SellerMonthlyHistoryTotals {
+  const record = asRecord(raw);
+  return {
+    completedSalesCount: toNumber(record.completed_sales_count),
+    commissionBase: toNumber(record.commission_base),
+    commissionAmount: toNumber(record.commission_amount),
+  };
+}
+
+export async function getSellerMonthlyHistory(
+  token: string,
+  sellerId: number,
+  options?: { year?: number },
+): Promise<SellerMonthlyHistory> {
+  const query = buildQuery({ year: options?.year });
+  const payload = await authorizedFetch<unknown>(
+    `/sellers/${sellerId}/monthly-history?${query}`,
+    token,
+  );
+  const record = asRecord(payload);
+  const seller = asRecord(record.seller);
+
+  return {
+    seller: {
+      id: toNumber(seller.id),
+      name: toText(seller.name),
+      phone: toText(seller.phone),
+      commissionRate: toNumber(seller.commission_rate),
+    },
+    year: toNumber(record.year),
+    currentPeriod: toText(record.current_period),
+    months: (Array.isArray(record.months) ? record.months : []).map(
+      normalizeSellerMonthlyPeriod,
+    ),
+    yearTotals: normalizeSellerMonthlyHistoryTotals(record.year_totals),
+  };
 }
