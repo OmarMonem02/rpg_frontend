@@ -127,7 +127,7 @@ export function BikeForm({ mode, initialData }: BikeFormProps) {
       label: "Bike Photo",
       type: "image",
       section: "Bike Identity",
-      description: "Upload a clear showroom photo for this bike listing.",
+      description: "Upload a file or paste an image URL for this bike listing.",
       value: initialData?.image,
       imagePublicIdField: "image_public_id",
       uploadFolder: "rpg-system/bikes",

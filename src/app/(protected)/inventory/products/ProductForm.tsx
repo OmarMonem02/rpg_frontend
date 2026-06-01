@@ -121,7 +121,7 @@ export function ProductForm({ initialData, mode }: ProductFormProps) {
       label: "Product Photo",
       type: "image",
       section: "Basic Info",
-      description: "Upload the main catalog photo for this product.",
+      description: "Upload a file or paste an image URL for the main catalog photo.",
       value: initialData?.image,
       imagePublicIdField: "image_public_id",
       uploadFolder: "rpg-system/products",

@@ -69,3 +69,33 @@ export async function uploadImage(
 
   return (await response.json()) as UploadedImage;
 }
+
+/**
+ * Fetches a remote image URL via Cloudinary and returns the hosted URL and public id.
+ */
+export async function uploadImageFromUrl(
+  imageUrl: string,
+  folder = "rpg-system/general",
+): Promise<UploadedImage> {
+  const token = getAuthToken();
+
+  const response = await fetch(getUploadUrl(), {
+    method: "POST",
+    credentials: "include",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ imageUrl, folder }),
+  });
+
+  if (!response.ok) {
+    throw new UploadImageError(
+      await parseUploadError(response),
+      response.status,
+    );
+  }
+
+  return (await response.json()) as UploadedImage;
+}

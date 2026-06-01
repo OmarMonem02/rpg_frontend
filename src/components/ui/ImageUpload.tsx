@@ -3,12 +3,18 @@
 import {
   ArrowUpTrayIcon,
   ExclamationTriangleIcon,
+  InformationCircleIcon,
   PhotoIcon,
   XMarkIcon,
 } from "@heroicons/react/24/outline";
 import { useEffect, useId, useRef, useState, type DragEvent } from "react";
 
-import { UploadImageError, uploadImage } from "@/lib/uploadImage";
+import { compressImageIfNeeded } from "@/lib/compressImage";
+import {
+  UploadImageError,
+  uploadImage,
+  uploadImageFromUrl,
+} from "@/lib/uploadImage";
 
 interface ImageUploadProps {
   value?: string;
@@ -18,6 +24,8 @@ interface ImageUploadProps {
   uploadFolder?: string;
   accept?: string;
   maxSizeMB?: number;
+  /** When true, shows an option to paste a remote image URL. Default: true */
+  allowUrl?: boolean;
 }
 
 const acceptedImageTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
@@ -34,6 +42,15 @@ function isAcceptedImageFile(file: File): boolean {
 
 function formatFileSize(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function isValidImageUrl(value: string): boolean {
+  try {
+    const parsed = new URL(value.trim());
+    return parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -59,14 +76,19 @@ export function ImageUpload({
   uploadFolder = "rpg-system/general",
   accept = "image/*",
   maxSizeMB = 5,
+  allowUrl = true,
 }: ImageUploadProps) {
   const inputId = useId();
+  const urlInputId = useId();
   const inputRef = useRef<HTMLInputElement | null>(null);
   const objectUrlRef = useRef<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | undefined>(value);
+  const [imageUrlInput, setImageUrlInput] = useState("");
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [isCompressing, setIsCompressing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [infoMessage, setInfoMessage] = useState<string | null>(null);
 
   useEffect(() => {
     setPreviewUrl(value);
@@ -105,19 +127,34 @@ export function ImageUpload({
       return;
     }
 
-    if (file.size > maxBytes) {
-      surfaceError(
-        `Image must be ${maxSizeMB}MB or less. Selected file is ${formatFileSize(file.size)}.`,
-      );
-      return;
-    }
+    const needsCompression = file.size > maxBytes;
 
     setErrorMessage(null);
+    if (needsCompression) {
+      setInfoMessage(
+        `This image is ${formatFileSize(file.size)} (over the ${maxSizeMB}MB limit). We will automatically compress and resize it before uploading.`,
+      );
+    } else {
+      setInfoMessage(null);
+    }
+
     replaceLocalPreview(file);
     setIsUploading(true);
 
     try {
-      const uploaded = await uploadImage(file, uploadFolder);
+      let fileToUpload = file;
+
+      if (needsCompression) {
+        setIsCompressing(true);
+        setInfoMessage("Compressing and resizing your image…");
+        const compressed = await compressImageIfNeeded(file, { maxBytes });
+        fileToUpload = compressed.file;
+        setInfoMessage(
+          `Optimized from ${formatFileSize(compressed.originalSize)} to ${formatFileSize(compressed.finalSize)} (${compressed.originalWidth}×${compressed.originalHeight} → ${compressed.finalWidth}×${compressed.finalHeight}).`,
+        );
+      }
+
+      const uploaded = await uploadImage(fileToUpload, uploadFolder);
       onChange(uploaded.url, uploaded.public_id);
       setPreviewUrl(uploaded.url);
       if (objectUrlRef.current) {
@@ -132,6 +169,7 @@ export function ImageUpload({
       surfaceError(message);
     } finally {
       setIsUploading(false);
+      setIsCompressing(false);
       if (inputRef.current) {
         inputRef.current.value = "";
       }
@@ -142,6 +180,36 @@ export function ImageUpload({
     event.preventDefault();
     setIsDragging(false);
     void handleFile(event.dataTransfer.files.item(0) ?? undefined);
+  }
+
+  async function handleImageUrl(): Promise<void> {
+    const trimmedUrl = imageUrlInput.trim();
+    if (!trimmedUrl || isUploading) return;
+
+    if (!isValidImageUrl(trimmedUrl)) {
+      surfaceError("Enter a valid image URL starting with http:// or https://");
+      return;
+    }
+
+    setErrorMessage(null);
+    setPreviewUrl(trimmedUrl);
+    setIsUploading(true);
+
+    try {
+      const uploaded = await uploadImageFromUrl(trimmedUrl, uploadFolder);
+      onChange(uploaded.url, uploaded.public_id);
+      setPreviewUrl(uploaded.url);
+      setImageUrlInput("");
+    } catch (error) {
+      const message =
+        error instanceof UploadImageError
+          ? error.message
+          : "Network error. Please check your connection and try again.";
+      surfaceError(message);
+      setPreviewUrl(value);
+    } finally {
+      setIsUploading(false);
+    }
   }
 
   return (
@@ -209,6 +277,7 @@ export function ImageUpload({
                   event.preventDefault();
                   setPreviewUrl(value);
                   setErrorMessage(null);
+                  setInfoMessage(null);
                 }}
               >
                 <XMarkIcon className="h-5 w-5" aria-hidden="true" />
@@ -244,11 +313,13 @@ export function ImageUpload({
                   : "text-on-surface"
               }`}
             >
-              {isUploading
-                ? "Uploading image"
-                : previewUrl
-                  ? "Change image"
-                  : "Drop image or browse"}
+              {isCompressing
+                ? "Compressing image"
+                : isUploading
+                  ? "Uploading image"
+                  : previewUrl
+                    ? "Change image"
+                    : "Drop image or browse"}
             </p>
             <p
               className={`mt-1 max-w-md text-sm leading-6 ${
@@ -257,11 +328,64 @@ export function ImageUpload({
                   : "text-on-surface-variant"
               }`}
             >
-              JPG, PNG, or WebP. Max {maxSizeMB}MB.
+              JPG, PNG, or WebP. Target size {maxSizeMB}MB — larger files are
+              automatically compressed and resized before upload.
+              {allowUrl ? " Or paste an image URL below." : ""}
             </p>
           </div>
         </div>
       </label>
+
+      {allowUrl ? (
+        <div className="rounded-2xl border border-outline-variant/20 bg-surface-container-low p-4 shadow-ambient">
+          <label htmlFor={urlInputId} className="label-caps mb-2 block text-on-surface">
+            Image URL
+          </label>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <input
+              id={urlInputId}
+              type="url"
+              inputMode="url"
+              autoComplete="off"
+              placeholder="https://example.com/photo.jpg"
+              value={imageUrlInput}
+              disabled={isUploading}
+              onChange={(event) => setImageUrlInput(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  void handleImageUrl();
+                }
+              }}
+              className="w-full flex-1 rounded-xl border border-outline-variant/25 bg-surface px-4 py-2.5 text-sm text-on-surface outline-none transition-colors placeholder:text-on-surface-variant/50 focus:border-primary"
+            />
+            <button
+              type="button"
+              disabled={isUploading || !imageUrlInput.trim()}
+              onClick={() => void handleImageUrl()}
+              className="inline-flex shrink-0 items-center justify-center rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-on-primary transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {isUploading ? "Importing…" : "Use URL"}
+            </button>
+          </div>
+          <p className="mt-2 text-xs leading-relaxed text-on-surface-variant">
+            The image is imported to Cloudinary so it works the same as an upload.
+          </p>
+        </div>
+      ) : null}
+
+      {infoMessage ? (
+        <p
+          role="status"
+          className="flex items-start gap-2 rounded-xl border border-primary/20 bg-primary/10 px-3 py-2 text-sm text-on-surface"
+        >
+          <InformationCircleIcon
+            className="mt-0.5 h-4 w-4 flex-none text-primary"
+            aria-hidden="true"
+          />
+          <span>{infoMessage}</span>
+        </p>
+      ) : null}
 
       {errorMessage ? (
         <p className="flex items-start gap-2 rounded-xl border border-error/20 bg-error/10 px-3 py-2 text-sm text-error">

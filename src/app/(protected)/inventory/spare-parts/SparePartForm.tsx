@@ -256,7 +256,7 @@ export function SparePartForm({ mode, initialData }: SparePartFormProps) {
       label: "Spare Part Photo",
       type: "image",
       section: "Basic Info",
-      description: "Upload a clear product photo so the team can identify the part quickly.",
+      description: "Upload a file or paste an image URL so the team can identify the part quickly.",
       value: initialData?.image,
       imagePublicIdField: "image_public_id",
       uploadFolder: "rpg-system/spare-parts",
