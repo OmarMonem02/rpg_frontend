@@ -129,9 +129,6 @@ function ProtectedWorkspace({
               <line x1="3" y1="18" x2="21" y2="18" />
             </svg>
           </button>
-          <div className="flex w-full flex-row items-center justify-end gap-2">
-            <RefetchAllDataButton />
-          </div>
         </div>
 
         <main className="flex-1 px-4 py-6 md:px-6 md:py-8 lg:px-8">

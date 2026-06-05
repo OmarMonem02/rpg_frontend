@@ -2,7 +2,10 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import { usePermissions } from "@/components/permission-provider";
+import { getPendingApprovalRequestCount } from "@/lib/api/approval-requests";
+import { getAuthToken, getAuthUser } from "@/lib/auth-session";
 import {
   defaultWorkspaceNavSections,
   type SidebarNavSection,
@@ -69,6 +72,39 @@ export function AppSidebar({
 }: SidebarProps) {
   const pathname = usePathname();
   const permissions = usePermissions();
+  const [pendingRequestCount, setPendingRequestCount] = useState(0);
+  const isAdminUser = getAuthUser()?.role === "admin";
+
+  useEffect(() => {
+    if (!isAdminUser) {
+      setPendingRequestCount(0);
+      return;
+    }
+
+    let active = true;
+
+    async function loadPendingCount() {
+      const token = getAuthToken();
+      if (!token) return;
+
+      try {
+        const count = await getPendingApprovalRequestCount(token);
+        if (active) setPendingRequestCount(count);
+      } catch {
+        if (active) setPendingRequestCount(0);
+      }
+    }
+
+    void loadPendingCount();
+    const interval = window.setInterval(() => {
+      void loadPendingCount();
+    }, 60_000);
+
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+    };
+  }, [isAdminUser, pathname]);
 
   const filteredNavSections = navSections
     .map((section) => ({
@@ -231,7 +267,14 @@ export function AppSidebar({
                       )}
                     </span>
                     {!isCollapsed ? (
-                      <span className="ml-3 truncate">{item.label}</span>
+                      <span className="ml-3 flex min-w-0 flex-1 items-center justify-between gap-2">
+                        <span className="truncate">{item.label}</span>
+                        {item.href === "/requests" && pendingRequestCount > 0 ? (
+                          <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-warning px-1.5 py-0.5 text-[10px] font-bold text-on-warning">
+                            {pendingRequestCount}
+                          </span>
+                        ) : null}
+                      </span>
                     ) : null}
                   </Link>
                 );

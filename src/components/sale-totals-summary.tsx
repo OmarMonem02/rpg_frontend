@@ -38,6 +38,38 @@ export function computeCartTotalsBreakdown(
   };
 }
 
+export function hasMaintenanceCartItems(items: SaleLineItem[]): boolean {
+  return items.some((item) => item.sellable_type === "maintenance_services");
+}
+
+export function computeDiscountBaseSubtotal(
+  items: SaleLineItem[],
+  exchangeRate: number,
+  exchangeRateEur: number,
+  options: { includeMaintenance: boolean },
+): number {
+  let subtotal = 0;
+  for (const item of items) {
+    if (
+      !options.includeMaintenance &&
+      item.sellable_type === "maintenance_services"
+    ) {
+      continue;
+    }
+
+    const m = egpMultiplierForPricingCurrency(item.currency, {
+      usdToEgp: exchangeRate,
+      eurToEgp: exchangeRateEur,
+    });
+    const unitEGP = item.selling_price * m;
+    const discEGP = item.discount_amount * m;
+    const qty = Number(item.quantity) || 0;
+    subtotal += Math.max(0, unitEGP - discEGP) * qty;
+  }
+
+  return Math.round(subtotal * 100) / 100;
+}
+
 function formatEgp(amount: number) {
   return amount.toLocaleString("en-US", { minimumFractionDigits: 2 });
 }

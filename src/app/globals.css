@@ -45,7 +45,20 @@
   --color-negative: #ba1a1a;
   --color-neutral-metric: #5c6467;
 
+  /* Approval workflow — distinguishes a "consumed" request (already turned
+     into a sale) from a plain "approved" one, gives discounts a dedicated
+     emphasis tone, and defines the tint used for the active queue row. */
+  --color-consumed: #574fc7;
+  --color-consumed-container: #e6e4fb;
+  --color-on-consumed-container: #1d1862;
+
+  --color-discount-emphasis: #c42d08;
+  --color-discount-container: #ffe9e3;
+
+  --color-surface-selected: #e7eeff;
+
   --shadow-ambient: 0px 12px 32px rgba(44, 52, 55, 0.06);
+  --shadow-ambient-lg: 0px 18px 48px rgba(44, 52, 55, 0.10);
   --transition-snappy: 150ms cubic-bezier(0.4, 0, 0.2, 1);
 
   --radius-md: 0.75rem;

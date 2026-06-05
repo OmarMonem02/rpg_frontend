@@ -84,6 +84,9 @@ export function PermissionProvider({
         if (/^\/history(?:\/|$)/.test(normalized)) {
           return authUser?.role === "admin";
         }
+        if (/^\/requests(?:\/|$)/.test(normalized)) {
+          return authUser?.role === "admin";
+        }
         return canAccessRoute(permissionMatrix, pathname);
       },
       canCreate: (page) => canCreate(permissionMatrix, page),

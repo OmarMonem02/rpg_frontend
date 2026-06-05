@@ -159,6 +159,7 @@ export type CreateSalePayload = {
   shipping_fee?: number;
   discount?: number;
   sale_discount?: number;
+  discount_approval_request_id?: number;
   admin_password?: string;
   is_maintenance?: boolean;
   items: CreateSaleLineItemPayload[];

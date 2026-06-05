@@ -15,6 +15,14 @@ import {
   SaleTotalsSummary,
 } from "@/components/sale-totals-summary";
 import { TrashIcon, PencilSquareIcon, CheckIcon, XMarkIcon } from "@heroicons/react/24/outline";
+import {
+  clampRawDiscountValue,
+  clampResolvedDiscount,
+  convertDiscountBetweenTypes,
+  maxRawDiscountValue,
+  resolveDiscountAmount,
+  type DiscountInputType,
+} from "@/lib/discount-input";
 
 export type SaleLineItem = {
   id?: string; // temp ID for unsaved items
@@ -49,7 +57,12 @@ export function CartLineItemsPanel({
   exchangeRateEur = 0,
 }: CartLineItemsPanelProps) {
   const [editingRowId, setEditingRowId] = useState<string | number | null>(null);
-  const [editValues, setEditValues] = useState<{ qty: number; price: number; discount: number }>({ qty: 1, price: 0, discount: 0 });
+  const [editValues, setEditValues] = useState<{
+    qty: number;
+    price: number;
+    discount: number;
+    discountType: DiscountInputType;
+  }>({ qty: 1, price: 0, discount: 0, discountType: "fixed" });
 
   const getMaxQty = (item: SaleLineItem): number | undefined => {
     if (item.sellable_type === "bikes" || item.sellable_type === "maintenance_services") return 1;
@@ -73,25 +86,54 @@ export function CartLineItemsPanel({
     return typeof max === "number" ? Math.min(clampedMin, max) : clampedMin;
   };
 
-  const normalizeDiscount = (item: SaleLineItem, raw: number): number => {
-    const max = calculateMaxDiscount(item);
-    const n = Number.isFinite(raw) ? raw : 0;
-    return Math.max(0, Math.min(n, max));
+  const lineDiscountBase = (item: SaleLineItem, qty: number) =>
+    item.selling_price * qty;
+
+  const normalizeDiscount = (
+    item: SaleLineItem,
+    raw: number,
+    type: DiscountInputType = "fixed",
+    qty = item.quantity,
+  ): number => {
+    const baseAmount = lineDiscountBase(item, qty);
+    const maxFixed = calculateMaxDiscount(item);
+    return clampRawDiscountValue(type, raw, maxFixed, baseAmount);
+  };
+
+  const resolveLineDiscountAmount = (
+    item: SaleLineItem,
+    raw: number,
+    type: DiscountInputType,
+    qty: number,
+  ): number => {
+    const baseAmount = lineDiscountBase(item, qty);
+    const maxFixed = calculateMaxDiscount(item);
+    const resolved = resolveDiscountAmount(type, raw, baseAmount);
+    return clampResolvedDiscount(resolved, maxFixed, baseAmount);
   };
 
   const handleEditClick = (item: SaleLineItem) => {
+    const qty = normalizeQty(item, item.quantity);
     setEditingRowId(item.id || item.sellable_id);
     setEditValues({
-      qty: normalizeQty(item, item.quantity),
+      qty,
       price: item.selling_price,
-      discount: normalizeDiscount(item, item.discount_amount),
+      discount: normalizeDiscount(item, item.discount_amount, "fixed", qty),
+      discountType: "fixed",
     });
   };
 
   const handleSaveEdit = (itemId: string | number) => {
     const item = items.find((i) => (i.id || i.sellable_id) === itemId);
     const qty = item ? normalizeQty(item, editValues.qty) : Math.max(1, Math.trunc(editValues.qty || 0));
-    const discount = item ? normalizeDiscount(item, editValues.discount) : Math.max(0, editValues.discount || 0);
+    const discount = item
+      ? resolveLineDiscountAmount(
+          item,
+          editValues.discount,
+          editValues.discountType,
+          qty,
+        )
+      : Math.max(0, editValues.discount || 0);
     onUpdateItem(itemId, {
       quantity: qty,
       selling_price: editValues.price,
@@ -232,6 +274,15 @@ export function CartLineItemsPanel({
                   const isStockLimited = item.sellable_type === "products" || item.sellable_type === "spare_parts";
                   const isOutOfStock = isStockLimited && typeof maxQty === "number" && maxQty === 0;
                   const maxDiscount = calculateMaxDiscount(item);
+                  const editLineBase = lineDiscountBase(item, editValues.qty);
+                  const editResolvedDiscount = isEditing
+                    ? resolveLineDiscountAmount(
+                        item,
+                        editValues.discount,
+                        editValues.discountType,
+                        editValues.qty,
+                      )
+                    : 0;
                   return (
                     <tr
                       key={index}
@@ -281,16 +332,32 @@ export function CartLineItemsPanel({
                             <input
                               type="number"
                               value={editValues.qty}
-                              onChange={(e) =>
-                                setEditValues({
-                                  ...editValues,
-                                  qty: normalizeQty(item, Number(e.target.value)),
-                                })
-                              }
+                              onChange={(e) => {
+                                const nextQty = normalizeQty(
+                                  item,
+                                  Number(e.target.value),
+                                );
+                                setEditValues((v) => ({
+                                  ...v,
+                                  qty: nextQty,
+                                  discount: normalizeDiscount(
+                                    item,
+                                    v.discount,
+                                    v.discountType,
+                                    nextQty,
+                                  ),
+                                }));
+                              }}
                               onBlur={() =>
                                 setEditValues((v) => ({
                                   ...v,
                                   qty: normalizeQty(item, v.qty),
+                                  discount: normalizeDiscount(
+                                    item,
+                                    v.discount,
+                                    v.discountType,
+                                    v.qty,
+                                  ),
                                 }))
                               }
                               min={1}
@@ -333,28 +400,101 @@ export function CartLineItemsPanel({
                       {/* Discount */}
                       <td className="px-5 py-4 text-right">
                         {isEditing ? (
-                          <div className="flex flex-col items-end gap-1">
-                            <input
-                              type="number"
-                              value={editValues.discount}
-                              onChange={(e) =>
-                                setEditValues({
-                                  ...editValues,
-                                  discount: normalizeDiscount(item, Number(e.target.value)),
-                                })
-                              }
-                              onBlur={() =>
-                                setEditValues((v) => ({
-                                  ...v,
-                                  discount: normalizeDiscount(item, v.discount),
-                                }))
-                              }
-                              max={maxDiscount}
-                              className="form-input-base mono-data w-20 py-1.5 text-right text-sm"
-                              aria-label="Line item discount amount"
-                            />
+                          <div className="flex min-w-[9rem] flex-col items-end gap-1">
+                            <div
+                              className="grid w-full grid-cols-2 gap-1"
+                              role="radiogroup"
+                              aria-label="Line discount type"
+                            >
+                              {(["fixed", "percentage"] as const).map((type) => {
+                                const active = editValues.discountType === type;
+                                return (
+                                  <button
+                                    key={type}
+                                    type="button"
+                                    role="radio"
+                                    aria-checked={active}
+                                    onClick={() =>
+                                      setEditValues((v) => {
+                                        const converted =
+                                          convertDiscountBetweenTypes(
+                                            v.discountType,
+                                            type,
+                                            v.discount,
+                                            lineDiscountBase(item, v.qty),
+                                          );
+                                        return {
+                                          ...v,
+                                          discountType: type,
+                                          discount: normalizeDiscount(
+                                            item,
+                                            converted,
+                                            type,
+                                            v.qty,
+                                          ),
+                                        };
+                                      })
+                                    }
+                                    className={`rounded-md border px-1.5 py-1 text-[10px] font-semibold uppercase tracking-wide transition-all ${
+                                      active
+                                        ? "border-primary bg-primary/10 text-on-surface"
+                                        : "border-outline-variant/30 bg-surface text-on-surface-variant hover:border-primary/30"
+                                    }`}
+                                  >
+                                    {type === "fixed" ? "Fixed" : "%"}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                            <div className="relative w-full">
+                              <input
+                                type="number"
+                                value={editValues.discount}
+                                onChange={(e) =>
+                                  setEditValues((v) => ({
+                                    ...v,
+                                    discount: normalizeDiscount(
+                                      item,
+                                      Number(e.target.value),
+                                      v.discountType,
+                                      v.qty,
+                                    ),
+                                  }))
+                                }
+                                onBlur={() =>
+                                  setEditValues((v) => ({
+                                    ...v,
+                                    discount: normalizeDiscount(
+                                      item,
+                                      v.discount,
+                                      v.discountType,
+                                      v.qty,
+                                    ),
+                                  }))
+                                }
+                                className="form-input-base mono-data w-full py-1.5 pr-10 text-right text-sm"
+                                aria-label={
+                                  editValues.discountType === "percentage"
+                                    ? "Line item discount percentage"
+                                    : "Line item discount amount"
+                                }
+                              />
+                              <span className="pointer-events-none absolute inset-y-0 right-2 flex items-center text-[10px] font-semibold uppercase text-on-surface-variant">
+                                {editValues.discountType === "percentage"
+                                  ? "%"
+                                  : item.currency}
+                              </span>
+                            </div>
+                            {editValues.discountType === "percentage" &&
+                            editResolvedDiscount > 0 ? (
+                              <span className="label-caps">
+                                = {editResolvedDiscount.toFixed(2)} {item.currency}
+                              </span>
+                            ) : null}
                             <span className="label-caps">
-                              Max: {maxDiscount.toFixed(0)} {item.currency}
+                              {editValues.discountType === "percentage"
+                                ? `Max: ${maxRawDiscountValue("percentage", maxDiscount, editLineBase).toFixed(1)}%`
+                                : `Max: ${maxDiscount.toFixed(0)} ${item.currency}`}
                             </span>
                           </div>
                         ) : (
