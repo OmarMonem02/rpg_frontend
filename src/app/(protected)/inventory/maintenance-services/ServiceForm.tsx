@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { usePermissions } from "@/components/permission-provider";
 import { getAuthToken } from "@/lib/auth-session";
 import {
   listMaintenanceServiceSectors,
+  createMaintenanceServiceSector,
   createMaintenanceService,
   updateMaintenanceService,
   type MaintenanceServiceRecord,
@@ -23,10 +25,12 @@ interface ServiceFormProps {
 
 export function ServiceForm({ initialData, mode }: ServiceFormProps) {
   const router = useRouter();
+  const permissions = usePermissions();
   const [sectors, setSectors] = useState<MaintenanceServiceSectorRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const canCreateServices = permissions.canCreate("maintenance-services");
 
   useEffect(() => {
     const loadDependencies = async () => {
@@ -75,7 +79,11 @@ export function ServiceForm({ initialData, mode }: ServiceFormProps) {
     }
   };
 
-  const fields: FieldConfig[] = [
+  const formKey =
+    mode === "edit" && initialData ? `edit-${initialData.id}` : "create";
+
+  const fields: FieldConfig[] = useMemo(
+    () => [
     {
       name: "name",
       label: "Service Name",
@@ -95,8 +103,36 @@ export function ServiceForm({ initialData, mode }: ServiceFormProps) {
       required: true,
       section: "Basic Info",
       description: "Choose the sector tab this service should appear under.",
-      options: sectors.map((sector) => ({ value: sector.id, label: sector.name })),
+      options: () =>
+        sectors.map((sector) => ({ value: sector.id, label: sector.name })),
       value: initialData?.maintenance_service_sector_id,
+      quickCreate: {
+        title: "Add Sector",
+        description: "Create a maintenance sector without leaving this form.",
+        submitLabel: "Create & Select",
+        enabled: canCreateServices,
+        fields: [
+          {
+            name: "name",
+            label: "Sector Name",
+            type: "text",
+            required: true,
+            section: "Basic Information",
+            description: "e.g., Engine Maintenance, Electrical, Suspension",
+            placeholder: "Enter sector name",
+            helperTone: "featured",
+          },
+        ],
+        onCreate: async (data) => {
+          const token = getAuthToken();
+          if (!token) throw new Error("Authentication required");
+          const created = await createMaintenanceServiceSector(token, {
+            name: String(data.name),
+          });
+          setSectors((prev) => [...prev, created]);
+          return { id: created.id };
+        },
+      },
     },
     {
       name: "service_price",
@@ -151,7 +187,9 @@ export function ServiceForm({ initialData, mode }: ServiceFormProps) {
       min: 0,
       step: "0.01",
     },
-  ];
+  ],
+    [mode, initialData, sectors, canCreateServices],
+  );
 
   if (loading) {
     return (
@@ -166,6 +204,7 @@ export function ServiceForm({ initialData, mode }: ServiceFormProps) {
   return (
     <div className="max-w-4xl mx-auto py-8 px-4">
       <EntityForm
+        formKey={formKey}
         title={mode === "edit" ? "Edit Maintenance Service" : "Create Maintenance Service"}
         description={
           mode === "edit"

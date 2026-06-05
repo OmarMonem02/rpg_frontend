@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { usePermissions } from "@/components/permission-provider";
 import { getAuthToken } from "@/lib/auth-session";
 import {
   listProductCategories,
   listBrands,
+  createBrand,
   createProduct,
   updateProduct,
   type ProductRecord,
@@ -25,11 +27,13 @@ interface ProductFormProps {
 
 export function ProductForm({ initialData, mode }: ProductFormProps) {
   const router = useRouter();
+  const permissions = usePermissions();
   const [categories, setCategories] = useState<ProductCategoryRecord[]>([]);
   const [brands, setBrands] = useState<BrandRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const canCreateBrands = permissions.canCreate("brands");
 
   useEffect(() => {
     const loadDependencies = async () => {
@@ -93,7 +97,9 @@ export function ProductForm({ initialData, mode }: ProductFormProps) {
     }
   };
 
-  const fields: FieldConfig[] = [
+  const formKey = mode === "edit" && initialData ? `edit-${initialData.id}` : "create";
+
+  const fields: FieldConfig[] = useMemo(() => [
     {
       name: "name",
       label: "Product Name",
@@ -135,7 +141,7 @@ export function ProductForm({ initialData, mode }: ProductFormProps) {
       section: "Classification",
       sectionDescription: "Group the product for clearer catalog browsing and reporting.",
       description: "Choose the main product category.",
-      options: categories.map((c) => ({ value: c.id, label: c.name })),
+      options: () => categories.map((c) => ({ value: c.id, label: c.name })),
       value: initialData?.products_category_id,
     },
     {
@@ -145,8 +151,33 @@ export function ProductForm({ initialData, mode }: ProductFormProps) {
       required: true,
       section: "Classification",
       description: "Pick the brand your team uses for purchasing and display.",
-      options: brands.map((b) => ({ value: b.id, label: b.name })),
+      options: () => brands.map((b) => ({ value: b.id, label: b.name })),
       value: initialData?.brand_id,
+      quickCreate: {
+        title: "Add Brand",
+        description: "Create a product brand without leaving this form.",
+        submitLabel: "Create & Select",
+        enabled: canCreateBrands,
+        fields: [
+          {
+            name: "name",
+            label: "Brand Name",
+            type: "text",
+            required: true,
+            placeholder: "e.g., Honda, Yamaha",
+          },
+        ],
+        onCreate: async (data) => {
+          const token = getAuthToken();
+          if (!token) throw new Error("Authentication required");
+          const created = await createBrand(token, {
+            name: String(data.name),
+            type: "products",
+          });
+          setBrands((prev) => [...prev, created]);
+          return { id: created.id };
+        },
+      },
     },
     {
       name: "stock_quantity",
@@ -253,7 +284,13 @@ export function ProductForm({ initialData, mode }: ProductFormProps) {
       value: initialData?.notes,
       rows: 3,
     },
-  ];
+  ], [
+    mode,
+    initialData,
+    categories,
+    brands,
+    canCreateBrands,
+  ]);
 
   if (loading) {
     return (
@@ -268,6 +305,7 @@ export function ProductForm({ initialData, mode }: ProductFormProps) {
   return (
     <div className="max-w-4xl mx-auto py-8 px-4">
       <EntityForm
+        formKey={formKey}
         title={mode === "edit" ? "Edit Product" : "Create Product"}
         description={mode === "edit" ? "Update product profile, stock settings, and pricing." : "Create a polished product entry with inventory, pricing, and sales settings."}
         fields={fields}

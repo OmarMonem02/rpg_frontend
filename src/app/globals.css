@@ -133,7 +133,7 @@
   }
 
   .mono-data {
-    @apply font-mono tracking-normal;
+    @apply font-sans tracking-normal;
     font-size: 0.8125rem;
     line-height: 1.4;
   }

@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { usePermissions } from "@/components/permission-provider";
 import {
   type SparePartRecord,
   type CreateSparePartPayload,
@@ -12,6 +13,8 @@ import {
   listSparePartCategories,
   listBrands,
   listBikeBlueprints,
+  createBrand,
+  createBikeBlueprint,
   createSparePart,
   updateSparePart,
   assignSparePartToBikeBlueprint,
@@ -29,6 +32,9 @@ interface SparePartFormProps {
 
 export function SparePartForm({ mode, initialData }: SparePartFormProps) {
   const router = useRouter();
+  const permissions = usePermissions();
+  const canCreateBrands = permissions.canCreate("brands");
+  const canCreateBlueprints = permissions.canCreate("bike-blueprints");
   const [currentBlueprintIds, setCurrentBlueprintIds] = useState<number[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [categoryRows, setCategoryRows] = useState<SparePartCategoryRecord[]>([]);
@@ -93,6 +99,69 @@ export function SparePartForm({ mode, initialData }: SparePartFormProps) {
   const bikeBrandNameById = useMemo(
     () => new Map(bikeBrands.map((brand) => [brand.id, brand.name])),
     [bikeBrands],
+  );
+
+  const formKey =
+    mode === "edit" && initialData ? `edit-${initialData.id}` : "create";
+
+  const buildBikeBrandQuickCreate = useCallback((): FieldConfig["quickCreate"] => ({
+    title: "Add Bike Brand",
+    description: "Create a motorcycle manufacturer brand for blueprint linking.",
+    submitLabel: "Create & Select",
+    enabled: canCreateBrands,
+    fields: [
+      {
+        name: "name",
+        label: "Brand Name",
+        type: "text",
+        required: true,
+        placeholder: "e.g., Honda, Yamaha",
+      },
+    ],
+    onCreate: async (data) => {
+      const token = getAuthToken();
+      if (!token) throw new Error("Authentication required");
+      const created = await createBrand(token, {
+        name: String(data.name),
+        type: "bikes",
+      });
+      setBrandRows((prev) => [...prev, created]);
+      return { id: created.id };
+    },
+  }), [canCreateBrands]);
+
+  const blueprintQuickCreateFields: FieldConfig[] = useMemo(
+    () => [
+      {
+        name: "brand_id",
+        label: "Manufacturer Brand",
+        type: "select",
+        required: true,
+        section: "Identity",
+        description: "Select the motorcycle brand (e.g., Honda, Yamaha).",
+        options: () => bikeBrands.map((b) => ({ value: b.id, label: b.name })),
+        quickCreate: buildBikeBrandQuickCreate(),
+      },
+      {
+        name: "model",
+        label: "Model Name",
+        type: "text",
+        required: true,
+        section: "Identity",
+        placeholder: "e.g., MT-07",
+      },
+      {
+        name: "year",
+        label: "Production Year",
+        type: "number",
+        required: true,
+        section: "Identity",
+        placeholder: "e.g., 2024",
+        min: 1900,
+        max: 2100,
+      },
+    ],
+    [bikeBrands, buildBikeBrandQuickCreate],
   );
 
   const blueprintYears = useMemo(() => {
@@ -219,7 +288,7 @@ export function SparePartForm({ mode, initialData }: SparePartFormProps) {
     }
   };
 
-  const fields: FieldConfig[] = [
+  const fields: FieldConfig[] = useMemo(() => [
     {
       name: "name",
       label: "Part Name",
@@ -270,7 +339,7 @@ export function SparePartForm({ mode, initialData }: SparePartFormProps) {
       section: "Classification",
       sectionDescription: "Place the part under the right shelf and supplier grouping.",
       description: "Choose the main spare-parts category.",
-      options: categoryRows.map((c) => ({ value: c.id, label: c.name })),
+      options: () => categoryRows.map((c) => ({ value: c.id, label: c.name })),
       value: initialData?.spare_parts_category_id,
     },
     {
@@ -280,8 +349,33 @@ export function SparePartForm({ mode, initialData }: SparePartFormProps) {
       required: true,
       section: "Classification",
       description: "Pick the source brand used in purchasing and reporting.",
-      options: sparePartBrands.map((b) => ({ value: b.id, label: b.name })),
+      options: () => sparePartBrands.map((b) => ({ value: b.id, label: b.name })),
       value: initialData?.brand_id,
+      quickCreate: {
+        title: "Add Brand",
+        description: "Create a spare-parts brand without leaving this form.",
+        submitLabel: "Create & Select",
+        enabled: canCreateBrands,
+        fields: [
+          {
+            name: "name",
+            label: "Brand Name",
+            type: "text",
+            required: true,
+            placeholder: "e.g., OEM Supplier",
+          },
+        ],
+        onCreate: async (data) => {
+          const token = getAuthToken();
+          if (!token) throw new Error("Authentication required");
+          const created = await createBrand(token, {
+            name: String(data.name),
+            type: "spare_parts",
+          });
+          setBrandRows((prev) => [...prev, created]);
+          return { id: created.id };
+        },
+      },
     },
     {
       name: "stock_quantity",
@@ -385,9 +479,10 @@ export function SparePartForm({ mode, initialData }: SparePartFormProps) {
       type: "select",
       section: "Compatibility",
       description: "Narrow compatibility options by bike brand before selecting blueprints.",
-      options: bikeBrands.map((brand) => ({ value: brand.id, label: brand.name })),
+      options: () => bikeBrands.map((brand) => ({ value: brand.id, label: brand.name })),
       disabled: (formData) => formData.universal === true,
       value: "",
+      quickCreate: buildBikeBrandQuickCreate(),
     },
     {
       name: "blueprint_model_search",
@@ -501,6 +596,26 @@ export function SparePartForm({ mode, initialData }: SparePartFormProps) {
       disabled: (formData) => formData.universal === true,
       span: 2,
       value: mode === "edit" ? currentBlueprintIds : undefined,
+      quickCreate: {
+        title: "Add Bike Blueprint",
+        description:
+          "Define a bike model and year, then add it to compatible blueprints.",
+        submitLabel: "Create & Add",
+        enabled: canCreateBlueprints,
+        mode: "multiselect-append",
+        fields: blueprintQuickCreateFields,
+        onCreate: async (data) => {
+          const token = getAuthToken();
+          if (!token) throw new Error("Authentication required");
+          const created = await createBikeBlueprint(token, {
+            brand_id: Number(data.brand_id),
+            model: String(data.model),
+            year: Number(data.year),
+          });
+          setBlueprints((prev) => [...prev, created]);
+          return { id: created.id };
+        },
+      },
     },
     {
       name: "notes",
@@ -513,7 +628,21 @@ export function SparePartForm({ mode, initialData }: SparePartFormProps) {
       value: initialData?.notes,
       rows: 3,
     },
-  ];
+  ], [
+    mode,
+    initialData,
+    categoryRows,
+    sparePartBrands,
+    bikeBrands,
+    blueprints,
+    bikeBrandNameById,
+    blueprintYears,
+    currentBlueprintIds,
+    blueprintQuickCreateFields,
+    buildBikeBrandQuickCreate,
+    canCreateBrands,
+    canCreateBlueprints,
+  ]);
 
   if (loading) {
     return (
@@ -525,6 +654,7 @@ export function SparePartForm({ mode, initialData }: SparePartFormProps) {
 
   return (
     <EntityForm
+      formKey={formKey}
       variant="page"
       title={mode === "create" ? "Create Spare Part" : "Edit Spare Part"}
       description={

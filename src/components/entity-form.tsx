@@ -1,8 +1,18 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useState,
+} from "react";
 import { ImageUpload } from "@/components/ui/ImageUpload";
 import { ActionButton } from "@/components/ops-ui";
+import { QuickCreateButton } from "@/components/quick-create/QuickCreateButton";
+import { QuickCreateDrawer } from "@/components/quick-create/QuickCreateDrawer";
+import type { QuickCreateConfig } from "@/components/quick-create/types";
 
 type SectionSummaryResolver = (args: {
   field: FieldConfig;
@@ -55,6 +65,13 @@ export type FieldConfig = {
     value: unknown;
     formData: Record<string, unknown>;
   }) => Partial<Record<string, unknown>> | void;
+  quickCreate?: QuickCreateConfig;
+};
+
+export type EntityFormHandle = {
+  setFieldValue: (name: string, value: unknown) => void;
+  patchFormData: (partial: Record<string, unknown>) => void;
+  getFormData: () => Record<string, unknown>;
 };
 
 export type EntityFormProps = {
@@ -69,7 +86,23 @@ export type EntityFormProps = {
   description?: string;
   heroLabel?: string;
   variant?: "modal" | "page" | "drawer";
+  /** When this changes, form state resets to field default values */
+  formKey?: string | number;
 };
+
+function buildInitialFormData(fields: FieldConfig[]) {
+  const initialData: Record<string, unknown> = {};
+  fields.forEach((field) => {
+    if (field.type === "toggle") {
+      initialData[field.name] = field.value === true;
+    } else if (field.type === "multiselect") {
+      initialData[field.name] = Array.isArray(field.value) ? field.value : [];
+    } else {
+      initialData[field.name] = field.value ?? "";
+    }
+  });
+  return initialData;
+}
 
 type SectionConfig = {
   name: string;
@@ -77,23 +110,33 @@ type SectionConfig = {
   fields: FieldConfig[];
 };
 
-export function EntityForm({
-  title,
-  fields,
-  isLoading = false,
-  error,
-  onCancel,
-  onSubmit,
-  submitLabel = "Save",
-  cancelLabel = "Cancel",
-  description,
-  heroLabel = "Guided Entry",
-  variant = "page",
-}: EntityFormProps) {
-  const [formData, setFormData] = useState<Record<string, unknown>>({});
+export const EntityForm = forwardRef<EntityFormHandle, EntityFormProps>(
+  function EntityForm(
+    {
+      title,
+      fields,
+      isLoading = false,
+      error,
+      onCancel,
+      onSubmit,
+      submitLabel = "Save",
+      cancelLabel = "Cancel",
+      description,
+      heroLabel = "Guided Entry",
+      variant = "page",
+      formKey = "default",
+    },
+    ref,
+  ) {
+  const [formData, setFormData] = useState<Record<string, unknown>>(() =>
+    buildInitialFormData(fields),
+  );
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentSectionIndex, setCurrentSectionIndex] = useState(0);
+  const [activeQuickCreateField, setActiveQuickCreateField] = useState<
+    string | null
+  >(null);
 
   const requiredFieldsCount = fields.filter((field) => field.required).length;
 
@@ -134,21 +177,45 @@ export function EntityForm({
   const isFinalSection = currentSectionIndex === sections.length - 1;
 
   useEffect(() => {
-    const initialData: Record<string, unknown> = {};
-    fields.forEach((field) => {
-      if (field.type === "toggle") {
-        initialData[field.name] = field.value === true;
-      } else if (field.type === "multiselect") {
-        initialData[field.name] = Array.isArray(field.value) ? field.value : [];
-      } else {
-        initialData[field.name] = field.value ?? "";
-      }
-    });
-
-    setFormData(initialData);
+    setFormData(buildInitialFormData(fields));
     setFieldErrors({});
     setCurrentSectionIndex(0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset only when form identity changes
+  }, [formKey]);
+
+  const setFieldValue = useCallback((name: string, value: unknown) => {
+    setFormData((prev) => {
+      const next = { ...prev, [name]: value };
+      const field = fields.find((candidate) => candidate.name === name);
+      if (field?.onValueChange) {
+        const updates = field.onValueChange({ value, formData: next });
+        if (updates) {
+          Object.assign(next, updates);
+        }
+      }
+      return next;
+    });
+    setFieldErrors((prev) => {
+      if (!prev[name]) return prev;
+      const next = { ...prev };
+      delete next[name];
+      return next;
+    });
   }, [fields]);
+
+  const patchFormData = useCallback((partial: Record<string, unknown>) => {
+    setFormData((prev) => ({ ...prev, ...partial }));
+  }, []);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      setFieldValue,
+      patchFormData,
+      getFormData: () => formData,
+    }),
+    [setFieldValue, patchFormData, formData],
+  );
 
   const isFieldDisabled = (field: FieldConfig) => {
     if (typeof field.disabled === "function") {
@@ -194,24 +261,61 @@ export function EntityForm({
   };
 
   const handleChange = (name: string, value: unknown) => {
-    setFormData((prev) => {
-      const next = { ...prev, [name]: value };
-      const field = fields.find((candidate) => candidate.name === name);
-      if (field?.onValueChange) {
-        const updates = field.onValueChange({ value, formData: next });
-        if (updates) {
-          Object.assign(next, updates);
-        }
-      }
-      return next;
-    });
-    if (fieldErrors[name]) {
-      setFieldErrors((prev) => {
-        const next = { ...prev };
-        delete next[name];
-        return next;
+    setFieldValue(name, value);
+  };
+
+  const activeQuickCreate = activeQuickCreateField
+    ? fields.find((field) => field.name === activeQuickCreateField)?.quickCreate
+    : undefined;
+
+  const handleQuickCreateSubmit = async (data: Record<string, unknown>) => {
+    if (!activeQuickCreateField || !activeQuickCreate) return;
+
+    const created = await activeQuickCreate.onCreate(data);
+    const fieldName = activeQuickCreateField;
+
+    if (activeQuickCreate.mode === "multiselect-append") {
+      setFormData((prev) => {
+        const current = Array.isArray(prev[fieldName])
+          ? (prev[fieldName] as Array<number | string>)
+          : [];
+        const alreadySelected = current.some(
+          (item) => String(item) === String(created.id),
+        );
+        if (alreadySelected) return prev;
+        return { ...prev, [fieldName]: [...current, created.id] };
       });
+    } else {
+      setFieldValue(fieldName, String(created.id));
     }
+  };
+
+  const renderFieldLabelRow = (
+    field: FieldConfig,
+    options?: { multiselect?: boolean },
+  ) => {
+    const quickCreate = field.quickCreate;
+    const showQuickCreate =
+      quickCreate &&
+      quickCreate.enabled !== false &&
+      (field.type === "select" || field.type === "multiselect");
+
+    return (
+      <div className="mb-2 ml-1 flex items-center justify-between gap-2">
+        <label className="label-caps block">
+          {field.label}{" "}
+          {field.required && <span className="text-error">*</span>}
+        </label>
+        {showQuickCreate ? (
+          <QuickCreateButton
+            label={options?.multiselect ? "New" : "New"}
+            ariaLabel={`Add new ${field.label}`}
+            onClick={() => setActiveQuickCreateField(field.name)}
+            disabled={isSubmitting || isLoading}
+          />
+        ) : null}
+      </div>
+    );
   };
 
   const handleMultiselectChange = (
@@ -552,12 +656,20 @@ export function EntityForm({
                         </div>
                       ) : (
                         <div className="group">
-                          <label className="label-caps mb-2 ml-1 block">
-                            {field.label}{" "}
-                            {field.required && (
-                              <span className="text-error">*</span>
-                            )}
-                          </label>
+                          {field.type === "textarea" ||
+                          field.type === "select" ||
+                          field.type === "multiselect" ? (
+                            renderFieldLabelRow(field, {
+                              multiselect: field.type === "multiselect",
+                            })
+                          ) : (
+                            <label className="label-caps mb-2 ml-1 block">
+                              {field.label}{" "}
+                              {field.required && (
+                                <span className="text-error">*</span>
+                              )}
+                            </label>
+                          )}
                           <div className="relative">
                             {field.type === "textarea" ? (
                               <textarea
@@ -804,6 +916,23 @@ export function EntityForm({
           )}
         </div>
       </div>
+
+      {activeQuickCreate ? (
+        <QuickCreateDrawer
+          isOpen={activeQuickCreateField !== null}
+          onClose={() => setActiveQuickCreateField(null)}
+          title={activeQuickCreate.title}
+          description={activeQuickCreate.description}
+          submitLabel={activeQuickCreate.submitLabel}
+          fields={activeQuickCreate.fields}
+          onSubmit={handleQuickCreateSubmit}
+          heroLabel="Quick Create"
+          width="md"
+        />
+      ) : null}
     </form>
   );
-}
+},
+);
+
+EntityForm.displayName = "EntityForm";

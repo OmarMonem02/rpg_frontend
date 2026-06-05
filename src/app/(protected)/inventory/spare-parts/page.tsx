@@ -206,19 +206,22 @@ export default function SparePartsPage() {
   const getStockBadge = (part: SparePartRecord) => {
     if (part.stock_quantity <= 0)
       return (
-        <StatusBadge tone="danger">
-          <span className="mono-data">0</span> Out
+        <StatusBadge tone="danger" className="gap-1">
+          <span className="mono-data">0</span>
+          <span>Out</span>
         </StatusBadge>
       );
     if (part.stock_quantity <= 5)
       return (
-        <StatusBadge tone="warning">
-          Low <span className="mono-data">{part.stock_quantity}</span>
+        <StatusBadge tone="warning" className="gap-1">
+          <span>Low</span>
+          <span className="mono-data">{part.stock_quantity}</span>
         </StatusBadge>
       );
     return (
-      <StatusBadge tone="success">
-        In <span className="mono-data"> {part.stock_quantity}</span>
+      <StatusBadge tone="success" className="gap-1">
+        <span>In</span>
+        <span className="mono-data">{part.stock_quantity}</span>
       </StatusBadge>
     );
   };
