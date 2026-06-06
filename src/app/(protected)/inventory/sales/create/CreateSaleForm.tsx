@@ -38,6 +38,7 @@ import {
   type CreateSalePayload,
   type CreateSaleLineItemPayload,
 } from "@/lib/crud-api";
+import { findExactSkuOrPartNumberMatch } from "@/lib/item-lookup";
 import { CatalogPickerModal } from "@/components/catalog-picker-modal";
 import {
   CartLineItemsPanel,
@@ -724,26 +725,16 @@ export function CreateSaleForm() {
         listSpareParts(token, 1, { search: code }),
       ]);
 
-      const normalized = code.toLowerCase();
-      const productMatch =
-        productsRes.items.find(
-          (p) =>
-            p.sku?.toLowerCase() === normalized ||
-            p.part_number?.toLowerCase() === normalized,
-        ) ?? null;
-      const spareMatch =
-        spareRes.items.find(
-          (s) =>
-            s.sku?.toLowerCase() === normalized ||
-            s.part_number?.toLowerCase() === normalized,
-        ) ?? null;
-
-      const match = productMatch ?? spareMatch;
+      const match = findExactSkuOrPartNumberMatch(
+        code,
+        productsRes.items,
+        spareRes.items,
+      );
       if (!match) {
         throw new Error(`No product/spare part found for "${code}"`);
       }
 
-      addOrIncrementCatalogItem(match);
+      addOrIncrementCatalogItem(match.record);
       setBarcodeValue("");
     } catch (err) {
       setBarcodeError(err instanceof Error ? err.message : "Scan failed");

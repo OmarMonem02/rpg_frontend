@@ -158,7 +158,11 @@ export function LinkCustomerBikeModal({
               <input
                 type="number"
                 min={0}
-                className="w-full rounded-xl border border-outline-variant/30 bg-surface px-4 py-2 outline-none focus:border-primary"
+                onWheel={(event) => {
+                  event.preventDefault();
+                  event.currentTarget.blur();
+                }}
+                className="w-full rounded-xl border border-outline-variant/30 bg-surface px-4 py-2 outline-none focus:border-primary [&::-webkit-inner-spin-button]:appearance-none"
                 value={details.mileage}
                 onChange={(e) =>
                   setDetails((d) => ({ ...d, mileage: e.target.value }))

@@ -360,6 +360,7 @@ export function CartLineItemsPanel({
                                   ),
                                 }))
                               }
+                              
                               min={1}
                               max={maxQty}
                               step={1}
@@ -370,7 +371,7 @@ export function CartLineItemsPanel({
                                 item.sellable_type === "bikes" ||
                                 item.sellable_type === "maintenance_services"
                               }
-                              className="form-input-base mono-data w-16 py-1.5 text-right text-sm"
+                              className="form-input-base mono-data w-16 py-1.5 text-right text-sm [&::-webkit-inner-spin-button]:appearance-none"
                               aria-label="Quantity"
                             />
                             {isOutOfStock ? (
@@ -449,6 +450,10 @@ export function CartLineItemsPanel({
                             <div className="relative w-full">
                               <input
                                 type="number"
+                                onWheel={(event) => {
+                                  event.preventDefault();
+                                  event.currentTarget.blur();
+                                }}
                                 value={editValues.discount}
                                 onChange={(e) =>
                                   setEditValues((v) => ({

@@ -11,6 +11,9 @@ import {
 } from "./core";
 import type { PricingCurrency } from "@/lib/currencies";
 import { toPricingCurrency } from "@/lib/currencies";
+import { getApiUrl } from "@/lib/config";
+import { ApiError } from "@/lib/auth-api";
+import type { StocktakeExportRow } from "@/lib/stocktake";
 
 // --- BRANDS ---
 export type BrandRecord = {
@@ -457,6 +460,7 @@ export type ProductRecord = {
   max_discount_value: number;
   universal: boolean;
   notes?: string;
+  bike_blueprint_ids?: number[];
   created_at?: string;
 };
 
@@ -477,9 +481,13 @@ export type CreateProductPayload = {
   max_discount_value: number;
   universal?: boolean;
   notes?: string;
+  bike_blueprint_ids?: number[];
 };
 
-export type UpdateProductPayload = CreateProductPayload;
+export type UpdateProductPayload = CreateProductPayload & {
+  /** When set, replaces pivot links (use [] when universal). Omit to leave links unchanged. */
+  bike_blueprint_ids?: number[];
+};
 
 export function normalizeProduct(raw: unknown): ProductRecord {
   const record = asRecord(raw);
@@ -501,6 +509,7 @@ export function normalizeProduct(raw: unknown): ProductRecord {
     max_discount_value: toNumber(record.max_discount_value),
     universal: record.universal === true || record.universal === "true",
     notes: toText(record.notes) || undefined,
+    bike_blueprint_ids: coalesceBikeBlueprintIds(record),
     created_at: toText(record.created_at) || undefined,
   };
 }
@@ -515,6 +524,9 @@ export async function listProducts(
     price_range?: string;
     currency?: string;
     low_stock?: boolean;
+    bike_brand_id?: number;
+    bike_model?: string;
+    bike_year?: number;
   },
 ): Promise<PaginatedResult<ProductRecord>> {
   const query = buildQuery({
@@ -525,6 +537,9 @@ export async function listProducts(
     price_range: filters?.price_range,
     currency: filters?.currency,
     low_stock: filters?.low_stock,
+    bike_brand_id: filters?.bike_brand_id,
+    bike_model: filters?.bike_model,
+    bike_year: filters?.bike_year,
   });
 
   const payload = await authorizedFetch<unknown>(`/products?${query}`, token);
@@ -741,4 +756,51 @@ export async function bulkApplySpareParts(
     body: JSON.stringify(cleanBulkPayload(payload)),
   });
   return normalizeBulkApplyResult(data);
+}
+
+// --- STOCKTAKE (INVENTORY COUNT) ---
+
+/**
+ * Sends counted rows to the backend, which re-reads authoritative stock,
+ * computes variance, and streams back a styled .xlsx of discrepant items.
+ */
+export async function exportStocktakeDiscrepancies(
+  token: string,
+  rows: StocktakeExportRow[],
+): Promise<void> {
+  const response = await fetch(getApiUrl("/stocktake/discrepancy-export"), {
+    method: "POST",
+    headers: {
+      Accept: "application/octet-stream",
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ items: rows }),
+  });
+
+  if (!response.ok) {
+    let message = "Failed to generate the discrepancy report.";
+    try {
+      const json = (await response.json()) as { message?: string };
+      if (json.message) message = json.message;
+    } catch {
+      // Keep the fallback message.
+    }
+    throw new ApiError(message, response.status);
+  }
+
+  const blob = await response.blob();
+  const filename = `inventory-count-discrepancies_${new Date()
+    .toISOString()
+    .slice(0, 19)
+    .replace(/[:T]/g, "")}.xlsx`;
+
+  const downloadUrl = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = downloadUrl;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+  URL.revokeObjectURL(downloadUrl);
 }

@@ -329,9 +329,13 @@ export function YearPicker({
         type="number"
         min="2000"
         max="2100"
+        onWheel={(event) => {
+          event.preventDefault();
+          event.currentTarget.blur();
+        }}
         value={year}
         onChange={(event) => onChange(Number(event.target.value) || year)}
-        className="form-input-base"
+        className="form-input-base [&::-webkit-inner-spin-button]:appearance-none"
       />
     </InputGroup>
   );

@@ -746,13 +746,17 @@ export default function RequestsPage() {
                     <InputGroup label="Discount value">
                       <input
                         type="number"
+                        onWheel={(event) => {
+                          event.preventDefault();
+                          event.currentTarget.blur();
+                        }}
                         min={0}
                         step="0.01"
                         value={approveDraft}
                         onChange={(event) =>
                           setApproveDraft(Number(event.target.value) || 0)
                         }
-                        className="form-input-base mono-data"
+                        className="form-input-base mono-data [&::-webkit-inner-spin-button]:appearance-none"
                       />
                     </InputGroup>
                   </div>

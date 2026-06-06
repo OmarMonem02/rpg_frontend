@@ -408,7 +408,11 @@ export default function ManageSaleItemsPage() {
                           ),
                         )
                       }
-                      className="w-full rounded-xl border border-outline-variant/30 px-4 py-3 text-lg font-semibold tabular-nums focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all bg-surface"
+                      onWheel={(event) => {
+                        event.preventDefault();
+                        event.currentTarget.blur();
+                      }}
+                      className="w-full rounded-xl border border-outline-variant/30 px-4 py-3 text-lg font-semibold tabular-nums focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all bg-surface [&::-webkit-inner-spin-button]:appearance-none"
                     />
                     <div className="label-caps absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant/40">
                       Units
@@ -521,7 +525,11 @@ export default function ManageSaleItemsPage() {
                                     ),
                                   )
                                 }
-                                className="w-full rounded-xl border border-outline-variant/30 px-3 py-1.5 bg-surface text-center font-bold tabular-nums text-sm"
+                                onWheel={(event) => {
+                                  event.preventDefault();
+                                  event.currentTarget.blur();
+                                }}
+                                className="w-full rounded-xl border border-outline-variant/30 px-3 py-1.5 bg-surface text-center font-bold tabular-nums text-sm [&::-webkit-inner-spin-button]:appearance-none"
                               />
                             </InputGroup>
                           </div>
@@ -548,7 +556,11 @@ export default function ManageSaleItemsPage() {
                                     ),
                                   )
                                 }
-                                className="w-full rounded-xl border border-outline-variant/30 px-2 py-1.5 bg-surface text-right tabular-nums font-medium text-sm"
+                                onWheel={(event) => {
+                                  event.preventDefault();
+                                  event.currentTarget.blur();
+                                }}
+                                className="w-full rounded-xl border border-outline-variant/30 px-2 py-1.5 bg-surface text-right tabular-nums font-medium text-sm [&::-webkit-inner-spin-button]:appearance-none"
                               />
                             </InputGroup>
                             <InputGroup label="Disc (EGP)">
@@ -573,7 +585,11 @@ export default function ManageSaleItemsPage() {
                                     ),
                                   )
                                 }
-                                className="w-full rounded-xl border border-outline-variant/30 px-2 py-1.5 bg-surface text-right tabular-nums text-error font-medium text-sm"
+                                onWheel={(event) => {
+                                  event.preventDefault();
+                                  event.currentTarget.blur();
+                                }}
+                                className="w-full rounded-xl border border-outline-variant/30 px-2 py-1.5 bg-surface text-right tabular-nums text-error font-medium text-sm [&::-webkit-inner-spin-button]:appearance-none"
                               />
                             </InputGroup>
                           </div>

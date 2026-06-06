@@ -976,6 +976,10 @@ export default function TicketDetailsPage() {
                                 <input
                                   type="number"
                                   min={0}
+                                  onWheel={(event) => {
+                                    event.preventDefault();
+                                    event.currentTarget.blur();
+                                  }}
                                   max={ticketItemMaxDiscount(item, {
                                     applyCatalogCap: applyStaffDiscountCap,
                                   })}
@@ -996,7 +1000,7 @@ export default function TicketDetailsPage() {
                                       e.currentTarget.blur();
                                     }
                                   }}
-                                  className="w-24 rounded-lg border border-outline-variant/30 bg-surface px-2 py-1 text-right text-sm text-error outline-none focus:border-primary"
+                                  className="w-24 rounded-lg border border-outline-variant/30 bg-surface px-2 py-1 text-right text-sm text-error outline-none focus:border-primary [&::-webkit-inner-spin-button]:appearance-none"
                                 />
                                 {applyStaffDiscountCap ? (
                                   <span className="text-caption font-medium text-on-surface-variant">

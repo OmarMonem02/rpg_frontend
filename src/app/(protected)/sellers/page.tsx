@@ -416,8 +416,12 @@ export default function SellersPage() {
                       commission_rate: event.target.value,
                     }))
                   }
+                  onWheel={(event) => {
+                    event.preventDefault();
+                    event.currentTarget.blur();
+                  }}
                   required
-                  className="form-input-base"
+                  className="form-input-base [&::-webkit-inner-spin-button]:appearance-none"
                   placeholder="5"
                 />
               </label>

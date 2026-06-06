@@ -23,6 +23,7 @@ import {
   EntityFormModal,
   type FieldConfig,
 } from "@/components/entity-form-modal";
+import { BikeCompatibilityFilter } from "@/components/BikeCompatibilityFilter";
 import { AdvancedFilters } from "@/components/advanced-filters";
 import {
   ActionButton,
@@ -45,6 +46,7 @@ export default function ProductsPage() {
     [],
   );
   const [brands, setBrands] = useState<BrandRecord[]>([]);
+  const [bikeBrands, setBikeBrands] = useState<BrandRecord[]>([]);
   const [totalPages, setTotalPages] = useState(1);
   const [categoriesPage, setCategoriesPage] = useState(1);
   const [categoriesTotalPages, setCategoriesTotalPages] = useState(1);
@@ -63,6 +65,7 @@ export default function ProductsPage() {
     setPriceMin,
     setPriceMax,
     setCurrency,
+    setBikeCompatibility,
   } = useEntityFilters();
 
   // Category Modal State
@@ -87,10 +90,11 @@ export default function ProductsPage() {
       if (!token) return;
       const [catsRes, brandsRes] = await Promise.all([
         fetchAllPages((p) => listProductCategories(token, p)),
-        fetchAllPages((p) => listBrands(token, p, { type: "products" })),
+        fetchAllPages((p) => listBrands(token, p)),
       ]);
       setAllCategories(catsRes);
       setBrands(brandsRes.filter((b) => b.type === "products"));
+      setBikeBrands(brandsRes.filter((b) => b.type === "bikes"));
     } catch (err) {
       console.error("Failed to load dropdowns:", err);
     }
@@ -312,6 +316,24 @@ export default function ProductsPage() {
         showCurrencyFilter={true}
       />
 
+      <div className="rounded-[1.5rem] border border-outline-variant/15 bg-surface-container-lowest p-4">
+        <div className="mb-3">
+          <p className="label-caps text-on-surface-variant">Compatible Bike</p>
+          <p className="mt-1 text-xs text-on-surface-variant/80">
+            Filter products by bike brand, model, and year. Universal products
+            remain visible.
+          </p>
+        </div>
+        <BikeCompatibilityFilter
+          brands={bikeBrands}
+          selectedBrandId={filters.bike_brand_id}
+          selectedModel={filters.bike_model}
+          selectedYear={filters.bike_year}
+          isLoading={loading}
+          onFilterChange={(compat) => setBikeCompatibility(compat)}
+        />
+      </div>
+
       {loading ? (
         <div className="flex justify-center py-12">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-outline-variant/30 border-t-primary"></div>
@@ -342,6 +364,7 @@ export default function ProductsPage() {
                 <th className="label-caps px-4 py-3 text-left">Price</th>
                 <th className="label-caps px-4 py-3 text-left">Category</th>
                 <th className="label-caps px-4 py-3 text-left">Brand</th>
+                <th className="label-caps px-4 py-3 text-left">Is Universal</th>
                 <th className="label-caps px-4 py-3 text-right">Actions</th>
               </tr>
             </thead>
@@ -382,6 +405,11 @@ export default function ProductsPage() {
                   <td className="px-4 py-3">
                     <span className="form-chip bg-primary/8 text-primary border-primary/15">
                       {brands.find((b) => b.id === product.brand_id)?.name}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className="form-chip bg-primary/8 text-primary border-primary/15">
+                      {product.universal ? "Universal" : "Specific"}
                     </span>
                   </td>
                   <td className="px-4 py-3 text-right">

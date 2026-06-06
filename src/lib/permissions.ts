@@ -334,6 +334,14 @@ const ROUTE_PERMISSION_RULES: Array<{
     permission: { page: "inventory", action: "read" },
   },
   {
+    pattern: /^\/inventory\/item-lookup(?:\/|$)/,
+    permission: { page: "inventory", action: "read" },
+  },
+  {
+    pattern: /^\/inventory\/count(?:\/|$)/,
+    permission: { page: "inventory", action: "read" },
+  },
+  {
     pattern: /^\/inventory\/spare-parts\/create(?:\/|$)/,
     permission: { page: "spare-parts", action: "create" },
   },
@@ -650,6 +658,14 @@ export function canAccessRoute(
   }
 
   if (/^\/inventory\/alarms(?:\/|$)/.test(normalizedPath)) {
+    return (
+      canAccessPageUi(permissions, "inventory") ||
+      canReadPage(permissions, "spare-parts") ||
+      canReadPage(permissions, "products")
+    );
+  }
+
+  if (/^\/inventory\/item-lookup(?:\/|$)/.test(normalizedPath)) {
     return (
       canAccessPageUi(permissions, "inventory") ||
       canReadPage(permissions, "spare-parts") ||

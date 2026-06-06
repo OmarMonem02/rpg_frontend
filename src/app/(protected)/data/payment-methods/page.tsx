@@ -436,7 +436,11 @@ export default function PaymentMethodsPage() {
                   onChange={(event) =>
                     handleSettingsFieldChange("exchange_rate", event.target.value)
                   }
-                  className={`form-input-base max-w-xs ${settingsErrors.exchange_rate ? "form-input-error" : ""}`}
+                  onWheel={(event) => {
+                    event.preventDefault();
+                    event.currentTarget.blur();
+                  }}
+                  className={`form-input-base max-w-xs [&::-webkit-inner-spin-button]:appearance-none ${settingsErrors.exchange_rate ? "form-input-error" : ""}`}
                   placeholder="e.g. 50.25"
                   disabled={isSettingsSaving}
                   aria-invalid={Boolean(settingsErrors.exchange_rate)}
@@ -496,7 +500,11 @@ export default function PaymentMethodsPage() {
                       event.target.value,
                     )
                   }
-                  className={`form-input-base max-w-xs ${settingsErrors.exchange_rate_eur ? "form-input-error" : ""}`}
+                  onWheel={(event) => {
+                    event.preventDefault();
+                    event.currentTarget.blur();
+                  }}
+                  className={`form-input-base max-w-xs [&::-webkit-inner-spin-button]:appearance-none ${settingsErrors.exchange_rate_eur ? "form-input-error" : ""}`}
                   placeholder="e.g. 52.50"
                   disabled={isSettingsSaving}
                   aria-invalid={Boolean(settingsErrors.exchange_rate_eur)}

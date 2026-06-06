@@ -111,8 +111,12 @@ export function BulkEditConfigureStep({
                       type="number"
                       step={field.price ? "0.01" : "1"}
                       value={d.value}
+                      onWheel={(event) => {
+                        event.preventDefault();
+                        event.currentTarget.blur();
+                      }}
                       onChange={(e) => updateField(field.key, { value: e.target.value })}
-                      className="form-input-base py-2 text-sm mono-data"
+                      className="form-input-base py-2 text-sm mono-data [&::-webkit-inner-spin-button]:appearance-none"
                       placeholder={d.mode === "percent" ? "e.g. 10" : "0"}
                     />
                   </div>

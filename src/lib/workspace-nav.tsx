@@ -326,6 +326,47 @@ function HistoryIcon(props: SidebarIconProps) {
   );
 }
 
+function SearchIcon(props: SidebarIconProps) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      {...props}
+    >
+      <circle cx="11" cy="11" r="8" />
+      <path d="m21 21-4.3-4.3" />
+    </svg>
+  );
+}
+
+function StocktakeIcon(props: SidebarIconProps) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      {...props}
+    >
+      <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" />
+      <rect x="9" y="3" width="6" height="4" rx="1" />
+      <path d="m9 14 2 2 4-4" />
+    </svg>
+  );
+}
+
 /** Default sidebar / launcher navigation; filter with `canAccessRoute` on the client. */
 export const defaultWorkspaceNavSections: SidebarNavSection[] = [
   {
@@ -380,6 +421,16 @@ export const defaultWorkspaceNavSections: SidebarNavSection[] = [
         href: "/inventory/products",
         label: "Products",
         icon: <ProductsIcon className="h-5 w-5" />,
+      },
+      {
+        href: "/inventory/item-lookup",
+        label: "Item Lookup",
+        icon: <SearchIcon className="h-5 w-5" />,
+      },
+      {
+        href: "/inventory/count",
+        label: "Inventory Count",
+        icon: <StocktakeIcon className="h-5 w-5" />,
       },
       {
         href: "/inventory/bikes",

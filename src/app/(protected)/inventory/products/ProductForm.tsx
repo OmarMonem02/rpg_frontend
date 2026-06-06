@@ -1,19 +1,23 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { usePermissions } from "@/components/permission-provider";
 import { getAuthToken } from "@/lib/auth-session";
 import {
   listProductCategories,
   listBrands,
+  listBikeBlueprints,
   createBrand,
+  createBikeBlueprint,
   createProduct,
   updateProduct,
   type ProductRecord,
   type CreateProductPayload,
+  type UpdateProductPayload,
   type ProductCategoryRecord,
   type BrandRecord,
+  type BikeBlueprintRecord,
   fetchAllPages,
 } from "@/lib/crud-api";
 import { CURRENCY_SELECT_OPTIONS, toPricingCurrency } from "@/lib/currencies";
@@ -29,23 +33,28 @@ export function ProductForm({ initialData, mode }: ProductFormProps) {
   const router = useRouter();
   const permissions = usePermissions();
   const [categories, setCategories] = useState<ProductCategoryRecord[]>([]);
-  const [brands, setBrands] = useState<BrandRecord[]>([]);
+  const [brandRows, setBrandRows] = useState<BrandRecord[]>([]);
+  const [blueprints, setBlueprints] = useState<BikeBlueprintRecord[]>([]);
+  const [currentBlueprintIds, setCurrentBlueprintIds] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const canCreateBrands = permissions.canCreate("brands");
+  const canCreateBlueprints = permissions.canCreate("bike-blueprints");
 
   useEffect(() => {
     const loadDependencies = async () => {
       try {
         const token = getAuthToken();
         if (!token) return;
-        const [catRes, brandRes] = await Promise.all([
+        const [catRes, brandsRes, blueprintRows] = await Promise.all([
           fetchAllPages((p) => listProductCategories(token, p)),
-          fetchAllPages((p) => listBrands(token, p, { type: "products" })),
+          fetchAllPages((p) => listBrands(token, p)),
+          fetchAllPages((p) => listBikeBlueprints(token, p)),
         ]);
         setCategories(catRes);
-        setBrands(brandRes.filter((b) => b.type === "products"));
+        setBrandRows(brandsRes);
+        setBlueprints(blueprintRows);
       } catch (err) {
         console.error("Failed to load dependencies:", err);
       } finally {
@@ -55,6 +64,100 @@ export function ProductForm({ initialData, mode }: ProductFormProps) {
     loadDependencies();
   }, []);
 
+  useEffect(() => {
+    if (mode === "edit" && initialData) {
+      setCurrentBlueprintIds(initialData.bike_blueprint_ids ?? []);
+    }
+  }, [mode, initialData]);
+
+  const brands = useMemo(
+    () => brandRows.filter((item) => item.type === "products"),
+    [brandRows],
+  );
+  const bikeBrands = useMemo(
+    () => brandRows.filter((item) => item.type === "bikes"),
+    [brandRows],
+  );
+  const bikeBrandNameById = useMemo(
+    () => new Map(bikeBrands.map((brand) => [brand.id, brand.name])),
+    [bikeBrands],
+  );
+
+  const buildBikeBrandQuickCreate = useCallback((): FieldConfig["quickCreate"] => ({
+    title: "Add Bike Brand",
+    description: "Create a motorcycle manufacturer brand for blueprint linking.",
+    submitLabel: "Create & Select",
+    enabled: canCreateBrands,
+    fields: [
+      {
+        name: "name",
+        label: "Brand Name",
+        type: "text",
+        required: true,
+        placeholder: "e.g., Honda, Yamaha",
+      },
+    ],
+    onCreate: async (data) => {
+      const token = getAuthToken();
+      if (!token) throw new Error("Authentication required");
+      const created = await createBrand(token, {
+        name: String(data.name),
+        type: "bikes",
+      });
+      setBrandRows((prev) => [...prev, created]);
+      return { id: created.id };
+    },
+  }), [canCreateBrands]);
+
+  const blueprintQuickCreateFields: FieldConfig[] = useMemo(
+    () => [
+      {
+        name: "brand_id",
+        label: "Manufacturer Brand",
+        type: "select",
+        required: true,
+        section: "Identity",
+        description: "Select the motorcycle brand (e.g., Honda, Yamaha).",
+        options: () => bikeBrands.map((b) => ({ value: b.id, label: b.name })),
+        quickCreate: buildBikeBrandQuickCreate(),
+      },
+      {
+        name: "model",
+        label: "Model Name",
+        type: "text",
+        required: true,
+        section: "Identity",
+        placeholder: "e.g., MT-07",
+      },
+      {
+        name: "year",
+        label: "Production Year",
+        type: "number",
+        required: true,
+        section: "Identity",
+        placeholder: "e.g., 2024",
+        min: 1900,
+        max: 2100,
+      },
+    ],
+    [bikeBrands, buildBikeBrandQuickCreate],
+  );
+
+  const blueprintYears = useMemo(() => {
+    const years = Array.from(
+      new Set(blueprints.map((blueprint) => blueprint.year)),
+    ).sort((a, b) => a - b);
+    return years.map((year) => ({ value: year, label: String(year) }));
+  }, [blueprints]);
+
+  const parseOptionalNumber = (value: unknown): number | undefined => {
+    if (value === "" || value === null || value === undefined) {
+      return undefined;
+    }
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  };
+
   const handleSubmit = async (formData: Record<string, unknown>) => {
     try {
       setIsSubmitting(true);
@@ -62,7 +165,29 @@ export function ProductForm({ initialData, mode }: ProductFormProps) {
       const token = getAuthToken();
       if (!token) throw new Error("Authentication required");
 
-      const payload: CreateProductPayload = {
+      const yearFrom = parseOptionalNumber(formData.blueprint_year_from);
+      const yearTo = parseOptionalNumber(formData.blueprint_year_to);
+      if (
+        typeof yearFrom === "number" &&
+        typeof yearTo === "number" &&
+        yearFrom > yearTo
+      ) {
+        throw new Error("Compatibility year range is invalid (From year > To year).");
+      }
+
+      const isUniversal = Boolean(formData.universal);
+      const selectedBlueprintsRaw = Array.isArray(formData.blueprint_ids)
+        ? (formData.blueprint_ids as number[])
+        : [];
+      if (!isUniversal && selectedBlueprintsRaw.length === 0) {
+        throw new Error(
+          "Please select at least one Compatible Bike Blueprint (or enable Universal Product).",
+        );
+      }
+
+      const selectedBlueprints = isUniversal ? [] : selectedBlueprintsRaw;
+
+      const basePayload: UpdateProductPayload = {
         name: String(formData.name),
         sku: String(formData.sku),
         image: formData.image ? String(formData.image) : undefined,
@@ -78,14 +203,22 @@ export function ProductForm({ initialData, mode }: ProductFormProps) {
         sale_price: Number(formData.sale_price),
         max_discount_type: String(formData.max_discount_type) as "fixed" | "percentage",
         max_discount_value: Number(formData.max_discount_value),
-        universal: formData.universal === true,
+        universal: isUniversal,
         notes: formData.notes ? String(formData.notes) : undefined,
       };
 
       if (mode === "edit" && initialData) {
-        await updateProduct(token, initialData.id, payload);
+        await updateProduct(token, initialData.id, {
+          ...basePayload,
+          bike_blueprint_ids: selectedBlueprints,
+        });
       } else {
-        await createProduct(token, payload);
+        const createPayload: CreateProductPayload = {
+          ...basePayload,
+          bike_blueprint_ids:
+            selectedBlueprints.length > 0 ? selectedBlueprints : undefined,
+        };
+        await createProduct(token, createPayload);
       }
 
       router.push("/inventory/products");
@@ -174,7 +307,7 @@ export function ProductForm({ initialData, mode }: ProductFormProps) {
             name: String(data.name),
             type: "products",
           });
-          setBrands((prev) => [...prev, created]);
+          setBrandRows((prev) => [...prev, created]);
           return { id: created.id };
         },
       },
@@ -269,9 +402,155 @@ export function ProductForm({ initialData, mode }: ProductFormProps) {
       name: "universal",
       label: "Universal Product",
       type: "toggle",
-      section: "Discount",
-      description: "Use this when the product should be treated as universally applicable.",
-      value: initialData?.universal ?? false,
+      section: "Compatibility",
+      description:
+        "When off, select at least one compatible bike blueprint below. When on, the product applies broadly without blueprint links.",
+      value: mode === "create" ? true : (initialData?.universal ?? false),
+      helperTone: "featured",
+    },
+    {
+      name: "blueprint_brand_id",
+      label: "Filter by Blueprint Brand",
+      type: "select",
+      section: "Compatibility",
+      description: "Narrow compatibility options by bike brand before selecting blueprints.",
+      options: () => bikeBrands.map((brand) => ({ value: brand.id, label: brand.name })),
+      disabled: (formData) => formData.universal === true,
+      value: "",
+      quickCreate: buildBikeBrandQuickCreate(),
+    },
+    {
+      name: "blueprint_model_search",
+      label: "Filter by Model",
+      type: "text",
+      section: "Compatibility",
+      description: "Search model names like MT, CB, R1, or GS.",
+      placeholder: "Type model keyword",
+      disabled: (formData) => formData.universal === true,
+      value: "",
+    },
+    {
+      name: "blueprint_year_from",
+      label: "Year From",
+      type: "select",
+      section: "Compatibility",
+      description: "Set the first production year in the compatibility range.",
+      options: blueprintYears,
+      disabled: (formData) => formData.universal === true,
+      value: "",
+      onValueChange: ({ value, formData }) => {
+        const selectedFrom = parseOptionalNumber(value);
+        const selectedTo = parseOptionalNumber(formData.blueprint_year_to);
+        if (
+          selectedFrom !== undefined &&
+          selectedTo !== undefined &&
+          selectedFrom > selectedTo
+        ) {
+          return { blueprint_year_to: String(selectedFrom) };
+        }
+      },
+    },
+    {
+      name: "blueprint_year_to",
+      label: "Year To",
+      type: "select",
+      section: "Compatibility",
+      description: "Set the last production year in the compatibility range.",
+      options: (formData) => {
+        const selectedFrom = parseOptionalNumber(formData.blueprint_year_from);
+        if (selectedFrom === undefined) {
+          return blueprintYears;
+        }
+        return blueprintYears.filter((year) => Number(year.value) >= selectedFrom);
+      },
+      disabled: (formData) => formData.universal === true,
+      value: "",
+    },
+    {
+      name: "blueprint_ids",
+      label: "Compatible Bike Blueprints",
+      type: "multiselect",
+      required: true,
+      section: "Compatibility",
+      description:
+        "Choose one or more bike blueprints. Use brand, model, and year range filters above to narrow the list. Already selected blueprints stay selected even if they are hidden by current filters.",
+      options: (formData) => {
+        const selectedBrandId = parseOptionalNumber(formData.blueprint_brand_id);
+        const modelSearch = String(formData.blueprint_model_search || "")
+          .trim()
+          .toLowerCase();
+        const yearFrom = parseOptionalNumber(formData.blueprint_year_from);
+        const yearTo = parseOptionalNumber(formData.blueprint_year_to);
+        const selectedBlueprintIds = Array.isArray(formData.blueprint_ids)
+          ? (formData.blueprint_ids as number[])
+          : [];
+        const selectedSet = new Set(selectedBlueprintIds);
+
+        const matchesFilters = (bp: BikeBlueprintRecord) => {
+          const matchesBrand = selectedBrandId !== undefined
+            ? bp.brand_id === selectedBrandId
+            : true;
+          const matchesModel = modelSearch.length > 0
+            ? bp.model.toLowerCase().includes(modelSearch)
+            : true;
+          const matchesYearFrom = yearFrom !== undefined
+            ? bp.year >= yearFrom
+            : true;
+          const matchesYearTo = yearTo !== undefined
+            ? bp.year <= yearTo
+            : true;
+          return matchesBrand && matchesModel && matchesYearFrom && matchesYearTo;
+        };
+
+        const selectedOrdered = [...blueprints]
+          .filter((bp) => selectedSet.has(bp.id))
+          .sort((a, b) => {
+            const bnA = bikeBrandNameById.get(a.brand_id) || "";
+            const bnB = bikeBrandNameById.get(b.brand_id) || "";
+            const byBrand = bnA.localeCompare(bnB);
+            if (byBrand !== 0) return byBrand;
+            const byModel = a.model.localeCompare(b.model);
+            if (byModel !== 0) return byModel;
+            return a.year - b.year;
+          });
+
+        const filteredUnselected = blueprints.filter(
+          (bp) => !selectedSet.has(bp.id) && matchesFilters(bp),
+        );
+
+        const orderedBlueprints = [...selectedOrdered, ...filteredUnselected];
+
+        return orderedBlueprints.map((bp) => {
+          const brandName = bikeBrandNameById.get(bp.brand_id) || `Brand ${bp.brand_id}`;
+          return {
+            value: bp.id,
+            label: `${brandName} • ${bp.model} • ${bp.year}`,
+          };
+        });
+      },
+      disabled: (formData) => formData.universal === true,
+      span: 2,
+      value: mode === "edit" ? currentBlueprintIds : undefined,
+      quickCreate: {
+        title: "Add Bike Blueprint",
+        description:
+          "Define a bike model and year, then add it to compatible blueprints.",
+        submitLabel: "Create & Add",
+        enabled: canCreateBlueprints,
+        mode: "multiselect-append",
+        fields: blueprintQuickCreateFields,
+        onCreate: async (data) => {
+          const token = getAuthToken();
+          if (!token) throw new Error("Authentication required");
+          const created = await createBikeBlueprint(token, {
+            brand_id: Number(data.brand_id),
+            model: String(data.model),
+            year: Number(data.year),
+          });
+          setBlueprints((prev) => [...prev, created]);
+          return { id: created.id };
+        },
+      },
     },
     {
       name: "notes",
@@ -289,7 +568,15 @@ export function ProductForm({ initialData, mode }: ProductFormProps) {
     initialData,
     categories,
     brands,
+    bikeBrands,
+    blueprints,
+    bikeBrandNameById,
+    blueprintYears,
+    currentBlueprintIds,
+    blueprintQuickCreateFields,
+    buildBikeBrandQuickCreate,
     canCreateBrands,
+    canCreateBlueprints,
   ]);
 
   if (loading) {
@@ -307,7 +594,7 @@ export function ProductForm({ initialData, mode }: ProductFormProps) {
       <EntityForm
         formKey={formKey}
         title={mode === "edit" ? "Edit Product" : "Create Product"}
-        description={mode === "edit" ? "Update product profile, stock settings, and pricing." : "Create a polished product entry with inventory, pricing, and sales settings."}
+        description={mode === "edit" ? "Update product profile, stock settings, pricing, and compatibility." : "Create a polished product entry with inventory, pricing, sales settings, and bike compatibility."}
         fields={fields}
         onSubmit={handleSubmit}
         onCancel={() => router.push("/inventory/products")}

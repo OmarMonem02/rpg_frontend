@@ -377,13 +377,17 @@ export default function ExpensesPage() {
                 min="0"
                 step="0.01"
                 value={form.amount}
+                onWheel={(event) => {
+                  event.preventDefault();
+                  event.currentTarget.blur();
+                }}
                 onChange={(event) =>
                   setForm((current) => ({
                     ...current,
                     amount: event.target.value,
                   }))
                 }
-                className="form-input-base"
+                className="form-input-base [&::-webkit-inner-spin-button]:appearance-none"
               />
             </InputGroup>
 

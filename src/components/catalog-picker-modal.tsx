@@ -219,13 +219,14 @@ export function CatalogPickerModal({
       if (!token) return;
 
       if (catalogType === "products") {
-        const [brandsRes, categoriesRes] = await Promise.all([
+        const [brandsRes, bikeBrandsRes, categoriesRes] = await Promise.all([
           fetchAllPages((p) => listBrands(token, p, { type: "products" })),
+          fetchAllPages((p) => listBrands(token, p, { type: "bikes" })),
           fetchAllPages((p) => listProductCategories(token, p)),
         ]);
         setBrands(brandsRes);
+        setBikeBrands(bikeBrandsRes);
         setProductCategories(categoriesRes);
-        setBikeBrands([]);
         setBlueprints([]);
       } else if (catalogType === "spare_parts") {
         const [spBrandsRes, bikeBrandsRes, categoriesRes] = await Promise.all([
@@ -285,6 +286,9 @@ export function CatalogPickerModal({
           brand_id: filters.brandId,
           category_id: filters.categoryId,
           currency: filters.currency,
+          bike_brand_id: filters.bike_brand_id,
+          bike_model: filters.bike_model,
+          bike_year: filters.bike_year,
         });
       } else if (catalogType === "spare_parts") {
         result = await listSpareParts(token, page, {
@@ -645,7 +649,8 @@ export function CatalogPickerModal({
               className="max-h-[min(50vh,26rem)] overflow-y-auto overscroll-y-contain scroll-smooth border-t border-outline-variant/10 px-4 py-3 [scrollbar-gutter:stable] sm:max-h-[min(56vh,32rem)] sm:px-6 sm:py-4"
             >
               <div className="rounded-2xl border border-outline-variant/10 bg-surface-container-lowest/35 p-4 sm:p-5">
-                {catalogType === "spare_parts" && bikeBrands.length > 0 && (
+                {(catalogType === "products" || catalogType === "spare_parts") &&
+                  bikeBrands.length > 0 && (
                   <div className="mb-4 rounded-xl border border-outline-variant/15 bg-surface-container-low/60 p-4 sm:rounded-2xl sm:p-4">
                     <p className="label-caps mb-3 text-on-surface-variant">
                       Compatible bike

@@ -751,8 +751,12 @@ function SalesPageContent() {
                   setTotalMin(event.target.value);
                   setPage(1);
                 }}
+                onWheel={(event) => {
+                  event.preventDefault();
+                  event.currentTarget.blur();
+                }}
                 placeholder="0.00"
-                className="form-input-base"
+                className="form-input-base [&::-webkit-inner-spin-button]:appearance-none"
               />
             </InputGroup>
             <InputGroup label="Max total">
@@ -764,8 +768,12 @@ function SalesPageContent() {
                   setTotalMax(event.target.value);
                   setPage(1);
                 }}
+                onWheel={(event) => {
+                  event.preventDefault();
+                  event.currentTarget.blur();
+                }}
                 placeholder="0.00"
-                className="form-input-base"
+                className="form-input-base [&::-webkit-inner-spin-button]:appearance-none"
               />
             </InputGroup>
             <div className="flex items-end">
