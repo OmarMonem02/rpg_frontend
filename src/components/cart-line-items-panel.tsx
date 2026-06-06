@@ -260,7 +260,7 @@ export function CartLineItemsPanel({
                     className="label-caps px-5 py-3 text-right"
                     title="Discount for this line only (not the overall sale discount)"
                   >
-                    Line disc.
+                    Item disc.
                   </th>
                   <th className="label-caps px-5 py-3 text-right">Total</th>
                   <th className="label-caps px-5 py-3 text-center">Actions</th>

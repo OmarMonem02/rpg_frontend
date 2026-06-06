@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import { getAuthToken } from "@/lib/auth-session";
 import {
@@ -12,9 +12,11 @@ import {
   listProductCategories,
   listSparePartCategories,
   listMaintenanceServiceSectors,
+  listBikeBlueprints,
   type ProductRecord,
   type SparePartRecord,
   type BikeRecord,
+  type BikeBlueprintRecord,
   type MaintenanceServiceRecord,
   type BrandRecord,
   type ProductCategoryRecord,
@@ -31,6 +33,8 @@ import {
   XMarkIcon,
   FunnelIcon,
   ChevronDownIcon,
+  MagnifyingGlassIcon,
+  PhotoIcon,
 } from "@heroicons/react/24/outline";
 
 type CatalogType =
@@ -76,6 +80,25 @@ function NativeSelectChevron() {
   );
 }
 
+function ItemThumbnail({ src, name }: { src?: string; name: string }) {
+  const [failed, setFailed] = useState(false);
+  const showImage = Boolean(src) && !failed;
+  return (
+    <div className="flex h-10 w-10 flex-none items-center justify-center overflow-hidden rounded-xl border border-outline-variant/15 bg-surface-container text-on-surface-variant">
+      {showImage ? (
+        <img
+          src={src}
+          alt=""
+          className="h-full w-full object-cover"
+          onError={() => setFailed(true)}
+        />
+      ) : (
+        <PhotoIcon className="h-5 w-5 opacity-70" aria-hidden title={name} />
+      )}
+    </div>
+  );
+}
+
 export function CatalogPickerModal({
   isOpen,
   onClose,
@@ -93,6 +116,9 @@ export function CatalogPickerModal({
   const [totalPages, setTotalPages] = useState(1);
   const [mounted, setMounted] = useState(false);
   const [filtersExpanded, setFiltersExpanded] = useState(false);
+  const [searchDraft, setSearchDraft] = useState("");
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
 
   // Filter state
   const [filters, setFilters] = useState<FilterConfig>({
@@ -111,6 +137,7 @@ export function CatalogPickerModal({
     SparePartCategoryRecord[]
   >([]);
   const [sectors, setSectors] = useState<MaintenanceServiceSectorRecord[]>([]);
+  const [blueprints, setBlueprints] = useState<BikeBlueprintRecord[]>([]);
 
   // Memoize filters to prevent unnecessary callback recreation
   const memoizedFilters = useMemo(
@@ -158,6 +185,7 @@ export function CatalogPickerModal({
   ]);
 
   const clearAllFilters = useCallback(() => {
+    setSearchDraft("");
     setFilters({
       search: "",
       priceMin: 0,
@@ -174,6 +202,16 @@ export function CatalogPickerModal({
     setPage(1);
   }, []);
 
+  // Debounce the search draft into the applied filter to avoid a request per keystroke
+  useEffect(() => {
+    if (searchDraft === filters.search) return;
+    const timer = window.setTimeout(() => {
+      setFilters((prev) => ({ ...prev, search: searchDraft }));
+      setPage(1);
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [searchDraft, filters.search]);
+
   // Load filter options (brands, categories, sectors)
   const loadFilterOptions = useCallback(async () => {
     try {
@@ -182,12 +220,13 @@ export function CatalogPickerModal({
 
       if (catalogType === "products") {
         const [brandsRes, categoriesRes] = await Promise.all([
-          listBrands(token, 1, { type: "products" }),
-          listProductCategories(token, 1),
+          fetchAllPages((p) => listBrands(token, p, { type: "products" })),
+          fetchAllPages((p) => listProductCategories(token, p)),
         ]);
-        setBrands(brandsRes.items);
-        setProductCategories(categoriesRes.items);
+        setBrands(brandsRes);
+        setProductCategories(categoriesRes);
         setBikeBrands([]);
+        setBlueprints([]);
       } else if (catalogType === "spare_parts") {
         const [spBrandsRes, bikeBrandsRes, categoriesRes] = await Promise.all([
           fetchAllPages((p) => listBrands(token, p, { type: "spare_parts" })),
@@ -197,15 +236,23 @@ export function CatalogPickerModal({
         setBrands(spBrandsRes);
         setBikeBrands(bikeBrandsRes);
         setSparePartCategories(categoriesRes.items);
+        setBlueprints([]);
       } else if (catalogType === "bikes") {
-        const brandsRes = await listBrands(token, 1, { type: "bikes" });
-        setBrands(brandsRes.items);
+        const [brandsRes, blueprintsRes] = await Promise.all([
+          fetchAllPages((p) => listBrands(token, p, { type: "bikes" })),
+          fetchAllPages((p) => listBikeBlueprints(token, p, {})),
+        ]);
+        setBrands(brandsRes);
+        setBlueprints(blueprintsRes);
         setBikeBrands([]);
       } else if (catalogType === "maintenance_services") {
-        const sectorsRes = await listMaintenanceServiceSectors(token, 1);
-        setSectors(sectorsRes.items);
+        const sectorsRes = await fetchAllPages((p) =>
+          listMaintenanceServiceSectors(token, p),
+        );
+        setSectors(sectorsRes);
         setBrands([]);
         setBikeBrands([]);
+        setBlueprints([]);
       }
     } catch (err) {
       console.error("Failed to load filter options:", err);
@@ -311,6 +358,7 @@ export function CatalogPickerModal({
       setSelectedItemIds(new Set(selectedIds));
       setPage(1);
       setFiltersExpanded(false);
+      setSearchDraft(filters.search);
     } else {
       setSelectedItemIds(new Set());
     }
@@ -347,6 +395,57 @@ export function CatalogPickerModal({
     setMounted(true);
   }, []);
 
+  // Escape to close, lock background scroll, and focus the close button on open
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.stopPropagation();
+        onClose();
+        return;
+      }
+
+      if (event.key === "Tab" && dialogRef.current) {
+        const focusables = Array.from(
+          dialogRef.current.querySelectorAll<HTMLElement>(
+            'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
+          ),
+        ).filter((el) => el.offsetParent !== null);
+        if (focusables.length === 0) return;
+
+        const first = focusables[0];
+        const last = focusables[focusables.length - 1];
+        const active = document.activeElement as HTMLElement | null;
+        const insideDialog = active && dialogRef.current.contains(active);
+
+        if (event.shiftKey) {
+          if (!insideDialog || active === first) {
+            event.preventDefault();
+            last.focus();
+          }
+        } else if (!insideDialog || active === last) {
+          event.preventDefault();
+          first.focus();
+        }
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    const focusTimer = window.setTimeout(() => {
+      closeButtonRef.current?.focus();
+    }, 0);
+
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      document.body.style.overflow = previousOverflow;
+      window.clearTimeout(focusTimer);
+    };
+  }, [isOpen, onClose]);
+
   if (!isOpen || !mounted) return null;
 
   const getItemPrice = (item: CatalogItem): number => {
@@ -356,9 +455,76 @@ export function CatalogPickerModal({
   };
 
   const getItemName = (item: CatalogItem): string => {
+    if ("bike_blueprint_id" in item) {
+      const blueprint = blueprints.find(
+        (b) => b.id === item.bike_blueprint_id,
+      );
+      if (blueprint) {
+        const brandName = brands.find((b) => b.id === blueprint.brand_id)?.name;
+        const label = `${blueprint.model} ${blueprint.year}`;
+        return brandName ? `${brandName} · ${label}` : label;
+      }
+      if (item.vin) return `Bike · ${item.vin}`;
+      return `Bike #${item.id}`;
+    }
     if ("name" in item) return item.name;
-    return `Item ${item.id}`;
+    return `Item #${(item as { id: number }).id}`;
   };
+
+  const getItemImage = (item: CatalogItem): string | undefined => {
+    if ("image" in item && item.image) return item.image;
+    return undefined;
+  };
+
+  const getBikeStatusTone = (
+    status: string,
+  ): "default" | "primary" | "success" | "warning" | "danger" => {
+    const toneMap: Record<
+      string,
+      "default" | "primary" | "success" | "warning" | "danger"
+    > = {
+      available: "success",
+      sold: "default",
+      maintenance: "warning",
+      reserved: "primary",
+    };
+    return toneMap[status.toLowerCase()] ?? "default";
+  };
+
+  const getBikeStatusLabel = (status: string): string => {
+    const labels: Record<string, string> = {
+      available: "Available",
+      sold: "Sold",
+      maintenance: "Under Maintenance",
+      reserved: "Reserved",
+    };
+    return labels[status.toLowerCase()] ?? status;
+  };
+
+  const getProductStockBadge = (product: ProductRecord) => {
+    if (product.stock_quantity <= 0) {
+      return (
+        <StatusBadge tone="danger">
+          <span className="mono-data">0</span> Out
+        </StatusBadge>
+      );
+    }
+    if (product.stock_quantity <= product.low_stock_alarm) {
+      return (
+        <StatusBadge tone="warning">
+          Low <span className="mono-data">{product.stock_quantity}</span>
+        </StatusBadge>
+      );
+    }
+    return (
+      <StatusBadge tone="success">
+        In <span className="mono-data">{product.stock_quantity}</span>
+      </StatusBadge>
+    );
+  };
+
+  const allVisibleSelected =
+    items.length > 0 && items.every((item) => selectedItemIds.has(item.id));
 
   return createPortal(
     <div className="form-modal-overlay fixed inset-0 z-[100] flex items-stretch justify-end transition-opacity">
@@ -371,7 +537,13 @@ export function CatalogPickerModal({
       />
 
       {/* Right Sidebar Drawer */}
-      <div className="form-modal-shell relative flex h-full max-h-[100dvh] min-h-0 w-full max-w-[820px] animate-in slide-in-from-right-8 flex-col overflow-hidden border-l border-outline-variant/15 bg-surface shadow-ambient sm:max-w-[860px] lg:max-w-[940px]">
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Catalog picker"
+        className="form-modal-shell relative flex h-full max-h-[100dvh] min-h-0 w-full max-w-[820px] animate-in slide-in-from-right-8 flex-col overflow-hidden border-l border-outline-variant/15 bg-surface shadow-ambient sm:max-w-[860px] lg:max-w-[940px]"
+      >
         {/* Header */}
         <div className="relative border-b border-outline-variant/15 bg-surface-container-low px-4 sm:px-6 py-4 sm:py-5 flex items-start sm:items-center justify-between shrink-0">
           <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent" />
@@ -396,15 +568,22 @@ export function CatalogPickerModal({
               {catalogType === "spare_parts" && "Browse Spare Parts"}
               {catalogType === "bikes" && "Browse Bikes"}
               {catalogType === "maintenance_services" && "Browse Services"}
+              {selectedItemIds.size > 0 && (
+                <span className="label-caps inline-flex shrink-0 items-center rounded-full border border-primary/30 bg-primary/12 px-2 py-0.5 text-primary">
+                  {selectedItemIds.size} selected
+                </span>
+              )}
             </h2>
             <p className="text-sm font-medium text-on-surface-variant mt-1.5 ml-10">
               Select items from the catalog to add to your list
             </p>
           </div>
           <button
+            ref={closeButtonRef}
             type="button"
             onClick={onClose}
-            className="flex h-10 w-10 items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors"
+            aria-label="Close catalog picker"
+            className="flex h-10 w-10 items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           >
             <XMarkIcon className="w-6 h-6" />
           </button>
@@ -500,17 +679,15 @@ export function CatalogPickerModal({
                     </label>
                     <div className="relative">
                       <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-on-surface-variant/55">
+                        <MagnifyingGlassIcon className="h-4 w-4" aria-hidden />
                       </span>
                       <input
                         id="catalog-picker-search"
                         type="search"
                         autoComplete="off"
                         placeholder="Name, SKU, part number…"
-                        value={filters.search}
-                        onChange={(e) => {
-                          setFilters({ ...filters, search: e.target.value });
-                          setPage(1);
-                        }}
+                        value={searchDraft}
+                        onChange={(e) => setSearchDraft(e.target.value)}
                         className="form-input-base w-full pl-10"
                       />
                     </div>
@@ -726,14 +903,44 @@ export function CatalogPickerModal({
           ) : null}
         </div>
 
+        {/* Results context bar */}
+        {!loading && !error && items.length > 0 ? (
+          <div className="flex shrink-0 items-center justify-between gap-3 border-b border-outline-variant/10 bg-surface px-4 py-2 sm:px-6">
+            <p className="label-caps text-on-surface-variant">
+              {items.length} {items.length === 1 ? "item" : "items"}
+              {totalPages > 1 ? ` · page ${page} of ${totalPages}` : ""}
+              {activeFilterCount > 0 ? " · filtered" : ""}
+            </p>
+            {selectedItemIds.size > 0 ? (
+              <span className="label-caps text-primary">
+                {selectedItemIds.size} selected
+              </span>
+            ) : null}
+          </div>
+        ) : null}
+
         {/* Items List */}
-        <div className="relative flex min-h-0 flex-1 scroll-smooth overflow-y-auto overscroll-y-contain bg-surface-container-low/30 [-webkit-overflow-scrolling:touch]">
+        <div className="relative flex min-h-0 w-full flex-1 flex-col scroll-smooth overflow-y-auto overscroll-y-contain bg-surface-container-low/30 [-webkit-overflow-scrolling:touch]">
           {loading ? (
-            <div className="flex flex-col items-center justify-center p-12 h-64 gap-3 animate-pulse text-primary">
-              <div className="w-8 h-8 rounded-full border-4 border-primary border-t-transparent animate-spin" />
-              <p className="text-sm font-semibold tracking-wide text-on-surface-variant uppercase">
-                Loading Catalog...
-              </p>
+            <div
+              className="grid grid-cols-1 gap-2 p-4 pb-6"
+              aria-busy="true"
+              aria-label="Loading catalog"
+            >
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="flex items-center gap-4 rounded-2xl border border-outline-variant/15 bg-surface-container-lowest p-3"
+                >
+                  <div className="h-6 w-6 shrink-0 animate-pulse rounded border-2 border-outline-variant/30 bg-surface-container" />
+                  <div className="h-10 w-10 shrink-0 animate-pulse rounded-xl bg-surface-container" />
+                  <div className="min-w-0 flex-1 space-y-2">
+                    <div className="h-3.5 w-1/2 animate-pulse rounded bg-surface-container" />
+                    <div className="h-3 w-3/4 animate-pulse rounded bg-surface-container" />
+                  </div>
+                  <div className="h-7 w-20 shrink-0 animate-pulse rounded-lg bg-surface-container" />
+                </div>
+              ))}
             </div>
           ) : error ? (
             <div className="m-6 rounded-2xl bg-error-container border border-error/30 p-5 flex gap-3 shadow-sm">
@@ -757,6 +964,7 @@ export function CatalogPickerModal({
           ) : items.length === 0 ? (
             <div className="flex flex-col items-center justify-center p-12 h-64 text-center">
               <div className="w-16 h-16 rounded-full bg-surface-container flex items-center justify-center mb-4 text-on-surface-variant/50">
+                <MagnifyingGlassIcon className="h-8 w-8" aria-hidden />
               </div>
               <h3 className="font-display text-lg font-semibold text-on-surface">
                 No items found
@@ -765,10 +973,20 @@ export function CatalogPickerModal({
                 Try adjusting your search filters or browse a different catalog
                 type to find what you&apos;re looking for.
               </p>
+              {activeFilterCount > 0 ? (
+                <ActionButton
+                  variant="outline"
+                  size="sm"
+                  onClick={clearAllFilters}
+                  className="mt-4"
+                >
+                  Clear all filters
+                </ActionButton>
+              ) : null}
             </div>
           ) : (
-            <div className="grid grid-cols-1 gap-2 p-4 pb-6">
-              {items.map((item) => {
+            <div className="grid w-full grid-cols-1 gap-2 p-4 pb-6">
+              {items.map((item, index) => {
                 const isSelected = selectedItemIds.has(item.id);
                 const isUniversalSparePart =
                   catalogType === "spare_parts" &&
@@ -777,7 +995,8 @@ export function CatalogPickerModal({
                 return (
                   <label
                     key={item.id}
-                    className={`group relative cursor-pointer rounded-2xl border p-3 transition-all duration-150 active:scale-[0.98] ${
+                    style={{ animationDelay: `${Math.min(index, 10) * 30}ms` }}
+                    className={`group relative block w-full min-w-0 cursor-pointer rounded-2xl border p-3 transition-all duration-150 animate-fade-in active:scale-[0.98] focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-primary ${
                       isSelected
                         ? "bg-primary/6 border-primary ring-2 ring-primary shadow-sm"
                         : isUniversalSparePart
@@ -810,68 +1029,138 @@ export function CatalogPickerModal({
                           </svg>
                         )}
                       </div>
-                      <div className="w-10">
-                        {(catalogType === "spare_parts" ||
-                          catalogType === "products") &&
-                          "sku" in item &&
-                          item.image ? (
-                          <img
-                            src={item.image}
-                            alt=""
-                            className="h-10 w-10 flex-none rounded-xl object-cover"
-                          />
-                        ) : (
-                          <img
-                            src={`https://demofree.sirv.com/nope-not-here.jpg?w=150`}
-                            alt=""
-                            className="h-10 w-10 flex-none rounded-xl object-cover"
-                          />
-                        )}
-                      </div>
+                      <ItemThumbnail
+                        src={getItemImage(item)}
+                        name={getItemName(item)}
+                      />
                       {/* Content */}
                       <div className="flex-1 min-w-0 pr-4">
                         <h4 className="font-semibold text-sm text-on-surface truncate">
                           {getItemName(item)}
                         </h4>
-                        {(catalogType === "spare_parts" ||
-                          catalogType === "products") &&
-                          "sku" in item && (
-                            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1.5">
+                        {catalogType === "products" &&
+                          "products_category_id" in item && (
+                            <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1">
                               <span className="mono-data inline-flex items-center text-xs font-medium text-on-surface-variant">
                                 <span className="label-caps mr-1 text-on-surface-variant/60">
                                   SKU
                                 </span>{" "}
                                 {item.sku}
                               </span>
-                              <span className="mono-data inline-flex items-center text-xs font-medium text-on-surface-variant">
-                                <span className="label-caps mr-1 text-on-surface-variant/60">
-                                  Part#
-                                </span>{" "}
-                                {item.part_number}
-                              </span>
-                              {catalogType === "spare_parts" && (
-                                <span className="mono-data inline-flex items-center text-xs font-medium text-on-surface-variant">
-                                  <span className="label-caps mr-1 text-on-surface-variant/60">
-                                    Is Universal:
-                                  </span>{" "}
-                                  {item.universal ? "Yes" : "No"}
-                                </span>
-                              )}
-                              {item.brand_id && (
+                              {item.brand_id ? (
                                 <span className="inline-flex items-center text-xs font-medium text-on-surface-variant">
                                   <span className="label-caps mr-1 text-on-surface-variant/60">
-                                    Brand:
+                                    Brand
                                   </span>{" "}
                                   {brands.find((b) => b.id === item.brand_id)
-                                    ?.name || item.brand_id}
+                                    ?.name ?? item.brand_id}
                                 </span>
-                              )}
+                              ) : null}
+                              {item.products_category_id ? (
+                                <span className="inline-flex items-center text-xs font-medium text-on-surface-variant">
+                                  <span className="label-caps mr-1 text-on-surface-variant/60">
+                                    Category
+                                  </span>{" "}
+                                  {productCategories.find(
+                                    (c) => c.id === item.products_category_id,
+                                  )?.name ?? item.products_category_id}
+                                </span>
+                              ) : null}
+                              {getProductStockBadge(item)}
+                            </div>
+                          )}
+
+                        {catalogType === "spare_parts" &&
+                          "spare_parts_category_id" in item && (
+                            <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1">
+                              <span className="mono-data inline-flex items-center text-xs font-medium text-on-surface-variant">
+                                <span className="label-caps mr-1 text-on-surface-variant/60">
+                                  SKU
+                                </span>{" "}
+                                {item.sku}
+                              </span>
+                              {item.part_number ? (
+                                <span className="mono-data inline-flex items-center text-xs font-medium text-on-surface-variant">
+                                  <span className="label-caps mr-1 text-on-surface-variant/60">
+                                    Part#
+                                  </span>{" "}
+                                  {item.part_number}
+                                </span>
+                              ) : null}
+                              <span className="mono-data inline-flex items-center text-xs font-medium text-on-surface-variant">
+                                <span className="label-caps mr-1 text-on-surface-variant/60">
+                                  Universal
+                                </span>{" "}
+                                {item.universal ? "Yes" : "No"}
+                              </span>
+                              {item.brand_id ? (
+                                <span className="inline-flex items-center text-xs font-medium text-on-surface-variant">
+                                  <span className="label-caps mr-1 text-on-surface-variant/60">
+                                    Brand
+                                  </span>{" "}
+                                  {brands.find((b) => b.id === item.brand_id)
+                                    ?.name ?? item.brand_id}
+                                </span>
+                              ) : null}
                               <span className="inline-flex items-center text-xs font-medium text-on-surface-variant">
                                 <span className="label-caps mr-1 text-on-surface-variant/60">
-                                  Stock:
+                                  Stock
                                 </span>
                                 {item.stock_quantity ?? 0}
                               </span>
+                            </div>
+                          )}
+
+                        {catalogType === "bikes" && "bike_blueprint_id" in item && (
+                          <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1">
+                            {item.vin ? (
+                              <span className="mono-data inline-flex items-center text-xs font-medium text-on-surface-variant">
+                                <span className="label-caps mr-1 text-on-surface-variant/60">
+                                  VIN
+                                </span>{" "}
+                                {item.vin}
+                              </span>
+                            ) : null}
+                            <span className="mono-data inline-flex items-center text-xs font-medium text-on-surface-variant">
+                              <span className="label-caps mr-1 text-on-surface-variant/60">
+                                Mileage
+                              </span>{" "}
+                              {item.mileage.toLocaleString()} km
+                            </span>
+                            {item.status ? (
+                              <StatusBadge tone={getBikeStatusTone(item.status)}>
+                                {getBikeStatusLabel(item.status)}
+                              </StatusBadge>
+                            ) : null}
+                          </div>
+                        )}
+
+                        {catalogType === "maintenance_services" &&
+                          "service_price" in item && (
+                            <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1">
+                              {item.maintenance_service_sector_id ? (
+                                <span className="inline-flex items-center text-xs font-medium text-on-surface-variant">
+                                  <span className="label-caps mr-1 text-on-surface-variant/60">
+                                    Sector
+                                  </span>{" "}
+                                  {sectors.find(
+                                    (s) =>
+                                      s.id ===
+                                      item.maintenance_service_sector_id,
+                                  )?.name ?? item.maintenance_service_sector_id}
+                                </span>
+                              ) : null}
+                              {item.max_discount_value > 0 ? (
+                                <span className="mono-data inline-flex items-center text-xs font-medium text-on-surface-variant">
+                                  <span className="label-caps mr-1 text-on-surface-variant/60">
+                                    Max disc.
+                                  </span>{" "}
+                                  {item.max_discount_value}{" "}
+                                  {item.max_discount_type === "percentage"
+                                    ? "%"
+                                    : item.currency_pricing}
+                                </span>
+                              ) : null}
                             </div>
                           )}
                       </div>
@@ -931,6 +1220,7 @@ export function CatalogPickerModal({
               variant="ghost"
               onClick={handleSelectAll}
               className="px-3"
+              disabled={items.length === 0 || allVisibleSelected}
             >
               Select All
             </ActionButton>

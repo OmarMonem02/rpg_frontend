@@ -783,6 +783,12 @@ export function CreateSaleForm() {
     [cartItems],
   );
 
+  useEffect(() => {
+    if (hasMaintenanceItems) {
+      setIsMaintenance(true);
+    }
+  }, [hasMaintenanceItems]);
+
   const discountBaseSubtotal = useMemo(() => {
     if (!hasMaintenanceItems) return cartSubtotal;
     return computeDiscountBaseSubtotal(cartItems, exchangeRate, exchangeRateEur, {
