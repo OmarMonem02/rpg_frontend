@@ -13,6 +13,7 @@ import { ActionButton } from "@/components/ops-ui";
 import { QuickCreateButton } from "@/components/quick-create/QuickCreateButton";
 import { QuickCreateDrawer } from "@/components/quick-create/QuickCreateDrawer";
 import type { QuickCreateConfig } from "@/components/quick-create/types";
+import { TagInput } from "@/components/TagInput";
 
 type SectionSummaryResolver = (args: {
   field: FieldConfig;
@@ -34,6 +35,7 @@ export type FieldConfig = {
     | "textarea"
     | "select"
     | "multiselect"
+    | "tags"
     | "toggle"
     | "image"
     | "password"
@@ -95,7 +97,7 @@ function buildInitialFormData(fields: FieldConfig[]) {
   fields.forEach((field) => {
     if (field.type === "toggle") {
       initialData[field.name] = field.value === true;
-    } else if (field.type === "multiselect") {
+    } else if (field.type === "multiselect" || field.type === "tags") {
       initialData[field.name] = Array.isArray(field.value) ? field.value : [];
     } else {
       initialData[field.name] = field.value ?? "";
@@ -232,7 +234,7 @@ export const EntityForm = forwardRef<EntityFormHandle, EntityFormProps>(
   };
 
   const isEmptyValue = (field: FieldConfig, value: unknown) => {
-    if (field.type === "multiselect")
+    if (field.type === "multiselect" || field.type === "tags")
       return !Array.isArray(value) || value.length === 0;
     if (field.type === "toggle") return value !== true;
     if (field.type === "image") return !value;
@@ -392,6 +394,7 @@ export const EntityForm = forwardRef<EntityFormHandle, EntityFormProps>(
         field.type === "toggle" ||
         field.type === "image" ||
         field.type === "multiselect" ||
+        field.type === "tags" ||
         field.span === 2,
     );
     return shouldUseSingleColumn ? "space-y-4" : "grid gap-4 md:grid-cols-2";
@@ -402,7 +405,8 @@ export const EntityForm = forwardRef<EntityFormHandle, EntityFormProps>(
       field.span === 2 ||
       field.type === "textarea" ||
       field.type === "toggle" ||
-      field.type === "multiselect"
+      field.type === "multiselect" ||
+      field.type === "tags"
     )
       return "md:col-span-2";
     return "";
@@ -658,10 +662,20 @@ export const EntityForm = forwardRef<EntityFormHandle, EntityFormProps>(
                         <div className="group">
                           {field.type === "textarea" ||
                           field.type === "select" ||
-                          field.type === "multiselect" ? (
-                            renderFieldLabelRow(field, {
-                              multiselect: field.type === "multiselect",
-                            })
+                          field.type === "multiselect" ||
+                          field.type === "tags" ? (
+                            field.type === "tags" ? (
+                              <label className="label-caps mb-2 ml-1 block">
+                                {field.label}{" "}
+                                {field.required && (
+                                  <span className="text-error">*</span>
+                                )}
+                              </label>
+                            ) : (
+                              renderFieldLabelRow(field, {
+                                multiselect: field.type === "multiselect",
+                              })
+                            )
                           ) : (
                             <label className="label-caps mb-2 ml-1 block">
                               {field.label}{" "}
@@ -702,6 +716,20 @@ export const EntityForm = forwardRef<EntityFormHandle, EntityFormProps>(
                                   </option>
                                 ))}
                               </select>
+                            ) : field.type === "tags" ? (
+                              <TagInput
+                                value={
+                                  Array.isArray(fieldValue)
+                                    ? fieldValue.map(String)
+                                    : []
+                                }
+                                onChange={(tags) => handleChange(field.name, tags)}
+                                placeholder={field.placeholder}
+                                description={field.description}
+                                disabled={
+                                  isSubmitting || isLoading || fieldDisabled
+                                }
+                              />
                             ) : field.type === "multiselect" ? (
                               <div
                                 className={`rounded-2xl border border-outline-variant/20 bg-surface-container-lowest p-3 ${fieldErrors[field.name] ? "form-input-error" : ""}`}

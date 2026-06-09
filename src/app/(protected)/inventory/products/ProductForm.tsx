@@ -205,6 +205,9 @@ export function ProductForm({ initialData, mode }: ProductFormProps) {
         max_discount_value: Number(formData.max_discount_value),
         universal: isUniversal,
         notes: formData.notes ? String(formData.notes) : undefined,
+        tags: Array.isArray(formData.tags)
+          ? (formData.tags as string[]).filter((tag) => String(tag).trim())
+          : undefined,
       };
 
       if (mode === "edit" && initialData) {
@@ -311,6 +314,17 @@ export function ProductForm({ initialData, mode }: ProductFormProps) {
           return { id: created.id };
         },
       },
+    },
+    {
+      name: "tags",
+      label: "Tags",
+      type: "tags",
+      section: "Classification",
+      description:
+        "Add labels like Metallic, Black, or High Load to help find this item later.",
+      placeholder: "e.g., Black",
+      value: initialData?.tags ?? [],
+      span: 2,
     },
     {
       name: "stock_quantity",

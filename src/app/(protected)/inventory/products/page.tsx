@@ -28,6 +28,7 @@ import {
 import { BikeCompatibilityFilter } from "@/components/BikeCompatibilityFilter";
 import { AdvancedFilters } from "@/components/advanced-filters";
 import { StockBadge } from "@/components/inventory/stock-badge";
+import { TagInput } from "@/components/TagInput";
 import {
   ActionButton,
   EmptyState,
@@ -38,6 +39,28 @@ import {
   PaginationControls,
   TabsWrapper,
 } from "@/components/ops-ui";
+
+function TagsCell({ tags }: { tags?: string[] }) {
+  if (!tags || tags.length === 0) {
+    return <span className="text-xs text-on-surface-variant">—</span>;
+  }
+
+  const visible = tags.slice(0, 2);
+  const remaining = tags.length - visible.length;
+
+  return (
+    <div className="flex flex-wrap gap-1">
+      {visible.map((tag) => (
+        <span key={tag} className="form-chip text-xs">
+          {tag}
+        </span>
+      ))}
+      {remaining > 0 ? (
+        <span className="text-xs text-on-surface-variant">+{remaining} more</span>
+      ) : null}
+    </div>
+  );
+}
 
 export default function ProductsPage() {
   const router = useRouter();
@@ -69,6 +92,7 @@ export default function ProductsPage() {
     setPriceMax,
     setCurrency,
     setBikeCompatibility,
+    setTags,
   } = useEntityFilters();
 
   // Category Modal State
@@ -288,6 +312,17 @@ export default function ProductsPage() {
         </InputGroup>
       </FilterBar>
 
+      <div className="rounded-[1.5rem] border border-outline-variant/15 bg-surface-container-lowest p-4">
+        <TagInput
+          label="Tags"
+          value={filters.tags ?? []}
+          onChange={setTags}
+          placeholder="e.g., Black"
+          addButtonLabel="Add tag"
+          description="Add one or more tags to narrow results. Items must match every tag."
+        />
+      </div>
+
       <AdvancedFilters
         priceMin={filters.price_min}
         setPriceMin={setPriceMin}
@@ -347,6 +382,7 @@ export default function ProductsPage() {
                 <th className="label-caps px-4 py-3 text-left">Price</th>
                 <th className="label-caps px-4 py-3 text-left">Category</th>
                 <th className="label-caps px-4 py-3 text-left">Brand</th>
+                <th className="label-caps px-4 py-3 text-left">Tags</th>
                 <th className="label-caps px-4 py-3 text-left">Is Universal</th>
                 <th className="label-caps px-4 py-3 text-right">Actions</th>
               </tr>
@@ -396,6 +432,9 @@ export default function ProductsPage() {
                     <span className="form-chip bg-primary/8 text-primary border-primary/15">
                       {brands.find((b) => b.id === product.brand_id)?.name}
                     </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <TagsCell tags={product.tags} />
                   </td>
                   <td className="px-4 py-3">
                     <span className="form-chip bg-primary/8 text-primary border-primary/15">

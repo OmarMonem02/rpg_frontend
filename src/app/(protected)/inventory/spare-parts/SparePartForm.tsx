@@ -257,6 +257,9 @@ export function SparePartForm({ mode, initialData }: SparePartFormProps) {
         max_discount_value: Number(formData.max_discount_value),
         universal: Boolean(formData.universal),
         notes: formData.notes ? String(formData.notes) : undefined,
+        tags: Array.isArray(formData.tags)
+          ? (formData.tags as string[]).filter((tag) => String(tag).trim())
+          : undefined,
       };
 
       let sparePart: SparePartRecord;
@@ -376,6 +379,17 @@ export function SparePartForm({ mode, initialData }: SparePartFormProps) {
           return { id: created.id };
         },
       },
+    },
+    {
+      name: "tags",
+      label: "Tags",
+      type: "tags",
+      section: "Classification",
+      description:
+        "Add labels like Metallic, Black, or High Load to help find this item later.",
+      placeholder: "e.g., Black",
+      value: initialData?.tags ?? [],
+      span: 2,
     },
     {
       name: "stock_quantity",

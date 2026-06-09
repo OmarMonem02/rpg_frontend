@@ -266,6 +266,7 @@ export type SparePartRecord = {
   max_discount_value: number;
   universal: boolean;
   notes?: string;
+  tags?: string[];
   bike_blueprint_ids?: number[];
   created_at?: string;
 };
@@ -287,6 +288,7 @@ export type CreateSparePartPayload = {
   max_discount_value: number;
   universal?: boolean;
   notes?: string;
+  tags?: string[];
   bike_blueprint_ids?: number[];
 };
 
@@ -307,9 +309,22 @@ export type UpdateSparePartPayload = {
   max_discount_value: number;
   universal?: boolean;
   notes?: string;
+  tags?: string[];
   /** When set, replaces pivot links (use [] when universal). Omit to leave links unchanged. */
   bike_blueprint_ids?: number[];
 };
+
+function coalesceTags(record: Record<string, unknown>): string[] | undefined {
+  if (!Array.isArray(record.tags)) {
+    return undefined;
+  }
+
+  const tags = record.tags
+    .map((tag) => toText(tag).trim())
+    .filter((tag) => tag.length > 0);
+
+  return tags.length > 0 ? tags : undefined;
+}
 
 function coalesceBikeBlueprintIds(record: Record<string, unknown>): number[] | undefined {
   if (Array.isArray(record.bike_blueprint_ids)) {
@@ -346,6 +361,7 @@ export function normalizeSparePart(raw: unknown): SparePartRecord {
     max_discount_value: toNumber(record.max_discount_value),
     universal: record.universal === true || record.universal === "true",
     notes: toText(record.notes) || undefined,
+    tags: coalesceTags(record),
     bike_blueprint_ids: coalesceBikeBlueprintIds(record),
     created_at: toText(record.created_at) || undefined,
   };
@@ -366,6 +382,7 @@ export async function listSpareParts(
     bike_year?: number;
     bike_year_from?: number;
     bike_year_to?: number;
+    tags?: string[];
   },
 ): Promise<PaginatedResult<SparePartRecord>> {
   const query = buildQuery({
@@ -381,6 +398,7 @@ export async function listSpareParts(
     bike_year: filters?.bike_year,
     bike_year_from: filters?.bike_year_from,
     bike_year_to: filters?.bike_year_to,
+    tags: filters?.tags?.length ? filters.tags.join(",") : undefined,
   });
 
   const payload = await authorizedFetch<unknown>(
@@ -460,6 +478,7 @@ export type ProductRecord = {
   max_discount_value: number;
   universal: boolean;
   notes?: string;
+  tags?: string[];
   bike_blueprint_ids?: number[];
   created_at?: string;
 };
@@ -481,6 +500,7 @@ export type CreateProductPayload = {
   max_discount_value: number;
   universal?: boolean;
   notes?: string;
+  tags?: string[];
   bike_blueprint_ids?: number[];
 };
 
@@ -509,6 +529,7 @@ export function normalizeProduct(raw: unknown): ProductRecord {
     max_discount_value: toNumber(record.max_discount_value),
     universal: record.universal === true || record.universal === "true",
     notes: toText(record.notes) || undefined,
+    tags: coalesceTags(record),
     bike_blueprint_ids: coalesceBikeBlueprintIds(record),
     created_at: toText(record.created_at) || undefined,
   };
@@ -527,6 +548,7 @@ export async function listProducts(
     bike_brand_id?: number;
     bike_model?: string;
     bike_year?: number;
+    tags?: string[];
   },
 ): Promise<PaginatedResult<ProductRecord>> {
   const query = buildQuery({
@@ -540,6 +562,7 @@ export async function listProducts(
     bike_brand_id: filters?.bike_brand_id,
     bike_model: filters?.bike_model,
     bike_year: filters?.bike_year,
+    tags: filters?.tags?.length ? filters.tags.join(",") : undefined,
   });
 
   const payload = await authorizedFetch<unknown>(`/products?${query}`, token);

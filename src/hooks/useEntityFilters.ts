@@ -15,6 +15,7 @@ export type EntityFilters = {
   bike_brand_id?: number;
   bike_model?: string;
   bike_year?: number;
+  tags?: string[];
 };
 
 export type FilterState = EntityFilters & {
@@ -131,6 +132,14 @@ export function useEntityFilters(initialFilters?: EntityFilters) {
     setPage(1);
   }, []);
 
+  const setTags = useCallback((tags: string[]) => {
+    setFilters((prev) => ({
+      ...prev,
+      tags: tags.length > 0 ? tags : undefined,
+    }));
+    setPage(1);
+  }, []);
+
   // Reset all filters
   const resetFilters = useCallback(() => {
     setFilters({});
@@ -155,6 +164,17 @@ export function useEntityFilters(initialFilters?: EntityFilters) {
       }
       delete cleaned.price_min;
       delete cleaned.price_max;
+    }
+
+    if (Array.isArray(cleaned.tags)) {
+      const tags = cleaned.tags.filter(
+        (tag): tag is string => typeof tag === "string" && tag.trim() !== "",
+      );
+      if (tags.length > 0) {
+        cleaned.tags = tags;
+      } else {
+        delete cleaned.tags;
+      }
     }
 
     return cleaned;
@@ -187,6 +207,7 @@ export function useEntityFilters(initialFilters?: EntityFilters) {
     setStatus,
     setType,
     setLowStock,
+    setTags,
     setPage,
     resetFilters,
 
