@@ -1,5 +1,9 @@
 import type { BikeBlueprintRecord } from "@/lib/api/bikes";
-import type { PricingCurrency } from "@/lib/currencies";
+import {
+  formatCatalogPriceInEGP,
+  type ExchangeRates,
+  type PricingCurrency,
+} from "@/lib/currencies";
 import type { ProductRecord, SparePartRecord } from "@/lib/api/inventory";
 
 export type LookupItemKind = "product" | "spare_part";
@@ -47,7 +51,10 @@ export function findExactSkuOrPartNumberMatch(
   return null;
 }
 
-export function formatMaxDiscount(item: DiscountDisplayItem): string {
+export function formatMaxDiscount(
+  item: DiscountDisplayItem,
+  rates: ExchangeRates,
+): string {
   if (item.max_discount_value <= 0) {
     return "None";
   }
@@ -56,7 +63,11 @@ export function formatMaxDiscount(item: DiscountDisplayItem): string {
     return `${item.max_discount_value}%`;
   }
 
-  return `${item.max_discount_value} ${item.currency_pricing}`;
+  return formatCatalogPriceInEGP(
+    item.max_discount_value,
+    item.currency_pricing,
+    rates,
+  );
 }
 
 export function resolveCompatibleBikeLabels(

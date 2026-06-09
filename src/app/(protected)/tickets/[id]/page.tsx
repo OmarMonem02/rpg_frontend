@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { TrashIcon } from "@heroicons/react/24/outline";
+import { TrashIcon, CheckIcon, ArrowPathIcon, ChevronUpIcon, ChevronDownIcon, PlusIcon } from "@heroicons/react/24/outline";
 import { useParams, useRouter } from "next/navigation";
 import { usePermissions } from "@/components/permission-provider";
 import {
@@ -13,6 +13,7 @@ import {
   StatusBadge,
   SurfaceCard,
   InputGroup,
+  EmptyState,
 } from "@/components/ops-ui";
 import {
   ModalShell,
@@ -21,21 +22,34 @@ import {
   TicketInvoiceModal,
 } from "@/components/tickets/ticket-workflow-modals";
 import { TicketMessengerChat } from "@/components/tickets/ticket-messenger-chat";
+import { TicketOverallDiscountPanel } from "@/components/tickets/ticket-overall-discount-panel";
+import { TicketLineItemDiscountCell } from "@/components/ticket-line-item-discount-cell";
 import {
   buildTicketTrackingUrl,
   ticketsApi,
   ticketItemName,
+  ticketItemTypeLabel,
   type Ticket,
   type TicketItem,
 } from "@/lib/tickets-api";
+import { useExchangeRates } from "@/hooks/useExchangeRates";
 import { getAuthUser } from "@/lib/auth-session";
+import { convertToEGP, formatEgp, toPricingCurrency } from "@/lib/currencies";
+import { clampTicketItemDiscount } from "@/lib/ticket-item-discount";
 import {
-  clampTicketItemDiscount,
-  formatTicketMaxDiscountHint,
-  ticketItemMaxDiscount,
-} from "@/lib/ticket-item-discount";
+  readTicketPendingItemDiscountRequests,
+  writeTicketPendingItemDiscountRequests,
+} from "@/lib/ticket-pending-item-discount-storage";
+import {
+  computeTicketDisplayTotals,
+  computeTicketLineSubtotalDisplay,
+  computeTicketTaskSubtotalDisplay,
+  convertTicketDiscountForDisplay,
+  convertTicketLineAmount,
+} from "@/lib/ticket-display-pricing";
 import {
   type SaleRecord,
+  type ProductRecord,
   type SparePartRecord,
   type MaintenanceServiceRecord,
 } from "@/lib/crud-api";
@@ -85,9 +99,97 @@ function TicketNotesBlock({
   );
 }
 
+function DebouncedQuantityInput({
+  initialQty,
+  disabled,
+  onUpdate,
+}: {
+  initialQty: number;
+  disabled: boolean;
+  onUpdate: (newQty: number) => void;
+}) {
+  const [localQty, setLocalQty] = useState(initialQty);
+
+  useEffect(() => {
+    setLocalQty(initialQty);
+  }, [initialQty]);
+
+  useEffect(() => {
+    if (localQty === initialQty) return;
+    const timer = setTimeout(() => {
+      onUpdate(localQty);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [localQty, initialQty, onUpdate]);
+
+  const handleIncrement = () => {
+    if (disabled) return;
+    setLocalQty((prev) => prev + 1);
+  };
+
+  const handleDecrement = () => {
+    if (disabled || localQty <= 1) return;
+    setLocalQty((prev) => prev - 1);
+  };
+
+  return (
+    <div className="flex items-center gap-1">
+      <button
+        type="button"
+        disabled={disabled || localQty <= 1}
+        onClick={handleDecrement}
+        className="flex h-7 w-7 items-center justify-center rounded-md border border-outline-variant/30 bg-surface text-on-surface-variant hover:bg-surface-container hover:text-on-surface disabled:opacity-50 disabled:pointer-events-none transition-colors"
+      >
+        -
+      </button>
+      <input
+        type="number"
+        min={1}
+        step={1}
+        inputMode="numeric"
+        value={localQty}
+        disabled={disabled}
+        onChange={(e) => {
+          const val = parseInt(e.target.value, 10);
+          if (!isNaN(val) && val >= 1) {
+            setLocalQty(val);
+          } else if (e.target.value === "") {
+            // Allow empty temporarily while typing, but it will revert or we can handle it.
+            // For simplicity, let's just use the value if valid.
+            // Actually, if it's empty, we might not want to update localQty to NaN.
+            // We'll leave it as a controlled input that requires valid numbers.
+          }
+        }}
+        onWheel={(event) => {
+          event.preventDefault();
+          event.currentTarget.blur();
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.currentTarget.blur();
+            if (localQty !== initialQty) {
+              onUpdate(localQty);
+            }
+          }
+        }}
+        className="w-12 text-center rounded-md border border-outline-variant/30 bg-surface px-1 py-1 text-sm text-on-surface outline-none focus:border-primary [&::-webkit-inner-spin-button]:appearance-none"
+      />
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={handleIncrement}
+        className="flex h-7 w-7 items-center justify-center rounded-md border border-outline-variant/30 bg-surface text-on-surface-variant hover:bg-surface-container hover:text-on-surface disabled:opacity-50 disabled:pointer-events-none transition-colors"
+      >
+        +
+      </button>
+    </div>
+  );
+}
+
 export default function TicketDetailsPage() {
   const { id } = useParams() as { id: string };
   const router = useRouter();
+  const { rates } = useExchangeRates();
   const permissions = usePermissions();
   const canViewCustomerWorkspace =
     permissions.canReadPage("sales") ||
@@ -98,6 +200,10 @@ export default function TicketDetailsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
+  const [pendingItemDiscountRequestByItemId, setPendingItemDiscountRequestByItemId] =
+    useState<Record<number, number>>(() =>
+      readTicketPendingItemDiscountRequests(Number(id)),
+    );
 
   // Task Management State
   const [isAddTaskModalOpen, setIsAddTaskModalOpen] = useState(false);
@@ -110,11 +216,33 @@ export default function TicketDetailsPage() {
     skippedCount: number;
   } | null>(null);
   const [deleteTaskId, setDeleteTaskId] = useState<number | null>(null);
+  const [expandedTasks, setExpandedTasks] = useState<Record<number, boolean>>({});
+
+  const toggleTaskExpanded = (taskId: number) => {
+    setExpandedTasks((prev) => ({
+      ...prev,
+      [taskId]: prev[taskId] === undefined ? false : !prev[taskId],
+    }));
+  };
 
   // Item Management State
   const [activeTaskId, setActiveTaskId] = useState<number | null>(null);
-  const [isPickerOpen, setIsPickerOpen] = useState(false);
-  const [itemType, setItemType] = useState<"spare_parts" | "maintenance_services">("spare_parts");
+  const [pickerCatalogType, setPickerCatalogType] = useState<
+    "spare_parts" | "maintenance_services" | "products" | null
+  >(null);
+
+  const openCatalogPicker = (
+    taskId: number,
+    catalogType: "spare_parts" | "maintenance_services" | "products",
+  ) => {
+    setActiveTaskId(taskId);
+    setPickerCatalogType(catalogType);
+  };
+
+  const closeCatalogPicker = () => {
+    setPickerCatalogType(null);
+    setActiveTaskId(null);
+  };
 
   // Close ticket payment state
   const [isClosing, setIsClosing] = useState(false);
@@ -131,6 +259,38 @@ export default function TicketDetailsPage() {
   const [trackingMessage, setTrackingMessage] = useState("");
 
   const ticketId = Number(id);
+
+  useEffect(() => {
+    setPendingItemDiscountRequestByItemId(
+      readTicketPendingItemDiscountRequests(ticketId),
+    );
+  }, [ticketId]);
+
+  useEffect(() => {
+    writeTicketPendingItemDiscountRequests(
+      ticketId,
+      pendingItemDiscountRequestByItemId,
+    );
+  }, [ticketId, pendingItemDiscountRequestByItemId]);
+
+  const handlePersistPendingItemDiscountRequest = useCallback(
+    (itemId: number, requestId: number) => {
+      setPendingItemDiscountRequestByItemId((current) => ({
+        ...current,
+        [itemId]: requestId,
+      }));
+    },
+    [],
+  );
+
+  const handleClearPendingItemDiscountRequest = useCallback((itemId: number) => {
+    setPendingItemDiscountRequestByItemId((current) => {
+      if (!(itemId in current)) return current;
+      const next = { ...current };
+      delete next[itemId];
+      return next;
+    });
+  }, []);
 
   const refreshTicket = useCallback(async () => {
     const data = await ticketsApi.getTicket(ticketId);
@@ -259,7 +419,8 @@ export default function TicketDetailsPage() {
     Number(ticketData.amount_paid ?? 0) >= Number(ticketData.total ?? 0);
 
   const openCloseModal = () => {
-    const total = Number(ticket?.total ?? 0);
+    if (!ticket) return;
+    const total = computeTicketDisplayTotals(ticket, rates).total;
     setPaymentMethod("cash");
     setAmountPaidInput(total.toFixed(2));
     setCloseModalError("");
@@ -269,7 +430,7 @@ export default function TicketDetailsPage() {
   const handleCloseTicket = async () => {
     if (!ticket) return;
     const amountPaid = Number(amountPaidInput);
-    const total = Number(ticket.total ?? 0);
+    const total = computeTicketDisplayTotals(ticket, rates).total;
     if (!Number.isFinite(amountPaid) || amountPaid < total) {
       setCloseModalError("Full payment is required before closing this ticket.");
       return;
@@ -464,28 +625,47 @@ export default function TicketDetailsPage() {
     }
   };
 
-  const taskPickerPrice = (item: SparePartRecord | MaintenanceServiceRecord) =>
-    "sale_price" in item ? item.sale_price : item.service_price;
+  const taskPickerPrice = (item: SparePartRecord | MaintenanceServiceRecord | ProductRecord) =>
+    "service_price" in item ? item.service_price : item.sale_price;
 
-  const handleAddItemToTask = async (
+  const buildTaskItemPayload = (
+    catalogType: "spare_parts" | "maintenance_services" | "products",
+    item: SparePartRecord | MaintenanceServiceRecord | ProductRecord,
+  ) => ({
+    spare_part_id: catalogType === "spare_parts" ? item.id : undefined,
+    maintenance_service_id: catalogType === "maintenance_services" ? item.id : undefined,
+    product_id: catalogType === "products" ? item.id : undefined,
+    price_snapshot: convertToEGP(
+      taskPickerPrice(item),
+      toPricingCurrency(item.currency_pricing),
+      rates,
+    ),
+    qty: 1,
+    discount: 0,
+  });
+
+  const handleAddItemsToTask = async (
     taskId: number,
-    item: SparePartRecord | MaintenanceServiceRecord,
+    catalogType: "spare_parts" | "maintenance_services" | "products",
+    items: Array<SparePartRecord | MaintenanceServiceRecord | ProductRecord>,
   ) => {
     if (ticket?.status !== "in_progress") {
-      setError("Start work before adding parts or services to this ticket.");
+      setError("Start work before adding parts, products, or services to this ticket.");
       return;
     }
 
+    if (items.length === 0) return;
+
     try {
       setIsProcessing(true);
-      const isPart = itemType === "spare_parts";
-      await ticketsApi.addItemToTask(Number(id), taskId, {
-        spare_part_id: isPart ? item.id : undefined,
-        maintenance_service_id: !isPart ? item.id : undefined,
-        price_snapshot: taskPickerPrice(item),
-        qty: 1,
-        discount: 0,
-      });
+      setError("");
+      for (const item of items) {
+        await ticketsApi.addItemToTask(
+          Number(id),
+          taskId,
+          buildTaskItemPayload(catalogType, item),
+        );
+      }
       await fetchTicket();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to add item");
@@ -497,26 +677,72 @@ export default function TicketDetailsPage() {
   const handleUpdateItemDiscount = async (
     taskId: number,
     item: TicketItem,
-    rawDiscount: number,
-    applyCatalogCap: boolean,
+    unitDiscount: number,
+    approvalRequestId?: number,
   ) => {
     if (ticket?.status !== "in_progress") {
       setError("Start work before editing parts or services on this ticket.");
       return;
     }
 
-    const discount = clampTicketItemDiscount(item, rawDiscount, { applyCatalogCap });
-    if (discount === Number(item.discount)) {
+    const unitPrice = Number(item.price_snapshot) || 0;
+    let discount = unitDiscount;
+
+    if (isAdminUser) {
+      discount = Math.max(0, Math.min(unitDiscount, unitPrice));
+    } else if (!approvalRequestId) {
+      discount = clampTicketItemDiscount(item, unitDiscount, {
+        applyCatalogCap: true,
+      });
+    }
+
+    if (
+      discount === Number(item.discount) &&
+      !approvalRequestId
+    ) {
       return;
     }
 
     try {
       setIsProcessing(true);
       setError("");
-      await ticketsApi.updateItemInTask(Number(id), taskId, item.id, { discount });
+      await ticketsApi.updateItemInTask(Number(id), taskId, item.id, {
+        discount,
+        ...(approvalRequestId
+          ? { discount_approval_request_id: approvalRequestId }
+          : {}),
+      });
+      handleClearPendingItemDiscountRequest(item.id);
       await fetchTicket();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to update discount");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleUpdateItemQty = async (
+    taskId: number,
+    item: TicketItem,
+    rawQty: number,
+  ) => {
+    if (ticket?.status !== "in_progress") {
+      setError("Start work before editing parts or services on this ticket.");
+      return;
+    }
+
+    const qty = Math.max(1, Math.trunc(Number.isFinite(rawQty) ? rawQty : 1));
+    if (qty === Number(item.qty)) {
+      return;
+    }
+
+    try {
+      setIsProcessing(true);
+      setError("");
+      await ticketsApi.updateItemInTask(Number(id), taskId, item.id, { qty });
+      await fetchTicket();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to update quantity");
     } finally {
       setIsProcessing(false);
     }
@@ -547,14 +773,22 @@ export default function TicketDetailsPage() {
   };
 
   const buildInvoiceFromTicket = (ticketData: Ticket): SaleRecord => {
+    const allItems =
+      ticketData.tasks?.flatMap((task) => task.items ?? []) ?? [];
+    const displayTotals = computeTicketDisplayTotals(ticketData, rates);
+
     const lineItems = ticketData.tasks?.flatMap((task) =>
       task.items?.map((item) => ({
         id: item.id,
         sale_id: ticketData.id,
-        sellable_type: (item.spare_part_id ? "spare_parts" : "maintenance_services") as "spare_parts" | "maintenance_services",
-        sellable_id: item.spare_part_id ?? item.maintenance_service_id ?? 0,
-        selling_price: item.price_snapshot,
-        discount_amount: item.discount,
+        sellable_type: (item.spare_part_id
+          ? "spare_parts"
+          : item.product_id
+            ? "products"
+            : "maintenance_services") as "spare_parts" | "products" | "maintenance_services",
+        sellable_id: item.spare_part_id ?? item.product_id ?? item.maintenance_service_id ?? 0,
+        selling_price: convertTicketLineAmount(item, item.price_snapshot, rates),
+        discount_amount: convertTicketLineAmount(item, item.discount, rates),
         quantity: item.qty,
         returned_qty: 0,
         remaining_qty: item.qty,
@@ -582,8 +816,12 @@ export default function TicketDetailsPage() {
       delivery_status: "delivered",
       is_maintenance: true,
       shipping_fee: 0,
-      sale_discount: 0,
-      total: ticketData.total,
+      sale_discount: convertTicketDiscountForDisplay(
+        Number(ticketData.discount ?? 0),
+        allItems,
+        rates,
+      ),
+      total: displayTotals.total,
       line_items: lineItems,
       created_at: ticketData.created_at,
       customer: ticketData.customer
@@ -680,7 +918,18 @@ export default function TicketDetailsPage() {
   const isStaffUser = authRole === "staff";
   const isAdminUser = authRole === "admin";
   const canEditLineDiscount = canEditItems && (isStaffUser || isAdminUser);
-  const applyStaffDiscountCap = isStaffUser;
+  const canEditOverallDiscount =
+    ticket.status !== "closed" &&
+    (isStaffUser || isAdminUser) &&
+    permissions.canUpdate("maintenance");
+  const allTicketItems =
+    ticket.tasks?.flatMap((task) => task.items ?? []) ?? [];
+  const displayTotals = computeTicketDisplayTotals(ticket, rates);
+  const displayAmountPaid = convertTicketDiscountForDisplay(
+    Number(ticket.amount_paid ?? 0),
+    allTicketItems,
+    rates,
+  );
   const isClosed = ticket.status === "closed";
   const ticketFullyPaid = isClosedAndFullyPaid(ticket);
   const trackingUrl = ticket.public_token
@@ -732,10 +981,10 @@ export default function TicketDetailsPage() {
               </div>
               <div className="mt-2">
                 <p className="text-on-surface-variant font-medium mb-1">Total Amount</p>
-                <p className="text-2xl font-bold text-primary">${Number(ticket.total || 0).toFixed(2)}</p>
+                <p className="text-2xl font-bold text-primary">{formatEgp(displayTotals.total)}</p>
                 {isClosed ? (
                   <p className="mt-1 text-xs text-on-surface-variant">
-                    Paid ${Number(ticket.amount_paid ?? 0).toFixed(2)}
+                    Paid {formatEgp(displayAmountPaid)}
                     {ticket.payment_method ? ` · ${ticket.payment_method.replace("_", " ")}` : ""}
                   </p>
                 ) : null}
@@ -893,14 +1142,18 @@ export default function TicketDetailsPage() {
         </div>
 
         {(!ticket.tasks || ticket.tasks.length === 0) ? (
-          <div className="flex flex-col items-center justify-center p-12 text-center border-2 border-dashed border-outline-variant/20 rounded-[2rem] bg-surface-container-lowest">
-            <p className="text-on-surface-variant text-lg font-medium mb-4">No tasks added yet.</p>
-            {isEditable && (
-              <ActionButton variant="outline" onClick={() => setIsAddTaskModalOpen(true)}>
-                Create First Task
-              </ActionButton>
-            )}
-          </div>
+          <EmptyState
+            title="No tasks added yet"
+            description="Create a task to start adding items and tracking work."
+            action={
+              isEditable ? (
+                <ActionButton tone="primary" onClick={() => setIsAddTaskModalOpen(true)}>
+                  <PlusIcon className="h-5 w-5" />
+                  Create First Task
+                </ActionButton>
+              ) : undefined
+            }
+          />
         ) : (
           <div className="grid gap-6">
             {ticket.tasks.map((task) => (
@@ -912,107 +1165,166 @@ export default function TicketDetailsPage() {
                       <StatusBadge tone={task.status === "completed" ? "success" : "warning"}>
                         {task.status.toUpperCase()}
                       </StatusBadge>
-                      <span className="text-sm font-semibold text-on-surface-variant">Subtotal: ${Number(task.subtotal || 0).toFixed(2)}</span>
+                      <span className="text-sm font-semibold text-on-surface-variant">
+                        Subtotal: {formatEgp(computeTicketTaskSubtotalDisplay(task.items, rates))}
+                      </span>
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-2 items-center">
                     {isEditable && (
                       <>
-                        <ActionButton 
-                          variant="ghost" 
-                          size="sm" 
-                          onClick={() => { setItemType("spare_parts"); setActiveTaskId(task.id); setIsPickerOpen(true); }}
-                          disabled={!canEditItems}
-                        >
-                          + Part
-                        </ActionButton>
-                        <ActionButton 
-                          variant="ghost" 
-                          size="sm" 
-                          onClick={() => { setItemType("maintenance_services"); setActiveTaskId(task.id); setIsPickerOpen(true); }}
-                          disabled={!canEditItems}
-                        >
-                          + Service
-                        </ActionButton>
+                        <div className="flex items-center rounded-xl border border-outline-variant/20 bg-surface p-1">
+                          <ActionButton 
+                            variant="ghost" 
+                            size="sm" 
+                            className="border-0 rounded-lg"
+                            onClick={() => openCatalogPicker(task.id, "spare_parts")}
+                            disabled={!canEditItems}
+                          >
+                            + Part
+                          </ActionButton>
+                          <div className="w-px h-4 bg-outline-variant/20 mx-1" />
+                          <ActionButton 
+                            variant="ghost" 
+                            size="sm" 
+                            className="border-0 rounded-lg"
+                            onClick={() => openCatalogPicker(task.id, "products")}
+                            disabled={!canEditItems}
+                          >
+                            + Product
+                          </ActionButton>
+                          <div className="w-px h-4 bg-outline-variant/20 mx-1" />
+                          <ActionButton 
+                            variant="ghost" 
+                            size="sm" 
+                            className="border-0 rounded-lg"
+                            onClick={() => openCatalogPicker(task.id, "maintenance_services")}
+                            disabled={!canEditItems}
+                          >
+                            + Service
+                          </ActionButton>
+                        </div>
                         <ActionButton 
                           variant="ghost" 
                           size="sm" 
                           tone={task.status === "completed" ? "danger" : "success"}
                           onClick={() => handleUpdateTaskStatus(task.id, task.status === "completed" ? "pending" : "completed")}
+                          className="gap-1.5"
                         >
-                          {task.status === "completed" ? "Reopen Task" : "Complete Task"}
+                          {task.status === "completed" ? (
+                            <>
+                              <ArrowPathIcon className="h-4 w-4" />
+                              Reopen Task
+                            </>
+                          ) : (
+                            <>
+                              <CheckIcon className="h-4 w-4" />
+                              Complete Task
+                            </>
+                          )}
                         </ActionButton>
-                        <ActionButton variant="ghost" size="sm" tone="danger" onClick={() => setDeleteTaskId(task.id)}>
+                        <ActionButton 
+                          variant="ghost" 
+                          size="sm" 
+                          tone="danger" 
+                          onClick={() => setDeleteTaskId(task.id)}
+                          className="gap-1.5"
+                        >
+                          <TrashIcon className="h-4 w-4" />
                           Delete
                         </ActionButton>
                       </>
                     )}
+                    <button
+                      onClick={() => toggleTaskExpanded(task.id)}
+                      className="ml-2 p-1.5 text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded-lg transition-colors"
+                    >
+                      {expandedTasks[task.id] === false ? (
+                        <ChevronDownIcon className="h-5 w-5" />
+                      ) : (
+                        <ChevronUpIcon className="h-5 w-5" />
+                      )}
+                    </button>
                   </div>
                 </div>
 
-                <div className="rounded-2xl border border-outline-variant/10 bg-surface-container-lowest overflow-hidden">
-                  <table className="w-full text-left text-sm">
-                    <thead className="bg-surface-container-low text-on-surface-variant">
-                      <tr>
-                        <th className="px-4 py-3 font-semibold">Item Name</th>
-                        <th className="px-4 py-3 font-semibold">Type</th>
-                        <th className="px-4 py-3 font-semibold">Price</th>
-                        <th className="px-4 py-3 font-semibold">Qty</th>
-                        <th className="px-4 py-3 font-semibold">Discount</th>
-                        <th className="px-4 py-3 font-semibold">Total</th>
-                        {isEditable && <th className="px-4 py-3 text-right">Action</th>}
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-outline-variant/5">
-                      {task.items?.map((item) => (
-                        <tr key={item.id} className="hover:bg-surface-container-lowest transition-colors">
-                          <td className="px-4 py-3 font-medium text-on-surface">{ticketItemName(item)}</td>
-                          <td className="px-4 py-3 font-medium text-on-surface">{(item.spare_part_id ? "Spare Part" : "Service")}</td>
-                          <td className="px-4 py-3">${Number(item.price_snapshot).toFixed(2)}</td>
-                          <td className="px-4 py-3">{item.qty}</td>
+                {expandedTasks[task.id] !== false && (
+                  <div className="rounded-2xl border border-outline-variant/10 bg-surface-container-lowest overflow-hidden">
+                    <table className="w-full text-left text-sm">
+                      <thead className="bg-surface-container-low text-on-surface-variant">
+                        <tr>
+                          <th className="px-4 py-3 font-semibold">Item Name</th>
+                          <th className="px-4 py-3 font-semibold">Type</th>
+                          <th className="px-4 py-3 font-semibold">Price</th>
+                          <th className="px-4 py-3 font-semibold">Qty</th>
+                          <th className="px-4 py-3 font-semibold">Discount</th>
+                          <th className="px-4 py-3 font-semibold">Total</th>
+                          {isEditable && <th className="px-4 py-3 text-right">Action</th>}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-outline-variant/5">
+                        {task.items?.map((item) => (
+                          <tr key={item.id} className="hover:bg-surface-container-lowest transition-colors">
+                            <td className="px-4 py-3 font-medium text-on-surface">{ticketItemName(item)}</td>
+                            <td className="px-4 py-3 font-medium text-on-surface">{ticketItemTypeLabel(item)}</td>
+                            <td className="px-4 py-3">
+                              {formatEgp(
+                                convertTicketLineAmount(item, item.price_snapshot, rates),
+                              )}
+                            </td>
+                            <td className="px-4 py-3">
+                              {canEditItems ? (
+                                <DebouncedQuantityInput
+                                  initialQty={item.qty}
+                                  disabled={isProcessing}
+                                  onUpdate={(newQty) => {
+                                    void handleUpdateItemQty(task.id, item, newQty);
+                                  }}
+                                />
+                              ) : (
+                                item.qty
+                              )}
+                            </td>
                           <td className="px-4 py-3">
                             {canEditLineDiscount ? (
-                              <div className="flex flex-col items-start gap-0.5">
-                                <input
-                                  type="number"
-                                  min={0}
-                                  onWheel={(event) => {
-                                    event.preventDefault();
-                                    event.currentTarget.blur();
-                                  }}
-                                  max={ticketItemMaxDiscount(item, {
-                                    applyCatalogCap: applyStaffDiscountCap,
-                                  })}
-                                  step="0.01"
-                                  defaultValue={Number(item.discount).toFixed(2)}
-                                  key={`${item.id}-${item.discount}`}
-                                  disabled={isProcessing}
-                                  onBlur={(e) => {
-                                    void handleUpdateItemDiscount(
-                                      task.id,
-                                      item,
-                                      Number(e.target.value),
-                                      applyStaffDiscountCap,
-                                    );
-                                  }}
-                                  onKeyDown={(e) => {
-                                    if (e.key === "Enter") {
-                                      e.currentTarget.blur();
-                                    }
-                                  }}
-                                  className="w-24 rounded-lg border border-outline-variant/30 bg-surface px-2 py-1 text-right text-sm text-error outline-none focus:border-primary [&::-webkit-inner-spin-button]:appearance-none"
-                                />
-                                {applyStaffDiscountCap ? (
-                                  <span className="text-caption font-medium text-on-surface-variant">
-                                    {formatTicketMaxDiscountHint(item)}
-                                  </span>
-                                ) : null}
-                              </div>
+                              <TicketLineItemDiscountCell
+                                key={`${item.id}-${item.discount}-${pendingItemDiscountRequestByItemId[item.id] ?? 0}`}
+                                item={item}
+                                isAdmin={isAdminUser}
+                                disabled={isProcessing}
+                                ticketId={Number(id)}
+                                taskId={task.id}
+                                customerName={ticket.customer?.name ?? null}
+                                rates={rates}
+                                storedRequestId={
+                                  pendingItemDiscountRequestByItemId[item.id]
+                                }
+                                onPersistPendingRequest={
+                                  handlePersistPendingItemDiscountRequest
+                                }
+                                onClearStoredRequest={
+                                  handleClearPendingItemDiscountRequest
+                                }
+                                onApply={(unitDiscount, approvalRequestId) =>
+                                  handleUpdateItemDiscount(
+                                    task.id,
+                                    item,
+                                    unitDiscount,
+                                    approvalRequestId,
+                                  )
+                                }
+                              />
                             ) : (
-                              <span className="text-error">-${Number(item.discount).toFixed(2)}</span>
+                              <span className="text-error">
+                                -{formatEgp(
+                                  convertTicketLineAmount(item, item.discount, rates),
+                                )}
+                              </span>
                             )}
                           </td>
-                          <td className="px-4 py-3 font-bold">${Number(item.subtotal).toFixed(2)}</td>
+                          <td className="px-4 py-3 font-bold">
+                            {formatEgp(computeTicketLineSubtotalDisplay(item, rates))}
+                          </td>
                           {isEditable && (
                             <td className="px-4 py-3 text-right">
                               <button 
@@ -1035,11 +1347,20 @@ export default function TicketDetailsPage() {
                     </tbody>
                   </table>
                 </div>
+                )}
               </SurfaceCard>
             ))}
           </div>
         )}
       </div>
+
+      <TicketOverallDiscountPanel
+        ticket={ticket}
+        items={allTicketItems}
+        canEdit={canEditOverallDiscount}
+        onTicketUpdated={(updated) => setTicket(updated)}
+        onError={(message) => setError(message)}
+      />
 
       <ConfirmDialog
         isOpen={deleteTaskId !== null}
@@ -1162,18 +1483,22 @@ export default function TicketDetailsPage() {
         </InputGroup>
       </ModalShell>
 
-      {/* Item Picker */}
-      <CatalogPickerModal
-        isOpen={isPickerOpen}
-        onClose={() => setIsPickerOpen(false)}
-        catalogType={itemType}
-        onAddItems={(items) => {
-          if (items.length > 0 && activeTaskId) {
-            handleAddItemToTask(activeTaskId, items[0] as SparePartRecord | MaintenanceServiceRecord);
-          }
-          setIsPickerOpen(false);
-        }}
-      />
+      {pickerCatalogType ? (
+        <CatalogPickerModal
+          isOpen
+          onClose={closeCatalogPicker}
+          catalogType={pickerCatalogType}
+          onAddItems={(items) => {
+            if (activeTaskId) {
+              void handleAddItemsToTask(
+                activeTaskId,
+                pickerCatalogType,
+                items as Array<SparePartRecord | MaintenanceServiceRecord | ProductRecord>,
+              );
+            }
+          }}
+        />
+      ) : null}
 
       <PaymentCloseModal
         isOpen={isClosing}
@@ -1181,7 +1506,7 @@ export default function TicketDetailsPage() {
           setIsClosing(false);
           setCloseModalError("");
         }}
-        total={Number(ticket.total || 0)}
+        total={displayTotals.total}
         paymentMethod={paymentMethod}
         amountPaid={amountPaidInput}
         onPaymentMethodChange={setPaymentMethod}
@@ -1199,8 +1524,8 @@ export default function TicketDetailsPage() {
           setReopenModalError("");
         }}
         ticketId={ticket.id}
-        total={Number(ticket.total || 0)}
-        amountPaid={Number(ticket.amount_paid ?? 0)}
+        total={displayTotals.total}
+        amountPaid={displayAmountPaid}
         password={reopenPassword}
         onPasswordChange={setReopenPassword}
         onConfirm={() => void handleReopenTicket(reopenPassword)}

@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { EntityFormModal, type FieldConfig } from "@/components/entity-form-modal";
 import { useEntityFilters } from "@/hooks/useEntityFilters";
+import { useExchangeRates } from "@/hooks/useExchangeRates";
 import { useGlobalDataRefresh } from "@/hooks/useGlobalDataRefresh";
+import { formatCatalogPriceInEGP } from "@/lib/currencies";
 import {
   ActionButton,
   EmptyState,
@@ -33,6 +35,7 @@ import {
 type SectorFilter = "all" | number;
 
 export default function MaintenanceServicesPage() {
+  const { rates } = useExchangeRates();
   const [services, setServices] = useState<MaintenanceServiceRecord[]>([]);
   const [sectors, setSectors] = useState<MaintenanceServiceSectorRecord[]>([]);
   const [allSectors, setAllSectors] = useState<MaintenanceServiceSectorRecord[]>([]);
@@ -318,10 +321,20 @@ export default function MaintenanceServicesPage() {
                     {allSectors.find((sector) => sector.id === service.maintenance_service_sector_id)?.name ?? "-"}
                   </td>
                   <td className="px-4 py-3 text-on-surface">
-                    {service.service_price} {service.currency_pricing}
+                    {formatCatalogPriceInEGP(
+                      service.service_price,
+                      service.currency_pricing,
+                      rates,
+                    )}
                   </td>
                   <td className="px-4 py-3 text-on-surface-variant text-xs">
-                    {service.max_discount_value} {service.max_discount_type === "percentage" ? "%" : service.currency_pricing}
+                    {service.max_discount_type === "percentage"
+                      ? `${service.max_discount_value}%`
+                      : formatCatalogPriceInEGP(
+                          service.max_discount_value,
+                          service.currency_pricing,
+                          rates,
+                        )}
                   </td>
                   <td className="px-4 py-3 text-xs text-on-surface-variant">
                     {service.created_at ? new Date(service.created_at).toLocaleDateString() : "-"}

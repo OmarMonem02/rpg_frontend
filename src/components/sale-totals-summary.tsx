@@ -2,6 +2,10 @@
 
 import type { SaleLineItem } from "@/components/cart-line-items-panel";
 import { egpMultiplierForPricingCurrency } from "@/lib/currencies";
+import {
+  scopeIncludesSaleItem,
+  type DiscountScope,
+} from "@/lib/discount-scope";
 
 export type CartTotalsBreakdown = {
   grossLinesTotal: number;
@@ -42,18 +46,27 @@ export function hasMaintenanceCartItems(items: SaleLineItem[]): boolean {
   return items.some((item) => item.sellable_type === "maintenance_services");
 }
 
+export function hasSparePartCartItems(items: SaleLineItem[]): boolean {
+  return items.some((item) => item.sellable_type === "spare_parts");
+}
+
+export function hasProductCartItems(items: SaleLineItem[]): boolean {
+  return items.some((item) => item.sellable_type === "products");
+}
+
+export function hasBikeCartItems(items: SaleLineItem[]): boolean {
+  return items.some((item) => item.sellable_type === "bikes");
+}
+
 export function computeDiscountBaseSubtotal(
   items: SaleLineItem[],
   exchangeRate: number,
   exchangeRateEur: number,
-  options: { includeMaintenance: boolean },
+  scope: DiscountScope,
 ): number {
   let subtotal = 0;
   for (const item of items) {
-    if (
-      !options.includeMaintenance &&
-      item.sellable_type === "maintenance_services"
-    ) {
+    if (!scopeIncludesSaleItem(item, scope)) {
       continue;
     }
 
@@ -82,6 +95,9 @@ type SaleTotalsSummaryProps = {
   overallDiscountDraft?: number | null;
   saleTotal: number;
   compact?: boolean;
+  formatAmount?: (amount: number) => string;
+  currencySuffix?: string;
+  overallDiscountLabel?: string;
 };
 
 export function SaleTotalsSummary({
@@ -92,8 +108,11 @@ export function SaleTotalsSummary({
   overallDiscountDraft = null,
   saleTotal,
   compact = false,
+  formatAmount = formatEgp,
+  currencySuffix = "EGP",
+  overallDiscountLabel = "Overall discount (whole sale)",
 }: SaleTotalsSummaryProps) {
-  const { grossLinesTotal, itemDiscountTotal, netSubtotal } = breakdown;
+  const { grossLinesTotal, itemDiscountTotal } = breakdown;
   const hasItemDiscounts = itemDiscountTotal > 0;
   const hasOverallDiscount = overallDiscount > 0;
   const hasDraftOverall =
@@ -114,12 +133,14 @@ export function SaleTotalsSummary({
           <>
             <div className="flex items-center justify-between gap-4">
               <dt className={labelClass}>Subtotal</dt>
-              <dd className={valueClass}>{formatEgp(grossLinesTotal)} EGP</dd>
+              <dd className={valueClass}>
+                {formatAmount(grossLinesTotal)} {currencySuffix}
+              </dd>
             </div>
             <div className="flex items-center justify-between gap-4">
               <dt className={labelClass}>Discounts</dt>
               <dd className="mono-data font-semibold text-error">
-                −{formatEgp(itemDiscountTotal)} EGP
+                −{formatAmount(itemDiscountTotal)} {currencySuffix}
               </dd>
             </div>
           </>
@@ -127,15 +148,17 @@ export function SaleTotalsSummary({
         {showShipping && shippingFee > 0 ? (
           <div className="flex items-center justify-between gap-4">
             <dt className={labelClass}>Shipping</dt>
-            <dd className={valueClass}>+{formatEgp(shippingFee)} EGP</dd>
+            <dd className={valueClass}>
+              +{formatAmount(shippingFee)} {currencySuffix}
+            </dd>
           </div>
         ) : null}
 
         {hasOverallDiscount ? (
           <div className="flex items-center justify-between gap-4">
-            <dt className={labelClass}>Overall discount (whole sale)</dt>
+            <dt className={labelClass}>{overallDiscountLabel}</dt>
             <dd className="mono-data font-semibold text-error">
-              −{formatEgp(overallDiscount)} EGP
+              −{formatAmount(overallDiscount)} {currencySuffix}
             </dd>
           </div>
         ) : null}
@@ -146,7 +169,7 @@ export function SaleTotalsSummary({
               Overall discount (pending approval)
             </dt>
             <dd className="mono-data text-xs font-semibold">
-              −{formatEgp(overallDiscountDraft)} EGP
+              −{formatAmount(overallDiscountDraft)} {currencySuffix}
             </dd>
           </div>
         ) : null}
@@ -160,7 +183,7 @@ export function SaleTotalsSummary({
             {compact ? "Total" : "Estimated total"}
           </dt>
           <dd className="mono-data text-lg font-black text-primary">
-            {formatEgp(saleTotal)} EGP
+            {formatAmount(saleTotal)} {currencySuffix}
           </dd>
         </div>
       </dl>

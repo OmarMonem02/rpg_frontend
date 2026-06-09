@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { SaleLineItemDiscountCell } from "@/components/sale-line-item-discount-cell";
 import type { PricingCurrency } from "@/lib/currencies";
-import { egpMultiplierForPricingCurrency } from "@/lib/currencies";
+import { egpMultiplierForPricingCurrency, formatEgp } from "@/lib/currencies";
 import {
   ProductRecord,
   SparePartRecord,
@@ -15,15 +16,6 @@ import {
   SaleTotalsSummary,
 } from "@/components/sale-totals-summary";
 import { TrashIcon, PencilSquareIcon, CheckIcon, XMarkIcon } from "@heroicons/react/24/outline";
-import {
-  clampRawDiscountValue,
-  clampResolvedDiscount,
-  convertDiscountBetweenTypes,
-  maxRawDiscountValue,
-  resolveDiscountAmount,
-  type DiscountInputType,
-} from "@/lib/discount-input";
-
 export type SaleLineItem = {
   id?: string; // temp ID for unsaved items
   sellable_id: number;
@@ -31,6 +23,8 @@ export type SaleLineItem = {
   item_name: string;
   selling_price: number;
   discount_amount: number;
+  discount_approval_request_id?: number;
+  discount_approval_request_pending?: boolean;
   quantity: number;
   currency: PricingCurrency;
   catalogItem: ProductRecord | SparePartRecord | BikeRecord | MaintenanceServiceRecord;
@@ -42,6 +36,14 @@ interface CartLineItemsPanelProps {
   onDeleteItem: (itemId: string | number) => void;
   shippingFee: number;
   saleDiscount: number;
+  isAdmin?: boolean;
+  saleContext?: {
+    customer_id?: number | null;
+    customer_name?: string | null;
+    seller_id?: number | null;
+    sale_type?: string | null;
+  };
+  onPendingItemApprovalsChange?: (hasPending: boolean) => void;
   exchangeRate?: number;
   /** EGP per 1 EUR (same naming as settings `exchange_rate_eur`). */
   exchangeRateEur?: number;
@@ -53,6 +55,9 @@ export function CartLineItemsPanel({
   onDeleteItem,
   shippingFee = 0,
   saleDiscount = 0,
+  isAdmin = false,
+  saleContext,
+  onPendingItemApprovalsChange,
   exchangeRate = 0,
   exchangeRateEur = 0,
 }: CartLineItemsPanelProps) {
@@ -60,9 +65,18 @@ export function CartLineItemsPanel({
   const [editValues, setEditValues] = useState<{
     qty: number;
     price: number;
-    discount: number;
-    discountType: DiscountInputType;
-  }>({ qty: 1, price: 0, discount: 0, discountType: "fixed" });
+  }>({ qty: 1, price: 0 });
+  const exchangeRates = {
+    usdToEgp: exchangeRate,
+    eurToEgp: exchangeRateEur,
+  };
+
+  useEffect(() => {
+    const hasPending = items.some(
+      (line) => line.discount_approval_request_pending === true,
+    );
+    onPendingItemApprovalsChange?.(hasPending);
+  }, [items, onPendingItemApprovalsChange]);
 
   const getMaxQty = (item: SaleLineItem): number | undefined => {
     if (item.sellable_type === "bikes" || item.sellable_type === "maintenance_services") return 1;
@@ -86,60 +100,59 @@ export function CartLineItemsPanel({
     return typeof max === "number" ? Math.min(clampedMin, max) : clampedMin;
   };
 
-  const lineDiscountBase = (item: SaleLineItem, qty: number) =>
-    item.selling_price * qty;
-
-  const normalizeDiscount = (
-    item: SaleLineItem,
-    raw: number,
-    type: DiscountInputType = "fixed",
-    qty = item.quantity,
-  ): number => {
-    const baseAmount = lineDiscountBase(item, qty);
-    const maxFixed = calculateMaxDiscount(item);
-    return clampRawDiscountValue(type, raw, maxFixed, baseAmount);
-  };
-
-  const resolveLineDiscountAmount = (
-    item: SaleLineItem,
-    raw: number,
-    type: DiscountInputType,
-    qty: number,
-  ): number => {
-    const baseAmount = lineDiscountBase(item, qty);
-    const maxFixed = calculateMaxDiscount(item);
-    const resolved = resolveDiscountAmount(type, raw, baseAmount);
-    return clampResolvedDiscount(resolved, maxFixed, baseAmount);
-  };
-
   const handleEditClick = (item: SaleLineItem) => {
     const qty = normalizeQty(item, item.quantity);
     setEditingRowId(item.id || item.sellable_id);
     setEditValues({
       qty,
       price: item.selling_price,
-      discount: normalizeDiscount(item, item.discount_amount, "fixed", qty),
-      discountType: "fixed",
     });
   };
 
   const handleSaveEdit = (itemId: string | number) => {
     const item = items.find((i) => (i.id || i.sellable_id) === itemId);
     const qty = item ? normalizeQty(item, editValues.qty) : Math.max(1, Math.trunc(editValues.qty || 0));
-    const discount = item
-      ? resolveLineDiscountAmount(
-          item,
-          editValues.discount,
-          editValues.discountType,
-          qty,
-        )
-      : Math.max(0, editValues.discount || 0);
     onUpdateItem(itemId, {
       quantity: qty,
       selling_price: editValues.price,
-      discount_amount: discount,
     });
     setEditingRowId(null);
+  };
+
+  const handleDiscountApply = (
+    itemId: string | number,
+    discountAmount: number,
+    approvalRequestId?: number,
+  ) => {
+    onUpdateItem(itemId, {
+      discount_amount: discountAmount,
+      ...(approvalRequestId != null
+        ? {
+            discount_approval_request_id: approvalRequestId,
+            discount_approval_request_pending: false,
+          }
+        : {
+            discount_approval_request_id: undefined,
+            discount_approval_request_pending: undefined,
+          }),
+    });
+  };
+
+  const handlePersistPendingRequest = (
+    itemId: string | number,
+    requestId: number,
+  ) => {
+    onUpdateItem(itemId, {
+      discount_approval_request_id: requestId,
+      discount_approval_request_pending: true,
+    });
+  };
+
+  const handleClearStoredRequest = (itemId: string | number) => {
+    onUpdateItem(itemId, {
+      discount_approval_request_id: undefined,
+      discount_approval_request_pending: undefined,
+    });
   };
 
   const handleCancelEdit = () => {
@@ -167,39 +180,7 @@ export function CartLineItemsPanel({
     return item.discount_amount * m;
   };
 
-  const getDisplayPrice = (item: SaleLineItem): {
-    amount: number;
-    currency: string;
-    converted?: { amount: number; currency: string };
-  } => {
-    const displayPrice = {
-      amount: item.selling_price,
-      currency: item.currency,
-      converted: undefined as { amount: number; currency: string } | undefined,
-    };
-
-    const m = egpMultiplierForPricingCurrency(item.currency, {
-      usdToEgp: exchangeRate,
-      eurToEgp: exchangeRateEur,
-    });
-    if (item.currency !== "EGP" && m > 0 && m !== 1) {
-      displayPrice.converted = {
-        amount: item.selling_price * m,
-        currency: "EGP",
-      };
-    }
-
-    return displayPrice;
-  };
-
-  const calculateMaxDiscount = (item: SaleLineItem): number => {
-    const maxDiscountValue = item.catalogItem.max_discount_value || 0;
-    // Max discount is always in item's native currency
-    if (item.catalogItem.max_discount_type === "percentage") {
-      return (item.selling_price * maxDiscountValue) / 100;
-    }
-    return maxDiscountValue;
-  };
+  const getDisplayPriceEgp = (item: SaleLineItem): number => toEGP(item);
 
   /**
    * Line subtotal always in EGP (base currency).
@@ -273,16 +254,6 @@ export function CartLineItemsPanel({
                   const maxQty = getMaxQty(item);
                   const isStockLimited = item.sellable_type === "products" || item.sellable_type === "spare_parts";
                   const isOutOfStock = isStockLimited && typeof maxQty === "number" && maxQty === 0;
-                  const maxDiscount = calculateMaxDiscount(item);
-                  const editLineBase = lineDiscountBase(item, editValues.qty);
-                  const editResolvedDiscount = isEditing
-                    ? resolveLineDiscountAmount(
-                        item,
-                        editValues.discount,
-                        editValues.discountType,
-                        editValues.qty,
-                      )
-                    : 0;
                   return (
                     <tr
                       key={index}
@@ -308,21 +279,9 @@ export function CartLineItemsPanel({
 
                       {/* Price */}
                       <td className="px-5 py-4 text-right">
-                        {(() => {
-                          const priceInfo = getDisplayPrice(item);
-                          return (
-                            <div className="flex flex-col items-end">
-                              <p className="mono-data font-semibold text-on-surface">
-                                {priceInfo.amount.toLocaleString()} <span className="form-chip bg-primary/8 text-primary border-primary/15 font-mono text-caption">{priceInfo.currency}</span>
-                              </p>
-                              {priceInfo.converted && (
-                                <p className="mono-data mt-0.5 text-caption font-medium text-on-surface-variant">
-                                  ≈ {priceInfo.converted.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <span className="text-caption uppercase">EGP</span>
-                                </p>
-                              )}
-                            </div>
-                          );
-                        })()}
+                        <p className="mono-data font-semibold text-on-surface">
+                          {formatEgp(getDisplayPriceEgp(item))}
+                        </p>
                       </td>
 
                       {/* Quantity */}
@@ -340,24 +299,12 @@ export function CartLineItemsPanel({
                                 setEditValues((v) => ({
                                   ...v,
                                   qty: nextQty,
-                                  discount: normalizeDiscount(
-                                    item,
-                                    v.discount,
-                                    v.discountType,
-                                    nextQty,
-                                  ),
                                 }));
                               }}
                               onBlur={() =>
                                 setEditValues((v) => ({
                                   ...v,
                                   qty: normalizeQty(item, v.qty),
-                                  discount: normalizeDiscount(
-                                    item,
-                                    v.discount,
-                                    v.discountType,
-                                    v.qty,
-                                  ),
                                 }))
                               }
                               
@@ -401,129 +348,35 @@ export function CartLineItemsPanel({
                       {/* Discount */}
                       <td className="px-5 py-4 text-right">
                         {isEditing ? (
-                          <div className="flex min-w-[9rem] flex-col items-end gap-1">
-                            <div
-                              className="grid w-full grid-cols-2 gap-1"
-                              role="radiogroup"
-                              aria-label="Line discount type"
-                            >
-                              {(["fixed", "percentage"] as const).map((type) => {
-                                const active = editValues.discountType === type;
-                                return (
-                                  <button
-                                    key={type}
-                                    type="button"
-                                    role="radio"
-                                    aria-checked={active}
-                                    onClick={() =>
-                                      setEditValues((v) => {
-                                        const converted =
-                                          convertDiscountBetweenTypes(
-                                            v.discountType,
-                                            type,
-                                            v.discount,
-                                            lineDiscountBase(item, v.qty),
-                                          );
-                                        return {
-                                          ...v,
-                                          discountType: type,
-                                          discount: normalizeDiscount(
-                                            item,
-                                            converted,
-                                            type,
-                                            v.qty,
-                                          ),
-                                        };
-                                      })
-                                    }
-                                    className={`rounded-md border px-1.5 py-1 text-[10px] font-semibold uppercase tracking-wide transition-all ${
-                                      active
-                                        ? "border-primary bg-primary/10 text-on-surface"
-                                        : "border-outline-variant/30 bg-surface text-on-surface-variant hover:border-primary/30"
-                                    }`}
-                                  >
-                                    {type === "fixed" ? "Fixed" : "%"}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                            <div className="relative w-full">
-                              <input
-                                type="number"
-                                onWheel={(event) => {
-                                  event.preventDefault();
-                                  event.currentTarget.blur();
-                                }}
-                                value={editValues.discount}
-                                onChange={(e) =>
-                                  setEditValues((v) => ({
-                                    ...v,
-                                    discount: normalizeDiscount(
-                                      item,
-                                      Number(e.target.value),
-                                      v.discountType,
-                                      v.qty,
-                                    ),
-                                  }))
-                                }
-                                onBlur={() =>
-                                  setEditValues((v) => ({
-                                    ...v,
-                                    discount: normalizeDiscount(
-                                      item,
-                                      v.discount,
-                                      v.discountType,
-                                      v.qty,
-                                    ),
-                                  }))
-                                }
-                                className="form-input-base mono-data w-full py-1.5 pr-10 text-right text-sm"
-                                aria-label={
-                                  editValues.discountType === "percentage"
-                                    ? "Line item discount percentage"
-                                    : "Line item discount amount"
-                                }
-                              />
-                              <span className="pointer-events-none absolute inset-y-0 right-2 flex items-center text-[10px] font-semibold uppercase text-on-surface-variant">
-                                {editValues.discountType === "percentage"
-                                  ? "%"
-                                  : item.currency}
-                              </span>
-                            </div>
-                            {editValues.discountType === "percentage" &&
-                            editResolvedDiscount > 0 ? (
-                              <span className="label-caps">
-                                = {editResolvedDiscount.toFixed(2)} {item.currency}
-                              </span>
-                            ) : null}
-                            <span className="label-caps">
-                              {editValues.discountType === "percentage"
-                                ? `Max: ${maxRawDiscountValue("percentage", maxDiscount, editLineBase).toFixed(1)}%`
-                                : `Max: ${maxDiscount.toFixed(0)} ${item.currency}`}
-                            </span>
-                          </div>
+                          <SaleLineItemDiscountCell
+                            item={{
+                              ...item,
+                              quantity: editValues.qty,
+                              selling_price: editValues.price,
+                            }}
+                            isAdmin={isAdmin}
+                            exchangeRates={exchangeRates}
+                            saleContext={saleContext}
+                            onApply={handleDiscountApply}
+                            onPersistPendingRequest={handlePersistPendingRequest}
+                            onClearStoredRequest={handleClearStoredRequest}
+                          />
                         ) : (
-                          <div className="flex flex-col items-end">
-                            <p className={`mono-data font-semibold ${item.discount_amount > 0 ? 'text-error' : 'text-on-surface-variant opacity-50'}`}>
-                              {item.discount_amount > 0 ? `-${item.discount_amount.toLocaleString()}` : "0"} <span className="text-caption uppercase">{item.currency}</span>
-                            </p>
-                            {item.currency === "USD" && item.discount_amount > 0 && exchangeRate > 0 && (
-                              <p className="mono-data mt-0.5 text-caption text-on-surface-variant/60">
-                                ≈ -{toEGPDiscount(item).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} EGP
-                              </p>
-                            )}
-                          </div>
+                          <p
+                            className={`mono-data font-semibold ${item.discount_amount > 0 ? "text-error" : "text-on-surface-variant opacity-50"}`}
+                          >
+                            {item.discount_amount > 0
+                              ? `-${formatEgp(toEGPDiscount(item))}`
+                              : formatEgp(0)}
+                          </p>
                         )}
                       </td>
 
                       {/* Subtotal — always EGP */}
                       <td className="px-5 py-4 text-right">
                         <p className="mono-data font-bold text-primary">
-                          {calculateLineSubtotal(item).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <span className="text-caption uppercase">EGP</span>
+                          {formatEgp(calculateLineSubtotal(item))}
                         </p>
-                        {item.currency === "USD" && (
-                          <p className="mono-data mt-0.5 text-caption text-on-surface-variant/50">Converted @ {exchangeRate}x</p>
-                        )}
                       </td>
 
                       {/* Actions */}

@@ -2,6 +2,7 @@ import { getApiUrl } from "@/lib/config";
 import { getAuthToken } from "@/lib/auth-session";
 import { ApiError } from "@/lib/auth-api";
 import { asRecord, parseErrorMessage, toNumber, toText } from "@/lib/api/core";
+import { toPricingCurrency, type PricingCurrency } from "@/lib/currencies";
 import type { MaxDiscountType } from "@/lib/max-discount";
 
 export async function authorizedFetch<T>(
@@ -77,6 +78,9 @@ export type Bike = {
 export type TicketCatalogDiscount = {
   max_discount_type?: "fixed" | "percentage";
   max_discount_value?: number;
+  currency_pricing?: PricingCurrency;
+  sale_price?: number;
+  service_price?: number;
 };
 
 export type TicketItem = {
@@ -85,6 +89,7 @@ export type TicketItem = {
   ticket_id: number;
   spare_part_id?: number;
   maintenance_service_id?: number;
+  product_id?: number;
   price_snapshot: number;
   discount: number;
   qty: number;
@@ -92,6 +97,7 @@ export type TicketItem = {
   item_name?: string;
   spare_part?: { id: number; name: string } & TicketCatalogDiscount;
   maintenance_service?: { id: number; name: string } & TicketCatalogDiscount;
+  product?: { id: number; name: string } & TicketCatalogDiscount;
 };
 
 function normalizeTicketCatalog(
@@ -107,6 +113,9 @@ function normalizeTicketCatalog(
     max_discount_type:
       type === "fixed" || type === "percentage" ? (type as MaxDiscountType) : undefined,
     max_discount_value: toNumber(record.max_discount_value),
+    currency_pricing: toPricingCurrency(record.currency_pricing),
+    sale_price: toNumber(record.sale_price) || undefined,
+    service_price: toNumber(record.service_price) || undefined,
   };
 }
 
@@ -116,6 +125,7 @@ function normalizeTicketItem(raw: unknown): TicketItem {
   const maintenanceService = normalizeTicketCatalog(
     record.maintenance_service ?? record.maintenanceService,
   );
+  const product = normalizeTicketCatalog(record.product);
 
   return {
     id: toNumber(record.id),
@@ -123,6 +133,7 @@ function normalizeTicketItem(raw: unknown): TicketItem {
     ticket_id: toNumber(record.ticket_id),
     spare_part_id: toNumber(record.spare_part_id) || undefined,
     maintenance_service_id: toNumber(record.maintenance_service_id) || undefined,
+    product_id: toNumber(record.product_id) || undefined,
     price_snapshot: toNumber(record.price_snapshot),
     discount: toNumber(record.discount),
     qty: toNumber(record.qty),
@@ -130,6 +141,7 @@ function normalizeTicketItem(raw: unknown): TicketItem {
     item_name: toText(record.item_name) || undefined,
     spare_part: sparePart,
     maintenance_service: maintenanceService,
+    product,
   };
 }
 
@@ -161,6 +173,7 @@ function normalizeTicket(raw: unknown): Ticket {
     customer_bike_id: toNumber(record.customer_bike_id),
     status: toText(record.status),
     total: toNumber(record.total),
+    discount: toNumber(record.discount),
     payment_method: toText(record.payment_method) || undefined,
     amount_paid: toNumber(record.amount_paid),
     closed_at: toText(record.closed_at) || undefined,
@@ -190,8 +203,17 @@ function normalizeTicket(raw: unknown): Ticket {
 export function ticketItemName(item: TicketItem): string {
   if (item.item_name) return item.item_name;
   if (item.spare_part?.name) return item.spare_part.name;
+  if (item.product?.name) return item.product.name;
   if (item.maintenance_service?.name) return item.maintenance_service.name;
-  return item.spare_part_id ? "Spare Part" : "Service";
+  if (item.spare_part_id) return "Spare Part";
+  if (item.product_id) return "Product";
+  return "Service";
+}
+
+export function ticketItemTypeLabel(item: TicketItem): string {
+  if (item.spare_part_id) return "Spare Part";
+  if (item.product_id) return "Product";
+  return "Service";
 }
 
 export type TicketTask = {
@@ -209,6 +231,7 @@ export type Ticket = {
   customer_bike_id: number;
   status: string; // 'pending', 'in_progress', 'completed', 'closed'
   total: number;
+  discount?: number;
   payment_method?: string | null;
   amount_paid?: number;
   closed_at?: string | null;
@@ -361,6 +384,7 @@ export const ticketsApi = {
     data: {
       spare_part_id?: number;
       maintenance_service_id?: number;
+      product_id?: number;
       price_snapshot: number;
       discount?: number;
       qty: number;
@@ -380,6 +404,7 @@ export const ticketsApi = {
     data: {
       price_snapshot?: number;
       discount?: number;
+      discount_approval_request_id?: number;
       qty?: number;
     },
   ) => {
@@ -403,6 +428,17 @@ export const ticketsApi = {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status }),
+    });
+    return normalizeTicket(res);
+  },
+  updateTicketDiscount: async (
+    ticketId: number,
+    data: { discount: number; discount_approval_request_id?: number },
+  ) => {
+    const res = await authorizedFetch<unknown>(`/tickets/${ticketId}/discount`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
     });
     return normalizeTicket(res);
   },

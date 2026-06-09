@@ -1,4 +1,6 @@
 import { asRecord, toNumber, toText } from "@/lib/api/core";
+import { formatEgp, type ExchangeRates } from "@/lib/currencies";
+import { convertTicketLineAmount } from "@/lib/ticket-display-pricing";
 import type { TicketItem } from "@/lib/tickets-api";
 import {
   calculateMaxLineDiscount,
@@ -13,10 +15,12 @@ export type TicketItemCatalogDiscount = {
 
 function readCatalogRecord(item: TicketItem): Record<string, unknown> {
   if (item.spare_part) return asRecord(item.spare_part);
+  if (item.product) return asRecord(item.product);
   if (item.maintenance_service) return asRecord(item.maintenance_service);
 
   const raw = item as unknown as Record<string, unknown>;
   if (raw.sparePart) return asRecord(raw.sparePart);
+  if (raw.product) return asRecord(raw.product);
   if (raw.maintenanceService) return asRecord(raw.maintenanceService);
 
   return {};
@@ -74,13 +78,17 @@ export function clampTicketItemDiscount(
   );
 }
 
-export function formatTicketMaxDiscountHint(item: TicketItem): string {
+export function formatTicketMaxDiscountHint(
+  item: TicketItem,
+  rates: ExchangeRates,
+): string {
   const catalog = getTicketItemCatalogDiscount(item);
   const max = ticketItemMaxDiscount(item, { applyCatalogCap: true });
+  const maxDisplay = convertTicketLineAmount(item, max, rates);
 
   if (catalog.max_discount_type === "percentage" && catalog.max_discount_value > 0) {
-    return `Max ${catalog.max_discount_value}% ($${max.toFixed(2)})`;
+    return `Max ${catalog.max_discount_value}% (${formatEgp(maxDisplay)})`;
   }
 
-  return `Max $${max.toFixed(2)}`;
+  return `Max ${formatEgp(maxDisplay)}`;
 }

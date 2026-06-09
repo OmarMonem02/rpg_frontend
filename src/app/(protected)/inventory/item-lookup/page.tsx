@@ -10,6 +10,7 @@ import {
   type KeyboardEvent,
 } from "react";
 import { BikeCompatibilityFilter } from "@/components/BikeCompatibilityFilter";
+import { StockBadge } from "@/components/inventory/stock-badge";
 import {
   ActionButton,
   EmptyState,
@@ -19,10 +20,11 @@ import {
   PageShell,
   PaginationControls,
   SectionHeading,
-  StatusBadge,
 } from "@/components/ops-ui";
+import { useExchangeRates } from "@/hooks/useExchangeRates";
 import { useLiveDataRefresh } from "@/hooks/useLiveDataRefresh";
 import { getAuthToken } from "@/lib/auth-session";
+import { formatCatalogPriceInEGP, type ExchangeRates } from "@/lib/currencies";
 import {
   fetchAllPages,
   listBikeBlueprints,
@@ -45,12 +47,6 @@ import {
   toLookupItem,
   type LookupItem,
 } from "@/lib/item-lookup";
-import {
-  getStockBadgeShortLabel,
-  getStockBadgeTone,
-  type StockTrackedItem,
-} from "@/lib/inventory-stock";
-
 type EntityFilter = "all" | "product" | "spare_part";
 
 const MAX_VISIBLE_BIKE_CHIPS = 4;
@@ -76,17 +72,6 @@ function ItemLookupImage({
       alt={name}
       className={`${sizeClass} flex-none rounded-xl border border-outline-variant/15 object-cover`}
     />
-  );
-}
-
-function getStockBadge(item: StockTrackedItem) {
-  const tone = getStockBadgeTone(item);
-  const label = getStockBadgeShortLabel(item);
-  return (
-    <StatusBadge tone={tone}>
-      {label}{" "}
-      <span className="mono-data">{item.stock_quantity}</span>
-    </StatusBadge>
   );
 }
 
@@ -129,9 +114,11 @@ function CompatibleBikesCell({
 function LookupResultCard({
   item,
   bikeLabels,
+  rates,
 }: {
   item: LookupItem;
   bikeLabels: string[];
+  rates: ExchangeRates;
 }) {
   const record = item.record;
 
@@ -155,18 +142,27 @@ function LookupResultCard({
         <div className="rounded-xl border border-outline-variant/10 bg-surface-container-low/60 px-4 py-3">
           <dt className="label-caps text-on-surface-variant">Price</dt>
           <dd className="mono-data mt-1 text-lg font-semibold text-primary">
-            {record.sale_price} {record.currency_pricing}
+            {formatCatalogPriceInEGP(
+              record.sale_price,
+              record.currency_pricing,
+              rates,
+            )}
           </dd>
         </div>
         <div className="rounded-xl border border-outline-variant/10 bg-surface-container-low/60 px-4 py-3">
           <dt className="label-caps text-on-surface-variant">Max discount</dt>
           <dd className="mono-data mt-1 text-base font-semibold text-on-surface">
-            {formatMaxDiscount(record)}
+            {formatMaxDiscount(record, rates)}
           </dd>
         </div>
         <div className="rounded-xl border border-outline-variant/10 bg-surface-container-low/60 px-4 py-3">
           <dt className="label-caps text-on-surface-variant">Stock</dt>
-          <dd className="mt-1">{getStockBadge(record)}</dd>
+          <dd className="mt-1">
+            <StockBadge
+              stock_quantity={record.stock_quantity}
+              low_stock_alarm={record.low_stock_alarm}
+            />
+          </dd>
         </div>
         <div className="rounded-xl border border-outline-variant/10 bg-surface-container-low/60 px-4 py-3">
           <dt className="label-caps text-on-surface-variant">Universal</dt>
@@ -199,6 +195,7 @@ function LookupResultCard({
 }
 
 export default function ItemLookupPage() {
+  const { rates } = useExchangeRates();
   const skuInputRef = useRef<HTMLInputElement>(null);
 
   const [blueprints, setBlueprints] = useState<BikeBlueprintRecord[]>([]);
@@ -503,6 +500,7 @@ export default function ItemLookupPage() {
             bikeLabels={resolveBikeLabels(
               quickResult.record.bike_blueprint_ids,
             )}
+            rates={rates}
           />
         ) : null}
       </section>
@@ -744,13 +742,20 @@ export default function ItemLookupPage() {
                           </div>
                         </td>
                         <td className="mono-data px-4 py-3 text-primary">
-                          {record.sale_price} {record.currency_pricing}
+                          {formatCatalogPriceInEGP(
+                            record.sale_price,
+                            record.currency_pricing,
+                            rates,
+                          )}
                         </td>
                         <td className="mono-data px-4 py-3 text-on-surface-variant">
-                          {formatMaxDiscount(record)}
+                          {formatMaxDiscount(record, rates)}
                         </td>
                         <td className="px-4 py-3 text-center">
-                          {getStockBadge(record)}
+                          <StockBadge
+                            stock_quantity={record.stock_quantity}
+                            low_stock_alarm={record.low_stock_alarm}
+                          />
                         </td>
                         <td className="px-4 py-3">
                           <span

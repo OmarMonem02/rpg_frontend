@@ -141,6 +141,7 @@ export type CreateSaleLineItemPayload = {
   maintenance_service_id?: number;
   selling_price: number;
   discount?: number;
+  discount_approval_request_id?: number;
   qty: number;
 };
 

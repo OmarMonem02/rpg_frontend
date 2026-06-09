@@ -4,7 +4,9 @@ import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { getAuthToken } from "@/lib/auth-session";
 import { useEntityFilters } from "@/hooks/useEntityFilters";
+import { useExchangeRates } from "@/hooks/useExchangeRates";
 import { useGlobalDataRefresh } from "@/hooks/useGlobalDataRefresh";
+import { formatCatalogPriceInEGP, toPricingCurrency } from "@/lib/currencies";
 import {
   listBikes,
   listBikeBlueprints,
@@ -37,6 +39,7 @@ const STATUSES = [
 
 export default function BikesPage() {
   const router = useRouter();
+  const { rates } = useExchangeRates();
   const [bikes, setBikes] = useState<BikeRecord[]>([]);
   const [blueprints, setBlueprints] = useState<BikeBlueprintRecord[]>([]);
   const [brands, setBrands] = useState<BrandRecord[]>([]);
@@ -263,18 +266,31 @@ export default function BikesPage() {
                       {bike.vin}
                     </td>
                     <td className="mono-data px-4 py-3 text-right font-semibold text-primary">
-                      {bike.sale_price} {bike.currency_pricing}
+                      {formatCatalogPriceInEGP(
+                        bike.sale_price,
+                        toPricingCurrency(bike.currency_pricing),
+                        rates,
+                      )}
                     </td>
                     <td className="mono-data px-4 py-3 text-right text-on-surface-variant">
-                      {bike.cost_price} {bike.currency_pricing}
+                      {formatCatalogPriceInEGP(
+                        bike.cost_price,
+                        toPricingCurrency(bike.currency_pricing),
+                        rates,
+                      )}
                     </td>
                     <td className="mono-data px-4 py-3 text-center text-on-surface">
                       {bike.mileage.toLocaleString()}
                     </td>
                     <td className="px-4 py-3">{getStatusBadge(bike.status)}</td>
                     <td className="mono-data px-4 py-3 text-on-surface text-xs">
-                      {bike.max_discount_value}
-                      {bike.max_discount_type === "percentage" ? "%" : " " + bike.currency_pricing}
+                      {bike.max_discount_type === "percentage"
+                        ? `${bike.max_discount_value}%`
+                        : formatCatalogPriceInEGP(
+                            bike.max_discount_value,
+                            toPricingCurrency(bike.currency_pricing),
+                            rates,
+                          )}
                     </td>
                     <td className="px-4 py-3 text-right">
                       <button

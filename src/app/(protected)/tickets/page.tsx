@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { TrashIcon } from "@heroicons/react/24/outline";
 import { usePermissions } from "@/components/permission-provider";
 import { useGlobalDataRefresh } from "@/hooks/useGlobalDataRefresh";
@@ -11,11 +11,92 @@ import {
   DataTableCard,
   StatusBadge,
   EmptyState,
+  InputGroup,
 } from "@/components/ops-ui";
+import { useExchangeRates } from "@/hooks/useExchangeRates";
+import { formatEgp } from "@/lib/currencies";
+import { computeTicketDisplayTotals } from "@/lib/ticket-display-pricing";
 import { ticketsApi, type Ticket } from "@/lib/tickets-api";
 import { CreateTicketModal } from "./CreateTicketModal";
 
+type TicketSort =
+  | "newest"
+  | "oldest"
+  | "highest"
+  | "lowest"
+  | "customer_asc"
+  | "customer_desc"
+  | "status";
+
+const TICKET_SORT_OPTIONS: Array<{ value: TicketSort; label: string }> = [
+  { value: "newest", label: "Newest first" },
+  { value: "oldest", label: "Oldest first" },
+  { value: "highest", label: "Highest total" },
+  { value: "lowest", label: "Lowest total" },
+  { value: "customer_asc", label: "Customer A–Z" },
+  { value: "customer_desc", label: "Customer Z–A" },
+  { value: "status", label: "Status" },
+];
+
+const STATUS_SORT_ORDER: Record<string, number> = {
+  pending: 0,
+  in_progress: 1,
+  completed: 2,
+  cancelled: 3,
+  closed: 4,
+};
+
+function sortTickets(tickets: Ticket[], sort: TicketSort): Ticket[] {
+  const sorted = [...tickets];
+
+  sorted.sort((a, b) => {
+    let result = 0;
+
+    switch (sort) {
+      case "oldest":
+        result =
+          new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+        break;
+      case "highest":
+        result = Number(b.total || 0) - Number(a.total || 0);
+        break;
+      case "lowest":
+        result = Number(a.total || 0) - Number(b.total || 0);
+        break;
+      case "customer_asc":
+        result = (a.customer?.name || "").localeCompare(
+          b.customer?.name || "",
+          undefined,
+          { sensitivity: "base" },
+        );
+        break;
+      case "customer_desc":
+        result = (b.customer?.name || "").localeCompare(
+          a.customer?.name || "",
+          undefined,
+          { sensitivity: "base" },
+        );
+        break;
+      case "status":
+        result =
+          (STATUS_SORT_ORDER[a.status.toLowerCase()] ?? 99) -
+          (STATUS_SORT_ORDER[b.status.toLowerCase()] ?? 99);
+        break;
+      case "newest":
+      default:
+        result =
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        break;
+    }
+
+    return result !== 0 ? result : b.id - a.id;
+  });
+
+  return sorted;
+}
+
 export default function TicketsPage() {
+  const { rates } = useExchangeRates();
   const permissions = usePermissions();
   const canDeleteTickets = permissions.canDelete("maintenance");
   const [tickets, setTickets] = useState<Ticket[]>([]);
@@ -23,6 +104,12 @@ export default function TicketsPage() {
   const [error, setError] = useState("");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [sortBy, setSortBy] = useState<TicketSort>("newest");
+
+  const sortedTickets = useMemo(
+    () => sortTickets(tickets, sortBy),
+    [tickets, sortBy],
+  );
 
   const fetchTickets = useCallback(async () => {
     try {
@@ -111,6 +198,32 @@ export default function TicketsPage() {
         />
       ) : (
         <DataTableCard className="overflow-hidden border-outline-variant/10 shadow-xl">
+          <div className="border-b border-outline-variant/15 bg-surface-container-low px-6 py-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <p className="label-caps">Queue</p>
+                <h2 className="mt-1 text-xl font-bold text-on-surface">
+                  {sortedTickets.length} ticket{sortedTickets.length === 1 ? "" : "s"}
+                </h2>
+              </div>
+              <InputGroup label="Sort by" className="w-full sm:w-56">
+                <select
+                  value={sortBy}
+                  onChange={(event) =>
+                    setSortBy(event.target.value as TicketSort)
+                  }
+                  className="form-input-base"
+                  aria-label="Sort tickets"
+                >
+                  {TICKET_SORT_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </InputGroup>
+            </div>
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm text-on-surface">
               <thead className="border-b border-outline-variant/20 bg-surface-container-low text-on-surface-variant">
@@ -125,7 +238,7 @@ export default function TicketsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-outline-variant/5 bg-surface">
-                {tickets.map((ticket) => (
+                {sortedTickets.map((ticket) => (
                   <tr key={ticket.id} className="data-row group">
                     <td className="mono-data px-6 py-5 font-bold text-primary">#{ticket.id}</td>
                     <td className="px-6 py-5">
@@ -150,7 +263,9 @@ export default function TicketsPage() {
                         {ticket.status.toUpperCase().replace("_", " ")}
                       </StatusBadge>
                     </td>
-                    <td className="mono-data px-6 py-5 font-black text-on-surface">${Number(ticket.total || 0).toFixed(2)}</td>
+                    <td className="mono-data px-6 py-5 font-black text-on-surface">
+                      {formatEgp(computeTicketDisplayTotals(ticket, rates).total)}
+                    </td>
                     <td className="mono-data px-6 py-5 text-on-surface-variant">{new Date(ticket.created_at).toLocaleDateString()}</td>
                     <td className="px-6 py-5 text-right">
                       <div className="inline-flex items-center justify-end gap-2">

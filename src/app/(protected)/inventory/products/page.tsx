@@ -5,7 +5,9 @@ import { useRouter } from "next/navigation";
 import { usePermissions } from "@/components/permission-provider";
 import { getAuthToken } from "@/lib/auth-session";
 import { useEntityFilters } from "@/hooks/useEntityFilters";
+import { useExchangeRates } from "@/hooks/useExchangeRates";
 import { useLiveDataRefresh } from "@/hooks/useLiveDataRefresh";
+import { formatCatalogPriceInEGP } from "@/lib/currencies";
 import {
   listProducts,
   listProductCategories,
@@ -25,6 +27,7 @@ import {
 } from "@/components/entity-form-modal";
 import { BikeCompatibilityFilter } from "@/components/BikeCompatibilityFilter";
 import { AdvancedFilters } from "@/components/advanced-filters";
+import { StockBadge } from "@/components/inventory/stock-badge";
 import {
   ActionButton,
   EmptyState,
@@ -33,13 +36,13 @@ import {
   PageHero,
   PageShell,
   PaginationControls,
-  StatusBadge,
   TabsWrapper,
 } from "@/components/ops-ui";
 
 export default function ProductsPage() {
   const router = useRouter();
   const permissions = usePermissions();
+  const { rates } = useExchangeRates();
   const [products, setProducts] = useState<ProductRecord[]>([]);
   const [categories, setCategories] = useState<ProductCategoryRecord[]>([]);
   const [allCategories, setAllCategories] = useState<ProductCategoryRecord[]>(
@@ -225,26 +228,6 @@ export default function ProductsPage() {
     }
   };
 
-  const getStockBadge = (product: ProductRecord) => {
-    if (product.stock_quantity <= 0)
-      return (
-        <StatusBadge tone="danger">
-          <span className="mono-data">0</span> Out
-        </StatusBadge>
-      );
-    if (product.stock_quantity <= 5)
-      return (
-        <StatusBadge tone="warning">
-          Low <span className="mono-data">{product.stock_quantity}</span>
-        </StatusBadge>
-      );
-    return (
-      <StatusBadge tone="success">
-        In <span className="mono-data">{product.stock_quantity}</span>
-      </StatusBadge>
-    );
-  };
-
   const categoryModalFields: FieldConfig[] = [
     {
       name: "name",
@@ -388,10 +371,17 @@ export default function ProductsPage() {
                     </div>
                   </td>
                   <td className="px-4 py-3 text-center">
-                    {getStockBadge(product)}
+                    <StockBadge
+                      stock_quantity={product.stock_quantity}
+                      low_stock_alarm={product.low_stock_alarm}
+                    />
                   </td>
                   <td className="mono-data px-4 py-3 text-primary">
-                    {product.sale_price} {product.currency_pricing}
+                    {formatCatalogPriceInEGP(
+                      product.sale_price,
+                      product.currency_pricing,
+                      rates,
+                    )}
                   </td>
                   <td className="px-4 py-3">
                     <span className="form-chip">

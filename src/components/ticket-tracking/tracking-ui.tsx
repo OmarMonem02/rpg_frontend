@@ -10,6 +10,13 @@ import {
 } from "@heroicons/react/24/outline";
 import type { PublicTicketTracking, TrackingTimelineStep } from "@/lib/public-tracking-api";
 import { formatMoney } from "@/lib/public-tracking-api";
+import {
+  computePublicTrackingDisplayTotal,
+  convertPublicItemAmount,
+  convertPublicItemSubtotal,
+  convertPublicTaskSubtotal,
+  toPublicExchangeRates,
+} from "@/lib/public-tracking-pricing";
 
 type TicketStatus = "pending" | "in_progress" | "completed" | "closed" | string;
 
@@ -286,6 +293,7 @@ function ProgressRing({ percent }: { percent: number }) {
 }
 
 export function TrackingStatusSummary({ data }: { data: PublicTicketTracking }) {
+  const displayTotal = computePublicTrackingDisplayTotal(data);
   const { ticket, progress } = data;
   const tone = statusTone(ticket.status);
 
@@ -315,7 +323,7 @@ export function TrackingStatusSummary({ data }: { data: PublicTicketTracking }) 
         </div>
         <div className="rounded-xl bg-primary/5 px-3 py-2.5 ring-1 ring-primary/10">
           <p className="label-caps text-primary">Est. total</p>
-          <p className=" mt-1 text-lg font-bold text-primary">{formatMoney(ticket.total)}</p>
+          <p className=" mt-1 text-lg font-bold text-primary">{formatMoney(displayTotal)}</p>
         </div>
       </div>
     </TrackingCard>
@@ -528,6 +536,8 @@ export function PhoneVerificationCard({
 }
 export function TicketTrackingDashboard({ data }: { data: PublicTicketTracking }) {
   const { customer, bike, tasks, progress } = data;
+  const rates = toPublicExchangeRates(data.exchange_rates);
+  const displayTotal = computePublicTrackingDisplayTotal(data);
 
   return (
     <>
@@ -575,19 +585,26 @@ export function TicketTrackingDashboard({ data }: { data: PublicTicketTracking }
         ) : (
           <div className="tracking-tasks-grid">
             {tasks.map((task) => (
-              <TaskCard key={task.id} task={task} />
+              <TaskCard key={task.id} task={task} rates={rates} />
             ))}
           </div>
         )}
       </div>
 
-      <TrackingTotalFooter total={data.ticket.total} className="lg:hidden" />
+      <TrackingTotalFooter total={displayTotal} className="lg:hidden" />
     </>
   );
 }
 
-function TaskCard({ task }: { task: PublicTicketTracking["tasks"][number] }) {
+function TaskCard({
+  task,
+  rates,
+}: {
+  task: PublicTicketTracking["tasks"][number];
+  rates: ReturnType<typeof toPublicExchangeRates>;
+}) {
   const isDone = task.status === "completed";
+  const taskSubtotal = convertPublicTaskSubtotal(task.items, rates);
 
   return (
     <article className="tracking-card overflow-hidden transition-shadow hover:shadow-[0_16px_40px_rgba(44,52,55,0.08)]">
@@ -607,7 +624,7 @@ function TaskCard({ task }: { task: PublicTicketTracking["tasks"][number] }) {
           </div>
         </div>
         <span className=" shrink-0 rounded-lg bg-surface-container px-2 py-1 text-sm font-bold text-on-surface">
-          {formatMoney(task.subtotal)}
+          {formatMoney(taskSubtotal)}
         </span>
       </div>
 
@@ -627,11 +644,15 @@ function TaskCard({ task }: { task: PublicTicketTracking["tasks"][number] }) {
                     {item.type}
                   </span>
                   <span>×{item.qty}</span>
-                  {item.discount > 0 ? <span>−{formatMoney(item.discount)}</span> : null}
+                  {item.discount > 0 ? (
+                    <span>
+                      −{formatMoney(convertPublicItemAmount(item, item.discount, rates))}
+                    </span>
+                  ) : null}
                 </p>
               </div>
               <span className=" shrink-0 font-semibold text-on-surface">
-                {formatMoney(item.subtotal)}
+                {formatMoney(convertPublicItemSubtotal(item, rates))}
               </span>
             </li>
           ))}

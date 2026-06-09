@@ -9,13 +9,8 @@ import {
   type ComponentType,
 } from "react";
 import { useRouter } from "next/navigation";
-import { getAuthToken, getAuthUser } from "@/lib/auth-session";
-import {
-  cancelApprovalRequest,
-  createSaleDiscountApprovalRequest,
-  getApprovalRequest,
-  type ApprovalRequestStatus,
-} from "@/lib/api/approval-requests";
+import { getAuthToken } from "@/lib/auth-session";
+import { createSaleDiscountApprovalRequest } from "@/lib/api/approval-requests";
 import { getSettings } from "@/lib/api/settings";
 import { egpMultiplierForPricingCurrency, toPricingCurrency } from "@/lib/currencies";
 import { REFRESH_ALL_DATA_EVENT } from "@/components/refetch-all-data-button";
@@ -51,6 +46,14 @@ import {
   hasMaintenanceCartItems,
   SaleTotalsSummary,
 } from "@/components/sale-totals-summary";
+import { OverallDiscountPanel } from "@/components/overall-discount-panel";
+import {
+  getPresentSaleCategories,
+  resolveScopeFromApprovalContext,
+  scopeToPayload,
+  type DiscountScope,
+} from "@/lib/discount-scope";
+import { useOverallDiscount } from "@/hooks/use-overall-discount";
 import {
   PageShell,
   ActionButton,
@@ -75,25 +78,12 @@ import {
   CheckIcon,
   ChevronDownIcon,
   GlobeAltIcon,
-  ArrowPathIcon,
 } from "@heroicons/react/24/outline";
-import {
-  clampRawDiscountValue,
-  convertDiscountBetweenTypes,
-  resolveDiscountAmount,
-  type DiscountInputType,
-} from "@/lib/discount-input";
-
-const DISCOUNT_TYPE_OPTIONS: {
-  value: DiscountInputType;
-  label: string;
-}[] = [
-    { value: "fixed", label: "Fixed Amount" },
-    { value: "percentage", label: "Percentage (%)" },
-  ];
+import type { DiscountInputType } from "@/lib/discount-input";
+import { formatDiscountAmount } from "@/components/form-discount-input";
 
 function formatEgp(amount: number) {
-  return amount.toLocaleString("en-US", { minimumFractionDigits: 2 });
+  return formatDiscountAmount(amount);
 }
 
 function FormSectionDivider({ title }: { title: string }) {
@@ -264,139 +254,6 @@ function FormMoneyInput({
   );
 }
 
-function FormDiscountInput({
-  id,
-  label,
-  icon: Icon,
-  prefix = "-",
-  value,
-  discountType,
-  onChange,
-  onTypeChange,
-  onBlur,
-  baseAmount,
-  maxFixedAmount,
-  disabled,
-  hint,
-  currencySuffix = "EGP",
-}: {
-  id: string;
-  label: string;
-  icon: ComponentType<{ className?: string }>;
-  prefix?: string;
-  value: number;
-  discountType: DiscountInputType;
-  onChange: (value: number) => void;
-  onTypeChange: (type: DiscountInputType) => void;
-  onBlur?: () => void;
-  baseAmount: number;
-  maxFixedAmount?: number;
-  disabled?: boolean;
-  hint?: string;
-  currencySuffix?: string;
-}) {
-  const isPercentage = discountType === "percentage";
-  const suffix = isPercentage ? "%" : currencySuffix;
-  const resolvedAmount = resolveDiscountAmount(
-    discountType,
-    value,
-    baseAmount,
-  );
-  const maxFixed = maxFixedAmount ?? baseAmount;
-
-  const handleTypeChange = (nextType: DiscountInputType) => {
-    if (nextType === discountType) return;
-    const converted = convertDiscountBetweenTypes(
-      discountType,
-      nextType,
-      value,
-      baseAmount,
-    );
-    const clamped = clampRawDiscountValue(
-      nextType,
-      converted,
-      maxFixed,
-      baseAmount,
-    );
-    onChange(clamped);
-    onTypeChange(nextType);
-  };
-
-  const handleValueChange = (raw: number) => {
-    onChange(
-      clampRawDiscountValue(discountType, raw, maxFixed, baseAmount),
-    );
-  };
-
-  return (
-    <div className={`space-y-2 ${disabled ? "opacity-70" : ""}`}>
-      <label
-        htmlFor={id}
-        className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-on-surface-variant"
-      >
-        <Icon className="h-4 w-4 shrink-0" aria-hidden />
-        {label}
-      </label>
-      <div
-        className="grid grid-cols-2 gap-1.5"
-        role="radiogroup"
-        aria-label={`${label} type`}
-      >
-        {DISCOUNT_TYPE_OPTIONS.map((option) => {
-          const active = discountType === option.value;
-          return (
-            <button
-              key={option.value}
-              type="button"
-              role="radio"
-              aria-checked={active}
-              disabled={disabled}
-              onClick={() => handleTypeChange(option.value)}
-              className={`rounded-xl border px-2.5 py-2 text-xs font-semibold transition-all ${active
-                ? "border-primary bg-primary/10 text-on-surface shadow-sm ring-1 ring-primary/20"
-                : "border-outline-variant/30 bg-surface text-on-surface-variant hover:border-primary/30 hover:bg-primary/5"
-                } disabled:cursor-not-allowed`}
-            >
-              {option.label}
-            </button>
-          );
-        })}
-      </div>
-      <div
-        className={`relative rounded-2xl border border-outline-variant/30 bg-surface shadow-sm transition-shadow focus-within:ring-2 focus-within:border-error/50 focus-within:ring-error/20 ${disabled ? "cursor-not-allowed bg-surface-container/50" : "hover:shadow-md"
-          }`}
-      >
-        <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 font-bold text-error">
-          {prefix}
-        </span>
-        <input
-          id={id}
-          type="number"
-          step="0.01"
-          min="0"
-          disabled={disabled}
-          value={value || ""}
-          onChange={(e) => handleValueChange(Number(e.target.value) || 0)}
-          onBlur={onBlur}
-          placeholder="0.00"
-          className="w-full appearance-none bg-transparent py-3.5 pl-10 pr-14 text-sm font-medium text-on-surface outline-none disabled:cursor-not-allowed"
-        />
-        <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-xs text-on-surface-variant">
-          {suffix}
-        </span>
-      </div>
-      {isPercentage && resolvedAmount > 0 ? (
-        <p className="text-xs font-medium text-on-surface-variant">
-          = {formatEgp(resolvedAmount)} {currencySuffix} off
-        </p>
-      ) : null}
-      {hint ? (
-        <p className="text-xs text-on-surface-variant/90">{hint}</p>
-      ) : null}
-    </div>
-  );
-}
-
 const SALE_TYPE_OPTIONS = [
   {
     value: "site" as const,
@@ -449,48 +306,7 @@ export function CreateSaleForm() {
   >("completed");
   const [deliveryStatus, setDeliveryStatus] = useState("pending");
   const [shippingFee, setShippingFee] = useState(0);
-  type DiscountApproval = {
-    amount: number;
-    inputType: DiscountInputType;
-    inputValue: number;
-    includesMaintenance: boolean;
-    requestId?: number;
-  };
-  type PendingDiscountSnapshot = {
-    amount: number;
-    inputType: DiscountInputType;
-    inputValue: number;
-    includesMaintenance: boolean;
-  };
-  const [discountApproval, setDiscountApproval] =
-    useState<DiscountApproval | null>(null);
-  const [discountDraft, setDiscountDraft] = useState(0);
-  const [discountDraftType, setDiscountDraftType] =
-    useState<DiscountInputType>("fixed");
-  const [discountIncludesMaintenance, setDiscountIncludesMaintenance] =
-    useState(false);
-  const [discountFieldError, setDiscountFieldError] = useState<string | null>(
-    null,
-  );
-  const [activeDiscountRequestId, setActiveDiscountRequestId] = useState<
-    number | null
-  >(null);
-  const [discountRequestStatus, setDiscountRequestStatus] =
-    useState<ApprovalRequestStatus | "none">("none");
-  const [discountRequestBusy, setDiscountRequestBusy] = useState(false);
-  const [discountRequestNotice, setDiscountRequestNotice] = useState<
-    string | null
-  >(null);
-  const [requestCartSignature, setRequestCartSignature] = useState<
-    string | null
-  >(null);
-  const [pendingDiscountSnapshot, setPendingDiscountSnapshot] =
-    useState<PendingDiscountSnapshot | null>(null);
-
-  const approvedDiscount = discountApproval?.amount ?? 0;
   const [isMaintenance, setIsMaintenance] = useState(false);
-
-  const isAdmin = getAuthUser()?.role === "admin";
 
   // Cart state
   const [cartItems, setCartItems] = useState<SaleLineItem[]>([]);
@@ -774,52 +590,27 @@ export function CreateSaleForm() {
     [cartItems],
   );
 
+  const presentCategories = useMemo(
+    () => getPresentSaleCategories(cartItems),
+    [cartItems],
+  );
+
   useEffect(() => {
     if (hasMaintenanceItems) {
       setIsMaintenance(true);
     }
   }, [hasMaintenanceItems]);
 
-  const discountBaseSubtotal = useMemo(() => {
-    if (!hasMaintenanceItems) return cartSubtotal;
-    return computeDiscountBaseSubtotal(cartItems, exchangeRate, exchangeRateEur, {
-      includeMaintenance: discountIncludesMaintenance,
-    });
-  }, [
-    cartItems,
-    cartSubtotal,
-    discountIncludesMaintenance,
-    exchangeRate,
-    exchangeRateEur,
-    hasMaintenanceItems,
-  ]);
-
-  const resolvedDiscountDraft = useMemo(
-    () =>
-      resolveDiscountAmount(discountDraftType, discountDraft, discountBaseSubtotal),
-    [discountDraftType, discountDraft, discountBaseSubtotal],
+  const computeSaleDiscountBase = useCallback(
+    (scope: DiscountScope) =>
+      computeDiscountBaseSubtotal(
+        cartItems,
+        exchangeRate,
+        exchangeRateEur,
+        scope,
+      ),
+    [cartItems, exchangeRate, exchangeRateEur],
   );
-
-  const saleTotal = useMemo(
-    () =>
-      Math.round((cartSubtotal + shippingFee - approvedDiscount) * 100) / 100,
-    [cartSubtotal, shippingFee, approvedDiscount],
-  );
-
-  const normalizeDiscountAmount = (value: number) =>
-    Math.round(Math.max(0, value) * 100) / 100;
-
-  const revertDiscountDraft = useCallback(() => {
-    if (discountApproval) {
-      setDiscountDraft(discountApproval.inputValue);
-      setDiscountDraftType(discountApproval.inputType);
-      setDiscountIncludesMaintenance(discountApproval.includesMaintenance);
-    } else {
-      setDiscountDraft(0);
-      setDiscountDraftType("fixed");
-      setDiscountIncludesMaintenance(false);
-    }
-  }, [discountApproval]);
 
   const getCartSignature = useCallback(
     () =>
@@ -835,34 +626,17 @@ export function CreateSaleForm() {
     [cartItems],
   );
 
-  const resetDiscountRequestState = useCallback(() => {
-    setActiveDiscountRequestId(null);
-    setDiscountRequestStatus("none");
-    setRequestCartSignature(null);
-    setPendingDiscountSnapshot(null);
-  }, []);
-
-  const draftMatchesPendingRequest = useCallback(() => {
-    if (!pendingDiscountSnapshot) return false;
-    const amount = normalizeDiscountAmount(resolvedDiscountDraft);
-    return (
-      pendingDiscountSnapshot.amount === amount &&
-      pendingDiscountSnapshot.inputType === discountDraftType &&
-      pendingDiscountSnapshot.inputValue === discountDraft &&
-      pendingDiscountSnapshot.includesMaintenance ===
-        (hasMaintenanceItems ? discountIncludesMaintenance : true)
-    );
-  }, [
-    discountDraft,
-    discountDraftType,
-    discountIncludesMaintenance,
-    hasMaintenanceItems,
-    pendingDiscountSnapshot,
-    resolvedDiscountDraft,
-  ]);
-
-  const buildDiscountRequestPayload = useCallback(
-    (amount: number) => {
+  const discount = useOverallDiscount({
+    presentCategories,
+    computeDiscountBase: computeSaleDiscountBase,
+    getItemsSignature: getCartSignature,
+    buildApprovalPayload: ({
+      amount,
+      discountDraft,
+      discountDraftType,
+      discountScope,
+      discountBaseSubtotal,
+    }) => {
       const customerName =
         customers.find((customer) => customer.id === customerId)?.name ?? null;
 
@@ -906,328 +680,71 @@ export function CreateSaleForm() {
             sale_type: saleType,
             shipping_fee: shippingFee,
             is_maintenance: isMaintenance,
-            discount_includes_maintenance: hasMaintenanceItems
-              ? discountIncludesMaintenance
-              : null,
+            discount_scope: scopeToPayload(discountScope, presentCategories),
             full_cart_subtotal: cartSubtotal,
           },
         },
       };
     },
-    [
-      cartItems,
-      cartSubtotal,
-      customerId,
-      customers,
-      discountBaseSubtotal,
-      discountDraft,
-      discountDraftType,
-      discountIncludesMaintenance,
-      exchangeRate,
-      exchangeRateEur,
-      hasMaintenanceItems,
-      isMaintenance,
-      saleType,
-      sellerId,
-      shippingFee,
-    ],
-  );
-
-  const cancelPendingDiscountRequest = useCallback(
-    async (notice?: string) => {
-      const token = getAuthToken();
-      if (activeDiscountRequestId && token) {
-        try {
-          await cancelApprovalRequest(token, activeDiscountRequestId);
-        } catch {
-          // Best-effort cancellation when the cart changes.
-        }
-      }
-
-      resetDiscountRequestState();
-      setDiscountApproval(null);
-      if (notice) {
-        setDiscountRequestNotice(notice);
-        setDiscountFieldError(null);
-      }
-    },
-    [activeDiscountRequestId, resetDiscountRequestState],
-  );
-
-  const applyApprovedDiscountFromRequest = useCallback(
-    (record: {
-      id: number;
-      approved_discount_amount: number | null;
-      approved_discount_input_type: DiscountInputType | null;
-      approved_discount_input_value: number | null;
-      discount_input_type: DiscountInputType;
-      discount_input_value: number;
-      payload?: {
-        sale_context?: {
-          discount_includes_maintenance?: boolean | null;
-        };
-      };
-    }) => {
-      const amount = record.approved_discount_amount ?? 0;
-      const inputType =
-        record.approved_discount_input_type ?? record.discount_input_type;
-      const inputValue =
-        record.approved_discount_input_value ?? record.discount_input_value;
-      const includesMaintenance =
-        record.payload?.sale_context?.discount_includes_maintenance ?? null;
-
-      setDiscountApproval({
-        amount,
-        inputType,
-        inputValue,
-        includesMaintenance:
-          includesMaintenance == null ? true : includesMaintenance,
-        requestId: record.id,
-      });
-      setDiscountDraft(inputValue);
-      setDiscountDraftType(inputType);
-      setDiscountIncludesMaintenance(
-        includesMaintenance == null ? false : includesMaintenance,
-      );
-      setActiveDiscountRequestId(record.id);
-      setDiscountRequestStatus("approved");
-      setDiscountFieldError(null);
-      setDiscountRequestNotice(null);
-    },
-    [],
-  );
-
-  const refreshDiscountRequest = useCallback(async () => {
-    if (!activeDiscountRequestId) return;
-
-    try {
-      setDiscountRequestBusy(true);
-      setDiscountFieldError(null);
-
-      const token = getAuthToken();
-      if (!token) throw new Error("Authentication required");
-
-      const record = await getApprovalRequest(token, activeDiscountRequestId);
-
-      if (record.status === "approved") {
-        applyApprovedDiscountFromRequest(record);
-        setDiscountRequestNotice("Admin approved this discount request.");
-        return;
-      }
-
-      if (record.status === "rejected") {
-        resetDiscountRequestState();
-        setDiscountApproval(null);
-        revertDiscountDraft();
-        setDiscountFieldError(
-          record.rejection_reason ||
-          "The discount request was rejected by an administrator.",
-        );
-        return;
-      }
-
-      if (record.status === "cancelled") {
-        resetDiscountRequestState();
-        setDiscountApproval(null);
-        revertDiscountDraft();
-        setDiscountRequestNotice(
-          "This discount request is no longer active.",
-        );
-        return;
-      }
-
-      setDiscountRequestStatus(record.status);
-    } catch (err) {
-      setDiscountFieldError(
-        err instanceof Error
-          ? err.message
-          : "Failed to refresh discount request status.",
-      );
-    } finally {
-      setDiscountRequestBusy(false);
-    }
-  }, [
-    activeDiscountRequestId,
-    applyApprovedDiscountFromRequest,
-    resetDiscountRequestState,
-    revertDiscountDraft,
-  ]);
-
-  const submitDiscountAction = useCallback(async () => {
-    const amount = normalizeDiscountAmount(resolvedDiscountDraft);
-    setDiscountFieldError(null);
-    setDiscountRequestNotice(null);
-
-    if (amount <= 0) {
-      if (!isAdmin && activeDiscountRequestId) {
-        await cancelPendingDiscountRequest();
-      }
-      setDiscountApproval(null);
-      resetDiscountRequestState();
-      return;
-    }
-
-    if (discountBaseSubtotal <= 0) {
-      setDiscountFieldError("Add items to the cart before applying a discount.");
-      revertDiscountDraft();
-      return;
-    }
-
-    if (amount > discountBaseSubtotal) {
-      setDiscountFieldError(
-        `Discount cannot exceed the discount base (${formatEgp(discountBaseSubtotal)} EGP).`,
-      );
-      revertDiscountDraft();
-      return;
-    }
-
-    if (isAdmin) {
-      if (discountApproval?.amount === amount) {
-        return;
-      }
-
-      setDiscountApproval({
-        amount,
-        inputType: discountDraftType,
-        inputValue: discountDraft,
-        includesMaintenance: hasMaintenanceItems
-          ? discountIncludesMaintenance
-          : true,
-      });
-      resetDiscountRequestState();
-      return;
-    }
-
-    if (
-      discountRequestStatus === "approved" &&
-      discountApproval?.amount === amount &&
-      activeDiscountRequestId
-    ) {
-      return;
-    }
-
-    if (
-      discountRequestStatus === "pending" &&
-      activeDiscountRequestId &&
-      draftMatchesPendingRequest()
-    ) {
-      setDiscountRequestNotice(
-        "Discount approval request is already pending. Use Refresh to check status.",
-      );
-      return;
-    }
-
-    try {
-      setDiscountRequestBusy(true);
-
-      const token = getAuthToken();
-      if (!token) throw new Error("Authentication required");
-
+    createApprovalRequest: async (token, payload) => {
       const record = await createSaleDiscountApprovalRequest(
         token,
-        buildDiscountRequestPayload(amount),
+        payload as Parameters<typeof createSaleDiscountApprovalRequest>[1],
       );
+      return { id: record.id };
+    },
+    resolveScopeFromRecord: (record) =>
+      resolveScopeFromApprovalContext(
+        record.payload.sale_context?.discount_scope,
+        record.payload.sale_context?.discount_includes_maintenance,
+        presentCategories,
+      ),
+    persistMode: "local",
+    itemsChangedNotice:
+      "Discount request cancelled because the cart changed.",
+    emptyItemsError: "Add items to the cart before applying a discount.",
+  });
 
-      setActiveDiscountRequestId(record.id);
-      setDiscountRequestStatus("pending");
-      setRequestCartSignature(getCartSignature());
-      setPendingDiscountSnapshot({
-        amount,
-        inputType: discountDraftType,
-        inputValue: discountDraft,
-        includesMaintenance: hasMaintenanceItems
-          ? discountIncludesMaintenance
-          : true,
-      });
-      setDiscountApproval(null);
-      setDiscountRequestNotice(
-        `Discount request sent to admin. ${hasMaintenanceItems && !discountIncludesMaintenance ? "Maintenance services excluded from discount base. " : ""}Use Refresh to check approval status.`,
-      );
-    } catch (err) {
-      setDiscountFieldError(
-        err instanceof Error
-          ? err.message
-          : "Failed to submit discount approval request.",
-      );
-      revertDiscountDraft();
-    } finally {
-      setDiscountRequestBusy(false);
-    }
-  }, [
-    activeDiscountRequestId,
-    buildDiscountRequestPayload,
-    cancelPendingDiscountRequest,
-    discountBaseSubtotal,
+  const {
+    isAdmin,
+    approvedDiscount,
     discountApproval,
+    activeDiscountRequestId,
+    discountRequestStatus,
+    discountBaseSubtotal,
+    resolvedDiscountDraft,
     discountDraft,
     discountDraftType,
-    discountIncludesMaintenance,
-    discountRequestStatus,
-    draftMatchesPendingRequest,
-    getCartSignature,
-    hasMaintenanceItems,
-    isAdmin,
-    resetDiscountRequestState,
-    resolvedDiscountDraft,
-    revertDiscountDraft,
-  ]);
+    discountScope,
+    submitDiscountAction,
+    setDiscountApproval,
+    normalizeDiscountAmount,
+  } = discount;
 
-  const tryCommitDiscountDraft = useCallback(() => {
-    void submitDiscountAction();
-  }, [submitDiscountAction]);
+  const saleTotal = useMemo(
+    () =>
+      Math.round((cartSubtotal + shippingFee - approvedDiscount) * 100) / 100,
+    [cartSubtotal, shippingFee, approvedDiscount],
+  );
 
-  const clearApprovedDiscount = () => {
-    setDiscountApproval(null);
-    setDiscountDraft(0);
-    setDiscountDraftType("fixed");
-    setDiscountIncludesMaintenance(false);
-    setDiscountFieldError(null);
-    setDiscountRequestNotice(null);
-    resetDiscountRequestState();
-  };
+  const hasPendingItemApprovals = useMemo(
+    () =>
+      cartItems.some(
+        (line) => line.discount_approval_request_pending === true,
+      ),
+    [cartItems],
+  );
 
-  useEffect(() => {
-    if (discountApproval && discountApproval.amount > discountBaseSubtotal) {
-      setDiscountApproval(null);
-      setDiscountDraft(0);
-      setDiscountDraftType("fixed");
-      setDiscountIncludesMaintenance(false);
-      resetDiscountRequestState();
-      setDiscountFieldError(
-        "Discount was cleared because the cart subtotal changed.",
-      );
-    }
-  }, [
-    discountBaseSubtotal,
-    discountApproval,
-    resetDiscountRequestState,
-  ]);
-
-  useEffect(() => {
-    if (
-      isAdmin ||
-      !activeDiscountRequestId ||
-      discountRequestStatus !== "pending" ||
-      !requestCartSignature
-    ) {
-      return;
-    }
-
-    const currentSignature = getCartSignature();
-    if (currentSignature !== requestCartSignature) {
-      void cancelPendingDiscountRequest(
-        "Discount request cancelled because the cart changed.",
-      );
-    }
-  }, [
-    activeDiscountRequestId,
-    cancelPendingDiscountRequest,
-    cartItems,
-    discountRequestStatus,
-    getCartSignature,
-    isAdmin,
-    requestCartSignature,
-  ]);
+  const saleItemDiscountContext = useMemo(
+    () => ({
+      customer_id: customerId,
+      customer_name:
+        customers.find((customer) => customer.id === customerId)?.name ?? null,
+      seller_id: sellerId,
+      sale_type: saleType,
+    }),
+    [customerId, customers, sellerId, saleType],
+  );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1241,6 +758,11 @@ export function CreateSaleForm() {
       if (!paymentMethodId) throw new Error("Please select a payment method");
       if (cartItems.length === 0)
         throw new Error("Please add at least one item");
+      if (hasPendingItemApprovals) {
+        throw new Error(
+          "Wait for admin approval of item discounts before finalizing.",
+        );
+      }
       if (shippingFee < 0) throw new Error("Shipping fee cannot be negative");
       const draftAmount = normalizeDiscountAmount(resolvedDiscountDraft);
       let saleDiscount = approvedDiscount;
@@ -1279,14 +801,11 @@ export function CreateSaleForm() {
             amount: draftAmount,
             inputType: discountDraftType,
             inputValue: discountDraft,
-            includesMaintenance: hasMaintenanceItems
-              ? discountIncludesMaintenance
-              : true,
+            scope: discountScope,
           });
         } else {
           saleDiscount = 0;
           setDiscountApproval(null);
-          resetDiscountRequestState();
         }
       }
 
@@ -1330,16 +849,28 @@ export function CreateSaleForm() {
             usdToEgp: exchangeRate,
             eurToEgp: exchangeRateEur,
           });
+          const qty = Number(item.quantity) || 1;
           const normalizedPrice =
             Math.round(Number(item.selling_price) * rate * 100) / 100;
-          const normalizedDiscount =
+          const normalizedLineDiscount =
             Math.round(Number(item.discount_amount) * rate * 100) / 100;
+          const normalizedDiscount =
+            Math.round((normalizedLineDiscount / qty) * 100) / 100;
 
           const lineItem: CreateSaleLineItemPayload = {
             selling_price: normalizedPrice,
             discount: normalizedDiscount,
-            qty: Number(item.quantity) || 1,
+            qty,
           };
+
+          if (
+            !isAdmin &&
+            item.discount_approval_request_id &&
+            normalizedDiscount > 0
+          ) {
+            lineItem.discount_approval_request_id =
+              item.discount_approval_request_id;
+          }
 
           // Map sellable_type to specific ID field
           if (item.sellable_type === "products") {
@@ -1581,6 +1112,8 @@ export function CreateSaleForm() {
               onDeleteItem={handleDeleteItem}
               shippingFee={shippingFee}
               saleDiscount={approvedDiscount}
+              isAdmin={isAdmin}
+              saleContext={saleItemDiscountContext}
               exchangeRate={exchangeRate}
               exchangeRateEur={exchangeRateEur}
             />
@@ -1828,220 +1361,19 @@ export function CreateSaleForm() {
                 ) : null}
               <FormSectionDivider title="Financial adjustments" />
 
-              <div
-                className="col-span-full"
-              >
-                <div className={`flex flex-col gap-3 grid grid-cols-2 gap-6 ${hasMaintenanceItems ? "md:grid-cols-2 lg:grid-cols-2" : "md:grid-cols-1 lg:grid-cols-1"}`}>
-                  <FormDiscountInput
-                    id="sale-discount"
-                    label="Overall discount (whole sale)"
-                    icon={TagIcon}
-                    prefix="-"
-                    value={discountDraft}
-                    discountType={discountDraftType}
-                    onChange={setDiscountDraft}
-                    onTypeChange={setDiscountDraftType}
-                    onBlur={tryCommitDiscountDraft}
-                    baseAmount={discountBaseSubtotal}
-                    maxFixedAmount={discountBaseSubtotal}
-                    disabled={
-                      cartItems.length === 0 ||
-                      discountRequestBusy ||
-                      (hasMaintenanceItems && discountBaseSubtotal <= 0)
-                    }
-                    hint={
-                      cartItems.length === 0
-                        ? "Add cart items before applying a discount."
-                        : hasMaintenanceItems && discountBaseSubtotal <= 0
-                          ? "Discount base is 0 because maintenance services are excluded."
-                        : isAdmin
-                          ? "Enter a fixed EGP amount or a percentage of the cart subtotal (after line discounts)."
-                          : "Enter a discount and request admin approval before finalizing the sale."
-                    }
-                  />
-                  {hasMaintenanceItems ? (
-                    <div className="rounded-2xl border border-outline-variant/20 bg-surface-container-lowest p-3">
-                      <p className="label-caps text-on-surface-variant">
-                        Overall discount scope
-                      </p>
-                      <div
-                        className="mt-2 grid grid-cols-2 gap-1.5"
-                        role="radiogroup"
-                        aria-label="Overall discount includes maintenance services"
-                      >
-                        <button
-                          type="button"
-                          role="radio"
-                          aria-checked={discountIncludesMaintenance}
-                          onClick={() => {
-                            const next = true;
-                            if (next === discountIncludesMaintenance) return;
-                            const currentResolved = resolveDiscountAmount(
-                              discountDraftType,
-                              discountDraft,
-                              discountBaseSubtotal,
-                            );
-                            const nextBase = cartSubtotal;
-                            const nextRaw =
-                              discountDraftType === "percentage"
-                                ? convertDiscountBetweenTypes(
-                                    "fixed",
-                                    "percentage",
-                                    currentResolved,
-                                    nextBase,
-                                  )
-                                : Math.min(discountDraft, nextBase);
-                            setDiscountDraft(
-                              clampRawDiscountValue(
-                                discountDraftType,
-                                nextRaw,
-                                nextBase,
-                                nextBase,
-                              ),
-                            );
-                            setDiscountIncludesMaintenance(next);
-                          }}
-                          className={`rounded-xl border px-2.5 py-2 text-xs font-semibold transition-all ${
-                            discountIncludesMaintenance
-                              ? "border-primary bg-primary/10 text-on-surface shadow-sm ring-1 ring-primary/20"
-                              : "border-outline-variant/30 bg-surface text-on-surface-variant hover:border-primary/30 hover:bg-primary/5"
-                          }`}
-                        >
-                          Include maintenance
-                        </button>
-                        <button
-                          type="button"
-                          role="radio"
-                          aria-checked={!discountIncludesMaintenance}
-                          onClick={() => {
-                            const next = false;
-                            if (next === discountIncludesMaintenance) return;
-                            const currentResolved = resolveDiscountAmount(
-                              discountDraftType,
-                              discountDraft,
-                              discountBaseSubtotal,
-                            );
-                            const nextBase = computeDiscountBaseSubtotal(
-                              cartItems,
-                              exchangeRate,
-                              exchangeRateEur,
-                              { includeMaintenance: false },
-                            );
-                            const nextRaw =
-                              discountDraftType === "percentage"
-                                ? convertDiscountBetweenTypes(
-                                    "fixed",
-                                    "percentage",
-                                    currentResolved,
-                                    nextBase,
-                                  )
-                                : Math.min(discountDraft, nextBase);
-                            setDiscountDraft(
-                              clampRawDiscountValue(
-                                discountDraftType,
-                                nextRaw,
-                                nextBase,
-                                nextBase,
-                              ),
-                            );
-                            setDiscountIncludesMaintenance(next);
-                          }}
-                          className={`rounded-xl border px-2.5 py-2 text-xs font-semibold transition-all ${
-                            !discountIncludesMaintenance
-                              ? "border-primary bg-primary/10 text-on-surface shadow-sm ring-1 ring-primary/20"
-                              : "border-outline-variant/30 bg-surface text-on-surface-variant hover:border-primary/30 hover:bg-primary/5"
-                          }`}
-                        >
-                          Exclude maintenance
-                        </button>
-                      </div>
-                      <p className="mt-2 text-xs text-on-surface-variant">
-                        Discount base: {formatEgp(discountBaseSubtotal)} EGP{" "}
-                        {discountIncludesMaintenance
-                          ? "(includes maintenance services)"
-                          : "(maintenance services excluded)"}
-                      </p>
-                    </div>
-                  ) : null}
-                  {cartItems.length > 0 ? (
-                    <div className="flex flex-wrap items-center gap-2">
-                      <ActionButton
-                        type="button"
-                        size="sm"
-                        tone="primary"
-                        variant="outline"
-                        onClick={tryCommitDiscountDraft}
-                        disabled={
-                          discountRequestBusy ||
-                          (isAdmin &&
-                            normalizeDiscountAmount(resolvedDiscountDraft) ===
-                            approvedDiscount)
-                        }
-                      >
-                        {isAdmin ? "Apply discount" : "Request approval"}
-                      </ActionButton>
-                      {!isAdmin && activeDiscountRequestId ? (
-                        <ActionButton
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          onClick={() => void refreshDiscountRequest()}
-                          disabled={discountRequestBusy}
-                        >
-                          <ArrowPathIcon className="h-4 w-4" aria-hidden />
-                          Refresh status
-                        </ActionButton>
-                      ) : null}
-                      {isAdmin && approvedDiscount > 0 ? (
-                        <>
-                          <span className="label-caps inline-flex items-center gap-1.5 rounded-full border border-success/25 bg-success/10 px-2.5 py-1 text-on-success-container">
-                            <CheckIcon className="h-3 w-3 shrink-0" aria-hidden />
-                            Applied · {formatEgp(approvedDiscount)} EGP
-                          </span>
-                          <button
-                            type="button"
-                            onClick={clearApprovedDiscount}
-                            className="label-capsr text-on-surface-variant underline-offset-2 hover:text-error hover:underline"
-                          >
-                            Remove
-                          </button>
-                        </>
-                      ) : null}
-                      {!isAdmin && discountRequestStatus === "pending" ? (
-                        <span className="label-caps inline-flex items-center gap-1.5 rounded-full border border-warning/25 bg-warning/10 px-2.5 py-1 text-on-warning-container">
-                          Pending admin approval
-                        </span>
-                      ) : null}
-                      {!isAdmin &&
-                        discountRequestStatus === "approved" &&
-                        approvedDiscount > 0 ? (
-                        <>
-                          <span className="label-caps inline-flex items-center gap-1.5 rounded-full border border-success/25 bg-success/10 px-2.5 py-1 text-on-success-container">
-                            <CheckIcon className="h-3 w-3 shrink-0" aria-hidden />
-                            Approved · {formatEgp(approvedDiscount)} EGP
-                          </span>
-                          <button
-                            type="button"
-                            onClick={clearApprovedDiscount}
-                            className="label-capsr text-on-surface-variant underline-offset-2 hover:text-error hover:underline"
-                          >
-                            Remove
-                          </button>
-                        </>
-                      ) : null}
-                    </div>
-                  ) : null}
-                  {discountRequestNotice ? (
-                    <p className="text-xs font-medium text-on-surface-variant">
-                      {discountRequestNotice}
-                    </p>
-                  ) : null}
-                  {discountFieldError ? (
-                    <p className="text-xs font-medium text-error">
-                      {discountFieldError}
-                    </p>
-                  ) : null}
-                </div>
+              <div className="col-span-full">
+                <OverallDiscountPanel
+                  id="sale-discount"
+                  label="Overall discount (whole sale)"
+                  context="sale"
+                  hasItems={cartItems.length > 0}
+                  presentCategories={presentCategories}
+                  computeDiscountBase={computeSaleDiscountBase}
+                  discount={discount}
+                  adminHint="Enter a fixed EGP amount or a percentage of the cart subtotal (after line discounts)."
+                  staffHint="Enter a discount and request admin approval before finalizing the sale."
+                  variant="embedded"
+                />
               </div>
 
               <div className="col-span-full rounded-2xl border border-outline-variant/20 bg-surface-container-lowest/90 p-4 md:p-5">

@@ -5,7 +5,9 @@ import { useRouter } from "next/navigation";
 import { usePermissions } from "@/components/permission-provider";
 import { getAuthToken } from "@/lib/auth-session";
 import { useEntityFilters } from "@/hooks/useEntityFilters";
+import { useExchangeRates } from "@/hooks/useExchangeRates";
 import { useLiveDataRefresh } from "@/hooks/useLiveDataRefresh";
+import { formatCatalogPriceInEGP } from "@/lib/currencies";
 import {
   listSpareParts,
   listSparePartCategories,
@@ -25,6 +27,7 @@ import {
   type FieldConfig,
 } from "@/components/entity-form-modal";
 import { AdvancedFilters } from "@/components/advanced-filters";
+import { StockBadge } from "@/components/inventory/stock-badge";
 import {
   ActionButton,
   EmptyState,
@@ -33,13 +36,13 @@ import {
   PageHero,
   PageShell,
   PaginationControls,
-  StatusBadge,
   TabsWrapper,
 } from "@/components/ops-ui";
 
 export default function SparePartsPage() {
   const router = useRouter();
   const permissions = usePermissions();
+  const { rates } = useExchangeRates();
   const canUpdateSpareParts = permissions.canUpdate("spare-parts");
   const [spareParts, setSpareParts] = useState<SparePartRecord[]>([]);
   const [categories, setCategories] = useState<SparePartCategoryRecord[]>([]);
@@ -203,29 +206,6 @@ export default function SparePartsPage() {
     }
   };
 
-  const getStockBadge = (part: SparePartRecord) => {
-    if (part.stock_quantity <= 0)
-      return (
-        <StatusBadge tone="danger" className="gap-1">
-          <span className="mono-data">0</span>
-          <span>Out</span>
-        </StatusBadge>
-      );
-    if (part.stock_quantity <= 5)
-      return (
-        <StatusBadge tone="warning" className="gap-1">
-          <span>Low</span>
-          <span className="mono-data">{part.stock_quantity}</span>
-        </StatusBadge>
-      );
-    return (
-      <StatusBadge tone="success" className="gap-1">
-        <span>In</span>
-        <span className="mono-data">{part.stock_quantity}</span>
-      </StatusBadge>
-    );
-  };
-
   const categoryModalFields: FieldConfig[] = [
     {
       name: "name",
@@ -372,10 +352,17 @@ export default function SparePartsPage() {
                     </div>
                   </td>
                   <td className="px-4 py-3 text-center">
-                    {getStockBadge(part)}
+                    <StockBadge
+                      stock_quantity={part.stock_quantity}
+                      low_stock_alarm={part.low_stock_alarm}
+                    />
                   </td>
                   <td className="mono-data px-4 py-3 text-primary">
-                    {part.sale_price} {part.currency_pricing}
+                    {formatCatalogPriceInEGP(
+                      part.sale_price,
+                      part.currency_pricing,
+                      rates,
+                    )}
                   </td>
                   <td className="px-4 py-3">
                     <span className="form-chip">

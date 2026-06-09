@@ -17,6 +17,12 @@ import {
   type DiscountInputType,
 } from "@/lib/discount-input";
 import {
+  formatScopeLabel,
+  resolveScopeFromApprovalContext,
+  type DiscountScopeCategory,
+  type DiscountScopeContext,
+} from "@/lib/discount-scope";
+import {
   ActionButton,
   ConfirmDialog,
   DataTableCard,
@@ -101,9 +107,109 @@ function discountIntensity(amount: number, subtotal: number) {
   return Math.min(100, Math.round((amount / subtotal) * 1000) / 10);
 }
 
+function isItemDiscountRequest(type: string) {
+  return type === "sale_item_discount" || type === "ticket_item_discount";
+}
+
 function requestTypeLabel(type: string) {
   if (type === "sale_discount") return "Sale discount";
+  if (type === "ticket_discount") return "Ticket discount";
+  if (type === "sale_item_discount") return "Sale item discount";
+  if (type === "ticket_item_discount") return "Ticket item discount";
   return type;
+}
+
+function formatItemContextMarginHints(
+  request: ApprovalRequestRecord,
+): string[] {
+  const ctx = request.payload.item_context;
+  if (!ctx) return [];
+
+  const hints: string[] = [];
+  const maxValue = Number(ctx.catalog_max_discount_value) || 0;
+
+  if (maxValue > 0) {
+    hints.push(
+      ctx.catalog_max_discount_type === "percentage"
+        ? `Catalog max discount: ${maxValue}%`
+        : `Catalog max discount: ${formatMoney(maxValue)} EGP`,
+    );
+  }
+
+  const costPrice = ctx.cost_price != null ? Number(ctx.cost_price) : 0;
+  const unitPrice = Number(ctx.unit_price) || 0;
+  if (costPrice > 0 && unitPrice > 0) {
+    const marginAmount = unitPrice - costPrice;
+    const marginPercent = (marginAmount / unitPrice) * 100;
+    hints.push(
+      `Profit margin: ${formatMoney(marginAmount)} EGP (${marginPercent.toFixed(1)}%)`,
+    );
+  }
+
+  return hints;
+}
+
+function requestCustomerName(request: ApprovalRequestRecord) {
+  return (
+    request.payload.ticket_context?.customer_name ??
+    request.payload.sale_context?.customer_name ??
+    "—"
+  );
+}
+
+function requestCurrencySuffix(_request: ApprovalRequestRecord) {
+  return "EGP";
+}
+
+function requestPresentCategories(
+  request: ApprovalRequestRecord,
+): DiscountScopeCategory[] {
+  const context: DiscountScopeContext =
+    request.type === "ticket_discount" ? "ticket" : "sale";
+  const present = new Set<DiscountScopeCategory>();
+
+  for (const item of request.payload.cart_items) {
+    const sellableType = item.sellable_type as DiscountScopeCategory;
+    if (
+      sellableType === "spare_parts" ||
+      sellableType === "products" ||
+      sellableType === "maintenance_services" ||
+      sellableType === "bikes"
+    ) {
+      present.add(sellableType);
+    }
+  }
+
+  const ordered =
+    context === "ticket"
+      ? (["spare_parts", "products", "maintenance_services"] as const)
+      : (["spare_parts", "products", "maintenance_services", "bikes"] as const);
+
+  return ordered.filter((category) => present.has(category));
+}
+
+function requestDiscountScopeLabel(request: ApprovalRequestRecord) {
+  if (isItemDiscountRequest(request.type)) {
+    return request.payload.item_context?.item_name ?? "Line item";
+  }
+
+  const presentCategories = requestPresentCategories(request);
+  const scope = resolveScopeFromApprovalContext(
+    request.payload.ticket_context?.discount_scope ??
+      request.payload.sale_context?.discount_scope,
+    request.payload.ticket_context?.discount_includes_maintenance ??
+      request.payload.sale_context?.discount_includes_maintenance,
+    presentCategories,
+  );
+  return formatScopeLabel(scope, presentCategories);
+}
+
+function requestFullCartSubtotal(request: ApprovalRequestRecord) {
+  return (
+    request.payload.ticket_context?.full_cart_subtotal ??
+    request.payload.sale_context?.full_cart_subtotal ??
+    null
+  );
 }
 
 function StatusChip({
@@ -223,7 +329,6 @@ export default function RequestsPage() {
 
       const [result, count] = await Promise.all([
         listApprovalRequests(token, {
-          type: "sale_discount",
           status: statusFilter || undefined,
           page: currentPage,
           per_page: 20,
@@ -524,8 +629,12 @@ export default function RequestsPage() {
                             </span>
                           </p>
                           <p className="mt-0.5 truncate text-sm text-on-surface-variant">
-                            Customer:{" "}
-                            {request.payload.sale_context.customer_name ?? "—"}
+                            Customer: {requestCustomerName(request)}
+                            {(request.type === "ticket_discount" ||
+                              request.type === "ticket_item_discount") &&
+                            request.payload.ticket_context?.ticket_id
+                              ? ` · Ticket #${request.payload.ticket_context.ticket_id}`
+                              : ""}
                           </p>
                         </div>
                         <StatusChip status={request.status} />
@@ -533,15 +642,19 @@ export default function RequestsPage() {
 
                       <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
                         <span className="text-on-surface-variant">
-                          Subtotal{" "}
+                          {isItemDiscountRequest(request.type)
+                            ? "Line subtotal"
+                            : "Subtotal"}{" "}
                           <strong className="mono-data text-on-surface">
-                            {formatMoney(request.cart_subtotal)} EGP
+                            {formatMoney(request.cart_subtotal)}{" "}
+                            {requestCurrencySuffix(request)}
                           </strong>
                         </span>
                         <span className="text-on-surface-variant">
                           Requested{" "}
                           <strong className="mono-data text-discount-emphasis">
-                            −{formatMoney(request.requested_discount_amount)} EGP
+                            −{formatMoney(request.requested_discount_amount)}{" "}
+                            {requestCurrencySuffix(request)}
                           </strong>
                         </span>
                       </div>
@@ -600,30 +713,44 @@ export default function RequestsPage() {
                   {selectedRequest.requester?.name ?? "—"}
                 </DetailStat>
                 <DetailStat label="Customer">
-                  {selectedRequest.payload.sale_context.customer_name ?? "—"}
+                  {requestCustomerName(selectedRequest)}
                 </DetailStat>
-                <DetailStat label="Discount scope">
-                  {selectedRequest.payload.sale_context
-                    .discount_includes_maintenance === false
-                    ? "Excludes maintenance services"
-                    : "Includes maintenance services"}
+                {selectedRequest.type === "ticket_discount" ||
+                selectedRequest.type === "ticket_item_discount" ? (
+                  <DetailStat label="Ticket">
+                    {selectedRequest.payload.ticket_context?.ticket_id
+                      ? `#${selectedRequest.payload.ticket_context.ticket_id}`
+                      : "—"}
+                  </DetailStat>
+                ) : null}
+                <DetailStat
+                  label={
+                    isItemDiscountRequest(selectedRequest.type)
+                      ? "Line item"
+                      : "Discount scope"
+                  }
+                >
+                  {requestDiscountScopeLabel(selectedRequest)}
                 </DetailStat>
                 <DetailStat
-                  label="Discount base subtotal"
+                  label={
+                    isItemDiscountRequest(selectedRequest.type)
+                      ? "Line subtotal"
+                      : "Discount base subtotal"
+                  }
                   hint={
-                    selectedRequest.payload.sale_context.full_cart_subtotal !=
-                      null &&
-                    selectedRequest.payload.sale_context.full_cart_subtotal !==
+                    requestFullCartSubtotal(selectedRequest) != null &&
+                    requestFullCartSubtotal(selectedRequest) !==
                       selectedRequest.cart_subtotal
                       ? `Full cart subtotal: ${formatMoney(
-                          selectedRequest.payload.sale_context
-                            .full_cart_subtotal,
-                        )} EGP`
+                          requestFullCartSubtotal(selectedRequest) ?? 0,
+                        )} ${requestCurrencySuffix(selectedRequest)}`
                       : undefined
                   }
                 >
                   <span className="mono-data">
-                    {formatMoney(selectedRequest.cart_subtotal)} EGP
+                    {formatMoney(selectedRequest.cart_subtotal)}{" "}
+                    {requestCurrencySuffix(selectedRequest)}
                   </span>
                 </DetailStat>
               </div>
@@ -636,7 +763,7 @@ export default function RequestsPage() {
                     </p>
                     <p className="mono-data mt-1 text-2xl font-bold text-discount-emphasis">
                       −{formatMoney(selectedRequest.requested_discount_amount)}{" "}
-                      EGP
+                      {requestCurrencySuffix(selectedRequest)}
                     </p>
                   </div>
                   <span className="mono-data text-sm font-semibold text-discount-emphasis">
@@ -660,9 +787,24 @@ export default function RequestsPage() {
                 </div>
               </div>
 
+              {formatItemContextMarginHints(selectedRequest).length > 0 ? (
+                <div className="rounded-2xl border border-outline-variant/20 bg-surface-container-low p-4">
+                  <p className="label-caps text-on-surface-variant">
+                    Item margin context
+                  </p>
+                  <ul className="mt-2 space-y-1 text-sm text-on-surface">
+                    {formatItemContextMarginHints(selectedRequest).map((hint) => (
+                      <li key={hint}>{hint}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+
               <div>
                 <p className="mb-3 label-caps text-on-surface-variant">
-                  Cart items
+                  {isItemDiscountRequest(selectedRequest.type)
+                    ? "Line item"
+                    : "Cart items"}
                 </p>
                 <div className="overflow-x-auto rounded-2xl border border-outline-variant/20">
                   <table className="min-w-full text-sm">
@@ -703,7 +845,7 @@ export default function RequestsPage() {
                             {formatMoney(item.discount_amount)} {item.currency}
                           </td>
                           <td className="mono-data px-4 py-3 text-right font-medium">
-                            {formatMoney(item.line_total)} EGP
+                            {formatMoney(item.line_total)} {item.currency}
                           </td>
                         </tr>
                       ))}
@@ -737,7 +879,9 @@ export default function RequestsPage() {
                                   : "text-on-surface-variant hover:bg-surface-container"
                               }`}
                             >
-                              {type === "fixed" ? "Fixed (EGP)" : "Percentage (%)"}
+                              {type === "fixed"
+                                ? `Fixed (${requestCurrencySuffix(selectedRequest)})`
+                                : "Percentage (%)"}
                             </button>
                           ),
                         )}
@@ -766,7 +910,8 @@ export default function RequestsPage() {
                       Resolved approval amount
                     </span>
                     <strong className="mono-data text-lg font-bold text-discount-emphasis">
-                      −{formatMoney(resolvedApproveAmount)} EGP
+                      −{formatMoney(resolvedApproveAmount)}{" "}
+                      {requestCurrencySuffix(selectedRequest)}
                     </strong>
                   </div>
 
@@ -817,7 +962,7 @@ export default function RequestsPage() {
                       </span>
                       <strong className="mono-data text-discount-emphasis">
                         −{formatMoney(selectedRequest.approved_discount_amount)}{" "}
-                        EGP
+                        {requestCurrencySuffix(selectedRequest)}
                       </strong>
                     </p>
                   ) : null}

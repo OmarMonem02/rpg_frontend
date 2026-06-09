@@ -33,7 +33,7 @@ export function PageHero({
 }) {
   return (
     <section className="animate-fade-in overflow-hidden rounded-[1.75rem] border border-outline-variant/15 bg-surface-container-low shadow-ambient">
-      <div className="grid gap-5 p-5 md:p-6 lg:grid-cols-[1.35fr_0.85fr] lg:items-end">
+      <div className="grid gap-1 p-5 md:p-4 lg:grid-cols-[1.35fr_0.85fr] lg:items-end">
         <div>
           {eyebrow ? (
             <div className="mb-4">

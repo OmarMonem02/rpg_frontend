@@ -24,8 +24,13 @@ import {
   type MaintenanceServiceSectorRecord,
   fetchAllPages,
 } from "@/lib/crud-api";
-import type { PricingCurrency } from "@/lib/currencies";
-import { SUPPORTED_PRICING_CURRENCIES } from "@/lib/currencies";
+import {
+  formatCatalogPriceInEGP,
+  SUPPORTED_PRICING_CURRENCIES,
+  toPricingCurrency,
+  type PricingCurrency,
+} from "@/lib/currencies";
+import { useExchangeRates } from "@/hooks/useExchangeRates";
 import { ActionButton, StatusBadge } from "@/components/ops-ui";
 import { BikeCompatibilityFilter } from "@/components/BikeCompatibilityFilter";
 import { useLiveDataRefresh } from "@/hooks/useLiveDataRefresh";
@@ -106,6 +111,7 @@ export function CatalogPickerModal({
   onAddItems,
   selectedIds = [],
 }: CatalogPickerModalProps) {
+  const { rates } = useExchangeRates();
   const [items, setItems] = useState<CatalogItem[]>([]);
   const [selectedItemIds, setSelectedItemIds] = useState<Set<number>>(
     new Set(),
@@ -456,6 +462,13 @@ export function CatalogPickerModal({
     if ("sale_price" in item) return item.sale_price;
     if ("service_price" in item) return item.service_price;
     return 0;
+  };
+
+  const getItemCurrency = (item: CatalogItem): PricingCurrency => {
+    if ("currency_pricing" in item) {
+      return toPricingCurrency(item.currency_pricing);
+    }
+    return toPricingCurrency(filters.currency || "EGP");
   };
 
   const getItemName = (item: CatalogItem): string => {
@@ -1160,10 +1173,13 @@ export function CatalogPickerModal({
                                   <span className="label-caps mr-1 text-on-surface-variant/60">
                                     Max disc.
                                   </span>{" "}
-                                  {item.max_discount_value}{" "}
                                   {item.max_discount_type === "percentage"
-                                    ? "%"
-                                    : item.currency_pricing}
+                                    ? `${item.max_discount_value}%`
+                                    : formatCatalogPriceInEGP(
+                                        item.max_discount_value,
+                                        toPricingCurrency(item.currency_pricing),
+                                        rates,
+                                      )}
                                 </span>
                               ) : null}
                             </div>
@@ -1174,12 +1190,11 @@ export function CatalogPickerModal({
                       <div className="shrink-0 flex flex-col items-end justify-center w-auto mt-0 pt-0 border-0">
                         <div className="bg-surface-container-highest/20 px-3 py-1.5 rounded-lg border border-outline-variant/10">
                           <p className="mono-data text-primary font-bold text-base">
-                            {getItemPrice(item).toLocaleString()}{" "}
-                            <span className="text-xs uppercase">
-                              {("currency_pricing" in item &&
-                                item.currency_pricing) ||
-                                filters.currency}
-                            </span>
+                            {formatCatalogPriceInEGP(
+                              getItemPrice(item),
+                              getItemCurrency(item),
+                              rates,
+                            )}
                           </p>
                         </div>
                       </div>

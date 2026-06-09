@@ -15,12 +15,19 @@ export type TrackingTimelineStep = {
 
 export type PublicTrackingItem = {
   id: number;
-  type: "part" | "service";
+  type: "part" | "service" | "product";
   label: string;
   qty: number;
   unit_price: number;
   discount: number;
   subtotal: number;
+  currency_pricing?: string;
+  catalog_unit_price?: number;
+};
+
+export type PublicExchangeRates = {
+  usd_to_egp: number;
+  eur_to_egp: number;
 };
 
 export type PublicTrackingTask = {
@@ -42,12 +49,14 @@ export type TrackingProgress = {
 };
 
 export type PublicTicketTracking = {
+  exchange_rates?: PublicExchangeRates;
   ticket: {
     id: number;
     ticket_number: string;
     status: string;
     status_label: string;
     total: number;
+    discount?: number;
     customer_notes: string | null;
     created_at: string | null;
     updated_at: string | null;

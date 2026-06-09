@@ -4,6 +4,7 @@ import { useEffect, useId, useSyncExternalStore, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { XMarkIcon, LockClosedIcon, BanknotesIcon, DocumentTextIcon } from "@heroicons/react/24/outline";
 import { ActionButton, InputGroup } from "@/components/ops-ui";
+import { formatEgp } from "@/lib/currencies";
 import { InvoiceTemplate } from "@/components/invoice-template";
 import type { SaleRecord } from "@/lib/crud-api";
 
@@ -196,7 +197,7 @@ export function PaymentCloseModal({
       <div className="mb-6 rounded-2xl border border-primary/10 bg-primary/5 p-5">
         <p className="text-sm font-medium text-on-surface-variant">Total amount due</p>
         <p className="mt-1 font-display text-4xl font-black tracking-tight text-primary">
-          ${total.toFixed(2)}
+          {formatEgp(total)}
         </p>
       </div>
 
@@ -214,7 +215,7 @@ export function PaymentCloseModal({
 
       {balanceDue > 0 ? (
         <p className="mb-4 text-sm text-warning">
-          ${balanceDue.toFixed(2)} remaining — full payment is required to close.
+          {formatEgp(balanceDue)} remaining — full payment is required to close.
         </p>
       ) : (
         <p className="mb-4 text-sm text-on-success-container">Payment covers the full ticket total.</p>
@@ -267,7 +268,7 @@ export function AdminPasswordReopenModal({
       isOpen={isOpen}
       onClose={onClose}
       title="Administrator confirmation"
-      description={`Ticket #${ticketId} was closed with full payment ($${amountPaid.toFixed(2)} of $${total.toFixed(2)}). Enter your admin password to reopen it.`}
+      description={`Ticket #${ticketId} was closed with full payment (${formatEgp(amountPaid)} of ${formatEgp(total)}). Enter your admin password to reopen it.`}
       icon={<LockClosedIcon className="h-6 w-6" aria-hidden />}
       size="md"
       footer={

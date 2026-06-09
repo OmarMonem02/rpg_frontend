@@ -26,12 +26,44 @@ export function toPricingCurrency(
   return isPricingCurrency(s) ? s : fallback;
 }
 
+export type ExchangeRates = {
+  usdToEgp: number;
+  eurToEgp: number;
+};
+
 /** EGP per 1 unit of foreign currency (same semantics as backend settings). */
 export function egpMultiplierForPricingCurrency(
   currency: PricingCurrency,
-  rates: { usdToEgp: number; eurToEgp: number },
+  rates: ExchangeRates,
 ): number {
   if (currency === "EGP") return 1;
   if (currency === "USD") return rates.usdToEgp > 0 ? rates.usdToEgp : 1;
   return rates.eurToEgp > 0 ? rates.eurToEgp : 1;
+}
+
+/** Converts a catalog amount to EGP using exchange rates (2 decimal places). */
+export function convertToEGP(
+  amount: number,
+  currency: PricingCurrency,
+  rates: ExchangeRates,
+): number {
+  const m = egpMultiplierForPricingCurrency(currency, rates);
+  return Math.round(amount * m * 100) / 100;
+}
+
+export function formatEgp(amount: number): string {
+  return new Intl.NumberFormat("en-EG", {
+    style: "currency",
+    currency: "EGP",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount);
+}
+
+export function formatCatalogPriceInEGP(
+  amount: number,
+  currency: PricingCurrency,
+  rates: ExchangeRates,
+): string {
+  return formatEgp(convertToEGP(amount, currency, rates));
 }
