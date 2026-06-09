@@ -45,7 +45,7 @@ function TagsCell({ tags }: { tags?: string[] }) {
     return <span className="text-xs text-on-surface-variant">—</span>;
   }
 
-  const visible = tags.slice(0, 2);
+  const visible = tags.slice(0, 1);
   const remaining = tags.length - visible.length;
 
   return (
@@ -376,41 +376,54 @@ export default function ProductsPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-outline-variant/15 bg-surface-container-low">
-                <th className="label-caps px-4 py-3 text-left">SKU</th>
-                <th className="label-caps px-4 py-3 text-left">Name</th>
-                <th className="label-caps px-4 py-3 text-center">Stock</th>
-                <th className="label-caps px-4 py-3 text-left">Price</th>
-                <th className="label-caps px-4 py-3 text-left">Category</th>
-                <th className="label-caps px-4 py-3 text-left">Brand</th>
-                <th className="label-caps px-4 py-3 text-left">Tags</th>
-                <th className="label-caps px-4 py-3 text-left">Is Universal</th>
-                <th className="label-caps px-4 py-3 text-right">Actions</th>
+                <th className="label-caps px-8 py-4 text-left">Image</th>
+                <th className="label-caps px-1 py-4 text-left">SKU <br />Part Number</th>
+                <th className="label-caps px-8 py-4 text-left">Name</th>
+                <th className="label-caps px-8 py-4 text-left">Stock</th>
+                <th className="label-caps px-8 py-4 text-left">Alarm on</th>
+                <th className="label-caps px-8 py-4 text-left">Cost Price</th>
+                <th className="label-caps px-8 py-4 text-left">Sale Price</th>
+                <th className="label-caps px-8 py-4 text-left">Category</th>
+                <th className="label-caps px-8 py-4 text-left">Brand</th>
+                <th className="label-caps px-8 py-4 text-left">Tags</th>
+                <th className="label-caps px-8 py-4 text-left">Is Universal</th>
+                <th className="label-caps px-8 py-4 text-center">Actions</th>
               </tr>
             </thead>
             <tbody>
               {products.map((product) => (
                 <tr key={product.id} className="data-row">
+                  <td className="mono-data px-8 py-3 text-xs text-on-surface-variant">
+                    {product.image ? (
+                      <img
+                        src={product.image}
+                        alt=""
+                        className="h-10 w-10 flex-none rounded-xl object-cover"
+                      />
+                    ) : null}{" "}
+                  </td>
                   <td className="mono-data px-4 py-3 text-xs text-on-surface-variant">
-                    {product.sku}
+                    {product.sku}<br />
+                    {product.part_number}
                   </td>
-                  <td className="px-4 py-3 text-on-surface">
-                    <div className="flex items-center gap-3">
-                      {product.image ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={product.image}
-                          alt=""
-                          className="h-10 w-10 flex-none rounded-xl object-cover"
-                        />
-                      ) : null}
-                      <span>{product.name}</span>
-                    </div>
-                  </td>
+                  <td className="mono-data px-4 py-3 text-xs text-on-surface-variant">
+                    {product.name}</td>
+                  
                   <td className="px-4 py-3 text-center">
                     <StockBadge
                       stock_quantity={product.stock_quantity}
                       low_stock_alarm={product.low_stock_alarm}
                     />
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                  {product.stock_quantity}
+                  </td>
+                  <td className="mono-data px-4 py-3 text-primary">
+                    {formatCatalogPriceInEGP(
+                      product.cost_price,
+                      product.currency_pricing,
+                      rates,
+                    )}
                   </td>
                   <td className="mono-data px-4 py-3 text-primary">
                     {formatCatalogPriceInEGP(
