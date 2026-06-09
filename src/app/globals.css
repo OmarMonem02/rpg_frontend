@@ -595,7 +595,6 @@
     display: flex;
     justify-content: flex-end;
     gap: 48px;
-    padding-top: 24px;
   }
 
   .invoice-template .totals-panel {
@@ -663,9 +662,17 @@
     color: var(--color-accent);
   }
 
+  .invoice-template .trow.paid .amt {
+    color: var(--color-success);
+  }
+
+  .invoice-template .trow.grand.balance-due {
+    border-left-color: #d97706;
+  }
+
   .invoice-template .trow.grand {
     margin-top: 12px;
-    padding: 18px 20px;
+    padding: 18px 18px;
     border-radius: 10px;
     border-left: 4px solid #e8380d;
     background: #1a2124;

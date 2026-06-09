@@ -127,6 +127,7 @@ export type SaleRecord = {
   shipping_fee: number;
   sale_discount: number;
   total: number;
+  amount_paid?: number;
   line_items?: SaleLineItemRecord[];
   created_at?: string;
   updated_at?: string;

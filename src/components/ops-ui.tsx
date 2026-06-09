@@ -4,7 +4,7 @@ import Link from "next/link";
 import { createPortal } from "react-dom";
 import { useEffect, useId, useState, useSyncExternalStore, type ReactNode } from "react";
 
-type Tone = "default" | "primary" | "success" | "warning" | "danger";
+type Tone = "default" | "primary" | "success" | "warning" | "danger" | "info";
 
 const toneClasses: Record<Tone, string> = {
   default: "border-outline-variant/15 bg-surface text-on-surface",
@@ -12,6 +12,7 @@ const toneClasses: Record<Tone, string> = {
   success: "border-success/20 bg-success/10 text-on-success-container",
   warning: "border-warning/20 bg-warning/10 text-on-warning-container",
   danger: "border-error/20 bg-error/10 text-error",
+  info: "border-info/20 bg-info-container text-on-info-container",
 };
 
 export function PageShell({ children, className = "" }: { children: ReactNode; className?: string }) {

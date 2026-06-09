@@ -1,7 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { TrashIcon } from "@heroicons/react/24/outline";
+import {
+  ArrowPathIcon,
+  ChevronDownIcon,
+  FunnelIcon,
+  TrashIcon,
+  XMarkIcon,
+} from "@heroicons/react/24/outline";
 import { usePermissions } from "@/components/permission-provider";
 import { useGlobalDataRefresh } from "@/hooks/useGlobalDataRefresh";
 import {
@@ -12,10 +18,25 @@ import {
   StatusBadge,
   EmptyState,
   InputGroup,
+  FilterBar,
+  SurfaceCard,
 } from "@/components/ops-ui";
 import { useExchangeRates } from "@/hooks/useExchangeRates";
 import { formatEgp } from "@/lib/currencies";
 import { computeTicketDisplayTotals } from "@/lib/ticket-display-pricing";
+import {
+  buildTicketFilterOptions,
+  filterTickets,
+  getTicketBikeBrand,
+  getTicketBikeModel,
+  getTicketBikeYear,
+  getTicketVin,
+  hasActiveTicketFilters,
+  TICKET_PAYMENT_METHODS,
+  TICKET_STATUSES,
+  TRACKING_LINK_FILTERS,
+  type TicketFilters,
+} from "@/lib/ticket-filters";
 import { ticketsApi, type Ticket } from "@/lib/tickets-api";
 import { CreateTicketModal } from "./CreateTicketModal";
 
@@ -44,7 +65,10 @@ const STATUS_SORT_ORDER: Record<string, number> = {
   completed: 2,
   cancelled: 3,
   closed: 4,
+  partial: 5,
 };
+
+const EMPTY_FILTERS: TicketFilters = {};
 
 function sortTickets(tickets: Ticket[], sort: TicketSort): Ticket[] {
   const sorted = [...tickets];
@@ -95,6 +119,18 @@ function sortTickets(tickets: Ticket[], sort: TicketSort): Ticket[] {
   return sorted;
 }
 
+function titleCase(value: string): string {
+  return value
+    .replace(/[-_]/g, " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function parseOptionalNumber(value: string): number | undefined {
+  if (!value.trim()) return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
 export default function TicketsPage() {
   const { rates } = useExchangeRates();
   const permissions = usePermissions();
@@ -105,11 +141,209 @@ export default function TicketsPage() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [sortBy, setSortBy] = useState<TicketSort>("newest");
+  const [showFilters, setShowFilters] = useState(false);
+  const [filters, setFilters] = useState<TicketFilters>(EMPTY_FILTERS);
+
+  const filterOptions = useMemo(
+    () => buildTicketFilterOptions(tickets),
+    [tickets],
+  );
+
+  const filteredTickets = useMemo(
+    () => filterTickets(tickets, filters, rates),
+    [tickets, filters, rates],
+  );
 
   const sortedTickets = useMemo(
-    () => sortTickets(tickets, sortBy),
-    [tickets, sortBy],
+    () => sortTickets(filteredTickets, sortBy),
+    [filteredTickets, sortBy],
   );
+
+  const updateFilter = useCallback(
+    <K extends keyof TicketFilters>(key: K, value: TicketFilters[K]) => {
+      setFilters((prev) => {
+        const next = { ...prev, [key]: value };
+        if (value === "" || value === undefined) {
+          delete next[key];
+        }
+        return next;
+      });
+    },
+    [],
+  );
+
+  const resetFilters = useCallback(() => {
+    setFilters(EMPTY_FILTERS);
+  }, []);
+
+  const activeFilters = useMemo(() => {
+    const chips: Array<{ key: string; label: string; onClear: () => void }> =
+      [];
+
+    if (filters.search) {
+      chips.push({
+        key: "search",
+        label: `Search: ${filters.search}`,
+        onClear: () => updateFilter("search", undefined),
+      });
+    }
+    if (filters.id) {
+      chips.push({
+        key: "id",
+        label: `Ticket #${filters.id}`,
+        onClear: () => updateFilter("id", undefined),
+      });
+    }
+    if (filters.status) {
+      chips.push({
+        key: "status",
+        label: `Status: ${titleCase(filters.status)}`,
+        onClear: () => updateFilter("status", undefined),
+      });
+    }
+    if (filters.customer_id) {
+      const customer = filterOptions.customers.find(
+        (entry) => entry.id === filters.customer_id,
+      );
+      chips.push({
+        key: "customer",
+        label: `Customer: ${customer?.name || `#${filters.customer_id}`}`,
+        onClear: () => updateFilter("customer_id", undefined),
+      });
+    }
+    if (filters.customer_bike_id) {
+      const bike = filterOptions.bikes.find(
+        (entry) => entry.id === filters.customer_bike_id,
+      );
+      chips.push({
+        key: "bike",
+        label: `Vehicle: ${bike?.label || `#${filters.customer_bike_id}`}`,
+        onClear: () => updateFilter("customer_bike_id", undefined),
+      });
+    }
+    if (filters.bike_brand) {
+      chips.push({
+        key: "brand",
+        label: `Brand: ${filters.bike_brand}`,
+        onClear: () => updateFilter("bike_brand", undefined),
+      });
+    }
+    if (filters.bike_model) {
+      chips.push({
+        key: "model",
+        label: `Model: ${filters.bike_model}`,
+        onClear: () => updateFilter("bike_model", undefined),
+      });
+    }
+    if (filters.vin) {
+      chips.push({
+        key: "vin",
+        label: `VIN: ${filters.vin}`,
+        onClear: () => updateFilter("vin", undefined),
+      });
+    }
+    if (filters.payment_method) {
+      const label =
+        TICKET_PAYMENT_METHODS.find(
+          (option) => option.value === filters.payment_method,
+        )?.label || titleCase(filters.payment_method);
+      chips.push({
+        key: "payment",
+        label: `Payment: ${label}`,
+        onClear: () => updateFilter("payment_method", undefined),
+      });
+    }
+    if (filters.tracking_link_sent) {
+      const label =
+        TRACKING_LINK_FILTERS.find(
+          (option) => option.value === filters.tracking_link_sent,
+        )?.label || filters.tracking_link_sent;
+      chips.push({
+        key: "tracking",
+        label: `Tracking: ${label}`,
+        onClear: () => updateFilter("tracking_link_sent", undefined),
+      });
+    }
+    if (filters.notes) {
+      chips.push({
+        key: "notes",
+        label: `Notes: ${filters.notes}`,
+        onClear: () => updateFilter("notes", undefined),
+      });
+    }
+    if (filters.opened_from) {
+      chips.push({
+        key: "opened_from",
+        label: `Opened from: ${filters.opened_from}`,
+        onClear: () => updateFilter("opened_from", undefined),
+      });
+    }
+    if (filters.opened_to) {
+      chips.push({
+        key: "opened_to",
+        label: `Opened to: ${filters.opened_to}`,
+        onClear: () => updateFilter("opened_to", undefined),
+      });
+    }
+    if (filters.closed_from) {
+      chips.push({
+        key: "closed_from",
+        label: `Closed from: ${filters.closed_from}`,
+        onClear: () => updateFilter("closed_from", undefined),
+      });
+    }
+    if (filters.closed_to) {
+      chips.push({
+        key: "closed_to",
+        label: `Closed to: ${filters.closed_to}`,
+        onClear: () => updateFilter("closed_to", undefined),
+      });
+    }
+    if (filters.total_min !== undefined) {
+      chips.push({
+        key: "total_min",
+        label: `Min total: ${formatEgp(filters.total_min)}`,
+        onClear: () => updateFilter("total_min", undefined),
+      });
+    }
+    if (filters.total_max !== undefined) {
+      chips.push({
+        key: "total_max",
+        label: `Max total: ${formatEgp(filters.total_max)}`,
+        onClear: () => updateFilter("total_max", undefined),
+      });
+    }
+    if (filters.discount_min !== undefined) {
+      chips.push({
+        key: "discount_min",
+        label: `Min discount: ${formatEgp(filters.discount_min)}`,
+        onClear: () => updateFilter("discount_min", undefined),
+      });
+    }
+    if (filters.discount_max !== undefined) {
+      chips.push({
+        key: "discount_max",
+        label: `Max discount: ${formatEgp(filters.discount_max)}`,
+        onClear: () => updateFilter("discount_max", undefined),
+      });
+    }
+    if (filters.amount_paid_min !== undefined) {
+      chips.push({
+        key: "paid_min",
+        label: `Min paid: ${formatEgp(filters.amount_paid_min)}`,
+        onClear: () => updateFilter("amount_paid_min", undefined),
+      });
+    }
+    if (filters.amount_paid_max !== undefined) {
+      chips.push({
+        key: "paid_max",
+        label: `Max paid: ${formatEgp(filters.amount_paid_max)}`,
+        onClear: () => updateFilter("amount_paid_max", undefined),
+      });
+    }
+
+    return chips;
+  }, [filterOptions.bikes, filterOptions.customers, filters, updateFilter]);
 
   const fetchTickets = useCallback(async () => {
     try {
@@ -197,107 +431,475 @@ export default function TicketsPage() {
           }
         />
       ) : (
-        <DataTableCard className="overflow-hidden border-outline-variant/10 shadow-xl">
-          <div className="border-b border-outline-variant/15 bg-surface-container-low px-6 py-4">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-              <div>
-                <p className="label-caps">Queue</p>
-                <h2 className="mt-1 text-xl font-bold text-on-surface">
-                  {sortedTickets.length} ticket{sortedTickets.length === 1 ? "" : "s"}
-                </h2>
-              </div>
-              <InputGroup label="Sort by" className="w-full sm:w-56">
-                <select
-                  value={sortBy}
-                  onChange={(event) =>
-                    setSortBy(event.target.value as TicketSort)
-                  }
-                  className="form-input-base"
-                  aria-label="Sort tickets"
-                >
-                  {TICKET_SORT_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </InputGroup>
-            </div>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm text-on-surface">
-              <thead className="border-b border-outline-variant/20 bg-surface-container-low text-on-surface-variant">
-                <tr>
-                  <th className="label-caps px-6 py-5">ID</th>
-                  <th className="label-caps px-6 py-5">Customer</th>
-                  <th className="label-caps px-6 py-5">Vehicle</th>
-                  <th className="label-caps px-6 py-5">Status</th>
-                  <th className="label-caps px-6 py-5">Total</th>
-                  <th className="label-caps px-6 py-5">Opened At</th>
-                  <th className="label-caps px-6 py-5 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-outline-variant/5 bg-surface">
-                {sortedTickets.map((ticket) => (
-                  <tr key={ticket.id} className="data-row group">
-                    <td className="mono-data px-6 py-5 font-bold text-primary">#{ticket.id}</td>
-                    <td className="px-6 py-5">
-                      <div className="font-semibold text-on-surface">{ticket.customer?.name || "Unknown"}</div>
-                      <div className="text-xs text-on-surface-variant">{ticket.customer?.phone}</div>
-                    </td>
-                    <td className="px-6 py-5">
-                      <div className="font-medium">
-                        {ticket.customer_bike?.bike_blueprint?.brand?.name ||
-                          ticket.customer_bike?.brand ||
-                          "Unknown"}{" "}
-                        {ticket.customer_bike?.bike_blueprint?.model ||
-                          ticket.customer_bike?.model ||
-                          ""}
-                      </div>
-                      <div className="mono-data text-xs text-on-surface-variant">
-                        VIN: {ticket.customer_bike?.vin || "N/A"}
-                      </div>
-                    </td>
-                    <td className="px-6 py-5">
-                      <StatusBadge tone={getStatusTone(ticket.status)}>
-                        {ticket.status.toUpperCase().replace("_", " ")}
-                      </StatusBadge>
-                    </td>
-                    <td className="mono-data px-6 py-5 font-black text-on-surface">
-                      {formatEgp(computeTicketDisplayTotals(ticket, rates).total)}
-                    </td>
-                    <td className="mono-data px-6 py-5 text-on-surface-variant">{new Date(ticket.created_at).toLocaleDateString()}</td>
-                    <td className="px-6 py-5 text-right">
-                      <div className="inline-flex items-center justify-end gap-2">
-                        <ActionButton
-                          href={`/tickets/${ticket.id}`}
-                          variant="outline"
-                          size="sm"
-                          className="group-hover:border-primary group-hover:bg-primary group-hover:text-on-primary transition-all"
-                        >
-                          View Details
-                        </ActionButton>
-                        {canDeleteTickets ? (
-                          <ActionButton
-                            variant="outline"
-                            tone="danger"
-                            size="sm"
-                            disabled={deletingId === ticket.id}
-                            className="group-hover:border-error group-hover:bg-error group-hover:text-on-primary transition-all"
-                            onClick={() => void handleDeleteTicket(ticket.id)}
-                            title="Delete ticket"
-                          >
-                            <TrashIcon className="h-4 w-4" />
-                          </ActionButton>
-                        ) : null}
-                      </div>
-                    </td>
-                  </tr>
+        <div className="space-y-4">
+          <FilterBar className="shadow-sm">
+            <InputGroup label="Search" className="md:col-span-4">
+              <input
+                type="text"
+                placeholder="Ticket #, customer, phone, vehicle, VIN, notes..."
+                value={filters.search || ""}
+                onChange={(event) => updateFilter("search", event.target.value)}
+                className="form-input-base"
+              />
+            </InputGroup>
+            <InputGroup label="Status" className="md:col-span-2">
+              <select
+                value={filters.status || ""}
+                onChange={(event) => updateFilter("status", event.target.value)}
+                className="form-input-base"
+                aria-label="Filter by status"
+              >
+                {TICKET_STATUSES.map((option) => (
+                  <option key={option.value || "all"} value={option.value}>
+                    {option.label}
+                  </option>
                 ))}
-              </tbody>
-            </table>
-          </div>
-        </DataTableCard>
+              </select>
+            </InputGroup>
+            <InputGroup label="Customer" className="md:col-span-3">
+              <select
+                value={filters.customer_id || ""}
+                onChange={(event) =>
+                  updateFilter(
+                    "customer_id",
+                    event.target.value ? Number(event.target.value) : undefined,
+                  )
+                }
+                className="form-input-base"
+                aria-label="Filter by customer"
+              >
+                <option value="">All customers</option>
+                {filterOptions.customers.map((customer) => (
+                  <option key={customer.id} value={customer.id}>
+                    {customer.name}
+                  </option>
+                ))}
+              </select>
+            </InputGroup>
+            <div className="flex items-end md:col-span-3">
+              <ActionButton
+                type="button"
+                variant="outline"
+                className="w-full"
+                onClick={() => setShowFilters((value) => !value)}
+              >
+                <FunnelIcon className="h-4 w-4" />
+                More filters
+                <ChevronDownIcon
+                  className={`h-4 w-4 transition-transform ${showFilters ? "rotate-180" : ""}`}
+                />
+              </ActionButton>
+            </div>
+          </FilterBar>
+
+          {activeFilters.length > 0 ? (
+            <SurfaceCard className="flex flex-col gap-3 p-3 md:flex-row md:items-center md:justify-between">
+              <div className="flex flex-wrap gap-2">
+                {activeFilters.map((filter) => (
+                  <button
+                    key={filter.key}
+                    type="button"
+                    onClick={filter.onClear}
+                    className="form-chip gap-2 rounded-full border border-primary/15 bg-primary/5 text-primary hover:bg-primary/10"
+                  >
+                    {filter.label}
+                    <XMarkIcon className="h-3.5 w-3.5" />
+                  </button>
+                ))}
+              </div>
+              <ActionButton
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={resetFilters}
+              >
+                <ArrowPathIcon className="h-4 w-4" />
+                Reset filters
+              </ActionButton>
+            </SurfaceCard>
+          ) : null}
+
+          {showFilters ? (
+            <SurfaceCard className="animate-app-shell-enter">
+              <div className="mb-4">
+                <p className="label-caps text-primary">Ticket attribute filters</p>
+                <p className="mt-1 text-sm text-on-surface-variant">
+                  Narrow the queue by ID, vehicle, payment, dates, totals, and tracking.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+                <InputGroup label="Ticket ID">
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="Exact ticket #"
+                    value={filters.id || ""}
+                    onChange={(event) => updateFilter("id", event.target.value)}
+                    className="form-input-base mono-data"
+                  />
+                </InputGroup>
+                <InputGroup label="Vehicle">
+                  <select
+                    value={filters.customer_bike_id || ""}
+                    onChange={(event) =>
+                      updateFilter(
+                        "customer_bike_id",
+                        event.target.value
+                          ? Number(event.target.value)
+                          : undefined,
+                      )
+                    }
+                    className="form-input-base"
+                  >
+                    <option value="">All vehicles</option>
+                    {filterOptions.bikes.map((bike) => (
+                      <option key={bike.id} value={bike.id}>
+                        {bike.label}
+                      </option>
+                    ))}
+                  </select>
+                </InputGroup>
+                <InputGroup label="Bike brand">
+                  <select
+                    value={filters.bike_brand || ""}
+                    onChange={(event) =>
+                      updateFilter("bike_brand", event.target.value)
+                    }
+                    className="form-input-base"
+                  >
+                    <option value="">All brands</option>
+                    {filterOptions.brands.map((brand) => (
+                      <option key={brand} value={brand}>
+                        {brand}
+                      </option>
+                    ))}
+                  </select>
+                </InputGroup>
+                <InputGroup label="Bike model">
+                  <select
+                    value={filters.bike_model || ""}
+                    onChange={(event) =>
+                      updateFilter("bike_model", event.target.value)
+                    }
+                    className="form-input-base"
+                  >
+                    <option value="">All models</option>
+                    {filterOptions.models.map((model) => (
+                      <option key={model} value={model}>
+                        {model}
+                      </option>
+                    ))}
+                  </select>
+                </InputGroup>
+                <InputGroup label="VIN contains">
+                  <input
+                    type="text"
+                    placeholder="Partial VIN match"
+                    value={filters.vin || ""}
+                    onChange={(event) => updateFilter("vin", event.target.value)}
+                    className="form-input-base mono-data"
+                  />
+                </InputGroup>
+                <InputGroup label="Payment method">
+                  <select
+                    value={filters.payment_method || ""}
+                    onChange={(event) =>
+                      updateFilter("payment_method", event.target.value)
+                    }
+                    className="form-input-base"
+                  >
+                    {TICKET_PAYMENT_METHODS.map((option) => (
+                      <option key={option.value || "all"} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </InputGroup>
+                <InputGroup label="Tracking link">
+                  <select
+                    value={filters.tracking_link_sent || ""}
+                    onChange={(event) =>
+                      updateFilter(
+                        "tracking_link_sent",
+                        event.target.value as TicketFilters["tracking_link_sent"],
+                      )
+                    }
+                    className="form-input-base"
+                  >
+                    {TRACKING_LINK_FILTERS.map((option) => (
+                      <option key={option.value || "all"} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </InputGroup>
+                <InputGroup label="Notes contain">
+                  <input
+                    type="text"
+                    placeholder="Text in ticket notes"
+                    value={filters.notes || ""}
+                    onChange={(event) => updateFilter("notes", event.target.value)}
+                    className="form-input-base"
+                  />
+                </InputGroup>
+                <InputGroup label="Opened from">
+                  <input
+                    type="date"
+                    value={filters.opened_from || ""}
+                    onChange={(event) =>
+                      updateFilter("opened_from", event.target.value)
+                    }
+                    className="form-input-base"
+                  />
+                </InputGroup>
+                <InputGroup label="Opened to">
+                  <input
+                    type="date"
+                    value={filters.opened_to || ""}
+                    onChange={(event) =>
+                      updateFilter("opened_to", event.target.value)
+                    }
+                    className="form-input-base"
+                  />
+                </InputGroup>
+                <InputGroup label="Closed from">
+                  <input
+                    type="date"
+                    value={filters.closed_from || ""}
+                    onChange={(event) =>
+                      updateFilter("closed_from", event.target.value)
+                    }
+                    className="form-input-base"
+                  />
+                </InputGroup>
+                <InputGroup label="Closed to">
+                  <input
+                    type="date"
+                    value={filters.closed_to || ""}
+                    onChange={(event) =>
+                      updateFilter("closed_to", event.target.value)
+                    }
+                    className="form-input-base"
+                  />
+                </InputGroup>
+                <InputGroup label="Min total (EGP)">
+                  <input
+                    type="number"
+                    min={0}
+                    placeholder="0"
+                    value={filters.total_min ?? ""}
+                    onChange={(event) =>
+                      updateFilter(
+                        "total_min",
+                        parseOptionalNumber(event.target.value),
+                      )
+                    }
+                    className="form-input-base mono-data"
+                  />
+                </InputGroup>
+                <InputGroup label="Max total (EGP)">
+                  <input
+                    type="number"
+                    min={0}
+                    placeholder="No limit"
+                    value={filters.total_max ?? ""}
+                    onChange={(event) =>
+                      updateFilter(
+                        "total_max",
+                        parseOptionalNumber(event.target.value),
+                      )
+                    }
+                    className="form-input-base mono-data"
+                  />
+                </InputGroup>
+                <InputGroup label="Min discount (EGP)">
+                  <input
+                    type="number"
+                    min={0}
+                    placeholder="0"
+                    value={filters.discount_min ?? ""}
+                    onChange={(event) =>
+                      updateFilter(
+                        "discount_min",
+                        parseOptionalNumber(event.target.value),
+                      )
+                    }
+                    className="form-input-base mono-data"
+                  />
+                </InputGroup>
+                <InputGroup label="Max discount (EGP)">
+                  <input
+                    type="number"
+                    min={0}
+                    placeholder="No limit"
+                    value={filters.discount_max ?? ""}
+                    onChange={(event) =>
+                      updateFilter(
+                        "discount_max",
+                        parseOptionalNumber(event.target.value),
+                      )
+                    }
+                    className="form-input-base mono-data"
+                  />
+                </InputGroup>
+                <InputGroup label="Min amount paid (EGP)">
+                  <input
+                    type="number"
+                    min={0}
+                    placeholder="0"
+                    value={filters.amount_paid_min ?? ""}
+                    onChange={(event) =>
+                      updateFilter(
+                        "amount_paid_min",
+                        parseOptionalNumber(event.target.value),
+                      )
+                    }
+                    className="form-input-base mono-data"
+                  />
+                </InputGroup>
+                <InputGroup label="Max amount paid (EGP)">
+                  <input
+                    type="number"
+                    min={0}
+                    placeholder="No limit"
+                    value={filters.amount_paid_max ?? ""}
+                    onChange={(event) =>
+                      updateFilter(
+                        "amount_paid_max",
+                        parseOptionalNumber(event.target.value),
+                      )
+                    }
+                    className="form-input-base mono-data"
+                  />
+                </InputGroup>
+              </div>
+            </SurfaceCard>
+          ) : null}
+
+          <DataTableCard className="overflow-hidden border-outline-variant/10 shadow-xl">
+            <div className="border-b border-outline-variant/15 bg-surface-container-low px-6 py-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <p className="label-caps">Queue</p>
+                  <h2 className="mt-1 text-xl font-bold text-on-surface">
+                    {sortedTickets.length} ticket{sortedTickets.length === 1 ? "" : "s"}
+                    {hasActiveTicketFilters(filters) ? (
+                      <span className="ml-2 text-sm font-medium text-on-surface-variant">
+                        of {tickets.length}
+                      </span>
+                    ) : null}
+                  </h2>
+                </div>
+                <InputGroup label="Sort by" className="w-full sm:w-56">
+                  <select
+                    value={sortBy}
+                    onChange={(event) =>
+                      setSortBy(event.target.value as TicketSort)
+                    }
+                    className="form-input-base"
+                    aria-label="Sort tickets"
+                  >
+                    {TICKET_SORT_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </InputGroup>
+              </div>
+            </div>
+            {sortedTickets.length === 0 ? (
+              <div className="px-6 py-16 text-center">
+                <p className="text-lg font-semibold text-on-surface">
+                  No tickets match your filters
+                </p>
+                <p className="mt-2 text-sm text-on-surface-variant">
+                  Try adjusting or clearing filters to see more results.
+                </p>
+                <ActionButton
+                  type="button"
+                  variant="outline"
+                  className="mt-6"
+                  onClick={resetFilters}
+                >
+                  Clear all filters
+                </ActionButton>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm text-on-surface">
+                  <thead className="border-b border-outline-variant/20 bg-surface-container-low text-on-surface-variant">
+                    <tr>
+                      <th className="label-caps px-6 py-5">ID</th>
+                      <th className="label-caps px-6 py-5">Customer</th>
+                      <th className="label-caps px-6 py-5">Vehicle</th>
+                      <th className="label-caps px-6 py-5">Status</th>
+                      <th className="label-caps px-6 py-5">Total</th>
+                      <th className="label-caps px-6 py-5">Opened At</th>
+                      <th className="label-caps px-6 py-5 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-outline-variant/5 bg-surface">
+                    {sortedTickets.map((ticket) => (
+                      <tr key={ticket.id} className="data-row group">
+                        <td className="mono-data px-6 py-5 font-bold text-primary">#{ticket.id}</td>
+                        <td className="px-6 py-5">
+                          <div className="font-semibold text-on-surface">{ticket.customer?.name || "Unknown"}</div>
+                          <div className="text-xs text-on-surface-variant">{ticket.customer?.phone}</div>
+                        </td>
+                        <td className="px-6 py-5">
+                          <div className="font-medium">
+                            {getTicketBikeBrand(ticket) || "Unknown"}{" "}
+                            {getTicketBikeModel(ticket)}{" "}
+                            {getTicketBikeYear(ticket) ? `(${getTicketBikeYear(ticket)})` : ""}
+                          </div>
+                          <div className="mono-data text-xs text-on-surface-variant">
+                            VIN: {getTicketVin(ticket) || "N/A"}
+                          </div>
+                        </td>
+                        <td className="px-6 py-5">
+                          <StatusBadge tone={getStatusTone(ticket.status)}>
+                            {ticket.status.toUpperCase().replace("_", " ")}
+                          </StatusBadge>
+                        </td>
+                        <td className="mono-data px-6 py-5 font-black text-on-surface">
+                          {formatEgp(computeTicketDisplayTotals(ticket, rates).total)}
+                        </td>
+                        <td className="mono-data px-6 py-5 text-on-surface-variant">{new Date(ticket.created_at).toLocaleDateString()}</td>
+                        <td className="px-6 py-5 text-right">
+                          <div className="inline-flex items-center justify-end gap-2">
+                            <ActionButton
+                              href={`/tickets/${ticket.id}`}
+                              variant="outline"
+                              size="sm"
+                              className="group-hover:border-primary group-hover:bg-primary group-hover:text-on-primary transition-all"
+                            >
+                              View Details
+                            </ActionButton>
+                            {canDeleteTickets ? (
+                              <ActionButton
+                                variant="outline"
+                                tone="danger"
+                                size="sm"
+                                disabled={deletingId === ticket.id}
+                                className="group-hover:border-error group-hover:bg-error group-hover:text-on-primary transition-all"
+                                onClick={() => void handleDeleteTicket(ticket.id)}
+                                title="Delete ticket"
+                              >
+                                <TrashIcon className="h-4 w-4" />
+                              </ActionButton>
+                            ) : null}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </DataTableCard>
+        </div>
       )}
 
       {isCreateOpen && (

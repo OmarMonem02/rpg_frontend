@@ -6,6 +6,7 @@ import { createCustomerBike } from "@/lib/api/customers";
 import { listBikeBlueprints, type BikeBlueprintRecord } from "@/lib/api/bikes";
 import { ActionButton, InputGroup } from "@/components/ops-ui";
 import { ImageUpload } from "@/components/ui/ImageUpload";
+import { ModalShell } from "@/components/tickets/ticket-workflow-modals";
 
 export function LinkCustomerBikeModal({
   customerId,
@@ -20,7 +21,11 @@ export function LinkCustomerBikeModal({
 }) {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [blueprintSearchQuery, setBlueprintSearchQuery] = useState("");
+  const [blueprintSearch, setBlueprintSearch] = useState({
+    brand: "",
+    model: "",
+    year: "",
+  });
   const [blueprints, setBlueprints] = useState<BikeBlueprintRecord[]>([]);
   const [selectedBlueprint, setSelectedBlueprint] =
     useState<BikeBlueprintRecord | null>(null);
@@ -33,16 +38,34 @@ export function LinkCustomerBikeModal({
   });
 
   const searchBlueprints = async () => {
-    if (!blueprintSearchQuery.trim()) return;
+    const brand = blueprintSearch.brand.trim();
+    const model = blueprintSearch.model.trim();
+    const yearText = blueprintSearch.year.trim();
+    if (!brand && !model && !yearText) return;
+
+    const parsedYear = yearText ? Number(yearText) : undefined;
+    if (
+      yearText &&
+      (parsedYear === undefined ||
+        !Number.isInteger(parsedYear) ||
+        parsedYear < 1900)
+    ) {
+      setError("Enter a valid year (e.g. 2024).");
+      return;
+    }
+
     try {
       setLoading(true);
       setError("");
       const token = getAuthToken();
       if (!token) throw new Error("Authentication required");
       const res = await listBikeBlueprints(token, 1, {
-        search: blueprintSearchQuery.trim(),
+        brand: brand || undefined,
+        model: model || undefined,
+        year: parsedYear,
       });
       setBlueprints(res.items);
+      setSelectedBlueprint(null);
       if (res.items.length === 0) setError("No bike models found.");
     } catch (err: unknown) {
       setError(
@@ -78,139 +101,176 @@ export function LinkCustomerBikeModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 backdrop-blur-md">
-      <div className="flex max-h-[90vh] w-full max-w-xl flex-col overflow-hidden rounded-[2rem] border border-outline-variant/20 bg-surface p-8 shadow-2xl">
-        <div className="mb-6 flex items-start justify-between gap-4">
-          <div>
-            <h2 className="text-2xl font-bold text-on-surface">Link a bike</h2>
-            <p className="mt-1 text-sm text-on-surface-variant">
-              Register another vehicle for {customerName}. Customers can have
-              multiple bikes.
-            </p>
-          </div>
-          <button
+    <ModalShell
+      isOpen
+      onClose={onClose}
+      title="Link a bike"
+      description={`Register another vehicle for ${customerName}. Customers can have multiple bikes.`}
+      size="full"
+      align="top"
+      footer={
+        <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+          <ActionButton
             type="button"
+            variant="ghost"
+            className="w-full sm:w-auto"
             onClick={onClose}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest"
-            aria-label="Close"
           >
-            &times;
-          </button>
-        </div>
-
-        {error ? (
-          <div className="mb-4 rounded-2xl border border-error/20 bg-error/10 p-4 text-sm text-error">
-            {error}
-          </div>
-        ) : null}
-
-        <div className="flex flex-1 flex-col gap-5 overflow-y-auto pr-1">
-          <InputGroup label="Find model (blueprint)">
-            <div className="flex gap-2">
-              <input
-                type="text"
-                className="flex-1 rounded-xl border border-outline-variant/30 bg-surface-container-lowest px-4 py-2 text-on-surface outline-none focus:border-primary focus:ring-2 focus:ring-primary/30"
-                placeholder="Search brand or model…"
-                value={blueprintSearchQuery}
-                onChange={(e) => setBlueprintSearchQuery(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && void searchBlueprints()}
-              />
-              <ActionButton
-                type="button"
-                onClick={() => void searchBlueprints()}
-                disabled={loading}
-              >
-                Find
-              </ActionButton>
-            </div>
-            {blueprints.length > 0 ? (
-              <div className="mt-2 max-h-40 overflow-y-auto rounded-xl border border-outline-variant/10 bg-surface-container-lowest">
-                {blueprints.map((bp) => (
-                  <button
-                    key={bp.id}
-                    type="button"
-                    className={`block w-full px-4 py-3 text-left text-sm transition-colors hover:bg-primary/5 ${
-                      selectedBlueprint?.id === bp.id
-                        ? "bg-primary/10 font-semibold text-primary"
-                        : "text-on-surface"
-                    }`}
-                    onClick={() => setSelectedBlueprint(bp)}
-                  >
-                    {bp.model} ({bp.year})
-                  </button>
-                ))}
-              </div>
-            ) : null}
-          </InputGroup>
-
-          <div className="grid grid-cols-2 gap-4">
-            <InputGroup label="VIN (optional)">
-              <input
-                type="text"
-                className="w-full rounded-xl border border-outline-variant/30 bg-surface px-4 py-2 outline-none focus:border-primary"
-                value={details.vin}
-                onChange={(e) =>
-                  setDetails((d) => ({ ...d, vin: e.target.value }))
-                }
-              />
-            </InputGroup>
-            <InputGroup label="Mileage (km)">
-              <input
-                type="number"
-                min={0}
-                onWheel={(event) => {
-                  event.preventDefault();
-                  event.currentTarget.blur();
-                }}
-                className="w-full rounded-xl border border-outline-variant/30 bg-surface px-4 py-2 outline-none focus:border-primary [&::-webkit-inner-spin-button]:appearance-none"
-                value={details.mileage}
-                onChange={(e) =>
-                  setDetails((d) => ({ ...d, mileage: e.target.value }))
-                }
-              />
-            </InputGroup>
-          </div>
-
-          <ImageUpload
-            value={details.image || undefined}
-            folder="Customer Bike Photo"
-            uploadFolder="rpg-system/Customer-Bike"
-            onChange={(url, publicId) =>
-              setDetails((d) => ({
-                ...d,
-                image: url,
-                image_public_id: publicId,
-              }))
-            }
-            onError={setError}
-          />
-
-          <InputGroup label="Notes (optional)">
-            <textarea
-              rows={2}
-              className="w-full resize-y rounded-xl border border-outline-variant/30 bg-surface px-4 py-2 outline-none focus:border-primary"
-              value={details.notes}
-              onChange={(e) =>
-                setDetails((d) => ({ ...d, notes: e.target.value }))
-              }
-            />
-          </InputGroup>
-        </div>
-
-        <div className="mt-6 flex justify-end gap-2 border-t border-outline-variant/10 pt-6">
-          <ActionButton type="button" variant="ghost" onClick={onClose}>
             Cancel
           </ActionButton>
           <ActionButton
             type="button"
             tone="primary"
+            className="w-full sm:w-auto"
             onClick={() => void handleSubmit()}
             disabled={loading || !selectedBlueprint}
           >
             {loading ? "Saving…" : "Link bike"}
           </ActionButton>
         </div>
+      }
+    >
+      <div className="flex flex-col gap-5">
+        {error ? (
+          <div className="rounded-2xl border border-error/20 bg-error/10 p-4 text-sm text-error">
+            {error}
+          </div>
+        ) : null}
+
+        <InputGroup label="Find model (blueprint)">
+          <p className="mb-3 text-xs text-on-surface-variant">
+            Search by brand, model, or year — use one field or combine them.
+          </p>
+          <div className="flex grid-cols-1 gap-3 sm:grid-cols-4">
+            <input
+              type="text"
+              className="w-full rounded-xl border border-outline-variant/30 bg-surface-container-lowest px-4 py-2 text-on-surface outline-none focus:border-primary focus:ring-2 focus:ring-primary/30"
+              placeholder="Brand"
+              value={blueprintSearch.brand}
+              onChange={(e) =>
+                setBlueprintSearch((current) => ({
+                  ...current,
+                  brand: e.target.value,
+                }))
+              }
+              onKeyDown={(e) => e.key === "Enter" && void searchBlueprints()}
+            />
+            <input
+              type="text"
+              className="w-full rounded-xl border border-outline-variant/30 bg-surface-container-lowest px-4 py-2 text-on-surface outline-none focus:border-primary focus:ring-2 focus:ring-primary/30"
+              placeholder="Model"
+              value={blueprintSearch.model}
+              onChange={(e) =>
+                setBlueprintSearch((current) => ({
+                  ...current,
+                  model: e.target.value,
+                }))
+              }
+              onKeyDown={(e) => e.key === "Enter" && void searchBlueprints()}
+            />
+            <input
+              type="number"
+              min={1900}
+              className="w-full rounded-xl border border-outline-variant/30 bg-surface-container-lowest px-4 py-2 text-on-surface outline-none focus:border-primary focus:ring-2 focus:ring-primary/30 [&::-webkit-inner-spin-button]:appearance-none"
+              placeholder="Year"
+              value={blueprintSearch.year}
+              onChange={(e) =>
+                setBlueprintSearch((current) => ({
+                  ...current,
+                  year: e.target.value,
+                }))
+              }
+              onKeyDown={(e) => e.key === "Enter" && void searchBlueprints()}
+            />
+          <div className="mt-3 flex justify-end">
+            <ActionButton
+              type="button"
+              onClick={() => void searchBlueprints()}
+              disabled={
+                loading ||
+                (!blueprintSearch.brand.trim() &&
+                  !blueprintSearch.model.trim() &&
+                  !blueprintSearch.year.trim())
+              }
+            >
+              Find
+            </ActionButton>
+          </div>
+          </div>
+          {blueprints.length > 0 ? (
+            <div className="mt-2 max-h-40 overflow-y-auto rounded-xl border border-outline-variant/10 bg-surface-container-lowest">
+              {blueprints.map((bp) => (
+                <button
+                  key={bp.id}
+                  type="button"
+                  className={`block w-full px-4 py-3 text-left text-sm transition-colors hover:bg-primary/5 ${
+                    selectedBlueprint?.id === bp.id
+                      ? "bg-primary/10 font-semibold text-primary"
+                      : "text-on-surface"
+                  }`}
+                  onClick={() => setSelectedBlueprint(bp)}
+                >
+                  {bp.brand?.name ? `${bp.brand.name} ` : ""}
+                  {bp.model} ({bp.year})
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </InputGroup>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <InputGroup label="VIN (optional)">
+            <input
+              type="text"
+              className="w-full rounded-xl border border-outline-variant/30 bg-surface px-4 py-2 outline-none focus:border-primary"
+              value={details.vin}
+              onChange={(e) =>
+                setDetails((d) => ({ ...d, vin: e.target.value }))
+              }
+            />
+          </InputGroup>
+          <InputGroup label="Mileage (km)">
+            <input
+              type="number"
+              min={0}
+              onWheel={(event) => {
+                event.preventDefault();
+                event.currentTarget.blur();
+              }}
+              className="w-full rounded-xl border border-outline-variant/30 bg-surface px-4 py-2 outline-none focus:border-primary [&::-webkit-inner-spin-button]:appearance-none"
+              value={details.mileage}
+              onChange={(e) =>
+                setDetails((d) => ({ ...d, mileage: e.target.value }))
+              }
+            />
+          </InputGroup>
+        </div>
+
+        <ImageUpload
+          value={details.image || undefined}
+          folder="Customer Bike Photo"
+          uploadFolder="rpg-system/Customer-Bike"
+          onChange={(url, publicId) =>
+            setDetails((d) => ({
+              ...d,
+              image: url,
+              image_public_id: publicId,
+            }))
+          }
+          onError={setError}
+        />
+
+        <InputGroup label="Notes (optional)">
+          <textarea
+            rows={2}
+            className="w-full resize-y rounded-xl border border-outline-variant/30 bg-surface px-4 py-2 outline-none focus:border-primary"
+            value={details.notes}
+            onChange={(e) =>
+              setDetails((d) => ({ ...d, notes: e.target.value }))
+            }
+          />
+        </InputGroup>
       </div>
-    </div>
+    </ModalShell>
   );
 }

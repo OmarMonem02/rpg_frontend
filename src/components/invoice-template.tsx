@@ -99,6 +99,10 @@ export function InvoiceTemplate({
   const shippingFee = sale.shipping_fee || 0;
   const saleDiscount = sale.sale_discount || 0;
   const netTotal = sale.total || 0;
+  const amountPaid = sale.amount_paid ?? 0;
+  const remainingBalance = Math.max(0, netTotal - amountPaid);
+  const hasOutstandingBalance =
+    sale.amount_paid != null && remainingBalance > 0.005;
 
   const activeLineItems =
     sale.line_items?.filter((item) => item.remaining_qty > 0) ?? [];
@@ -345,7 +349,7 @@ export function InvoiceTemplate({
             </div>
           </section>
 
-          <section className="totals-area invoice-summary" aria-label="Order summary">
+          <section className="totals-area" aria-label="Order summary">
             <div className="totals-panel">
               <div className="slabel totals-heading">Order summary</div>
               <div className="totals-table">
@@ -391,13 +395,35 @@ export function InvoiceTemplate({
 
                 <div className="totals-divider" aria-hidden="true" />
 
-                <div className="trow grand">
-                  <span className="lbl">
-                    Total due
-                    <span className="totals-status">{paymentStatus}</span>
-                  </span>
-                  <span className="amt mono-data">{formatEgp(netTotal)}</span>
-                </div>
+                {hasOutstandingBalance ? (
+                  <>
+                    <div className="trow">
+                      <span className="lbl">Invoice total</span>
+                      <span className="amt mono-data">{formatEgp(netTotal)}</span>
+                    </div>
+                    <div className="trow paid">
+                      <span className="lbl">Amount paid</span>
+                      <span className="amt mono-data">{formatEgp(amountPaid)}</span>
+                    </div>
+                    <div className="trow grand balance-due">
+                      <span className="lbl">
+                        Remaining balance
+                        <span className="totals-status">Balance due</span>
+                      </span>
+                      <span className="amt mono-data">
+                        {formatEgp(remainingBalance)}
+                      </span>
+                    </div>
+                  </>
+                ) : (
+                  <div className="trow grand">
+                    <span className="lbl">
+                      Total due
+                      <span className="totals-status">{paymentStatus}</span>
+                    </span>
+                    <span className="amt mono-data">{formatEgp(netTotal)}</span>
+                  </div>
+                )}
               </div>
             </div>
           </section>

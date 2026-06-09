@@ -143,11 +143,16 @@ export type PaymentCloseModalProps = {
   total: number;
   paymentMethod: string;
   amountPaid: string;
+  adminPassword?: string;
   onPaymentMethodChange: (value: string) => void;
   onAmountPaidChange: (value: string) => void;
+  onAdminPasswordChange?: (value: string) => void;
   onConfirm: () => void;
   isProcessing: boolean;
   error?: string;
+  mode?: "close" | "record";
+  requiresAdminPassword?: boolean;
+  previouslyPaid?: number;
 };
 
 export function PaymentCloseModal({
@@ -156,22 +161,35 @@ export function PaymentCloseModal({
   total,
   paymentMethod,
   amountPaid,
+  adminPassword,
   onPaymentMethodChange,
   onAmountPaidChange,
+  onAdminPasswordChange,
   onConfirm,
   isProcessing,
   error,
+  mode = "close",
+  requiresAdminPassword = false,
+  previouslyPaid = 0,
 }: PaymentCloseModalProps) {
   const parsedAmount = Number(amountPaid);
-  const isValidAmount = Number.isFinite(parsedAmount) && parsedAmount >= total && total >= 0;
-  const balanceDue = Math.max(0, total - (Number.isFinite(parsedAmount) ? parsedAmount : 0));
+  const newTotalPaid = previouslyPaid + (Number.isFinite(parsedAmount) ? parsedAmount : 0);
+  const isValidAmount = Number.isFinite(parsedAmount);
+  const balanceDue = Math.max(0, total - newTotalPaid);
+
+  const isRecordMode = mode === "record";
+  const title = isRecordMode ? "Record payment" : "Close ticket & collect payment";
+  const description = isRecordMode
+    ? "Record a partial or full payment without closing the ticket."
+    : "Record payment to close this ticket and generate an invoice.";
+  const confirmLabel = isRecordMode ? "Record payment" : "Confirm & close ticket";
 
   return (
     <ModalShell
       isOpen={isOpen}
       onClose={onClose}
-      title="Close ticket & collect payment"
-      description="Record full payment to close this ticket and generate an invoice."
+      title={title}
+      description={description}
       icon={<BanknotesIcon className="h-6 w-6" aria-hidden />}
       size="md"
       footer={
@@ -183,9 +201,9 @@ export function PaymentCloseModal({
             tone="success"
             className="w-full sm:w-auto"
             onClick={onConfirm}
-            disabled={isProcessing || !isValidAmount}
+            disabled={isProcessing || !isValidAmount || (requiresAdminPassword && !adminPassword?.trim())}
           >
-            {isProcessing ? "Processing…" : "Confirm & close ticket"}
+            {isProcessing ? "Processing…" : confirmLabel}
           </ActionButton>
         </div>
       }
@@ -195,17 +213,45 @@ export function PaymentCloseModal({
       ) : null}
 
       <div className="mb-6 rounded-2xl border border-primary/10 bg-primary/5 p-5">
-        <p className="text-sm font-medium text-on-surface-variant">Total amount due</p>
-        <p className="mt-1 font-display text-4xl font-black tracking-tight text-primary">
-          {formatEgp(total)}
-        </p>
+        {previouslyPaid > 0 ? (
+          <div className="space-y-3">
+            <div className="flex justify-between items-center">
+              <p className="text-sm font-medium text-on-surface-variant">Ticket total</p>
+              <p className="font-display text-xl font-bold text-on-surface">
+                {formatEgp(total)}
+              </p>
+            </div>
+            <div className="flex justify-between items-center">
+              <p className="text-sm font-medium text-on-surface-variant">Recorded payment</p>
+              <p className="font-display text-xl font-bold text-success">
+                {formatEgp(previouslyPaid)}
+              </p>
+            </div>
+            <div className="pt-3 border-t border-primary/10 flex justify-between items-center">
+              <p className="text-sm font-medium text-on-surface-variant">Remaining balance</p>
+              <p className="font-display text-3xl font-black tracking-tight text-warning">
+                {formatEgp(Math.max(0, total - previouslyPaid))}
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div>
+            <p className="text-sm font-medium text-on-surface-variant">Total amount due</p>
+            <p className="mt-1 font-display text-4xl font-black tracking-tight text-primary">
+              {formatEgp(total)}
+            </p>
+          </div>
+        )}
       </div>
 
-      <InputGroup label="Amount received" className="mb-4">
+      <InputGroup label="Payment amount (now)" className="mb-4">
         <input
           type="number"
-          min={0}
-          step="0.01"
+          onWheel={(event) => {
+            event.preventDefault();
+            event.currentTarget.blur();
+          }}
+          step="1"
           inputMode="decimal"
           className="w-full rounded-2xl border border-outline-variant/30 bg-surface px-5 py-3 outline-none transition-all focus:border-primary"
           value={amountPaid}
@@ -215,11 +261,11 @@ export function PaymentCloseModal({
 
       {balanceDue > 0 ? (
         <p className="mb-4 text-sm text-warning">
-          {formatEgp(balanceDue)} remaining — full payment is required to close.
+          {formatEgp(balanceDue)} remaining balance after this payment.
         </p>
-      ) : (
+      ) : newTotalPaid >= total ? (
         <p className="mb-4 text-sm text-on-success-container">Payment covers the full ticket total.</p>
-      )}
+      ) : null}
 
       <InputGroup label="Payment method" className="mb-2">
         <select
@@ -234,6 +280,20 @@ export function PaymentCloseModal({
           ))}
         </select>
       </InputGroup>
+
+      {requiresAdminPassword && onAdminPasswordChange && (
+        <div className="mt-4 animate-in fade-in slide-in-from-top-2">
+          <InputGroup label="Admin Password (Required to change recorded payment)">
+            <input
+              type="password"
+              className="w-full rounded-2xl border border-outline-variant/30 bg-surface px-5 py-3 outline-none transition-all focus:border-primary"
+              value={adminPassword || ""}
+              onChange={(event) => onAdminPasswordChange(event.target.value)}
+              placeholder="Enter admin password"
+            />
+          </InputGroup>
+        </div>
+      )}
     </ModalShell>
   );
 }

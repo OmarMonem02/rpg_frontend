@@ -18,6 +18,10 @@ export type BikeBlueprintRecord = {
   model: string;
   year: number;
   created_at?: string;
+  brand?: {
+    id: number;
+    name: string;
+  };
 };
 
 export type CreateBikeBlueprintPayload = {
@@ -30,12 +34,18 @@ export type UpdateBikeBlueprintPayload = CreateBikeBlueprintPayload;
 
 export function normalizeBikeBlueprint(raw: unknown): BikeBlueprintRecord {
   const record = asRecord(raw);
+  const brand = asRecord(record.brand);
+  const brandId = toNumber(brand.id);
   return {
     id: toNumber(record.id),
     brand_id: toNumber(record.brand_id),
     model: toText(record.model),
     year: toNumber(record.year),
     created_at: toText(record.created_at) || undefined,
+    brand:
+      brandId > 0
+        ? { id: brandId, name: toText(brand.name) }
+        : undefined,
   };
 }
 
@@ -44,6 +54,9 @@ export async function listBikeBlueprints(
   page = 1,
   filters?: {
     search?: string;
+    brand?: string;
+    model?: string;
+    year?: number;
     brand_id?: number;
     price_range?: string;
     currency?: string;
@@ -52,6 +65,9 @@ export async function listBikeBlueprints(
   const query = buildQuery({
     page,
     search: filters?.search,
+    brand: filters?.brand,
+    model: filters?.model,
+    year: filters?.year,
     brand_id: filters?.brand_id,
     price_range: filters?.price_range,
     currency: filters?.currency,

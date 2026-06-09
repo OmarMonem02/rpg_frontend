@@ -246,9 +246,11 @@ export default function TicketDetailsPage() {
 
   // Close ticket payment state
   const [isClosing, setIsClosing] = useState(false);
+  const [isRecordingPayment, setIsRecordingPayment] = useState(false);
   const [closeModalError, setCloseModalError] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("cash");
   const [amountPaidInput, setAmountPaidInput] = useState("");
+  const [paymentAdminPassword, setPaymentAdminPassword] = useState("");
   const [isReopenAuthOpen, setIsReopenAuthOpen] = useState(false);
   const [reopenPassword, setReopenPassword] = useState("");
   const [reopenModalError, setReopenModalError] = useState("");
@@ -421,33 +423,75 @@ export default function TicketDetailsPage() {
   const openCloseModal = () => {
     if (!ticket) return;
     const total = computeTicketDisplayTotals(ticket, rates).total;
-    setPaymentMethod("cash");
-    setAmountPaidInput(total.toFixed(2));
+    setPaymentMethod(ticket.payment_method || "cash");
+    const remaining = total - Number(ticket.amount_paid || 0);
+    setAmountPaidInput(Math.max(0, remaining).toFixed(2));
+    setPaymentAdminPassword("");
     setCloseModalError("");
     setIsClosing(true);
+  };
+
+  const openRecordPaymentModal = () => {
+    if (!ticket) return;
+    setPaymentMethod(ticket.payment_method || "cash");
+    setAmountPaidInput("");
+    setPaymentAdminPassword("");
+    setCloseModalError("");
+    setIsRecordingPayment(true);
   };
 
   const handleCloseTicket = async () => {
     if (!ticket) return;
     const amountPaid = Number(amountPaidInput);
-    const total = computeTicketDisplayTotals(ticket, rates).total;
-    if (!Number.isFinite(amountPaid) || amountPaid < total) {
-      setCloseModalError("Full payment is required before closing this ticket.");
+    if (!Number.isFinite(amountPaid)) {
+      setCloseModalError("Please enter a valid payment amount.");
       return;
     }
+
+    const newTotalPaid = Number(ticket.amount_paid || 0) + amountPaid;
 
     try {
       setIsProcessing(true);
       setCloseModalError("");
       await ticketsApi.closeTicket(Number(id), {
         payment_method: paymentMethod,
-        amount_paid: amountPaid,
+        amount_paid: newTotalPaid,
+        admin_password: paymentAdminPassword || undefined,
       });
       setIsClosing(false);
       await fetchTicket();
       setIsInvoiceOpen(true);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Failed to close ticket";
+      setCloseModalError(message);
+      setError(message);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleRecordPayment = async () => {
+    if (!ticket) return;
+    const amountPaid = Number(amountPaidInput);
+    if (!Number.isFinite(amountPaid)) {
+      setCloseModalError("Please enter a valid payment amount.");
+      return;
+    }
+
+    const newTotalPaid = Number(ticket.amount_paid || 0) + amountPaid;
+
+    try {
+      setIsProcessing(true);
+      setCloseModalError("");
+      await ticketsApi.recordPayment(Number(id), {
+        payment_method: paymentMethod,
+        amount_paid: newTotalPaid,
+        admin_password: paymentAdminPassword || undefined,
+      });
+      setIsRecordingPayment(false);
+      await fetchTicket();
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to record payment";
       setCloseModalError(message);
       setError(message);
     } finally {
@@ -822,6 +866,11 @@ export default function TicketDetailsPage() {
         rates,
       ),
       total: displayTotals.total,
+      amount_paid: convertTicketDiscountForDisplay(
+        Number(ticketData.amount_paid ?? 0),
+        allItems,
+        rates,
+      ),
       line_items: lineItems,
       created_at: ticketData.created_at,
       customer: ticketData.customer
@@ -905,6 +954,7 @@ export default function TicketDetailsPage() {
       case "pending": return "warning";
       case "in_progress": return "primary";
       case "completed": return "success";
+      case "partial": return "info";
       case "closed": return "default";
       default: return "default";
     }
@@ -931,6 +981,7 @@ export default function TicketDetailsPage() {
     rates,
   );
   const isClosed = ticket.status === "closed";
+  const isPartial = ticket.status === "partial";
   const ticketFullyPaid = isClosedAndFullyPaid(ticket);
   const trackingUrl = ticket.public_token
     ? buildTicketTrackingUrl(ticket.public_token)
@@ -968,7 +1019,7 @@ export default function TicketDetailsPage() {
                 </p>
               ) : null}
               <p className="text-on-surface-variant">
-                {ticket.customer_bike?.bike_blueprint?.brand?.name} {ticket.customer_bike?.bike_blueprint?.model}
+                {ticket.customer_bike?.bike_blueprint?.brand?.name} {ticket.customer_bike?.bike_blueprint?.model} {ticket.customer_bike?.bike_blueprint?.year}
               </p>
               <p className="text-xs text-on-surface-variant/70 mt-1 font-mono">VIN: {ticket.customer_bike?.vin || "N/A"}</p>
             </div>
@@ -982,10 +1033,15 @@ export default function TicketDetailsPage() {
               <div className="mt-2">
                 <p className="text-on-surface-variant font-medium mb-1">Total Amount</p>
                 <p className="text-2xl font-bold text-primary">{formatEgp(displayTotals.total)}</p>
-                {isClosed ? (
+                {displayAmountPaid > 0 ? (
                   <p className="mt-1 text-xs text-on-surface-variant">
                     Paid {formatEgp(displayAmountPaid)}
                     {ticket.payment_method ? ` · ${ticket.payment_method.replace("_", " ")}` : ""}
+                  </p>
+                ) : null}
+                {isPartial && displayAmountPaid < displayTotals.total ? (
+                  <p className="mt-1 text-xs font-semibold text-warning">
+                    {formatEgp(displayTotals.total - displayAmountPaid)} remaining balance
                   </p>
                 ) : null}
               </div>
@@ -997,6 +1053,11 @@ export default function TicketDetailsPage() {
             <ActionButton variant="outline" onClick={() => router.push("/tickets")}>
               Back
             </ActionButton>
+            {(ticket.status === "pending" || ticket.status === "in_progress") && (
+              <ActionButton variant="outline" onClick={openRecordPaymentModal} disabled={isProcessing}>
+                Record Payment
+              </ActionButton>
+            )}
             {ticket.status === "pending" && (
               <ActionButton tone="primary" onClick={() => handleUpdateStatus("start")} disabled={isProcessing}>
                 Start Work
@@ -1014,6 +1075,19 @@ export default function TicketDetailsPage() {
                 </ActionButton>
                 <ActionButton tone="primary" onClick={openCloseModal} disabled={isProcessing}>
                   Close Ticket
+                </ActionButton>
+              </>
+            )}
+            {isPartial && (
+              <>
+                <ActionButton variant="outline" onClick={() => setIsInvoiceOpen(true)}>
+                  View Invoice
+                </ActionButton>
+                <ActionButton variant="outline" onClick={handleReopenClick} disabled={isProcessing}>
+                  Reopen
+                </ActionButton>
+                <ActionButton tone="primary" onClick={openCloseModal} disabled={isProcessing}>
+                  Pay Remaining Balance
                 </ActionButton>
               </>
             )}
@@ -1509,11 +1583,45 @@ export default function TicketDetailsPage() {
         total={displayTotals.total}
         paymentMethod={paymentMethod}
         amountPaid={amountPaidInput}
+        adminPassword={paymentAdminPassword}
         onPaymentMethodChange={setPaymentMethod}
         onAmountPaidChange={setAmountPaidInput}
+        onAdminPasswordChange={setPaymentAdminPassword}
         onConfirm={() => void handleCloseTicket()}
         isProcessing={isProcessing}
         error={closeModalError}
+        mode="close"
+        previouslyPaid={Number(ticket?.amount_paid || 0)}
+        requiresAdminPassword={
+          Number(ticket?.amount_paid || 0) > 0 &&
+          (Number(amountPaidInput) < 0 ||
+            paymentMethod !== ticket?.payment_method)
+        }
+      />
+
+      <PaymentCloseModal
+        isOpen={isRecordingPayment}
+        onClose={() => {
+          setIsRecordingPayment(false);
+          setCloseModalError("");
+        }}
+        total={displayTotals.total}
+        paymentMethod={paymentMethod}
+        amountPaid={amountPaidInput}
+        adminPassword={paymentAdminPassword}
+        onPaymentMethodChange={setPaymentMethod}
+        onAmountPaidChange={setAmountPaidInput}
+        onAdminPasswordChange={setPaymentAdminPassword}
+        onConfirm={() => void handleRecordPayment()}
+        isProcessing={isProcessing}
+        error={closeModalError}
+        mode="record"
+        previouslyPaid={Number(ticket?.amount_paid || 0)}
+        requiresAdminPassword={
+          Number(ticket?.amount_paid || 0) > 0 &&
+          (Number(amountPaidInput) < 0 ||
+            paymentMethod !== ticket?.payment_method)
+        }
       />
 
       <AdminPasswordReopenModal

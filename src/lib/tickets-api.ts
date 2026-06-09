@@ -468,9 +468,20 @@ export const ticketsApi = {
     );
     return res;
   },
-  closeTicket: async (ticketId: number, payment: { payment_method: string; amount_paid: number }) => {
+  closeTicket: async (ticketId: number, payment: { payment_method: string; amount_paid: number; admin_password?: string }) => {
     const res = await authorizedFetch<{ message: string; status: string; ticket?: Ticket }>(
       `/tickets/${ticketId}/close`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payment),
+      },
+    );
+    return res;
+  },
+  recordPayment: async (ticketId: number, payment: { payment_method: string; amount_paid: number; admin_password?: string }) => {
+    const res = await authorizedFetch<{ message: string; status: string; ticket?: Ticket }>(
+      `/tickets/${ticketId}/payment`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
