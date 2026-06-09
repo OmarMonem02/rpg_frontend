@@ -1,6 +1,7 @@
 "use client";
 
 import type { FormEvent, KeyboardEvent } from "react";
+import { useState, useEffect } from "react";
 import {
   ArrowDownTrayIcon,
   MagnifyingGlassIcon,
@@ -37,6 +38,7 @@ import {
   ScanHistoryPanel,
   SortControl,
   WorkflowStrip,
+  BulkRecapTable,
 } from "./_components/count-components";
 import { useInventoryCount } from "./_components/useInventoryCount";
 
@@ -106,7 +108,27 @@ export default function InventoryCountPage() {
     resetAllCounted,
     removeAllMatches,
     rescanFromHistory,
+    countMode,
+    setCountMode,
+    bulkCatalog,
+    isBulkLoading,
+    loadBulkCatalog,
+    toggleLineInclusion,
+    updateLineFromBulk,
+    applyConfirmOpen,
+    setApplyConfirmOpen,
+    applying,
+    applyError,
+    applyDiscrepancies,
   } = useInventoryCount();
+
+  const [bulkTab, setBulkTab] = useState<"products" | "spare_parts">("products");
+
+  useEffect(() => {
+    if (countMode === "bulk") {
+      void loadBulkCatalog();
+    }
+  }, [countMode, loadBulkCatalog]);
 
   const handleScanSubmit = (event: FormEvent) => {
     event.preventDefault();
@@ -271,106 +293,179 @@ export default function InventoryCountPage() {
         <MatchRateBar rate={summary.matchRate} itemsCounted={summary.itemsCounted} />
       ) : null}
 
-      {/* ── Scan & Add section ── */}
-      <section className="space-y-4">
-        <SectionHeading
-          title="Scan & add"
-          description="Use a barcode scanner or type an exact SKU / part number. Press Enter to add the item to your count."
-        />
-
-        <InputGroupCard
-          label="Scanner ready"
-          hint="Focus here and scan, or press / from anywhere on the page."
-          tone="default"
+      {/* ── Mode Selector ── */}
+      <div className="mb-6 flex gap-2 rounded-xl border border-outline-variant/15 bg-surface-container-low p-1 w-fit">
+        <button
+          type="button"
+          onClick={() => setCountMode("scan")}
+          className={`flex-none rounded-lg px-4 py-2 text-sm font-semibold transition-all ${
+            countMode === "scan"
+              ? "bg-primary text-on-primary shadow-sm"
+              : "text-on-surface-variant hover:bg-surface-container hover:text-on-surface"
+          }`}
         >
-          <form onSubmit={handleScanSubmit}>
-            <FilterBar className="md:grid-cols-12">
-              <InputGroup label="Barcode / SKU" className="md:col-span-9">
-                <div className="relative">
-                  <QrCodeIcon
-                    className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-on-surface-variant/70"
-                    aria-hidden
-                  />
-                  <input
-                    ref={scanInputRef}
-                    type="text"
-                    inputMode="text"
-                    autoFocus
-                    autoComplete="off"
-                    value={scanValue}
-                    onChange={(event) => {
-                      setScanValue(event.target.value);
-                      setScanError(null);
-                    }}
-                    onKeyDown={handleScanKeyDown}
-                    placeholder="Scan or type SKU / part number, then press Enter"
-                    className="form-input-base indent-6 placeholder:text-on-surface-variant read-only:opacity-80"
-                    readOnly={scanBusy}
-                    aria-busy={scanBusy}
-                    aria-label="Barcode or SKU"
-                  />
-                  {scanBusy ? (
-                    <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2">
-                      <div className="h-5 w-5 animate-spin rounded-full border-2 border-outline-variant/30 border-t-primary" />
-                    </div>
-                  ) : null}
+          Scan Mode
+        </button>
+        <button
+          type="button"
+          onClick={() => setCountMode("bulk")}
+          className={`flex-none rounded-lg px-4 py-2 text-sm font-semibold transition-all ${
+            countMode === "bulk"
+              ? "bg-primary text-on-primary shadow-sm"
+              : "text-on-surface-variant hover:bg-surface-container hover:text-on-surface"
+          }`}
+        >
+          Bulk Recap
+        </button>
+      </div>
+
+      {countMode === "scan" ? (
+        /* ── Scan & Add section ── */
+        <section className="space-y-4">
+          <SectionHeading
+            title="Scan & add"
+            description="Use a barcode scanner or type an exact SKU / part number. Press Enter to add the item to your count."
+          />
+
+          <InputGroupCard
+            label="Scanner ready"
+            hint="Focus here and scan, or press / from anywhere on the page."
+            tone="default"
+          >
+            <form onSubmit={handleScanSubmit}>
+              <FilterBar className="md:grid-cols-12">
+                <InputGroup label="Barcode / SKU" className="md:col-span-9">
+                  <div className="relative">
+                    <QrCodeIcon
+                      className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-on-surface-variant/70"
+                      aria-hidden
+                    />
+                    <input
+                      ref={scanInputRef}
+                      type="text"
+                      inputMode="text"
+                      autoFocus
+                      autoComplete="off"
+                      value={scanValue}
+                      onChange={(event) => {
+                        setScanValue(event.target.value);
+                        setScanError(null);
+                      }}
+                      onKeyDown={handleScanKeyDown}
+                      placeholder="Scan or type SKU / part number, then press Enter"
+                      className="form-input-base indent-6 placeholder:text-on-surface-variant read-only:opacity-80"
+                      readOnly={scanBusy}
+                      aria-busy={scanBusy}
+                      aria-label="Barcode or SKU"
+                    />
+                    {scanBusy ? (
+                      <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2">
+                        <div className="h-5 w-5 animate-spin rounded-full border-2 border-outline-variant/30 border-t-primary" />
+                      </div>
+                    ) : null}
+                  </div>
+                </InputGroup>
+                <div className="flex items-end md:col-span-3">
+                  <ActionButton
+                    type="submit"
+                    tone="primary"
+                    className="w-full h-13"
+                    disabled={scanBusy || !scanValue.trim()}
+                  >
+                    {scanBusy ? "Searching..." : "Add to count"}
+                  </ActionButton>
                 </div>
-              </InputGroup>
-              <div className="flex items-end md:col-span-3">
+              </FilterBar>
+
+              <div className="mt-4 flex flex-wrap gap-2 border-t border-current/10 pt-4">
                 <ActionButton
-                  type="submit"
-                  tone="primary"
-                  className="w-full h-13"
-                  disabled={scanBusy || !scanValue.trim()}
+                  type="button"
+                  variant="outline"
+                  onClick={() => setPickerType("products")}
                 >
-                  {scanBusy ? "Searching..." : "Add to count"}
+                  <PlusIcon className="h-4 w-4" aria-hidden />
+                  Browse products
+                </ActionButton>
+                <ActionButton
+                  type="button"
+                  variant="outline"
+                  onClick={() => setPickerType("spare_parts")}
+                >
+                  <PlusIcon className="h-4 w-4" aria-hidden />
+                  Browse spare parts
                 </ActionButton>
               </div>
-            </FilterBar>
 
-            <div className="mt-4 flex flex-wrap gap-2 border-t border-current/10 pt-4">
-              <ActionButton
-                type="button"
-                variant="outline"
-                onClick={() => setPickerType("products")}
-              >
-                <PlusIcon className="h-4 w-4" aria-hidden />
-                Browse products
-              </ActionButton>
-              <ActionButton
-                type="button"
-                variant="outline"
-                onClick={() => setPickerType("spare_parts")}
-              >
-                <PlusIcon className="h-4 w-4" aria-hidden />
-                Browse spare parts
-              </ActionButton>
+              {scanError ? (
+                <p className="mt-3 text-sm text-error" role="alert">
+                  {scanError}
+                </p>
+              ) : null}
+            </form>
+          </InputGroupCard>
+
+          {lastScan ? <LastScanCard scan={lastScan} /> : null}
+
+          {/* ── Scan history panel ── */}
+          <ScanHistoryPanel
+            history={scanHistory}
+            onRescan={rescanFromHistory}
+            scanBusy={scanBusy}
+          />
+
+          {exportError ? <InlineMessage tone="danger">{exportError}</InlineMessage> : null}
+          {refreshError ? (
+            <InlineMessage tone={refreshError.includes("up to date") ? "success" : "danger"}>
+              {refreshError}
+            </InlineMessage>
+          ) : null}
+        </section>
+      ) : (
+        /* ── Bulk Recap section ── */
+        <section className="space-y-4">
+          <SectionHeading
+            title="Bulk Recap"
+            description="Quickly enter counts for all items in the catalog. Checking the box includes the item in this session."
+          />
+          <div className="flex gap-1 border-b border-outline-variant/15 mb-4">
+            <button
+              type="button"
+              onClick={() => setBulkTab("products")}
+              className={`px-4 py-2 text-sm font-semibold transition-colors border-b-2 ${
+                bulkTab === "products"
+                  ? "border-primary text-primary"
+                  : "border-transparent text-on-surface-variant hover:text-on-surface"
+              }`}
+            >
+              Products ({bulkCatalog.products.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setBulkTab("spare_parts")}
+              className={`px-4 py-2 text-sm font-semibold transition-colors border-b-2 ${
+                bulkTab === "spare_parts"
+                  ? "border-primary text-primary"
+                  : "border-transparent text-on-surface-variant hover:text-on-surface"
+              }`}
+            >
+              Spare Parts ({bulkCatalog.spareParts.length})
+            </button>
+          </div>
+          {isBulkLoading ? (
+            <div className="flex justify-center py-10">
+              <div className="h-6 w-6 animate-spin rounded-full border-2 border-outline-variant/30 border-t-primary" />
             </div>
-
-            {scanError ? (
-              <p className="mt-3 text-sm text-error" role="alert">
-                {scanError}
-              </p>
-            ) : null}
-          </form>
-        </InputGroupCard>
-
-        {lastScan ? <LastScanCard scan={lastScan} /> : null}
-
-        {/* ── NEW: Scan history panel ── */}
-        <ScanHistoryPanel
-          history={scanHistory}
-          onRescan={rescanFromHistory}
-          scanBusy={scanBusy}
-        />
-
-        {exportError ? <InlineMessage tone="danger">{exportError}</InlineMessage> : null}
-        {refreshError ? (
-          <InlineMessage tone={refreshError.includes("up to date") ? "success" : "danger"}>
-            {refreshError}
-          </InlineMessage>
-        ) : null}
-      </section>
+          ) : (
+            <BulkRecapTable
+              type={bulkTab === "products" ? "product" : "spare_part"}
+              records={bulkTab === "products" ? bulkCatalog.products : bulkCatalog.spareParts}
+              lines={lines}
+              onToggleInclusion={toggleLineInclusion}
+              onUpdateCounted={updateLineFromBulk}
+            />
+          )}
+        </section>
+      )}
 
       {/* ── Count List section ── */}
       <section className="space-y-4">
@@ -397,10 +492,12 @@ export default function InventoryCountPage() {
           matchCount={summary.matches}
           discrepancyCount={summary.discrepancies}
           refreshing={refreshing}
+          applying={applying}
           onRefreshStock={refreshSystemStock}
           onSetAllToSystem={() => setBatchConfirmOpen("setAllSystem")}
           onResetAllCounted={() => setBatchConfirmOpen("resetAll")}
           onRemoveMatches={() => setBatchConfirmOpen("removeMatches")}
+          onApplyDiscrepancies={() => setApplyConfirmOpen(true)}
         />
 
         {lines.length > 0 ? (
@@ -661,6 +758,20 @@ export default function InventoryCountPage() {
           This removes <strong>{summary.matches}</strong> item
           {summary.matches !== 1 ? "s" : ""} where the counted quantity equals the
           system stock. Only discrepant items will remain.
+        </p>
+      </ConfirmDialog>
+
+      <ConfirmDialog
+        isOpen={applyConfirmOpen}
+        onClose={() => setApplyConfirmOpen(false)}
+        title="Apply count to system stock?"
+        confirmLabel={applying ? "Applying..." : "Apply Count"}
+        confirmTone="primary"
+        onConfirm={applyDiscrepancies}
+      >
+        <p className="text-sm text-on-surface-variant">
+          You are about to change the live system stock for <strong>{summary.discrepancies}</strong> item
+          {summary.discrepancies !== 1 ? "s" : ""}. This will overwrite the current stock values with your counted quantities. This action cannot be undone.
         </p>
       </ConfirmDialog>
     </PageShell>

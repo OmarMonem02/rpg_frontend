@@ -20,6 +20,7 @@ import {
   type CountWorkflowStep,
 } from "@/lib/stocktake";
 import type { CountSessionLastScan } from "@/lib/stocktake-session";
+import type { ProductRecord, SparePartRecord } from "@/lib/crud-api";
 
 const WORKFLOW_STEPS: Array<{ id: CountWorkflowStep; label: string; hint: string }> = [
   { id: "scan", label: "Scan", hint: "Add items to the count" },
@@ -525,19 +526,23 @@ export function BatchActionsBar({
   matchCount,
   discrepancyCount,
   refreshing,
+  applying,
   onRefreshStock,
   onSetAllToSystem,
   onResetAllCounted,
   onRemoveMatches,
+  onApplyDiscrepancies,
 }: {
   lineCount: number;
   matchCount: number;
   discrepancyCount: number;
   refreshing: boolean;
+  applying?: boolean;
   onRefreshStock: () => void;
   onSetAllToSystem: () => void;
   onResetAllCounted: () => void;
   onRemoveMatches: () => void;
+  onApplyDiscrepancies?: () => void;
 }) {
   if (lineCount === 0) return null;
 
@@ -546,6 +551,23 @@ export function BatchActionsBar({
       <p className="mr-auto text-xs font-semibold text-on-surface-variant">
         Batch actions
       </p>
+      {onApplyDiscrepancies ? (
+        <ActionButton
+          type="button"
+          tone="primary"
+          size="sm"
+          onClick={onApplyDiscrepancies}
+          disabled={discrepancyCount === 0 || applying}
+          title="Apply current counts directly to system stock"
+        >
+          {applying ? (
+            <ArrowPathIcon className="h-3.5 w-3.5 animate-spin" aria-hidden />
+          ) : (
+            <CheckCircleIcon className="h-3.5 w-3.5" aria-hidden />
+          )}
+          {applying ? "Applying…" : "Apply count"}
+        </ActionButton>
+      ) : null}
       <ActionButton
         type="button"
         variant="outline"
@@ -646,5 +668,110 @@ export function ScanHistoryPanel({
         })}
       </div>
     </div>
+  );
+}
+
+/** Bulk Recap Table for listing all products/spare parts */
+export function BulkRecapTable({
+  type,
+  records,
+  lines,
+  onToggleInclusion,
+  onUpdateCounted,
+}: {
+  type: CountItemType;
+  records: Array<ProductRecord | SparePartRecord>;
+  lines: CountLine[];
+  onToggleInclusion: (type: CountItemType, record: ProductRecord | SparePartRecord, include: boolean) => void;
+  onUpdateCounted: (type: CountItemType, record: ProductRecord | SparePartRecord, value: number) => void;
+}) {
+  return (
+    <DataTableCard className="overflow-hidden border-outline-variant/10">
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[700px] text-left text-sm text-on-surface">
+          <thead className="sticky top-0 z-10 border-b border-outline-variant/20 bg-surface-container-low text-on-surface-variant">
+            <tr>
+              <th className="label-caps px-4 py-4 md:px-6 w-16 text-center">Include</th>
+              <th className="label-caps px-4 py-4 md:px-6">Item</th>
+              <th className="label-caps px-4 py-4 md:px-6">SKU</th>
+              <th className="label-caps px-4 py-4 text-center md:px-6">System Qty</th>
+              <th className="label-caps px-4 py-4 text-center md:px-6">Real Qty</th>
+              <th className="label-caps px-4 py-4 md:px-6 text-center">Variance</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-outline-variant/5 bg-surface">
+            {records.map((record) => {
+              const lineKeyStr = lineKey(type, record.id);
+              const line = lines.find((l) => lineKey(l.type, l.id) === lineKeyStr);
+              const isIncluded = !!line;
+              const counted = line?.counted ?? 0;
+              const variance = isIncluded ? counted - record.stock_quantity : 0;
+              const status = getDiscrepancyStatus(variance);
+              const rowTint = isIncluded
+                ? variance < 0
+                  ? "bg-error-container/15"
+                  : variance > 0
+                    ? "bg-warning-container/15"
+                    : "bg-success-container/10"
+                : "";
+
+              return (
+                <tr key={record.id} className={`data-row ${rowTint}`.trim()}>
+                  <td className="px-4 py-4 md:px-6 text-center">
+                    <input
+                      type="checkbox"
+                      checked={isIncluded}
+                      onChange={(e) => onToggleInclusion(type, record, e.target.checked)}
+                      className="h-4 w-4 rounded border-outline-variant/30 text-primary focus:ring-primary cursor-pointer"
+                    />
+                  </td>
+                  <td className="px-4 py-4 md:px-6">
+                    <div className="flex items-center gap-3">
+                      <CountItemThumbnail image={record.image || undefined} name={record.name} />
+                      <div className="min-w-0">
+                        <p className="font-medium text-on-surface">{record.name}</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="mono-data px-4 py-4 text-xs text-on-surface-variant md:px-6">
+                    {record.sku}
+                  </td>
+                  <td className="mono-data px-4 py-4 text-center font-semibold md:px-6">
+                    {record.stock_quantity}
+                  </td>
+                  <td className="px-4 py-4 text-center md:px-6">
+                    <input
+                      type="number"
+                      min={0}
+                      step={1}
+                      value={isIncluded ? counted : ""}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val !== "") {
+                           onUpdateCounted(type, record, e.target.valueAsNumber);
+                        } else {
+                           onUpdateCounted(type, record, 0);
+                        }
+                      }}
+                      placeholder={String(record.stock_quantity)}
+                      className="form-input-base w-24 px-3 py-2 text-center text-sm [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none mx-auto"
+                    />
+                  </td>
+                  <td className="px-4 py-4 text-center md:px-6">
+                    {isIncluded ? (
+                      <StatusBadge tone={statusTone[status]}>
+                        {variance > 0 ? `+${variance}` : variance}
+                      </StatusBadge>
+                    ) : (
+                      <span className="text-on-surface-variant">-</span>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </DataTableCard>
   );
 }

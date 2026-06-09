@@ -6,6 +6,8 @@ import {
   exportStocktakeDiscrepancies,
   listProducts,
   listSpareParts,
+  bulkApplyProducts,
+  bulkApplySpareParts,
   type ProductRecord,
   type SparePartRecord,
 } from "@/lib/crud-api";
@@ -41,6 +43,7 @@ function lineKey(type: CountItemType, id: number): string {
 function recordToLine(
   type: CountItemType,
   record: ProductRecord | SparePartRecord,
+  counted: number = 1
 ): CountLine {
   return {
     type,
@@ -50,7 +53,7 @@ function recordToLine(
     partNumber: record.part_number || undefined,
     image: record.image || undefined,
     systemQty: record.stock_quantity,
-    counted: 1,
+    counted,
   };
 }
 
@@ -94,6 +97,17 @@ export function useInventoryCount() {
 
   // ── NEW: batch operation states ──
   const [batchConfirmOpen, setBatchConfirmOpen] = useState<string | null>(null);
+
+  // ── NEW: Apply operation states ──
+  const [applyConfirmOpen, setApplyConfirmOpen] = useState(false);
+  const [applying, setApplying] = useState(false);
+  const [applyError, setApplyError] = useState<string | null>(null);
+
+  // ── NEW: Bulk mode states ──
+  const [countMode, setCountMode] = useState<"scan" | "bulk">("scan");
+  const [bulkCatalog, setBulkCatalog] = useState<{ products: ProductRecord[]; spareParts: SparePartRecord[] }>({ products: [], spareParts: [] });
+  const [isBulkLoading, setIsBulkLoading] = useState(false);
+  const [bulkCatalogLoaded, setBulkCatalogLoaded] = useState(false);
 
   const summary = useMemo(() => summarize(lines), [lines]);
   const workflowStep = useMemo(
@@ -493,6 +507,52 @@ export function useInventoryCount() {
     setBatchConfirmOpen(null);
   }, []);
 
+  const applyDiscrepancies = useCallback(async () => {
+    if (lines.length === 0 || applying) return;
+    try {
+      setApplying(true);
+      setApplyError(null);
+      const token = getAuthToken();
+      if (!token) throw new Error("Authentication required");
+
+      const discrepantLines = lines.filter((l) => l.counted !== l.systemQty);
+      if (discrepantLines.length === 0) {
+        setApplyConfirmOpen(false);
+        return;
+      }
+
+      await Promise.all(
+        discrepantLines.map(async (line) => {
+          if (line.type === "product") {
+            await bulkApplyProducts(token, {
+              ids: [line.id],
+              changes: { stock_quantity: { mode: "set", value: line.counted } }
+            });
+          } else {
+            await bulkApplySpareParts(token, {
+              ids: [line.id],
+              changes: { stock_quantity: { mode: "set", value: line.counted } }
+            });
+          }
+        })
+      );
+
+      // Successfully applied: update the local state's systemQty to match the counted ones
+      setLines((prev) =>
+        prev.map((line) => ({
+          ...line,
+          systemQty: line.counted,
+        }))
+      );
+      
+      setApplyConfirmOpen(false);
+    } catch (err) {
+      setApplyError(err instanceof Error ? err.message : "Failed to apply stock changes");
+    } finally {
+      setApplying(false);
+    }
+  }, [lines, applying]);
+
   // ── NEW: Re-scan from history ──
   const rescanFromHistory = useCallback(
     async (scan: CountSessionLastScan) => {
@@ -532,6 +592,84 @@ export function useInventoryCount() {
     },
     [addOrIncrement, scanBusy, scheduleScanRefocus],
   );
+
+  // ── NEW: Bulk mode functions ──
+  const loadBulkCatalog = useCallback(async () => {
+    if (bulkCatalogLoaded || isBulkLoading) return;
+    try {
+      setIsBulkLoading(true);
+      setRefreshError(null);
+      const token = getAuthToken();
+      if (!token) throw new Error("Authentication required");
+
+      const fetchAllProducts = async () => {
+        const first = await listProducts(token, 1, {});
+        const all: ProductRecord[] = [...first.items];
+        let page = 2;
+        while (page <= first.lastPage) {
+          const next = await listProducts(token, page, {});
+          all.push(...next.items);
+          page++;
+        }
+        return all;
+      };
+
+      const fetchAllSpareParts = async () => {
+        const first = await listSpareParts(token, 1, {});
+        const all: SparePartRecord[] = [...first.items];
+        let page = 2;
+        while (page <= first.lastPage) {
+          const next = await listSpareParts(token, page, {});
+          all.push(...next.items);
+          page++;
+        }
+        return all;
+      };
+
+      const [products, spareParts] = await Promise.all([
+        fetchAllProducts(),
+        fetchAllSpareParts(),
+      ]);
+
+      setBulkCatalog({ products, spareParts });
+      setBulkCatalogLoaded(true);
+    } catch (err) {
+      setRefreshError(err instanceof Error ? err.message : "Failed to load catalog");
+    } finally {
+      setIsBulkLoading(false);
+    }
+  }, [bulkCatalogLoaded, isBulkLoading]);
+
+  const toggleLineInclusion = useCallback((type: CountItemType, record: ProductRecord | SparePartRecord, include: boolean) => {
+    const key = lineKey(type, record.id);
+    if (include) {
+      setLines((prev) => {
+        if (prev.some((l) => lineKey(l.type, l.id) === key)) return prev;
+        return [recordToLine(type, record, record.stock_quantity), ...prev]; // Start with systemQty
+      });
+      touchLine(type, record.id);
+    } else {
+      removeLine(type, record.id);
+    }
+  }, [removeLine, touchLine]);
+
+  const updateLineFromBulk = useCallback((type: CountItemType, record: ProductRecord | SparePartRecord, value: number) => {
+    const key = lineKey(type, record.id);
+    const next = Number.isFinite(value) ? Math.max(0, Math.trunc(value)) : 0;
+    
+    setLines((prev) => {
+      const exists = prev.some((l) => lineKey(l.type, l.id) === key);
+      if (exists) {
+        return prev.map((line) =>
+          lineKey(line.type, line.id) === key ? { ...line, counted: next } : line
+        );
+      } else {
+        return [{ ...recordToLine(type, record, next) }, ...prev];
+      }
+    });
+    touchLine(type, record.id);
+    syncLastScanCounted(type, record.id, next);
+  }, [syncLastScanCounted, touchLine]);
 
   return {
     scanInputRef,
@@ -581,5 +719,18 @@ export function useInventoryCount() {
     resetAllCounted,
     removeAllMatches,
     rescanFromHistory,
+    // ── NEW: Bulk mode ──
+    countMode,
+    setCountMode,
+    bulkCatalog,
+    isBulkLoading,
+    loadBulkCatalog,
+    toggleLineInclusion,
+    updateLineFromBulk,
+    applyConfirmOpen,
+    setApplyConfirmOpen,
+    applying,
+    applyError,
+    applyDiscrepancies,
   };
 }
