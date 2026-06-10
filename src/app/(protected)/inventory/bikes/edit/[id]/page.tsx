@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { getAuthToken } from "@/lib/auth-session";
 import { getBike, type BikeRecord } from "@/lib/crud-api";
-import { PageShell, PageHero } from "@/components/ops-ui";
+import { PageShell } from "@/components/ops-ui";
 import { BikeForm } from "../../BikeForm";
 
 export default function EditBikePage() {
@@ -53,10 +53,6 @@ export default function EditBikePage() {
 
   return (
     <PageShell>
-      <PageHero
-        eyebrow="Showroom Inventory"
-        title={`Editing VIN: ${bike.vin}`}
-      />
       <BikeForm mode="edit" initialData={bike} />
     </PageShell>
   );

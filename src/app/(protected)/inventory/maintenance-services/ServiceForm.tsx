@@ -202,14 +202,18 @@ export function ServiceForm({ initialData, mode }: ServiceFormProps) {
   }
 
   return (
-    <div className="max-w-4xl mx-auto py-8 px-4">
+    <div className="w-full py-4 md:py-6">
       <EntityForm
         formKey={formKey}
-        title={mode === "edit" ? "Edit Maintenance Service" : "Create Maintenance Service"}
+        title={
+          mode === "edit"
+            ? `Edit ${initialData?.name ?? "Maintenance Service"}`
+            : "Create Maintenance Service"
+        }
         description={
           mode === "edit"
-            ? "Update the service name, sector assignment, and pricing rules from one guided flow."
-            : "Create a maintenance service with clean pricing and discount settings that match the existing inventory experience."
+            ? "Update the service name, sector assignment, and pricing rules in one view."
+            : "Create a maintenance service with pricing and discount settings in one view."
         }
         fields={fields}
         onSubmit={handleSubmit}

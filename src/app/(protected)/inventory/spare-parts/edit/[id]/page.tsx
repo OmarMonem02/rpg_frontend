@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { getAuthToken } from "@/lib/auth-session";
 import { getSparePart, type SparePartRecord } from "@/lib/crud-api";
-import { PageShell, PageHero } from "@/components/ops-ui";
+import { PageShell } from "@/components/ops-ui";
 import { SparePartForm } from "../../SparePartForm";
 
 export default function EditSparePartPage() {
@@ -59,7 +59,6 @@ export default function EditSparePartPage() {
 
   return (
     <PageShell>
-      <PageHero eyebrow="Inventory Control" title={`Editing ${part.name}`} />
       <SparePartForm mode="edit" initialData={part} />
     </PageShell>
   );

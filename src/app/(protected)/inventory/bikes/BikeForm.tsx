@@ -246,13 +246,18 @@ export function BikeForm({ mode, initialData }: BikeFormProps) {
   }
 
   return (
+    <div className="w-full py-4 md:py-6">
     <EntityForm
       variant="page"
-      title={mode === "create" ? "Create Bike Listing" : "Edit Bike Listing"}
+      title={
+        mode === "create"
+          ? "Create Bike Listing"
+          : `Edit Bike — ${initialData?.vin ?? "Listing"}`
+      }
       description={
         mode === "create"
-          ? "Create a showroom-ready bike listing with blueprint, pricing, and status details grouped into an easier flow."
-          : "Update the bike listing with pricing, mileage, and sale status in a cleaner layout."
+          ? "Create a showroom-ready bike listing with blueprint, pricing, and status details in one view."
+          : "Update the bike listing with pricing, mileage, and sale status."
       }
       fields={fields}
       isLoading={isSubmitting}
@@ -262,5 +267,6 @@ export function BikeForm({ mode, initialData }: BikeFormProps) {
       submitLabel={mode === "create" ? "Create Listing" : "Save Changes"}
       heroLabel="Bikes For Sale"
     />
+    </div>
   );
 }

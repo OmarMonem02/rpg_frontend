@@ -604,11 +604,15 @@ export function ProductForm({ initialData, mode }: ProductFormProps) {
   }
 
   return (
-    <div className="max-w-4xl mx-auto py-8 px-4">
+    <div className="w-full py-4 md:py-6">
       <EntityForm
         formKey={formKey}
-        title={mode === "edit" ? "Edit Product" : "Create Product"}
-        description={mode === "edit" ? "Update product profile, stock settings, pricing, and compatibility." : "Create a polished product entry with inventory, pricing, sales settings, and bike compatibility."}
+        title={
+          mode === "edit"
+            ? `Edit ${initialData?.name ?? "Product"}`
+            : "Create Product"
+        }
+        description={mode === "edit" ? "Update product profile, stock settings, pricing, and compatibility in one view." : "Create a product entry with inventory, pricing, and bike compatibility in one view."}
         fields={fields}
         onSubmit={handleSubmit}
         onCancel={() => router.push("/inventory/products")}

@@ -667,13 +667,18 @@ export function SparePartForm({ mode, initialData }: SparePartFormProps) {
   }
 
   return (
+    <div className="w-full py-4 md:py-6">
     <EntityForm
       formKey={formKey}
       variant="page"
-      title={mode === "create" ? "Create Spare Part" : "Edit Spare Part"}
+      title={
+        mode === "create"
+          ? "Create Spare Part"
+          : `Edit ${initialData?.name ?? "Spare Part"}`
+      }
       description={
         mode === "create"
-          ? "Build a clean spare part entry with inventory, pricing, and compatibility details in one guided flow."
+          ? "Build a spare part entry with inventory, pricing, and compatibility details in one view."
           : "Refine stock, pricing, and compatibility details for this spare part."
       }
       fields={fields}
@@ -684,5 +689,6 @@ export function SparePartForm({ mode, initialData }: SparePartFormProps) {
       submitLabel={mode === "create" ? "Create Spare Part" : "Save Changes"}
       heroLabel="Spare Parts"
     />
+    </div>
   );
 }

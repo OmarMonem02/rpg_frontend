@@ -146,7 +146,7 @@ export default function ProtectedLayout({
 }>) {
   const router = useRouter();
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(true);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [userName, setUserName] = useState(() => getAuthUser()?.name ?? "User");
 
