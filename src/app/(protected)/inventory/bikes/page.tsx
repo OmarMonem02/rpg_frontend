@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { usePermissions } from "@/components/permission-provider";
 import { getAuthToken } from "@/lib/auth-session";
 import { useEntityFilters } from "@/hooks/useEntityFilters";
 import { useExchangeRates } from "@/hooks/useExchangeRates";
@@ -12,11 +13,38 @@ import {
   listBikeBlueprints,
   listBrands,
   deleteBike,
+  patchBike,
   type BikeRecord,
   type BikeBlueprintRecord,
   type BrandRecord,
+  type BikeQuickEditFields,
   fetchAllPages,
 } from "@/lib/crud-api";
+import {
+  QuickEditActions,
+  QuickEditInput,
+  combineValidators,
+  useQuickEditRow,
+  validateNonNegativeIntegers,
+  validateNonNegativeNumbers,
+  type QuickEditDraft,
+} from "@/components/inventory/quick-edit";
+import {
+  InventoryItemThumbnail,
+  InventoryListTable,
+  InventoryListTableBody,
+  InventoryListTableElement,
+  InventoryListTableError,
+  InventoryListTableHead,
+  InventoryListTableRow,
+  InventoryListTableScroll,
+  InventoryListTableTd,
+  InventoryListTableTh,
+  InventoryListTableToolbar,
+  InventoryTableActionDivider,
+  InventoryTableActionLink,
+  InventoryTableSecondaryActions,
+} from "@/components/inventory/list-table";
 import { AdvancedFilters } from "@/components/advanced-filters";
 import {
   ActionButton,
@@ -37,9 +65,26 @@ const STATUSES = [
   { value: "reserved", label: "Reserved" },
 ];
 
+const BIKE_QUICK_EDIT_KEYS = [
+  "cost_price",
+  "sale_price",
+  "mileage",
+] as const;
+
+function parseBikeQuickEditChanges(changes: QuickEditDraft): BikeQuickEditFields {
+  const payload: BikeQuickEditFields = {};
+  if ("cost_price" in changes) payload.cost_price = Number(changes.cost_price);
+  if ("sale_price" in changes) payload.sale_price = Number(changes.sale_price);
+  if ("mileage" in changes) payload.mileage = Number(changes.mileage);
+  return payload;
+}
+
 export default function BikesPage() {
   const router = useRouter();
+  const permissions = usePermissions();
   const { rates } = useExchangeRates();
+  const canUpdateBikes = permissions.canUpdate("bikes");
+  const canDeleteBikes = permissions.canDelete("bikes");
   const [bikes, setBikes] = useState<BikeRecord[]>([]);
   const [blueprints, setBlueprints] = useState<BikeBlueprintRecord[]>([]);
   const [brands, setBrands] = useState<BrandRecord[]>([]);
@@ -49,6 +94,12 @@ export default function BikesPage() {
 
   // Use custom filter hook
   const { filters, page, setPage, getCleanFilters, setSearch, setStatus, setBlueprint, setBrand, setPriceMin, setPriceMax, setCurrency, logFilters } = useEntityFilters();
+
+  const quickEdit = useQuickEditRow();
+  const validateBikeQuickEdit = combineValidators(
+    (draft) => validateNonNegativeNumbers(draft, ["cost_price", "sale_price"]),
+    (draft) => validateNonNegativeIntegers(draft, ["mileage"]),
+  );
 
   const loadBikes = useCallback(async () => {
     try {
@@ -95,6 +146,26 @@ export default function BikesPage() {
   }, [loadBikes]);
 
   useGlobalDataRefresh(loadBikes);
+
+  const handleSaveBikeQuickEdit = async (bike: BikeRecord) => {
+    const token = getAuthToken();
+    if (!token) throw new Error("Authentication required");
+
+    await quickEdit.saveEdit(
+      [...BIKE_QUICK_EDIT_KEYS],
+      validateBikeQuickEdit,
+      async (changes) => {
+        const updated = await patchBike(
+          token,
+          bike.id,
+          parseBikeQuickEditChanges(changes),
+        );
+        setBikes((prev) =>
+          prev.map((row) => (row.id === bike.id ? updated : row)),
+        );
+      },
+    );
+  };
 
   const handleDelete = async (id: number) => {
     if (!confirm("Are you sure you want to delete this bike?")) return;
@@ -227,91 +298,152 @@ export default function BikesPage() {
             }
           />
         ) : (
-          <div className="overflow-x-auto rounded-[1.5rem] border border-outline-variant/15 bg-surface-container-lowest">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-outline-variant/15 bg-surface-container-low">
-                  <th className="label-caps px-4 py-3 text-left">Blueprint</th>
-                  <th className="label-caps px-4 py-3 text-left">VIN</th>
-                  <th className="label-caps px-4 py-3 text-right">Sale Price</th>
-                  <th className="label-caps px-4 py-3 text-right">Cost Price</th>
-                  <th className="label-caps px-4 py-3 text-center">
-                    Mileage (km)
-                  </th>
-                  <th className="label-caps px-4 py-3 text-left">Status</th>
-                  <th className="label-caps px-4 py-3 text-left">Discount</th>
-                  <th className="label-caps px-4 py-3 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {bikes.map((bike) => (
-                  <tr
-                    key={bike.id}
-                    className="data-row"
-                  >
-                    <td className="px-4 py-3 text-on-surface font-medium">
-                      <div className="flex items-center gap-3">
-                        {bike.image ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={bike.image}
-                            alt=""
-                            className="h-10 w-10 flex-none rounded-xl object-cover"
+          <InventoryListTable>
+            <InventoryListTableToolbar label="Showroom listings" count={bikes.length} />
+            <InventoryListTableScroll>
+              <InventoryListTableElement minWidth="960px">
+                <InventoryListTableHead>
+                  <tr>
+                    <InventoryListTableTh>Blueprint</InventoryListTableTh>
+                    <InventoryListTableTh>VIN</InventoryListTableTh>
+                    <InventoryListTableTh align="right">Sale Price</InventoryListTableTh>
+                    <InventoryListTableTh align="right">Cost Price</InventoryListTableTh>
+                    <InventoryListTableTh align="center">Mileage (km)</InventoryListTableTh>
+                    <InventoryListTableTh>Status</InventoryListTableTh>
+                    <InventoryListTableTh>Discount</InventoryListTableTh>
+                    <InventoryListTableTh align="center">Actions</InventoryListTableTh>
+                  </tr>
+                </InventoryListTableHead>
+                <InventoryListTableBody>
+                {bikes.map((bike) => {
+                  const editing = quickEdit.isEditing(bike.id);
+                  return (
+                    <InventoryListTableRow key={bike.id} editing={editing}>
+                      <InventoryListTableTd variant="name">
+                        <div className="flex items-center gap-3">
+                          <InventoryItemThumbnail
+                            image={bike.image}
+                            name={getBlueprintLabel(bike.bike_blueprint_id)}
                           />
-                        ) : null}
-                        <span>{getBlueprintLabel(bike.bike_blueprint_id)}</span>
-                      </div>
-                    </td>
-                    <td className="mono-data px-4 py-3 text-xs text-on-surface-variant">
-                      {bike.vin}
-                    </td>
-                    <td className="mono-data px-4 py-3 text-right font-semibold text-primary">
-                      {formatCatalogPriceInEGP(
-                        bike.sale_price,
-                        toPricingCurrency(bike.currency_pricing),
-                        rates,
-                      )}
-                    </td>
-                    <td className="mono-data px-4 py-3 text-right text-on-surface-variant">
-                      {formatCatalogPriceInEGP(
-                        bike.cost_price,
-                        toPricingCurrency(bike.currency_pricing),
-                        rates,
-                      )}
-                    </td>
-                    <td className="mono-data px-4 py-3 text-center text-on-surface">
-                      {bike.mileage.toLocaleString()}
-                    </td>
-                    <td className="px-4 py-3">{getStatusBadge(bike.status)}</td>
-                    <td className="mono-data px-4 py-3 text-on-surface text-xs">
-                      {bike.max_discount_type === "percentage"
-                        ? `${bike.max_discount_value}%`
-                        : formatCatalogPriceInEGP(
-                            bike.max_discount_value,
+                          <span>{getBlueprintLabel(bike.bike_blueprint_id)}</span>
+                        </div>
+                      </InventoryListTableTd>
+                      <InventoryListTableTd variant="mono">{bike.vin}</InventoryListTableTd>
+                      <InventoryListTableTd align="right" variant="primary">
+                        {editing ? (
+                          <QuickEditInput
+                            value={quickEdit.draft.sale_price ?? ""}
+                            onChange={(value) =>
+                              quickEdit.updateField("sale_price", value)
+                            }
+                            type="number"
+                            min={0}
+                            step="any"
+                            align="right"
+                            aria-label="Sale price"
+                          />
+                        ) : (
+                          formatCatalogPriceInEGP(
+                            bike.sale_price,
                             toPricingCurrency(bike.currency_pricing),
                             rates,
-                          )}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <button
-                        onClick={() => router.push(`/inventory/bikes/edit/${bike.id}`)}
-                        className="text-primary hover:underline text-xs font-medium"
-                      >
-                        Edit
-                      </button>
-                      <span className="mx-2 text-on-surface-variant">•</span>
-                      <button
-                        onClick={() => handleDelete(bike.id)}
-                        className="text-error hover:underline text-xs font-medium"
-                      >
-                        Delete
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                          )
+                        )}
+                      </InventoryListTableTd>
+                      <InventoryListTableTd align="right" variant="mono">
+                        {editing ? (
+                          <QuickEditInput
+                            value={quickEdit.draft.cost_price ?? ""}
+                            onChange={(value) =>
+                              quickEdit.updateField("cost_price", value)
+                            }
+                            type="number"
+                            min={0}
+                            step="any"
+                            align="right"
+                            aria-label="Cost price"
+                          />
+                        ) : (
+                          formatCatalogPriceInEGP(
+                            bike.cost_price,
+                            toPricingCurrency(bike.currency_pricing),
+                            rates,
+                          )
+                        )}
+                      </InventoryListTableTd>
+                      <InventoryListTableTd align="center" variant="mono">
+                        {editing ? (
+                          <QuickEditInput
+                            value={quickEdit.draft.mileage ?? ""}
+                            onChange={(value) =>
+                              quickEdit.updateField("mileage", value)
+                            }
+                            type="number"
+                            min={0}
+                            step={1}
+                            align="center"
+                            aria-label="Mileage"
+                          />
+                        ) : (
+                          bike.mileage.toLocaleString()
+                        )}
+                      </InventoryListTableTd>
+                      <InventoryListTableTd>{getStatusBadge(bike.status)}</InventoryListTableTd>
+                      <InventoryListTableTd variant="muted">
+                        {bike.max_discount_type === "percentage"
+                          ? `${bike.max_discount_value}%`
+                          : formatCatalogPriceInEGP(
+                              bike.max_discount_value,
+                              toPricingCurrency(bike.currency_pricing),
+                              rates,
+                            )}
+                      </InventoryListTableTd>
+                      <InventoryListTableTd align="right" className="whitespace-nowrap">
+                        <QuickEditActions
+                          isEditing={editing}
+                          saving={quickEdit.saving}
+                          canSave={quickEdit.hasChanges([...BIKE_QUICK_EDIT_KEYS])}
+                          showQuickEdit={canUpdateBikes}
+                          onStartEdit={() =>
+                            quickEdit.startEdit(bike.id, {
+                              cost_price: bike.cost_price,
+                              sale_price: bike.sale_price,
+                              mileage: bike.mileage,
+                            })
+                          }
+                          onSave={() => handleSaveBikeQuickEdit(bike)}
+                          onCancel={quickEdit.cancelEdit}
+                        >
+                          <InventoryTableSecondaryActions>
+                            <InventoryTableActionLink
+                              onClick={() =>
+                                router.push(`/inventory/bikes/edit/${bike.id}`)
+                              }
+                              hidden={!canUpdateBikes}
+                            >
+                              Edit
+                            </InventoryTableActionLink>
+                            <InventoryTableActionDivider />
+                            <InventoryTableActionLink
+                              tone="danger"
+                              onClick={() => handleDelete(bike.id)}
+                              hidden={!canDeleteBikes}
+                            >
+                              Delete
+                            </InventoryTableActionLink>
+                          </InventoryTableSecondaryActions>
+                        </QuickEditActions>
+                        {editing && quickEdit.rowError ? (
+                          <InventoryListTableError message={quickEdit.rowError} />
+                        ) : null}
+                      </InventoryListTableTd>
+                    </InventoryListTableRow>
+                  );
+                })}
+                </InventoryListTableBody>
+              </InventoryListTableElement>
+            </InventoryListTableScroll>
+          </InventoryListTable>
         )}
       </SurfaceCard>
 

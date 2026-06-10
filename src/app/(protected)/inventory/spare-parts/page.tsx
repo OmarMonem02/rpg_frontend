@@ -13,14 +13,43 @@ import {
   listSparePartCategories,
   listBrands,
   deleteSparePart,
+  updateSparePart,
+  buildSparePartQuickEditPayload,
   createSparePartCategory,
   updateSparePartCategory,
   deleteSparePartCategory,
   type SparePartRecord,
   type SparePartCategoryRecord,
   type BrandRecord,
+  type SparePartQuickEditFields,
   fetchAllPages,
 } from "@/lib/crud-api";
+import {
+  QuickEditActions,
+  QuickEditInput,
+  combineValidators,
+  useQuickEditRow,
+  validateNonEmptyName,
+  validateNonNegativeIntegers,
+  validateNonNegativeNumbers,
+  type QuickEditDraft,
+} from "@/components/inventory/quick-edit";
+import {
+  InventoryItemThumbnail,
+  InventoryListTable,
+  InventoryListTableBody,
+  InventoryListTableElement,
+  InventoryListTableError,
+  InventoryListTableHead,
+  InventoryListTableRow,
+  InventoryListTableScroll,
+  InventoryListTableTd,
+  InventoryListTableTh,
+  InventoryListTableToolbar,
+  InventoryTableActionDivider,
+  InventoryTableActionLink,
+  InventoryTableSecondaryActions,
+} from "@/components/inventory/list-table";
 import { BikeCompatibilityFilter } from "@/components/BikeCompatibilityFilter";
 import {
   EntityFormModal,
@@ -39,6 +68,30 @@ import {
   PaginationControls,
   TabsWrapper,
 } from "@/components/ops-ui";
+
+const SPARE_PART_QUICK_EDIT_KEYS = [
+  "name",
+  "stock_quantity",
+  "low_stock_alarm",
+  "cost_price",
+  "sale_price",
+] as const;
+
+function parseSparePartQuickEditChanges(
+  changes: QuickEditDraft,
+): SparePartQuickEditFields {
+  const payload: SparePartQuickEditFields = {};
+  if ("name" in changes) payload.name = changes.name.trim();
+  if ("stock_quantity" in changes) {
+    payload.stock_quantity = Number(changes.stock_quantity);
+  }
+  if ("low_stock_alarm" in changes) {
+    payload.low_stock_alarm = Number(changes.low_stock_alarm);
+  }
+  if ("cost_price" in changes) payload.cost_price = Number(changes.cost_price);
+  if ("sale_price" in changes) payload.sale_price = Number(changes.sale_price);
+  return payload;
+}
 
 function TagsCell({ tags }: { tags?: string[] }) {
   if (!tags || tags.length === 0) {
@@ -103,6 +156,18 @@ export default function SparePartsPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
+  const quickEdit = useQuickEditRow();
+  const validateSparePartQuickEdit = combineValidators(
+    validateNonEmptyName,
+    (draft) =>
+      validateNonNegativeIntegers(draft, [
+        "stock_quantity",
+        "low_stock_alarm",
+      ]),
+    (draft) =>
+      validateNonNegativeNumbers(draft, ["cost_price", "sale_price"]),
+  );
+
   const loadDropdowns = useCallback(async () => {
     try {
       const token = getAuthToken();
@@ -159,6 +224,29 @@ export default function SparePartsPage() {
   }, [loadData]);
 
   useLiveDataRefresh(loadData);
+
+  const handleSaveSparePartQuickEdit = async (part: SparePartRecord) => {
+    const token = getAuthToken();
+    if (!token) throw new Error("Authentication required");
+
+    await quickEdit.saveEdit(
+      [...SPARE_PART_QUICK_EDIT_KEYS],
+      validateSparePartQuickEdit,
+      async (changes) => {
+        const updated = await updateSparePart(
+          token,
+          part.id,
+          buildSparePartQuickEditPayload(
+            part,
+            parseSparePartQuickEditChanges(changes),
+          ),
+        );
+        setSpareParts((prev) =>
+          prev.map((row) => (row.id === part.id ? updated : row)),
+        );
+      },
+    );
+  };
 
   const handleDeleteSparePart = async (id: number) => {
     if (!confirm("Are you sure you want to delete this spare part?")) return;
@@ -348,114 +436,208 @@ export default function SparePartsPage() {
           }
         />
       ) : (
-        <div className="overflow-x-auto rounded-[1.5rem] border border-outline-variant/15 bg-surface-container-lowest">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-outline-variant/15 bg-surface-container-low">
-                <th className="label-caps px-8 py-4 text-left">Image</th>
-                <th className="label-caps px-1 py-4 text-left">SKU <br />Part Number</th>
-                <th className="label-caps px-8 py-4 text-left">Name</th>
-                <th className="label-caps px-8 py-4 text-left">Stock</th>
-                <th className="label-caps px-8 py-4 text-left">Alarm on</th>
-                <th className="label-caps px-8 py-4 text-left">Cost Price</th>
-                <th className="label-caps px-8 py-4 text-left">Price</th>
-                <th className="label-caps px-8 py-4 text-left">Category</th>
-                <th className="label-caps px-8 py-4 text-left">Brand</th>
-                <th className="label-caps px-8 py-4 text-left">Tags</th>
-                <th className="label-caps px-8 py-4 text-left">Is Universal</th>
-                <th className="label-caps px-8 py-4 text-center">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {spareParts.map((part) => (
-                <tr key={part.id} className="data-row">
-                  <td className="mono-data px-8 py-3 text-xs text-on-surface-variant">
-                    {part.image ? (
-                      <img
-                        src={part.image}
-                        alt=""
-                        className="h-10 w-10 flex-none rounded-xl object-cover"
-                      />
-                    ) : null}{" "}
-                  </td>
-                  <td className="mono-data px-1 py-3 text-xs text-on-surface-variant">
-                    {part.sku}<br />
-                    {part.part_number}
-                  </td>
-                  <td className="px-8 py-3 text-on-surface">
-                    <div className="flex items-center gap-3">
-                      <span>{part.name}</span>
-                    </div>
-                  </td>
-                  <td className="px-8 py-3 text-center">
-                    <StockBadge
-                      stock_quantity={part.stock_quantity}
-                      low_stock_alarm={part.low_stock_alarm}
-                    />
-                  </td>
-                  <td className="px-8 py-3 text-center">
-                    <span className="form-chip bg-primary/8 text-primary border-primary/15">
-                      {part.low_stock_alarm}
-                    </span>
-                  </td>
-                  <td className="mono-data px-8 py-3 text-primary">
-                    {formatCatalogPriceInEGP(
-                      part.cost_price,
-                      part.currency_pricing,
-                      rates,
-                    )}
-                  </td>
-                  <td className="mono-data px-8 py-3 text-primary">
-                    {formatCatalogPriceInEGP(
-                      part.sale_price,
-                      part.currency_pricing,
-                      rates,
-                    )}
-                  </td>
-                  <td className="px-8 py-3">
-                    <span className="form-chip">
-                      {
-                        allCategories.find(
-                          (c) => c.id === part.spare_parts_category_id,
-                        )?.name
-                      }
-                    </span>
-                  </td>
-                  <td className="px-8 py-3">
-                    <span className="form-chip bg-primary/8 text-primary border-primary/15">
-                      {brands.find((b) => b.id === part.brand_id)?.name}
-                    </span>
-                  </td>
-                  <td className="px-8 py-3">
-                    <TagsCell tags={part.tags} />
-                  </td>
-                  <td className="px-8 py-3">
-                    <span className="form-chip bg-primary/8 text-primary border-primary/15">
-                      {part.universal ? "Universal" : "Specific"}
-                    </span>
-                  </td>
-                  <td className="px-8 py-3 text-right flex items-center">
-                    <button
-                      onClick={() =>
-                        router.push(`/inventory/spare-parts/edit/${part.id}`)
-                      }
-                      className="text-primary hover:underline text-xs font-medium"
-                    >
-                      Edit
-                    </button>
-                    <span className="mx-2 text-on-surface-variant">•</span>
-                    <button
-                      onClick={() => handleDeleteSparePart(part.id)}
-                      className="text-error hover:underline text-xs font-medium"
-                    >
-                      Delete
-                    </button>
-                  </td>
+        <InventoryListTable>
+          <InventoryListTableToolbar label="Spare parts catalog" count={spareParts.length} />
+          <InventoryListTableScroll>
+            <InventoryListTableElement minWidth="1280px">
+              <InventoryListTableHead>
+                <tr>
+                  <InventoryListTableTh className="w-14">Image</InventoryListTableTh>
+                  <InventoryListTableTh>
+                    SKU
+                    <br />
+                    Part Number
+                  </InventoryListTableTh>
+                  <InventoryListTableTh>Name</InventoryListTableTh>
+                  <InventoryListTableTh align="center">Stock</InventoryListTableTh>
+                  <InventoryListTableTh align="center">Alarm on</InventoryListTableTh>
+                  <InventoryListTableTh>Cost Price</InventoryListTableTh>
+                  <InventoryListTableTh>Price</InventoryListTableTh>
+                  <InventoryListTableTh>Category</InventoryListTableTh>
+                  <InventoryListTableTh>Brand</InventoryListTableTh>
+                  <InventoryListTableTh>Tags</InventoryListTableTh>
+                  <InventoryListTableTh>Universal</InventoryListTableTh>
+                  <InventoryListTableTh align="center">Actions</InventoryListTableTh>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </InventoryListTableHead>
+              <InventoryListTableBody>
+              {spareParts.map((part) => {
+                const editing = quickEdit.isEditing(part.id);
+                return (
+                  <InventoryListTableRow key={part.id} editing={editing}>
+                    <InventoryListTableTd>
+                      <InventoryItemThumbnail image={part.image} name={part.name} />
+                    </InventoryListTableTd>
+                    <InventoryListTableTd variant="mono">
+                      {part.sku}
+                      <br />
+                      {part.part_number || "—"}
+                    </InventoryListTableTd>
+                    <InventoryListTableTd variant="name">
+                      {editing ? (
+                        <QuickEditInput
+                          value={quickEdit.draft.name ?? ""}
+                          onChange={(value) =>
+                            quickEdit.updateField("name", value)
+                          }
+                          aria-label="Spare part name"
+                        />
+                      ) : (
+                        part.name
+                      )}
+                    </InventoryListTableTd>
+                    <InventoryListTableTd align="center">
+                      {editing ? (
+                        <QuickEditInput
+                          value={quickEdit.draft.stock_quantity ?? ""}
+                          onChange={(value) =>
+                            quickEdit.updateField("stock_quantity", value)
+                          }
+                          type="number"
+                          min={0}
+                          step={1}
+                          align="center"
+                          aria-label="Stock quantity"
+                        />
+                      ) : (
+                        <StockBadge
+                          stock_quantity={part.stock_quantity}
+                          low_stock_alarm={part.low_stock_alarm}
+                        />
+                      )}
+                    </InventoryListTableTd>
+                    <InventoryListTableTd align="center">
+                      {editing ? (
+                        <QuickEditInput
+                          value={quickEdit.draft.low_stock_alarm ?? ""}
+                          onChange={(value) =>
+                            quickEdit.updateField("low_stock_alarm", value)
+                          }
+                          type="number"
+                          min={0}
+                          step={1}
+                          align="center"
+                          aria-label="Low stock alarm"
+                        />
+                      ) : (
+                        <span className="form-chip bg-primary/8 text-primary border-primary/15">
+                          {part.low_stock_alarm}
+                        </span>
+                      )}
+                    </InventoryListTableTd>
+                    <InventoryListTableTd variant="primary">
+                      {editing ? (
+                        <QuickEditInput
+                          value={quickEdit.draft.cost_price ?? ""}
+                          onChange={(value) =>
+                            quickEdit.updateField("cost_price", value)
+                          }
+                          type="number"
+                          min={0}
+                          step="any"
+                          aria-label="Cost price"
+                        />
+                      ) : (
+                        formatCatalogPriceInEGP(
+                          part.cost_price,
+                          part.currency_pricing,
+                          rates,
+                        )
+                      )}
+                    </InventoryListTableTd>
+                    <InventoryListTableTd variant="primary">
+                      {editing ? (
+                        <QuickEditInput
+                          value={quickEdit.draft.sale_price ?? ""}
+                          onChange={(value) =>
+                            quickEdit.updateField("sale_price", value)
+                          }
+                          type="number"
+                          min={0}
+                          step="any"
+                          aria-label="Sale price"
+                        />
+                      ) : (
+                        formatCatalogPriceInEGP(
+                          part.sale_price,
+                          part.currency_pricing,
+                          rates,
+                        )
+                      )}
+                    </InventoryListTableTd>
+                    <InventoryListTableTd>
+                      <span className="form-chip">
+                        {
+                          allCategories.find(
+                            (c) => c.id === part.spare_parts_category_id,
+                          )?.name
+                        }
+                      </span>
+                    </InventoryListTableTd>
+                    <InventoryListTableTd>
+                      <span className="form-chip bg-primary/8 text-primary border-primary/15">
+                        {brands.find((b) => b.id === part.brand_id)?.name}
+                      </span>
+                    </InventoryListTableTd>
+                    <InventoryListTableTd>
+                      <TagsCell tags={part.tags} />
+                    </InventoryListTableTd>
+                    <InventoryListTableTd>
+                      <span className="form-chip bg-primary/8 text-primary border-primary/15">
+                        {part.universal ? "Universal" : "Specific"}
+                      </span>
+                    </InventoryListTableTd>
+                    <InventoryListTableTd align="right" className="whitespace-nowrap">
+                      <QuickEditActions
+                        isEditing={editing}
+                        saving={quickEdit.saving}
+                        canSave={quickEdit.hasChanges([
+                          ...SPARE_PART_QUICK_EDIT_KEYS,
+                        ])}
+                        showQuickEdit={canUpdateSpareParts}
+                        onStartEdit={() =>
+                          quickEdit.startEdit(part.id, {
+                            name: part.name,
+                            stock_quantity: part.stock_quantity,
+                            low_stock_alarm: part.low_stock_alarm,
+                            cost_price: part.cost_price,
+                            sale_price: part.sale_price,
+                          })
+                        }
+                        onSave={() => handleSaveSparePartQuickEdit(part)}
+                        onCancel={quickEdit.cancelEdit}
+                      >
+                        <InventoryTableSecondaryActions>
+                          <InventoryTableActionLink
+                            onClick={() =>
+                              router.push(
+                                `/inventory/spare-parts/edit/${part.id}`,
+                              )
+                            }
+                            hidden={!canUpdateSpareParts}
+                          >
+                            Edit
+                          </InventoryTableActionLink>
+                          <InventoryTableActionDivider />
+                          <InventoryTableActionLink
+                            tone="danger"
+                            onClick={() => handleDeleteSparePart(part.id)}
+                          >
+                            Delete
+                          </InventoryTableActionLink>
+                        </InventoryTableSecondaryActions>
+                      </QuickEditActions>
+                      {editing && quickEdit.rowError ? (
+                        <InventoryListTableError message={quickEdit.rowError} />
+                      ) : null}
+                    </InventoryListTableTd>
+                  </InventoryListTableRow>
+                );
+              })}
+              </InventoryListTableBody>
+            </InventoryListTableElement>
+          </InventoryListTableScroll>
+        </InventoryListTable>
       )}
 
       <PaginationControls
@@ -497,44 +679,48 @@ export default function SparePartsPage() {
           }
         />
       ) : (
-        <div className="overflow-x-auto rounded-[1.5rem] border border-outline-variant/15 bg-surface-container-lowest">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-outline-variant/15 bg-surface-container-low">
-                <th className="label-caps px-4 py-3 text-left">Name</th>
-                <th className="label-caps px-4 py-3 text-left">Created</th>
-                <th className="label-caps px-4 py-3 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
+        <InventoryListTable>
+          <InventoryListTableToolbar label="Categories" count={categories.length} />
+          <InventoryListTableScroll>
+            <InventoryListTableElement minWidth="560px">
+              <InventoryListTableHead>
+                <tr>
+                  <InventoryListTableTh>Name</InventoryListTableTh>
+                  <InventoryListTableTh>Created</InventoryListTableTh>
+                  <InventoryListTableTh align="center">Actions</InventoryListTableTh>
+                </tr>
+              </InventoryListTableHead>
+              <InventoryListTableBody>
               {categories.map((cat) => (
-                <tr key={cat.id} className="data-row">
-                  <td className="px-4 py-3 text-on-surface">{cat.name}</td>
-                  <td className="px-4 py-3 text-on-surface-variant text-xs">
+                <InventoryListTableRow key={cat.id}>
+                  <InventoryListTableTd variant="name">{cat.name}</InventoryListTableTd>
+                  <InventoryListTableTd variant="muted">
                     {cat.created_at
                       ? new Date(cat.created_at).toLocaleDateString()
                       : "-"}
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    <button
-                      onClick={() => handleOpenCategoryModal(cat)}
-                      className="text-primary hover:underline text-xs font-medium"
-                    >
-                      Edit
-                    </button>
-                    <span className="mx-2 text-on-surface-variant">•</span>
-                    <button
-                      onClick={() => handleDeleteCategory(cat.id)}
-                      className="text-error hover:underline text-xs font-medium"
-                    >
-                      Delete
-                    </button>
-                  </td>
-                </tr>
+                  </InventoryListTableTd>
+                  <InventoryListTableTd align="right" className="whitespace-nowrap">
+                    <InventoryTableSecondaryActions>
+                      <InventoryTableActionLink
+                        onClick={() => handleOpenCategoryModal(cat)}
+                      >
+                        Edit
+                      </InventoryTableActionLink>
+                      {/* <InventoryTableActionDivider /> */}
+                      <InventoryTableActionLink
+                        tone="danger"
+                        onClick={() => handleDeleteCategory(cat.id)}
+                      >
+                        Delete
+                      </InventoryTableActionLink>
+                    </InventoryTableSecondaryActions>
+                  </InventoryListTableTd>
+                </InventoryListTableRow>
               ))}
-            </tbody>
-          </table>
-        </div>
+              </InventoryListTableBody>
+            </InventoryListTableElement>
+          </InventoryListTableScroll>
+        </InventoryListTable>
       )}
 
       <PaginationControls

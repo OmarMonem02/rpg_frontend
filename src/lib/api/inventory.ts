@@ -602,6 +602,60 @@ export async function updateProduct(
   return normalizeProduct(record.data ?? record);
 }
 
+export type ProductQuickEditFields = Partial<
+  Pick<
+    ProductRecord,
+    "name" | "stock_quantity" | "low_stock_alarm" | "cost_price" | "sale_price"
+  >
+>;
+
+export async function patchProduct(
+  token: string,
+  id: number,
+  payload: ProductQuickEditFields,
+): Promise<ProductRecord> {
+  const data = await authorizedFetch<unknown>(`/products/${id}`, token, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const record = asRecord(data);
+  return normalizeProduct(record.data ?? record);
+}
+
+export type SparePartQuickEditFields = Partial<
+  Pick<
+    SparePartRecord,
+    "name" | "stock_quantity" | "low_stock_alarm" | "cost_price" | "sale_price"
+  >
+>;
+
+export function buildSparePartQuickEditPayload(
+  record: SparePartRecord,
+  changes: SparePartQuickEditFields,
+): UpdateSparePartPayload {
+  return {
+    name: changes.name ?? record.name,
+    sku: record.sku,
+    image: record.image,
+    image_public_id: record.image_public_id,
+    part_number: record.part_number,
+    stock_quantity: changes.stock_quantity ?? record.stock_quantity,
+    low_stock_alarm: changes.low_stock_alarm ?? record.low_stock_alarm,
+    spare_parts_category_id: record.spare_parts_category_id,
+    brand_id: record.brand_id,
+    currency_pricing: record.currency_pricing,
+    cost_price: changes.cost_price ?? record.cost_price,
+    sale_price: changes.sale_price ?? record.sale_price,
+    max_discount_type: record.max_discount_type,
+    max_discount_value: record.max_discount_value,
+    universal: record.universal,
+    notes: record.notes,
+    tags: record.tags,
+    bike_blueprint_ids: record.bike_blueprint_ids,
+  };
+}
+
 export async function deleteProduct(token: string, id: number): Promise<void> {
   await authorizedFetch<void>(`/products/${id}`, token, { method: "DELETE" });
 }

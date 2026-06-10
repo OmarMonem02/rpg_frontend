@@ -13,14 +13,42 @@ import {
   listProductCategories,
   listBrands,
   deleteProduct,
+  patchProduct,
   createProductCategory,
   updateProductCategory,
   deleteProductCategory,
   type ProductRecord,
   type ProductCategoryRecord,
   type BrandRecord,
+  type ProductQuickEditFields,
   fetchAllPages,
 } from "@/lib/crud-api";
+import {
+  QuickEditActions,
+  QuickEditInput,
+  combineValidators,
+  useQuickEditRow,
+  validateNonEmptyName,
+  validateNonNegativeIntegers,
+  validateNonNegativeNumbers,
+  type QuickEditDraft,
+} from "@/components/inventory/quick-edit";
+import {
+  InventoryItemThumbnail,
+  InventoryListTable,
+  InventoryListTableBody,
+  InventoryListTableElement,
+  InventoryListTableError,
+  InventoryListTableHead,
+  InventoryListTableRow,
+  InventoryListTableScroll,
+  InventoryListTableTd,
+  InventoryListTableTh,
+  InventoryListTableToolbar,
+  InventoryTableActionDivider,
+  InventoryTableActionLink,
+  InventoryTableSecondaryActions,
+} from "@/components/inventory/list-table";
 import {
   EntityFormModal,
   type FieldConfig,
@@ -39,6 +67,30 @@ import {
   PaginationControls,
   TabsWrapper,
 } from "@/components/ops-ui";
+
+const PRODUCT_QUICK_EDIT_KEYS = [
+  "name",
+  "stock_quantity",
+  "low_stock_alarm",
+  "cost_price",
+  "sale_price",
+] as const;
+
+function parseProductQuickEditChanges(
+  changes: QuickEditDraft,
+): ProductQuickEditFields {
+  const payload: ProductQuickEditFields = {};
+  if ("name" in changes) payload.name = changes.name.trim();
+  if ("stock_quantity" in changes) {
+    payload.stock_quantity = Number(changes.stock_quantity);
+  }
+  if ("low_stock_alarm" in changes) {
+    payload.low_stock_alarm = Number(changes.low_stock_alarm);
+  }
+  if ("cost_price" in changes) payload.cost_price = Number(changes.cost_price);
+  if ("sale_price" in changes) payload.sale_price = Number(changes.sale_price);
+  return payload;
+}
 
 function TagsCell({ tags }: { tags?: string[] }) {
   if (!tags || tags.length === 0) {
@@ -111,6 +163,18 @@ export default function ProductsPage() {
   const canDeleteProductCategories =
     permissions.canDelete("product-categories");
 
+  const quickEdit = useQuickEditRow();
+  const validateProductQuickEdit = combineValidators(
+    validateNonEmptyName,
+    (draft) =>
+      validateNonNegativeIntegers(draft, [
+        "stock_quantity",
+        "low_stock_alarm",
+      ]),
+    (draft) =>
+      validateNonNegativeNumbers(draft, ["cost_price", "sale_price"]),
+  );
+
   const loadDropdowns = useCallback(async () => {
     try {
       const token = getAuthToken();
@@ -165,6 +229,26 @@ export default function ProductsPage() {
   }, [loadData]);
 
   useLiveDataRefresh(loadData);
+
+  const handleSaveProductQuickEdit = async (product: ProductRecord) => {
+    const token = getAuthToken();
+    if (!token) throw new Error("Authentication required");
+
+    await quickEdit.saveEdit(
+      [...PRODUCT_QUICK_EDIT_KEYS],
+      validateProductQuickEdit,
+      async (changes) => {
+        const updated = await patchProduct(
+          token,
+          product.id,
+          parseProductQuickEditChanges(changes),
+        );
+        setProducts((prev) =>
+          prev.map((row) => (row.id === product.id ? updated : row)),
+        );
+      },
+    );
+  };
 
   const handleDeleteProduct = async (id: number) => {
     if (!canDeleteProducts) {
@@ -372,112 +456,210 @@ export default function ProductsPage() {
           }
         />
       ) : (
-        <div className="overflow-x-auto rounded-[1.5rem] border border-outline-variant/15 bg-surface-container-lowest">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-outline-variant/15 bg-surface-container-low">
-                <th className="label-caps px-8 py-4 text-left">Image</th>
-                <th className="label-caps px-1 py-4 text-left">SKU <br />Part Number</th>
-                <th className="label-caps px-8 py-4 text-left">Name</th>
-                <th className="label-caps px-8 py-4 text-left">Stock</th>
-                <th className="label-caps px-8 py-4 text-left">Alarm on</th>
-                <th className="label-caps px-8 py-4 text-left">Cost Price</th>
-                <th className="label-caps px-8 py-4 text-left">Sale Price</th>
-                <th className="label-caps px-8 py-4 text-left">Category</th>
-                <th className="label-caps px-8 py-4 text-left">Brand</th>
-                <th className="label-caps px-8 py-4 text-left">Tags</th>
-                <th className="label-caps px-8 py-4 text-left">Is Universal</th>
-                <th className="label-caps px-8 py-4 text-center">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {products.map((product) => (
-                <tr key={product.id} className="data-row">
-                  <td className="mono-data px-8 py-3 text-xs text-on-surface-variant">
-                    {product.image ? (
-                      <img
-                        src={product.image}
-                        alt=""
-                        className="h-10 w-10 flex-none rounded-xl object-cover"
-                      />
-                    ) : null}{" "}
-                  </td>
-                  <td className="mono-data px-4 py-3 text-xs text-on-surface-variant">
-                    {product.sku}<br />
-                    {product.part_number}
-                  </td>
-                  <td className="mono-data px-4 py-3 text-xs text-on-surface-variant">
-                    {product.name}</td>
-                  
-                  <td className="px-4 py-3 text-center">
-                    <StockBadge
-                      stock_quantity={product.stock_quantity}
-                      low_stock_alarm={product.low_stock_alarm}
-                    />
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                  {product.stock_quantity}
-                  </td>
-                  <td className="mono-data px-4 py-3 text-primary">
-                    {formatCatalogPriceInEGP(
-                      product.cost_price,
-                      product.currency_pricing,
-                      rates,
-                    )}
-                  </td>
-                  <td className="mono-data px-4 py-3 text-primary">
-                    {formatCatalogPriceInEGP(
-                      product.sale_price,
-                      product.currency_pricing,
-                      rates,
-                    )}
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className="form-chip">
-                      {
-                        allCategories.find(
-                          (c) => c.id === product.products_category_id,
-                        )?.name
-                      }
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className="form-chip bg-primary/8 text-primary border-primary/15">
-                      {brands.find((b) => b.id === product.brand_id)?.name}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <TagsCell tags={product.tags} />
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className="form-chip bg-primary/8 text-primary border-primary/15">
-                      {product.universal ? "Universal" : "Specific"}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <button
-                      onClick={() =>
-                        router.push(`/inventory/products/edit/${product.id}`)
-                      }
-                      hidden={!canUpdateProducts}
-                      className="text-primary hover:underline text-xs font-medium"
-                    >
-                      Edit
-                    </button>
-                    <span className="mx-2 text-on-surface-variant">•</span>
-                    <button
-                      onClick={() => handleDeleteProduct(product.id)}
-                      hidden={!canDeleteProducts}
-                      className="text-error hover:underline text-xs font-medium"
-                    >
-                      Delete
-                    </button>
-                  </td>
+        <InventoryListTable>
+          <InventoryListTableToolbar label="Product catalog" count={products.length} />
+          <InventoryListTableScroll>
+            <InventoryListTableElement minWidth="1280px">
+              <InventoryListTableHead>
+                <tr>
+                  <InventoryListTableTh className="w-14">Image</InventoryListTableTh>
+                  <InventoryListTableTh>
+                    SKU
+                    <br />
+                    Part Number
+                  </InventoryListTableTh>
+                  <InventoryListTableTh>Name</InventoryListTableTh>
+                  <InventoryListTableTh align="center">Stock</InventoryListTableTh>
+                  <InventoryListTableTh align="center">Alarm on</InventoryListTableTh>
+                  <InventoryListTableTh>Cost Price</InventoryListTableTh>
+                  <InventoryListTableTh>Sale Price</InventoryListTableTh>
+                  <InventoryListTableTh>Category</InventoryListTableTh>
+                  <InventoryListTableTh>Brand</InventoryListTableTh>
+                  <InventoryListTableTh>Tags</InventoryListTableTh>
+                  <InventoryListTableTh>Universal</InventoryListTableTh>
+                  <InventoryListTableTh align="center">Actions</InventoryListTableTh>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </InventoryListTableHead>
+              <InventoryListTableBody>
+              {products.map((product) => {
+                const editing = quickEdit.isEditing(product.id);
+                return (
+                  <InventoryListTableRow key={product.id} editing={editing}>
+                    <InventoryListTableTd>
+                      <InventoryItemThumbnail
+                        image={product.image}
+                        name={product.name}
+                      />
+                    </InventoryListTableTd>
+                    <InventoryListTableTd variant="mono">
+                      {product.sku}
+                      <br />
+                      {product.part_number || "—"}
+                    </InventoryListTableTd>
+                    <InventoryListTableTd variant="name">
+                      {editing ? (
+                        <QuickEditInput
+                          value={quickEdit.draft.name ?? ""}
+                          onChange={(value) =>
+                            quickEdit.updateField("name", value)
+                          }
+                          aria-label="Product name"
+                        />
+                      ) : (
+                        product.name
+                      )}
+                    </InventoryListTableTd>
+                    <InventoryListTableTd align="center">
+                      {editing ? (
+                        <QuickEditInput
+                          value={quickEdit.draft.stock_quantity ?? ""}
+                          onChange={(value) =>
+                            quickEdit.updateField("stock_quantity", value)
+                          }
+                          type="number"
+                          min={0}
+                          step={1}
+                          align="center"
+                          aria-label="Stock quantity"
+                        />
+                      ) : (
+                        <StockBadge
+                          stock_quantity={product.stock_quantity}
+                          low_stock_alarm={product.low_stock_alarm}
+                        />
+                      )}
+                    </InventoryListTableTd>
+                    <InventoryListTableTd align="center" variant="mono">
+                      {editing ? (
+                        <QuickEditInput
+                          value={quickEdit.draft.low_stock_alarm ?? ""}
+                          onChange={(value) =>
+                            quickEdit.updateField("low_stock_alarm", value)
+                          }
+                          type="number"
+                          min={0}
+                          step={1}
+                          align="center"
+                          aria-label="Low stock alarm"
+                        />
+                      ) : (
+                        product.low_stock_alarm
+                      )}
+                    </InventoryListTableTd>
+                    <InventoryListTableTd variant="primary">
+                      {editing ? (
+                        <QuickEditInput
+                          value={quickEdit.draft.cost_price ?? ""}
+                          onChange={(value) =>
+                            quickEdit.updateField("cost_price", value)
+                          }
+                          type="number"
+                          min={0}
+                          step="any"
+                          aria-label="Cost price"
+                        />
+                      ) : (
+                        formatCatalogPriceInEGP(
+                          product.cost_price,
+                          product.currency_pricing,
+                          rates,
+                        )
+                      )}
+                    </InventoryListTableTd>
+                    <InventoryListTableTd variant="primary">
+                      {editing ? (
+                        <QuickEditInput
+                          value={quickEdit.draft.sale_price ?? ""}
+                          onChange={(value) =>
+                            quickEdit.updateField("sale_price", value)
+                          }
+                          type="number"
+                          min={0}
+                          step="any"
+                          aria-label="Sale price"
+                        />
+                      ) : (
+                        formatCatalogPriceInEGP(
+                          product.sale_price,
+                          product.currency_pricing,
+                          rates,
+                        )
+                      )}
+                    </InventoryListTableTd>
+                    <InventoryListTableTd>
+                      <span className="form-chip">
+                        {
+                          allCategories.find(
+                            (c) => c.id === product.products_category_id,
+                          )?.name
+                        }
+                      </span>
+                    </InventoryListTableTd>
+                    <InventoryListTableTd>
+                      <span className="form-chip bg-primary/8 text-primary border-primary/15">
+                        {brands.find((b) => b.id === product.brand_id)?.name}
+                      </span>
+                    </InventoryListTableTd>
+                    <InventoryListTableTd>
+                      <TagsCell tags={product.tags} />
+                    </InventoryListTableTd>
+                    <InventoryListTableTd>
+                      <span className="form-chip bg-primary/8 text-primary border-primary/15">
+                        {product.universal ? "Universal" : "Specific"}
+                      </span>
+                    </InventoryListTableTd>
+                    <InventoryListTableTd align="right" className="whitespace-nowrap">
+                      <QuickEditActions
+                        isEditing={editing}
+                        saving={quickEdit.saving}
+                        canSave={quickEdit.hasChanges([
+                          ...PRODUCT_QUICK_EDIT_KEYS,
+                        ])}
+                        showQuickEdit={canUpdateProducts}
+                        onStartEdit={() =>
+                          quickEdit.startEdit(product.id, {
+                            name: product.name,
+                            stock_quantity: product.stock_quantity,
+                            low_stock_alarm: product.low_stock_alarm,
+                            cost_price: product.cost_price,
+                            sale_price: product.sale_price,
+                          })
+                        }
+                        onSave={() => handleSaveProductQuickEdit(product)}
+                        onCancel={quickEdit.cancelEdit}
+                      >
+                        <InventoryTableSecondaryActions>
+                          <InventoryTableActionLink
+                            onClick={() =>
+                              router.push(
+                                `/inventory/products/edit/${product.id}`,
+                              )
+                            }
+                            hidden={!canUpdateProducts}
+                          >
+                            Edit
+                          </InventoryTableActionLink>
+                          {/* <InventoryTableActionDivider /> */}
+                          <InventoryTableActionLink
+                            tone="danger"
+                            onClick={() => handleDeleteProduct(product.id)}
+                            hidden={!canDeleteProducts}
+                          >
+                            Delete
+                          </InventoryTableActionLink>
+                        </InventoryTableSecondaryActions>
+                      </QuickEditActions>
+                      {editing && quickEdit.rowError ? (
+                        <InventoryListTableError message={quickEdit.rowError} />
+                      ) : null}
+                    </InventoryListTableTd>
+                  </InventoryListTableRow>
+                );
+              })}
+              </InventoryListTableBody>
+            </InventoryListTableElement>
+          </InventoryListTableScroll>
+        </InventoryListTable>
       )}
 
       <PaginationControls
@@ -526,46 +708,50 @@ export default function ProductsPage() {
           }
         />
       ) : (
-        <div className="overflow-x-auto rounded-[1.5rem] border border-outline-variant/15 bg-surface-container-lowest">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-outline-variant/15 bg-surface-container-low">
-                <th className="label-caps px-4 py-3 text-left">Name</th>
-                <th className="label-caps px-4 py-3 text-left">Created</th>
-                <th className="label-caps px-4 py-3 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
+        <InventoryListTable>
+          <InventoryListTableToolbar label="Categories" count={categories.length} />
+          <InventoryListTableScroll>
+            <InventoryListTableElement minWidth="560px">
+              <InventoryListTableHead>
+                <tr>
+                  <InventoryListTableTh>Name</InventoryListTableTh>
+                  <InventoryListTableTh>Created</InventoryListTableTh>
+                  <InventoryListTableTh align="center">Actions</InventoryListTableTh>
+                </tr>
+              </InventoryListTableHead>
+              <InventoryListTableBody>
               {categories.map((cat) => (
-                <tr key={cat.id} className="data-row">
-                  <td className="px-4 py-3 text-on-surface">{cat.name}</td>
-                  <td className="px-4 py-3 text-on-surface-variant text-xs">
+                <InventoryListTableRow key={cat.id}>
+                  <InventoryListTableTd variant="name">{cat.name}</InventoryListTableTd>
+                  <InventoryListTableTd variant="muted">
                     {cat.created_at
                       ? new Date(cat.created_at).toLocaleDateString()
                       : "-"}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <button
-                      onClick={() => handleOpenCategoryModal(cat)}
-                      hidden={!canUpdateProductCategories}
-                      className="text-primary hover:underline text-xs font-medium"
-                    >
-                      Edit
-                    </button>
-                    <span className="mx-2 text-on-surface-variant">•</span>
-                    <button
-                      onClick={() => handleDeleteCategory(cat.id)}
-                      hidden={!canDeleteProductCategories}
-                      className="text-error hover:underline text-xs font-medium"
-                    >
-                      Delete
-                    </button>
-                  </td>
-                </tr>
+                  </InventoryListTableTd>
+                  <InventoryListTableTd align="right" className="whitespace-nowrap">
+                    <InventoryTableSecondaryActions>
+                      <InventoryTableActionLink
+                        onClick={() => handleOpenCategoryModal(cat)}
+                        hidden={!canUpdateProductCategories}
+                      >
+                        Edit
+                      </InventoryTableActionLink>
+                      <InventoryTableActionDivider />
+                      <InventoryTableActionLink
+                        tone="danger"
+                        onClick={() => handleDeleteCategory(cat.id)}
+                        hidden={!canDeleteProductCategories}
+                      >
+                        Delete
+                      </InventoryTableActionLink>
+                    </InventoryTableSecondaryActions>
+                  </InventoryListTableTd>
+                </InventoryListTableRow>
               ))}
-            </tbody>
-          </table>
-        </div>
+              </InventoryListTableBody>
+            </InventoryListTableElement>
+          </InventoryListTableScroll>
+        </InventoryListTable>
       )}
 
       <PaginationControls

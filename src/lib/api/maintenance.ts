@@ -201,6 +201,28 @@ export async function updateMaintenanceService(
   return normalizeMaintenanceService(record.data ?? record);
 }
 
+export type MaintenanceServiceQuickEditFields = Partial<
+  Pick<MaintenanceServiceRecord, "name" | "service_price">
+>;
+
+export async function patchMaintenanceService(
+  token: string,
+  id: number,
+  payload: MaintenanceServiceQuickEditFields,
+): Promise<MaintenanceServiceRecord> {
+  const data = await authorizedFetch<unknown>(
+    `/maintenance_services/${id}`,
+    token,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    },
+  );
+  const record = asRecord(data);
+  return normalizeMaintenanceService(record.data ?? record);
+}
+
 export async function deleteMaintenanceService(
   token: string,
   id: number,

@@ -303,6 +303,24 @@ export async function updateBike(
   return normalizeBike(record.data ?? record);
 }
 
+export type BikeQuickEditFields = Partial<
+  Pick<BikeRecord, "cost_price" | "sale_price" | "mileage">
+>;
+
+export async function patchBike(
+  token: string,
+  id: number,
+  payload: BikeQuickEditFields,
+): Promise<BikeRecord> {
+  const data = await authorizedFetch<unknown>(`/bike_for_sale/${id}`, token, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const record = asRecord(data);
+  return normalizeBike(record.data ?? record);
+}
+
 export async function deleteBike(token: string, id: number): Promise<void> {
   await authorizedFetch<void>(`/bike_for_sale/${id}`, token, {
     method: "DELETE",

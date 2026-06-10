@@ -2,10 +2,35 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { EntityFormModal, type FieldConfig } from "@/components/entity-form-modal";
+import { usePermissions } from "@/components/permission-provider";
 import { useEntityFilters } from "@/hooks/useEntityFilters";
 import { useExchangeRates } from "@/hooks/useExchangeRates";
 import { useGlobalDataRefresh } from "@/hooks/useGlobalDataRefresh";
 import { formatCatalogPriceInEGP } from "@/lib/currencies";
+import {
+  QuickEditActions,
+  QuickEditInput,
+  combineValidators,
+  useQuickEditRow,
+  validateNonEmptyName,
+  validateNonNegativeNumbers,
+  type QuickEditDraft,
+} from "@/components/inventory/quick-edit";
+import {
+  InventoryListTable,
+  InventoryListTableBody,
+  InventoryListTableElement,
+  InventoryListTableError,
+  InventoryListTableHead,
+  InventoryListTableRow,
+  InventoryListTableScroll,
+  InventoryListTableTd,
+  InventoryListTableTh,
+  InventoryListTableToolbar,
+  InventoryTableActionDivider,
+  InventoryTableActionLink,
+  InventoryTableSecondaryActions,
+} from "@/components/inventory/list-table";
 import {
   ActionButton,
   EmptyState,
@@ -25,16 +50,34 @@ import {
   deleteMaintenanceServiceSector,
   listMaintenanceServices,
   listMaintenanceServiceSectors,
+  patchMaintenanceService,
   updateMaintenanceServiceSector,
   type CreateMaintenanceServiceSectorPayload,
   type MaintenanceServiceRecord,
   type MaintenanceServiceSectorRecord,
+  type MaintenanceServiceQuickEditFields,
   fetchAllPages,
 } from "@/lib/crud-api";
 
 type SectorFilter = "all" | number;
 
+const SERVICE_QUICK_EDIT_KEYS = ["name", "service_price"] as const;
+
+function parseServiceQuickEditChanges(
+  changes: QuickEditDraft,
+): MaintenanceServiceQuickEditFields {
+  const payload: MaintenanceServiceQuickEditFields = {};
+  if ("name" in changes) payload.name = changes.name.trim();
+  if ("service_price" in changes) {
+    payload.service_price = Number(changes.service_price);
+  }
+  return payload;
+}
+
 export default function MaintenanceServicesPage() {
+  const permissions = usePermissions();
+  const canUpdateServices = permissions.canUpdate("maintenance-services");
+  const canDeleteServices = permissions.canDelete("maintenance-services");
   const { rates } = useExchangeRates();
   const [services, setServices] = useState<MaintenanceServiceRecord[]>([]);
   const [sectors, setSectors] = useState<MaintenanceServiceSectorRecord[]>([]);
@@ -53,6 +96,12 @@ export default function MaintenanceServicesPage() {
   const [editingSector, setEditingSector] = useState<MaintenanceServiceSectorRecord | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const quickEdit = useQuickEditRow();
+  const validateServiceQuickEdit = combineValidators(
+    validateNonEmptyName,
+    (draft) => validateNonNegativeNumbers(draft, ["service_price"]),
+  );
 
   const loadServices = useCallback(async () => {
     try {
@@ -125,6 +174,26 @@ export default function MaintenanceServicesPage() {
     }
   }, [allSectors, filters.sector_id, setSector]);
 
+
+  const handleSaveServiceQuickEdit = async (service: MaintenanceServiceRecord) => {
+    const token = getAuthToken();
+    if (!token) throw new Error("Authentication required");
+
+    await quickEdit.saveEdit(
+      [...SERVICE_QUICK_EDIT_KEYS],
+      validateServiceQuickEdit,
+      async (changes) => {
+        const updated = await patchMaintenanceService(
+          token,
+          service.id,
+          parseServiceQuickEditChanges(changes),
+        );
+        setServices((prev) =>
+          prev.map((row) => (row.id === service.id ? updated : row)),
+        );
+      },
+    );
+  };
 
   const handleDeleteService = async (id: number) => {
     if (!confirm("Are you sure you want to delete this maintenance service?")) return;
@@ -301,64 +370,123 @@ export default function MaintenanceServicesPage() {
           description="Adjust the sector tab or search, or create a service to populate this module."
         />
       ) : (
-        <div className="overflow-x-auto rounded-[1.5rem] border border-outline-variant/15 bg-surface-container-lowest">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-outline-variant/15 bg-surface-container-low">
-                <th className="px-4 py-3 text-left font-semibold text-on-surface">Name</th>
-                <th className="px-4 py-3 text-left font-semibold text-on-surface">Sector</th>
-                <th className="px-4 py-3 text-left font-semibold text-on-surface">Price</th>
-                <th className="px-4 py-3 text-left font-semibold text-on-surface">Discount</th>
-                <th className="px-4 py-3 text-left font-semibold text-on-surface">Created</th>
-                <th className="px-4 py-3 text-right font-semibold text-on-surface">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {services.map((service) => (
-                <tr key={service.id} className="border-b border-outline-variant/10 hover:bg-surface-container-low">
-                  <td className="px-4 py-3 text-on-surface">{service.name}</td>
-                  <td className="px-4 py-3 text-xs text-on-surface-variant">
-                    {allSectors.find((sector) => sector.id === service.maintenance_service_sector_id)?.name ?? "-"}
-                  </td>
-                  <td className="px-4 py-3 text-on-surface">
-                    {formatCatalogPriceInEGP(
-                      service.service_price,
-                      service.currency_pricing,
-                      rates,
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-on-surface-variant text-xs">
-                    {service.max_discount_type === "percentage"
-                      ? `${service.max_discount_value}%`
-                      : formatCatalogPriceInEGP(
-                          service.max_discount_value,
+        <InventoryListTable>
+          <InventoryListTableToolbar label="Services" count={services.length} />
+          <InventoryListTableScroll>
+            <InventoryListTableElement minWidth="880px">
+              <InventoryListTableHead>
+                <tr>
+                  <InventoryListTableTh>Name</InventoryListTableTh>
+                  <InventoryListTableTh>Sector</InventoryListTableTh>
+                  <InventoryListTableTh>Price</InventoryListTableTh>
+                  <InventoryListTableTh>Discount</InventoryListTableTh>
+                  <InventoryListTableTh>Created</InventoryListTableTh>
+                  <InventoryListTableTh align="center">Actions</InventoryListTableTh>
+                </tr>
+              </InventoryListTableHead>
+              <InventoryListTableBody>
+              {services.map((service) => {
+                const editing = quickEdit.isEditing(service.id);
+                return (
+                  <InventoryListTableRow key={service.id} editing={editing}>
+                    <InventoryListTableTd variant="name">
+                      {editing ? (
+                        <QuickEditInput
+                          value={quickEdit.draft.name ?? ""}
+                          onChange={(value) =>
+                            quickEdit.updateField("name", value)
+                          }
+                          aria-label="Service name"
+                        />
+                      ) : (
+                        service.name
+                      )}
+                    </InventoryListTableTd>
+                    <InventoryListTableTd variant="muted">
+                      {allSectors.find(
+                        (sector) =>
+                          sector.id === service.maintenance_service_sector_id,
+                      )?.name ?? "-"}
+                    </InventoryListTableTd>
+                    <InventoryListTableTd variant="primary">
+                      {editing ? (
+                        <QuickEditInput
+                          value={quickEdit.draft.service_price ?? ""}
+                          onChange={(value) =>
+                            quickEdit.updateField("service_price", value)
+                          }
+                          type="number"
+                          min={0}
+                          step="any"
+                          aria-label="Service price"
+                        />
+                      ) : (
+                        formatCatalogPriceInEGP(
+                          service.service_price,
                           service.currency_pricing,
                           rates,
-                        )}
-                  </td>
-                  <td className="px-4 py-3 text-xs text-on-surface-variant">
-                    {service.created_at ? new Date(service.created_at).toLocaleDateString() : "-"}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <Link
-                      href={`/inventory/maintenance-services/edit/${service.id}`}
-                      className="text-xs font-medium text-primary hover:underline"
-                    >
-                      Edit
-                    </Link>
-                    <span className="mx-2 text-on-surface-variant">•</span>
-                    <button
-                      onClick={() => handleDeleteService(service.id)}
-                      className="text-xs font-medium text-error hover:underline"
-                    >
-                      Delete
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                        )
+                      )}
+                    </InventoryListTableTd>
+                    <InventoryListTableTd variant="muted">
+                      {service.max_discount_type === "percentage"
+                        ? `${service.max_discount_value}%`
+                        : formatCatalogPriceInEGP(
+                            service.max_discount_value,
+                            service.currency_pricing,
+                            rates,
+                          )}
+                    </InventoryListTableTd>
+                    <InventoryListTableTd variant="muted">
+                      {service.created_at
+                        ? new Date(service.created_at).toLocaleDateString()
+                        : "-"}
+                    </InventoryListTableTd>
+                    <InventoryListTableTd align="right" className="whitespace-nowrap">
+                      <QuickEditActions
+                        isEditing={editing}
+                        saving={quickEdit.saving}
+                        canSave={quickEdit.hasChanges([
+                          ...SERVICE_QUICK_EDIT_KEYS,
+                        ])}
+                        showQuickEdit={canUpdateServices}
+                        onStartEdit={() =>
+                          quickEdit.startEdit(service.id, {
+                            name: service.name,
+                            service_price: service.service_price,
+                          })
+                        }
+                        onSave={() => handleSaveServiceQuickEdit(service)}
+                        onCancel={quickEdit.cancelEdit}
+                      >
+                        <InventoryTableSecondaryActions>
+                          <InventoryTableActionLink
+                            href={`/inventory/maintenance-services/edit/${service.id}`}
+                            hidden={!canUpdateServices}
+                          >
+                            Edit
+                          </InventoryTableActionLink>
+                          <InventoryTableActionDivider />
+                          <InventoryTableActionLink
+                            tone="danger"
+                            onClick={() => handleDeleteService(service.id)}
+                            hidden={!canDeleteServices}
+                          >
+                            Delete
+                          </InventoryTableActionLink>
+                        </InventoryTableSecondaryActions>
+                      </QuickEditActions>
+                      {editing && quickEdit.rowError ? (
+                        <InventoryListTableError message={quickEdit.rowError} />
+                      ) : null}
+                    </InventoryListTableTd>
+                  </InventoryListTableRow>
+                );
+              })}
+              </InventoryListTableBody>
+            </InventoryListTableElement>
+          </InventoryListTableScroll>
+        </InventoryListTable>
       )}
 
       <PaginationControls
@@ -388,42 +516,48 @@ export default function MaintenanceServicesPage() {
       {sectors.length === 0 ? (
         <EmptyState title="No sectors found" description="Create a sector first so services can be grouped by tabs." />
       ) : (
-        <div className="overflow-x-auto rounded-[1.5rem] border border-outline-variant/15 bg-surface-container-lowest">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-outline-variant/15 bg-surface-container-low">
-                <th className="px-4 py-3 text-left font-semibold text-on-surface">Name</th>
-                <th className="px-4 py-3 text-left font-semibold text-on-surface">Created</th>
-                <th className="px-4 py-3 text-right font-semibold text-on-surface">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sectors.map((sector) => (
-                <tr key={sector.id} className="border-b border-outline-variant/10 hover:bg-surface-container-low">
-                  <td className="px-4 py-3 text-on-surface">{sector.name}</td>
-                  <td className="px-4 py-3 text-xs text-on-surface-variant">
-                    {sector.created_at ? new Date(sector.created_at).toLocaleDateString() : "-"}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <button
-                      onClick={() => handleOpenSectorModal(sector)}
-                      className="text-xs font-medium text-primary hover:underline"
-                    >
-                      Edit
-                    </button>
-                    <span className="mx-2 text-on-surface-variant">•</span>
-                    <button
-                      onClick={() => handleDeleteSector(sector.id)}
-                      className="text-xs font-medium text-error hover:underline"
-                    >
-                      Delete
-                    </button>
-                  </td>
+        <InventoryListTable>
+          <InventoryListTableToolbar label="Sectors" count={sectors.length} />
+          <InventoryListTableScroll>
+            <InventoryListTableElement minWidth="560px">
+              <InventoryListTableHead>
+                <tr>
+                  <InventoryListTableTh>Name</InventoryListTableTh>
+                  <InventoryListTableTh>Created</InventoryListTableTh>
+                  <InventoryListTableTh align="center">Actions</InventoryListTableTh>
                 </tr>
+              </InventoryListTableHead>
+              <InventoryListTableBody>
+              {sectors.map((sector) => (
+                <InventoryListTableRow key={sector.id}>
+                  <InventoryListTableTd variant="name">{sector.name}</InventoryListTableTd>
+                  <InventoryListTableTd variant="muted">
+                    {sector.created_at
+                      ? new Date(sector.created_at).toLocaleDateString()
+                      : "-"}
+                  </InventoryListTableTd>
+                  <InventoryListTableTd align="right" className="whitespace-nowrap">
+                    <InventoryTableSecondaryActions>
+                      <InventoryTableActionLink
+                        onClick={() => handleOpenSectorModal(sector)}
+                      >
+                        Edit
+                      </InventoryTableActionLink>
+                      <InventoryTableActionDivider />
+                      <InventoryTableActionLink
+                        tone="danger"
+                        onClick={() => handleDeleteSector(sector.id)}
+                      >
+                        Delete
+                      </InventoryTableActionLink>
+                    </InventoryTableSecondaryActions>
+                  </InventoryListTableTd>
+                </InventoryListTableRow>
               ))}
-            </tbody>
-          </table>
-        </div>
+              </InventoryListTableBody>
+            </InventoryListTableElement>
+          </InventoryListTableScroll>
+        </InventoryListTable>
       )}
 
       <PaginationControls
