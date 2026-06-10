@@ -24,6 +24,7 @@ import {
   type SparePartQuickEditFields,
   fetchAllPages,
 } from "@/lib/crud-api";
+import { filterBrandsByType } from "@/lib/brand-types";
 import {
   QuickEditActions,
   QuickEditInput,
@@ -177,8 +178,8 @@ export default function SparePartsPage() {
         fetchAllPages((p) => listBrands(token, p)),
       ]);
       setAllCategories(catsRes);
-      setBrands(brandsRes.filter((b) => b.type === "spare_parts"));
-      setBikeBrands(brandsRes.filter((b) => b.type === "bikes"));
+      setBrands(filterBrandsByType(brandsRes, "spare_parts"));
+      setBikeBrands(filterBrandsByType(brandsRes, "bikes"));
     } catch (err) {
       console.error("Failed to load dropdowns:", err);
     }

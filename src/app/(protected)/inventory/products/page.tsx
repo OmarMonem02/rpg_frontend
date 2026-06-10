@@ -23,6 +23,7 @@ import {
   type ProductQuickEditFields,
   fetchAllPages,
 } from "@/lib/crud-api";
+import { filterBrandsByType } from "@/lib/brand-types";
 import {
   QuickEditActions,
   QuickEditInput,
@@ -184,8 +185,8 @@ export default function ProductsPage() {
         fetchAllPages((p) => listBrands(token, p)),
       ]);
       setAllCategories(catsRes);
-      setBrands(brandsRes.filter((b) => b.type === "products"));
-      setBikeBrands(brandsRes.filter((b) => b.type === "bikes"));
+      setBrands(filterBrandsByType(brandsRes, "products"));
+      setBikeBrands(filterBrandsByType(brandsRes, "bikes"));
     } catch (err) {
       console.error("Failed to load dropdowns:", err);
     }

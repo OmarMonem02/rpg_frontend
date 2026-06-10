@@ -15,25 +15,50 @@ import { getApiUrl } from "@/lib/config";
 import { ApiError } from "@/lib/auth-api";
 import type { StocktakeExportRow } from "@/lib/stocktake";
 
+import type { BrandType } from "@/lib/brand-types";
+
 // --- BRANDS ---
 export type BrandRecord = {
   id: number;
   name: string;
-  type: "spare_parts" | "products" | "bikes";
+  types: BrandType[];
   created_at?: string;
 };
 
 export type CreateBrandPayload = {
   name: string;
-  type: "spare_parts" | "products" | "bikes";
+  types: BrandType[];
 };
+
+function normalizeBrandTypes(raw: unknown): BrandType[] {
+  if (Array.isArray(raw)) {
+    return raw
+      .map((value) => toText(value))
+      .filter((value): value is BrandType =>
+        value === "spare_parts" || value === "products" || value === "bikes",
+      );
+  }
+
+  const legacyType = toText(raw);
+  if (
+    legacyType === "spare_parts" ||
+    legacyType === "products" ||
+    legacyType === "bikes"
+  ) {
+    return [legacyType];
+  }
+
+  return [];
+}
 
 export function normalizeBrand(raw: unknown): BrandRecord {
   const record = asRecord(raw);
+  const types = normalizeBrandTypes(record.types ?? record.type);
+
   return {
     id: toNumber(record.id),
     name: toText(record.name),
-    type: toText(record.type) as "spare_parts" | "products" | "bikes",
+    types,
     created_at: toText(record.created_at) || undefined,
   };
 }

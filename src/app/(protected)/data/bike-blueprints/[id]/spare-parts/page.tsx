@@ -237,7 +237,7 @@ export default function BikeBlueprintSparePartsPage() {
         fetchAllPages((p) => listSparePartCategories(token, p)),
       ]);
 
-      setBrands(brandsResult.filter((b) => b.type === "spare_parts"));
+      setBrands(brandsResult);
       setCategories(categoriesResult);
     } catch (err) {
       console.error(err);

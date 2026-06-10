@@ -26,6 +26,11 @@ import {
   StatusBadge,
   SurfaceCard,
 } from "@/components/ops-ui";
+import {
+  BRAND_TYPE_OPTIONS,
+  formatBrandType,
+  type BrandType,
+} from "@/lib/brand-types";
 
 export default function BrandsPage() {
   const permissions = usePermissions();
@@ -104,7 +109,10 @@ export default function BrandsPage() {
 
       const payload: CreateBrandPayload = {
         name: String(formData.name),
-        type: String(formData.type) as "spare_parts" | "products" | "bikes",
+        types: (Array.isArray(formData.types)
+          ? formData.types
+          : [formData.types]
+        ).map(String) as BrandType[],
       };
 
       if (editingBrand) {
@@ -150,16 +158,12 @@ export default function BrandsPage() {
       value: editingBrand?.name,
     },
     {
-      name: "type",
-      label: "Brand Type",
-      type: "select",
+      name: "types",
+      label: "Brand Types",
+      type: "multiselect",
       required: true,
-      options: [
-        { value: "spare_parts", label: "Spare Parts" },
-        { value: "products", label: "Products" },
-        { value: "bikes", label: "Bikes" },
-      ],
-      value: editingBrand?.type,
+      options: BRAND_TYPE_OPTIONS,
+      value: editingBrand?.types,
     },
   ];
 
@@ -231,7 +235,7 @@ export default function BrandsPage() {
               <thead>
                 <tr className="border-b border-outline-variant/15 bg-surface-container-low">
                   <th className="px-4 py-3 text-left font-semibold text-on-surface">Name</th>
-                  <th className="px-4 py-3 text-left font-semibold text-on-surface">Type</th>
+                  <th className="px-4 py-3 text-left font-semibold text-on-surface">Types</th>
                   <th className="px-4 py-3 text-left font-semibold text-on-surface">Created</th>
                   <th className="px-4 py-3 text-right font-semibold text-on-surface">Actions</th>
                 </tr>
@@ -244,9 +248,13 @@ export default function BrandsPage() {
                   >
                     <td className="px-4 py-3 text-on-surface">{brand.name}</td>
                     <td className="px-4 py-3">
-                      <StatusBadge tone="primary">
-                        {brand.type.replace("_", " ")}
-                      </StatusBadge>
+                      <div className="flex flex-wrap gap-1">
+                        {brand.types.map((type) => (
+                          <StatusBadge key={type} tone="primary">
+                            {formatBrandType(type)}
+                          </StatusBadge>
+                        ))}
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-on-surface-variant text-xs">
                       {brand.created_at

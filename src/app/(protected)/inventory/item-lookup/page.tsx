@@ -38,6 +38,7 @@ import {
   type SparePartCategoryRecord,
 } from "@/lib/crud-api";
 import type { BikeBlueprintRecord } from "@/lib/api/bikes";
+import { filterBrandsByType } from "@/lib/brand-types";
 import {
   findExactSkuOrPartNumberMatch,
   formatMaxDiscount,
@@ -266,9 +267,9 @@ export default function ItemLookupPage() {
           fetchAllPages((p) => listBikeBlueprints(token, p)),
         ]);
 
-        setProductBrands(brandsRes.filter((b) => b.type === "products"));
-        setSparePartBrands(brandsRes.filter((b) => b.type === "spare_parts"));
-        setBikeBrands(brandsRes.filter((b) => b.type === "bikes"));
+        setProductBrands(filterBrandsByType(brandsRes, "products"));
+        setSparePartBrands(filterBrandsByType(brandsRes, "spare_parts"));
+        setBikeBrands(filterBrandsByType(brandsRes, "bikes"));
         setProductCategories(productCatsRes);
         setSparePartCategories(spareCatsRes);
         setBlueprints(blueprintRows);

@@ -131,7 +131,7 @@ export default function BikesPage() {
         fetchAllPages((p) => listBrands(token, p, { type: "bikes" })),
       ]);
       setBlueprints(bpRes);
-      setBrands(brandsRes.filter((b) => b.type === "bikes"));
+      setBrands(brandsRes);
     } catch (err) {
       console.error("Failed to load blueprints or brands:", err);
     }

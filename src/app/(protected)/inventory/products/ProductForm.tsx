@@ -27,6 +27,7 @@ import {
 } from "@/lib/blueprint-year-range-fields";
 import { EntityForm, type FieldConfig } from "@/components/entity-form";
 import { PageShell } from "@/components/ops-ui";
+import { filterBrandsByType } from "@/lib/brand-types";
 
 interface ProductFormProps {
   initialData?: ProductRecord | null;
@@ -76,11 +77,11 @@ export function ProductForm({ initialData, mode }: ProductFormProps) {
   }, [mode, initialData]);
 
   const brands = useMemo(
-    () => brandRows.filter((item) => item.type === "products"),
+    () => filterBrandsByType(brandRows, "products"),
     [brandRows],
   );
   const bikeBrands = useMemo(
-    () => brandRows.filter((item) => item.type === "bikes"),
+    () => filterBrandsByType(brandRows, "bikes"),
     [brandRows],
   );
   const bikeBrandNameById = useMemo(
@@ -107,7 +108,7 @@ export function ProductForm({ initialData, mode }: ProductFormProps) {
       if (!token) throw new Error("Authentication required");
       const created = await createBrand(token, {
         name: String(data.name),
-        type: "bikes",
+        types: ["bikes"],
       });
       setBrandRows((prev) => [...prev, created]);
       return { id: created.id };
@@ -328,7 +329,7 @@ export function ProductForm({ initialData, mode }: ProductFormProps) {
           if (!token) throw new Error("Authentication required");
           const created = await createBrand(token, {
             name: String(data.name),
-            type: "products",
+            types: ["products"],
           });
           setBrandRows((prev) => [...prev, created]);
           return { id: created.id };

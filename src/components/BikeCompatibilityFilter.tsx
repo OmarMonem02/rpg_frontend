@@ -7,6 +7,7 @@ import {
   listBikeBlueprintFilterYears,
   type BrandRecord,
 } from "@/lib/crud-api";
+import { filterBrandsByType } from "@/lib/brand-types";
 
 interface BikeCompatibilityFilterProps {
   brands: BrandRecord[];
@@ -35,7 +36,7 @@ export function BikeCompatibilityFilter({
   const [yearsLoading, setYearsLoading] = useState(false);
 
   const bikeBrands = useMemo(
-    () => brands.filter((b) => b.type === "bikes"),
+    () => filterBrandsByType(brands, "bikes"),
     [brands],
   );
 

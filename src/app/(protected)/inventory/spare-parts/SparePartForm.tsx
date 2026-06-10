@@ -28,6 +28,7 @@ import {
 } from "@/lib/blueprint-year-range-fields";
 import { CURRENCY_SELECT_OPTIONS, toPricingCurrency } from "@/lib/currencies";
 import { EntityForm, type FieldConfig } from "@/components/entity-form";
+import { filterBrandsByType } from "@/lib/brand-types";
 
 interface SparePartFormProps {
   mode: "create" | "edit";
@@ -87,11 +88,11 @@ export function SparePartForm({ mode, initialData }: SparePartFormProps) {
   }, []);
 
   const sparePartBrands = useMemo(
-    () => brandRows.filter((item) => item.type === "spare_parts"),
+    () => filterBrandsByType(brandRows, "spare_parts"),
     [brandRows],
   );
   const bikeBrands = useMemo(
-    () => brandRows.filter((item) => item.type === "bikes"),
+    () => filterBrandsByType(brandRows, "bikes"),
     [brandRows],
   );
 
@@ -128,7 +129,7 @@ export function SparePartForm({ mode, initialData }: SparePartFormProps) {
       if (!token) throw new Error("Authentication required");
       const created = await createBrand(token, {
         name: String(data.name),
-        type: "bikes",
+        types: ["bikes"],
       });
       setBrandRows((prev) => [...prev, created]);
       return { id: created.id };
@@ -393,7 +394,7 @@ export function SparePartForm({ mode, initialData }: SparePartFormProps) {
           if (!token) throw new Error("Authentication required");
           const created = await createBrand(token, {
             name: String(data.name),
-            type: "spare_parts",
+            types: ["spare_parts"],
           });
           setBrandRows((prev) => [...prev, created]);
           return { id: created.id };

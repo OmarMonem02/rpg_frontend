@@ -72,7 +72,7 @@ export default function BikeBlueprintsPage() {
 
       setBlueprints(blueprintResult.items);
       setTotalPages(blueprintResult.lastPage);
-      setBrands(brandResult.items.filter((b) => b.type === "bikes"));
+      setBrands(brandResult.items);
     } catch (err) {
       setLocalError(
         err instanceof Error ? err.message : "Failed to load bike blueprints",

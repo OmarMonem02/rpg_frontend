@@ -34,7 +34,7 @@ export function EntityDrawer({
   ...rest
 }: EntityDrawerProps) {
   const portalTarget = useSyncExternalStore(
-    () => () => {},
+    () => () => { },
     getDocumentBody,
     () => null,
   );
@@ -123,7 +123,7 @@ export function EntityDrawer({
               await onSubmit(data);
               onClose();
             }}
-            variant="drawer"
+            variant="page"
           />
         </div>
       </div>

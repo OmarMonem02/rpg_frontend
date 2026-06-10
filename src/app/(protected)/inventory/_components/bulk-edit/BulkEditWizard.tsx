@@ -74,7 +74,7 @@ export function BulkEditWizard({ config }: BulkEditWizardProps) {
           fetchAllPages((p) =>
             config.listBrands(token, p).then((r) => ({
               ...r,
-              items: r.items.filter((b) => b.type === config.brandType),
+              items: r.items,
             })),
           ),
         ]);
