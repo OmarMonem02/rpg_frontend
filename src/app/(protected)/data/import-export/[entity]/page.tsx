@@ -99,7 +99,7 @@ export default function EntityImportExportPage() {
         title={`Manage ${entity.label}`}
       />
 
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-6 md:grid-cols-1">
          {canExportData ? <ExportPanel entity={entity} /> : null}
          {canImportData ? <ImportPanel entity={entity} /> : null}
       </div>

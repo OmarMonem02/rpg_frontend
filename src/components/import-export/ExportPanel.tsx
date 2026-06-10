@@ -45,7 +45,7 @@ export function ExportPanel({ entity }: { entity: ImportExportEntity }) {
 
       {error ? <div className="mb-4 rounded-xl bg-error/10 p-3 text-sm text-error">{error}</div> : null}
 
-      <div className="space-y-5">
+      <div className="space-y-5 grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="rounded-xl border border-outline-variant/15 bg-surface p-4">
           <div className="mb-3 flex items-center gap-2 font-semibold text-on-surface">
             <TableCellsIcon className="h-5 w-5 text-primary" />
