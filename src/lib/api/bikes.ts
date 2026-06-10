@@ -30,6 +30,27 @@ export type CreateBikeBlueprintPayload = {
   year: number;
 };
 
+export type BulkCreateBikeBlueprintByYearRangePayload = {
+  brand_id: number;
+  model: string;
+  year_from: number;
+  year_to: number;
+};
+
+export type BulkCreateBikeBlueprintSkipped = {
+  year: number;
+  reason: string;
+};
+
+export type BulkCreateBikeBlueprintByYearRangeResult = {
+  created: BikeBlueprintRecord[];
+  restored: BikeBlueprintRecord[];
+  skipped: BulkCreateBikeBlueprintSkipped[];
+  count_created: number;
+  count_restored: number;
+  count_skipped: number;
+};
+
 export type UpdateBikeBlueprintPayload = CreateBikeBlueprintPayload;
 
 export function normalizeBikeBlueprint(raw: unknown): BikeBlueprintRecord {
@@ -106,6 +127,40 @@ export async function createBikeBlueprint(
   });
   const record = asRecord(data);
   return normalizeBikeBlueprint(record.data ?? record);
+}
+
+export async function bulkCreateBikeBlueprintsByYearRange(
+  token: string,
+  payload: BulkCreateBikeBlueprintByYearRangePayload,
+): Promise<BulkCreateBikeBlueprintByYearRangeResult> {
+  const data = await authorizedFetch<unknown>(
+    "/bike_blueprints/bulk/create-by-range",
+    token,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    },
+  );
+  const record = asRecord(data);
+  const created = pickArray(record, ["created"]);
+  const restored = pickArray(record, ["restored"]);
+  const skipped = pickArray(record, ["skipped"]);
+
+  return {
+    created: created.map(normalizeBikeBlueprint).filter((item) => item.id > 0),
+    restored: restored.map(normalizeBikeBlueprint).filter((item) => item.id > 0),
+    skipped: skipped.map((row) => {
+      const item = asRecord(row);
+      return {
+        year: toNumber(item.year),
+        reason: toText(item.reason),
+      };
+    }),
+    count_created: toNumber(record.count_created),
+    count_restored: toNumber(record.count_restored),
+    count_skipped: toNumber(record.count_skipped),
+  };
 }
 
 export async function updateBikeBlueprint(

@@ -9,7 +9,7 @@ import {
   listBrands,
   listBikeBlueprints,
   createBrand,
-  createBikeBlueprint,
+  createProductCategory,
   createProduct,
   updateProduct,
   type ProductRecord,
@@ -21,6 +21,10 @@ import {
   fetchAllPages,
 } from "@/lib/crud-api";
 import { CURRENCY_SELECT_OPTIONS, toPricingCurrency } from "@/lib/currencies";
+import {
+  buildBlueprintYearRangeFields,
+  createBlueprintsFromFormData,
+} from "@/lib/blueprint-year-range-fields";
 import { EntityForm, type FieldConfig } from "@/components/entity-form";
 import { PageShell } from "@/components/ops-ui";
 
@@ -41,6 +45,7 @@ export function ProductForm({ initialData, mode }: ProductFormProps) {
   const [error, setError] = useState<string | null>(null);
   const canCreateBrands = permissions.canCreate("brands");
   const canCreateBlueprints = permissions.canCreate("bike-blueprints");
+  const canCreateProductCategories = permissions.canCreate("product-categories");
 
   useEffect(() => {
     const loadDependencies = async () => {
@@ -129,16 +134,7 @@ export function ProductForm({ initialData, mode }: ProductFormProps) {
         section: "Identity",
         placeholder: "e.g., MT-07",
       },
-      {
-        name: "year",
-        label: "Production Year",
-        type: "number",
-        required: true,
-        section: "Identity",
-        placeholder: "e.g., 2024",
-        min: 1900,
-        max: 2100,
-      },
+      ...buildBlueprintYearRangeFields({ maxYear: 2100 }),
     ],
     [bikeBrands, buildBikeBrandQuickCreate],
   );
@@ -279,6 +275,30 @@ export function ProductForm({ initialData, mode }: ProductFormProps) {
       description: "Choose the main product category.",
       options: () => categories.map((c) => ({ value: c.id, label: c.name })),
       value: initialData?.products_category_id,
+      quickCreate: {
+        title: "Add Category",
+        description: "Create a product category without leaving this form.",
+        submitLabel: "Create & Select",
+        enabled: canCreateProductCategories,
+        fields: [
+          {
+            name: "name",
+            label: "Category Name",
+            type: "text",
+            required: true,
+            placeholder: "e.g., Helmets, Gloves",
+          },
+        ],
+        onCreate: async (data) => {
+          const token = getAuthToken();
+          if (!token) throw new Error("Authentication required");
+          const created = await createProductCategory(token, {
+            name: String(data.name),
+          });
+          setCategories((prev) => [...prev, created]);
+          return { id: created.id };
+        },
+      },
     },
     {
       name: "brand_id",
@@ -556,13 +576,14 @@ export function ProductForm({ initialData, mode }: ProductFormProps) {
         onCreate: async (data) => {
           const token = getAuthToken();
           if (!token) throw new Error("Authentication required");
-          const created = await createBikeBlueprint(token, {
-            brand_id: Number(data.brand_id),
-            model: String(data.model),
-            year: Number(data.year),
+          const result = await createBlueprintsFromFormData(token, data);
+          setBlueprints((prev) => {
+            const existingIds = new Set(prev.map((bp) => bp.id));
+            const additions = result.blueprints.filter((bp) => !existingIds.has(bp.id));
+            return additions.length > 0 ? [...prev, ...additions] : prev;
           });
-          setBlueprints((prev) => [...prev, created]);
-          return { id: created.id };
+          const ids = result.blueprints.map((bp) => bp.id);
+          return ids.length === 1 ? { id: ids[0] } : { ids };
         },
       },
     },
@@ -591,6 +612,7 @@ export function ProductForm({ initialData, mode }: ProductFormProps) {
     buildBikeBrandQuickCreate,
     canCreateBrands,
     canCreateBlueprints,
+    canCreateProductCategories,
   ]);
 
   if (loading) {

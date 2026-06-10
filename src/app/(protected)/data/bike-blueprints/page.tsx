@@ -55,7 +55,6 @@ export default function BikeBlueprintsPage() {
     setPriceMax,
     setCurrency,
   } = useEntityFilters();
-  const cleanFilters = getCleanFilters() as BikeBlueprintFilters;
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -65,6 +64,7 @@ export default function BikeBlueprintsPage() {
       const token = getAuthToken();
       if (!token) return;
 
+      const cleanFilters = getCleanFilters() as BikeBlueprintFilters;
       const [blueprintResult, brandResult] = await Promise.all([
         listBikeBlueprints(token, page, cleanFilters),
         listBrands(token, 1, { type: "bikes" }),
@@ -80,7 +80,7 @@ export default function BikeBlueprintsPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, cleanFilters]);
+  }, [page, getCleanFilters]);
 
   useEffect(() => {
     void loadData();

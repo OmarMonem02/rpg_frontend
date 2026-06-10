@@ -474,6 +474,7 @@ export default function SparePartsPage() {
                       {part.part_number || "—"}
                     </InventoryListTableTd>
                     <InventoryListTableTd variant="name">
+                      
                       {editing ? (
                         <QuickEditInput
                           value={quickEdit.draft.name ?? ""}

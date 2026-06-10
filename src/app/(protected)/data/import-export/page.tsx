@@ -56,7 +56,7 @@ export default function ImportExportHubPage() {
       ) : loading ? (
         <SurfaceCard>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {[1, 2, 3, 4, 5, 6].map((i) => (
+            {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((i) => (
               <div
                 key={i}
                 className="animate-pulse rounded-[1.5rem] border border-outline-variant/15 bg-surface-container p-5 h-[200px]"

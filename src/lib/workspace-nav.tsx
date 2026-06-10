@@ -413,16 +413,6 @@ export const defaultWorkspaceNavSections: SidebarNavSection[] = [
         icon: <AlarmIcon className="h-5 w-5" />,
       },
       {
-        href: "/inventory/spare-parts",
-        label: "Spare Parts",
-        icon: <SparePartsIcon className="h-5 w-5" />,
-      },
-      {
-        href: "/inventory/products",
-        label: "Products",
-        icon: <ProductsIcon className="h-5 w-5" />,
-      },
-      {
         href: "/inventory/item-lookup",
         label: "Item Lookup",
         icon: <SearchIcon className="h-5 w-5" />,
@@ -432,6 +422,17 @@ export const defaultWorkspaceNavSections: SidebarNavSection[] = [
         label: "Inventory Count",
         icon: <StocktakeIcon className="h-5 w-5" />,
       },
+      {
+        href: "/inventory/spare-parts",
+        label: "Spare Parts",
+        icon: <SparePartsIcon className="h-5 w-5" />,
+      },
+      {
+        href: "/inventory/products",
+        label: "Products",
+        icon: <ProductsIcon className="h-5 w-5" />,
+      },
+      
       {
         href: "/inventory/bikes",
         label: "Bikes",

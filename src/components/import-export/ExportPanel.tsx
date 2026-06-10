@@ -19,8 +19,11 @@ export function ExportPanel({ entity }: { entity: ImportExportEntity }) {
       const token = getAuthToken();
       if (!token) throw new Error("Authentication required");
 
-      const endpoint = action === "export" ? entity.endpoints.export : entity.endpoints.template;
-      await downloadFile(`${endpoint}?format=${format}`, token, `${entity.slug}_${action}.${format}`);
+      const path =
+        action === "export"
+          ? `/import-export/${entity.slug}/export?format=${format}`
+          : `/import-export/${entity.slug}/template?format=${format}`;
+      await downloadFile(path, token, `${entity.slug}_${action}.${format}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Download failed");
     } finally {

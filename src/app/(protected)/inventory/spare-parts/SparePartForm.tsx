@@ -14,7 +14,7 @@ import {
   listBrands,
   listBikeBlueprints,
   createBrand,
-  createBikeBlueprint,
+  createSparePartCategory,
   createSparePart,
   updateSparePart,
   assignSparePartToBikeBlueprint,
@@ -22,6 +22,10 @@ import {
   fetchAllPages,
 } from "@/lib/crud-api";
 import { getAuthToken } from "@/lib/auth-session";
+import {
+  buildBlueprintYearRangeFields,
+  createBlueprintsFromFormData,
+} from "@/lib/blueprint-year-range-fields";
 import { CURRENCY_SELECT_OPTIONS, toPricingCurrency } from "@/lib/currencies";
 import { EntityForm, type FieldConfig } from "@/components/entity-form";
 
@@ -35,6 +39,7 @@ export function SparePartForm({ mode, initialData }: SparePartFormProps) {
   const permissions = usePermissions();
   const canCreateBrands = permissions.canCreate("brands");
   const canCreateBlueprints = permissions.canCreate("bike-blueprints");
+  const canCreateSparePartCategories = permissions.canCreate("spare-part-categories");
   const [currentBlueprintIds, setCurrentBlueprintIds] = useState<number[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [categoryRows, setCategoryRows] = useState<SparePartCategoryRecord[]>([]);
@@ -150,16 +155,7 @@ export function SparePartForm({ mode, initialData }: SparePartFormProps) {
         section: "Identity",
         placeholder: "e.g., MT-07",
       },
-      {
-        name: "year",
-        label: "Production Year",
-        type: "number",
-        required: true,
-        section: "Identity",
-        placeholder: "e.g., 2024",
-        min: 1900,
-        max: 2100,
-      },
+      ...buildBlueprintYearRangeFields({ maxYear: 2100 }),
     ],
     [bikeBrands, buildBikeBrandQuickCreate],
   );
@@ -344,6 +340,30 @@ export function SparePartForm({ mode, initialData }: SparePartFormProps) {
       description: "Choose the main spare-parts category.",
       options: () => categoryRows.map((c) => ({ value: c.id, label: c.name })),
       value: initialData?.spare_parts_category_id,
+      quickCreate: {
+        title: "Add Category",
+        description: "Create a spare-parts category without leaving this form.",
+        submitLabel: "Create & Select",
+        enabled: canCreateSparePartCategories,
+        fields: [
+          {
+            name: "name",
+            label: "Category Name",
+            type: "text",
+            required: true,
+            placeholder: "e.g., Brakes, Filters",
+          },
+        ],
+        onCreate: async (data) => {
+          const token = getAuthToken();
+          if (!token) throw new Error("Authentication required");
+          const created = await createSparePartCategory(token, {
+            name: String(data.name),
+          });
+          setCategoryRows((prev) => [...prev, created]);
+          return { id: created.id };
+        },
+      },
     },
     {
       name: "brand_id",
@@ -621,13 +641,14 @@ export function SparePartForm({ mode, initialData }: SparePartFormProps) {
         onCreate: async (data) => {
           const token = getAuthToken();
           if (!token) throw new Error("Authentication required");
-          const created = await createBikeBlueprint(token, {
-            brand_id: Number(data.brand_id),
-            model: String(data.model),
-            year: Number(data.year),
+          const result = await createBlueprintsFromFormData(token, data);
+          setBlueprints((prev) => {
+            const existingIds = new Set(prev.map((bp) => bp.id));
+            const additions = result.blueprints.filter((bp) => !existingIds.has(bp.id));
+            return additions.length > 0 ? [...prev, ...additions] : prev;
           });
-          setBlueprints((prev) => [...prev, created]);
-          return { id: created.id };
+          const ids = result.blueprints.map((bp) => bp.id);
+          return ids.length === 1 ? { id: ids[0] } : { ids };
         },
       },
     },
@@ -656,6 +677,7 @@ export function SparePartForm({ mode, initialData }: SparePartFormProps) {
     buildBikeBrandQuickCreate,
     canCreateBrands,
     canCreateBlueprints,
+    canCreateSparePartCategories,
   ]);
 
   if (loading) {

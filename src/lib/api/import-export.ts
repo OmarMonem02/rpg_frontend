@@ -27,14 +27,33 @@ export async function fetchImportExportEntities(token: string): Promise<ImportEx
   return (await response.json()) as ImportExportEntity[];
 }
 
+function resolveDownloadUrl(url: string): string {
+  if (url.startsWith("http://") || url.startsWith("https://")) {
+    try {
+      const { pathname, search } = new URL(url);
+      const apiPath = pathname.startsWith("/api/")
+        ? pathname.slice(4)
+        : pathname;
+
+      return getApiUrl(`${apiPath}${search}`);
+    } catch {
+      return url;
+    }
+  }
+
+  return getApiUrl(url.startsWith("/") ? url : `/${url}`);
+}
+
 export async function downloadFile(url: string, token: string, filename: string): Promise<void> {
-  const isAbsolute = url.startsWith("http://") || url.startsWith("https://");
-  const fullUrl = isAbsolute ? url : getApiUrl(!url.startsWith("/") ? `/${url}` : url);
+  const fullUrl = resolveDownloadUrl(url);
 
   const response = await fetch(fullUrl, {
     method: "GET",
     headers: {
       Authorization: `Bearer ${token}`,
+      Accept: filename.endsWith(".csv")
+        ? "text/csv"
+        : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     },
   });
 
@@ -43,6 +62,18 @@ export async function downloadFile(url: string, token: string, filename: string)
   }
 
   const blob = await response.blob();
+  const contentType = response.headers.get("content-type");
+  const headerBytes = blob.size > 0 ? new Uint8Array(await blob.slice(0, 4).arrayBuffer()) : new Uint8Array();
+  const isZipXlsx = headerBytes[0] === 0x50 && headerBytes[1] === 0x4b;
+  const isCsv = filename.endsWith(".csv");
+
+  if (blob.size < 50) {
+    throw new ApiError("Export file is empty. Check that records exist and try again.", 500);
+  }
+
+  if (!isCsv && !isZipXlsx) {
+    throw new ApiError("Export did not return a valid Excel file. Please retry or contact support.", 500);
+  }
   const downloadUrl = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = downloadUrl;

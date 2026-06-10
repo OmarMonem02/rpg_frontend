@@ -5,13 +5,17 @@ import { useRouter } from "next/navigation";
 import { getAuthToken } from "@/lib/auth-session";
 import {
   listBrands,
-  createBikeBlueprint,
   updateBikeBlueprint,
   type BikeBlueprintRecord,
   type CreateBikeBlueprintPayload,
   type BrandRecord,
   fetchAllPages,
 } from "@/lib/crud-api";
+import {
+  buildBlueprintYearRangeFields,
+  createBlueprintsFromFormData,
+  resolveBlueprintSubmitLabel,
+} from "@/lib/blueprint-year-range-fields";
 import { EntityForm, type FieldConfig } from "@/components/entity-form";
 
 interface BlueprintFormProps {
@@ -25,6 +29,7 @@ export function BlueprintForm({ mode, initialData }: BlueprintFormProps) {
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -46,19 +51,27 @@ export function BlueprintForm({ mode, initialData }: BlueprintFormProps) {
     try {
       setIsSubmitting(true);
       setError(null);
+      setSuccess(null);
       const token = getAuthToken();
       if (!token) throw new Error("Authentication required");
 
-      const payload: CreateBikeBlueprintPayload = {
-        brand_id: Number(formData.brand_id),
-        model: String(formData.model),
-        year: Number(formData.year),
-      };
-
       if (mode === "edit" && initialData) {
+        const payload: CreateBikeBlueprintPayload = {
+          brand_id: Number(formData.brand_id),
+          model: String(formData.model),
+          year: Number(formData.year),
+        };
         await updateBikeBlueprint(token, initialData.id, payload);
-      } else {
-        await createBikeBlueprint(token, payload);
+        router.push("/data/bike-blueprints");
+        router.refresh();
+        return;
+      }
+
+      const result = await createBlueprintsFromFormData(token, formData);
+
+      if (result.summary) {
+        setSuccess(result.summary);
+        await new Promise((resolve) => setTimeout(resolve, 1500));
       }
 
       router.push("/data/bike-blueprints");
@@ -69,6 +82,24 @@ export function BlueprintForm({ mode, initialData }: BlueprintFormProps) {
       setIsSubmitting(false);
     }
   };
+
+  const yearRangeFields =
+    mode === "create"
+      ? buildBlueprintYearRangeFields()
+      : [
+          {
+            name: "year",
+            label: "Production Year",
+            type: "number" as const,
+            required: true,
+            section: "Identity",
+            description: "Set the manufacturing year for this model definition.",
+            placeholder: "2024",
+            value: initialData?.year,
+            min: 1900,
+            max: new Date().getFullYear() + 1,
+          },
+        ];
 
   const fields: FieldConfig[] = [
     {
@@ -93,18 +124,7 @@ export function BlueprintForm({ mode, initialData }: BlueprintFormProps) {
       placeholder: "e.g., MT-07",
       value: initialData?.model,
     },
-    {
-      name: "year",
-      label: "Production Year",
-      type: "number",
-      required: true,
-      section: "Identity",
-      description: "Set the manufacturing year for this model definition.",
-      placeholder: "2024",
-      value: initialData?.year,
-      min: 1900,
-      max: new Date().getFullYear() + 1,
-    },
+    ...yearRangeFields,
   ];
 
   if (loading) {
@@ -116,21 +136,32 @@ export function BlueprintForm({ mode, initialData }: BlueprintFormProps) {
   }
 
   return (
-    <EntityForm
-      variant="page"
-      title={mode === "create" ? "Create Bike Blueprint" : "Edit Blueprint"}
-      description={
-        mode === "create"
-          ? "Establish a new master model definition to link with inventory and parts later."
-          : "Refine the manufacturer, model, and year for this motorcycle blueprint."
-      }
-      fields={fields}
-      isLoading={isSubmitting}
-      error={error || undefined}
-      onCancel={() => router.push("/data/bike-blueprints")}
-      onSubmit={handleSubmit}
-      submitLabel={mode === "create" ? "Create Blueprint" : "Save Changes"}
-      heroLabel="Bike Blueprints"
-    />
+    <div className="space-y-4">
+      {success && (
+        <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-on-surface">
+          {success}
+        </div>
+      )}
+      <EntityForm
+        variant="page"
+        title={mode === "create" ? "Create Bike Blueprint" : "Edit Blueprint"}
+        description={
+          mode === "create"
+            ? "Establish a new master model definition to link with inventory and parts later."
+            : "Refine the manufacturer, model, and year for this motorcycle blueprint."
+        }
+        fields={fields}
+        isLoading={isSubmitting}
+        error={error || undefined}
+        onCancel={() => router.push("/data/bike-blueprints")}
+        onSubmit={handleSubmit}
+        submitLabel={
+          mode === "create"
+            ? (formData) => resolveBlueprintSubmitLabel(formData)
+            : "Save Changes"
+        }
+        heroLabel="Bike Blueprints"
+      />
+    </div>
   );
 }

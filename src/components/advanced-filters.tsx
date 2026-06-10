@@ -47,10 +47,7 @@ export function AdvancedFilters({
           <InputGroup label="Min Price" className="md:col-span-4">
             <input
               type="number"
-              onWheel={(event) => {
-                event.preventDefault();
-                event.currentTarget.blur();
-              }}
+              onWheel={(e) => (e.currentTarget as HTMLInputElement).blur()}
               value={priceMin ?? ""}
               onChange={(e) => setPriceMin(e.target.value ? Number(e.target.value) : "")}
               className="form-input-base py-2 text-sm mono-data [&::-webkit-inner-spin-button]:appearance-none"
@@ -60,10 +57,7 @@ export function AdvancedFilters({
           <InputGroup label="Max Price" className="md:col-span-4">
             <input
               type="number"
-              onWheel={(event) => {
-                event.preventDefault();
-                event.currentTarget.blur();
-              }}
+              onWheel={(e) => (e.currentTarget as HTMLInputElement).blur()}
               value={priceMax ?? ""}
               onChange={(e) => setPriceMax(e.target.value ? Number(e.target.value) : "")}
               className="form-input-base py-2 text-sm mono-data [&::-webkit-inner-spin-button]:appearance-none"

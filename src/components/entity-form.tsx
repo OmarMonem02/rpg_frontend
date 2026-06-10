@@ -84,7 +84,7 @@ export type EntityFormProps = {
   error?: string;
   onCancel: () => void;
   onSubmit: (formData: Record<string, unknown>) => Promise<void>;
-  submitLabel?: string;
+  submitLabel?: string | ((formData: Record<string, unknown>) => string);
   cancelLabel?: string;
   description?: string;
   heroLabel?: string;
@@ -146,6 +146,8 @@ export const EntityForm = forwardRef<EntityFormHandle, EntityFormProps>(
 
   const isStackedLayout = variant === "page";
   const requiredFieldsCount = fields.filter((field) => field.required).length;
+  const resolvedSubmitLabel =
+    typeof submitLabel === "function" ? submitLabel(formData) : submitLabel;
 
   const contentSections = useMemo(() => {
     return fields.reduce((acc, field) => {
@@ -301,20 +303,29 @@ export const EntityForm = forwardRef<EntityFormHandle, EntityFormProps>(
 
     const created = await activeQuickCreate.onCreate(data);
     const fieldName = activeQuickCreateField;
+    const createdIds =
+      "ids" in created
+        ? created.ids
+        : "id" in created
+          ? [created.id]
+          : [];
 
     if (activeQuickCreate.mode === "multiselect-append") {
       setFormData((prev) => {
         const current = Array.isArray(prev[fieldName])
           ? (prev[fieldName] as Array<number | string>)
           : [];
-        const alreadySelected = current.some(
-          (item) => String(item) === String(created.id),
+        const nextIds = createdIds.filter(
+          (id) => !current.some((item) => String(item) === String(id)),
         );
-        if (alreadySelected) return prev;
-        return { ...prev, [fieldName]: [...current, created.id] };
+        if (nextIds.length === 0) return prev;
+        return { ...prev, [fieldName]: [...current, ...nextIds] };
       });
     } else {
-      setFieldValue(fieldName, String(created.id));
+      const firstId = createdIds[0];
+      if (firstId !== undefined) {
+        setFieldValue(fieldName, String(firstId));
+      }
     }
   };
 
@@ -1113,7 +1124,7 @@ export const EntityForm = forwardRef<EntityFormHandle, EntityFormProps>(
               disabled={isSubmitting || isLoading}
               className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-6 py-3.5 text-base font-semibold text-on-primary shadow-md shadow-primary/15 transition-all duration-200 hover:-translate-y-px hover:shadow-lg hover:shadow-primary/25 active:scale-[0.97] disabled:pointer-events-none disabled:opacity-50"
             >
-              {isSubmitting ? "Processing..." : submitLabel}
+              {isSubmitting ? "Processing..." : resolvedSubmitLabel}
             </button>
           ) : (
             <button

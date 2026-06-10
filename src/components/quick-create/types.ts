@@ -5,7 +5,9 @@ export type QuickCreateConfig = {
   description?: string;
   submitLabel?: string;
   fields: FieldConfig[];
-  onCreate: (data: Record<string, unknown>) => Promise<{ id: number }>;
+  onCreate: (
+    data: Record<string, unknown>,
+  ) => Promise<{ id: number } | { ids: number[] }>;
   /** For multiselect: append id instead of replacing */
   mode?: "select" | "multiselect-append";
   /** Hide button when false */
