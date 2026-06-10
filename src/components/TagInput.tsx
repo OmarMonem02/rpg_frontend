@@ -77,7 +77,7 @@ export function TagInput({
         />
         <ActionButton
           type="button"
-          tone="secondary"
+          tone="default"
           onClick={addTag}
           disabled={disabled || !normalizeTag(draft)}
         >
