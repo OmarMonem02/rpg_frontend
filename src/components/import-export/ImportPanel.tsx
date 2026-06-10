@@ -4,8 +4,10 @@ import { ActionButton, StatusBadge } from "@/components/ops-ui";
 import type { ImportExportEntity, ImportPreview, ImportResult } from "@/types/import-export";
 import { useMemo, useRef, useState } from "react";
 import { importFile, parseImportFile } from "@/lib/api/import-export";
+import { getApiErrorDetails } from "@/lib/api/core";
 import { getAuthToken } from "@/lib/auth-session";
 import { ImportResultAlert } from "./ImportResultAlert";
+import { ImportIssueActionButton } from "./ImportIssueAction";
 import {
   ArrowPathIcon,
   ArrowUpTrayIcon,
@@ -91,10 +93,15 @@ export function ImportPanel({ entity }: { entity: ImportExportEntity }) {
     try {
       setPreview(await parseImportFile(entity.slug, file, getToken()));
     } catch (err) {
-      setHttpError(err instanceof Error ? err.message : "Could not preview this file.");
+      const { message } = getApiErrorDetails(err, "Could not preview this file.");
+      setHttpError(message);
     } finally {
       setIsParsing(false);
     }
+  };
+
+  const handleIssueResolved = async () => {
+    await handlePreview();
   };
 
   const handleImport = async () => {
@@ -107,7 +114,8 @@ export function ImportPanel({ entity }: { entity: ImportExportEntity }) {
       setFile(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
     } catch (err) {
-      setHttpError(err instanceof Error ? err.message : "Could not import this file.");
+      const { message } = getApiErrorDetails(err, "Could not import this file.");
+      setHttpError(message);
     } finally {
       setIsImporting(false);
     }
@@ -229,7 +237,15 @@ export function ImportPanel({ entity }: { entity: ImportExportEntity }) {
                             {row.issues.map((issue, index) => (
                               <li key={`${issue.code}-${index}`} className="flex gap-2">
                                 <ExclamationTriangleIcon className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
-                                <span>{issue.message}</span>
+                                <div className="min-w-0">
+                                  <span>{issue.message}</span>
+                                  {issue.action ? (
+                                    <ImportIssueActionButton
+                                      action={issue.action}
+                                      onResolved={handleIssueResolved}
+                                    />
+                                  ) : null}
+                                </div>
                               </li>
                             ))}
                           </ul>
@@ -245,7 +261,11 @@ export function ImportPanel({ entity }: { entity: ImportExportEntity }) {
           </div>
         ) : null}
 
-        <ImportResultAlert result={result} httpError={httpError} />
+        <ImportResultAlert
+          result={result}
+          httpError={httpError}
+          onIssueResolved={file ? handleIssueResolved : undefined}
+        />
       </div>
     </div>
   );

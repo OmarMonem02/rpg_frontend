@@ -1,12 +1,14 @@
 import type { ImportResult } from "@/types/import-export";
 import { InlineMessage } from "@/components/ops-ui";
+import { ImportIssueActionButton } from "./ImportIssueAction";
 
 type Props = {
   result: ImportResult | null;
   httpError?: string | null;
+  onIssueResolved?: () => Promise<void>;
 };
 
-export function ImportResultAlert({ result, httpError }: Props) {
+export function ImportResultAlert({ result, httpError, onIssueResolved }: Props) {
   if (!result && !httpError) return null;
 
   if (httpError) {
@@ -28,10 +30,25 @@ export function ImportResultAlert({ result, httpError }: Props) {
         <span>Total: {summary.total_rows}</span>
       </div>
       {issueRows.length > 0 ? (
-        <ul className="mt-3 list-disc space-y-1 pl-5 text-sm">
+        <ul className="mt-3 space-y-3 pl-0 text-sm">
           {issueRows.map((row) => (
-            <li key={row.row_number}>
-              Row {row.row_number}: {row.issues.map((issue) => issue.message).join(" ")}
+            <li key={row.row_number} className="list-none rounded-xl border border-outline-variant/15 bg-surface p-3">
+              <p className="font-medium text-on-surface">
+                Row {row.row_number}
+              </p>
+              <ul className="mt-2 space-y-2 text-on-surface-variant">
+                {row.issues.map((issue, index) => (
+                  <li key={`${issue.code}-${index}`}>
+                    <span>{issue.message}</span>
+                    {issue.action && onIssueResolved ? (
+                      <ImportIssueActionButton
+                        action={issue.action}
+                        onResolved={onIssueResolved}
+                      />
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
             </li>
           ))}
         </ul>

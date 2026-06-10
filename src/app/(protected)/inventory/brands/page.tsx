@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { usePermissions } from "@/components/permission-provider";
+import { getApiErrorDetails } from "@/lib/api/core";
 import { getAuthToken } from "@/lib/auth-session";
 import { useEntityFilters } from "@/hooks/useEntityFilters";
 import { useGlobalDataRefresh } from "@/hooks/useGlobalDataRefresh";
@@ -41,6 +42,7 @@ export default function BrandsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingBrand, setEditingBrand] = useState<BrandRecord | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submitFieldErrors, setSubmitFieldErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const {
     page,
@@ -89,6 +91,7 @@ export default function BrandsPage() {
 
     setEditingBrand(brand || null);
     setSubmitError(null);
+    setSubmitFieldErrors({});
     setIsModalOpen(true);
   };
 
@@ -104,6 +107,8 @@ export default function BrandsPage() {
       }
 
       setIsSubmitting(true);
+      setSubmitError(null);
+      setSubmitFieldErrors({});
       const token = getAuthToken();
       if (!token) throw new Error("Authentication required");
 
@@ -124,7 +129,9 @@ export default function BrandsPage() {
       await loadBrands();
       handleCloseModal();
     } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : "Failed to save brand");
+      const { message, fieldErrors } = getApiErrorDetails(err, "Failed to save brand");
+      setSubmitError(message);
+      setSubmitFieldErrors(fieldErrors);
     } finally {
       setIsSubmitting(false);
     }
@@ -306,6 +313,7 @@ export default function BrandsPage() {
         isOpen={isModalOpen}
         isLoading={isSubmitting}
         error={submitError || undefined}
+        serverFieldErrors={submitFieldErrors}
         onClose={handleCloseModal}
         onSubmit={handleSubmit}
       />

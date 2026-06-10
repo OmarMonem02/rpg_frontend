@@ -119,10 +119,7 @@ export function EntityDrawer({
             title=""
             description=""
             onCancel={onClose}
-            onSubmit={async (data) => {
-              await onSubmit(data);
-              onClose();
-            }}
+            onSubmit={onSubmit}
             variant="page"
           />
         </div>

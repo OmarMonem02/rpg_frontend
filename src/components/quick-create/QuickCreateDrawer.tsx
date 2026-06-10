@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { EntityDrawer } from "@/components/entity-drawer";
 import type { FieldConfig } from "@/components/entity-form";
+import { getApiErrorDetails } from "@/lib/api/core";
 
 type QuickCreateDrawerProps = {
   isOpen: boolean;
@@ -28,10 +29,12 @@ export function QuickCreateDrawer({
   width = "md",
 }: QuickCreateDrawerProps) {
   const [error, setError] = useState<string | undefined>();
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
 
   const handleClose = () => {
     setError(undefined);
+    setFieldErrors({});
     onClose();
   };
 
@@ -39,10 +42,16 @@ export function QuickCreateDrawer({
     try {
       setIsLoading(true);
       setError(undefined);
+      setFieldErrors({});
       await onSubmit(data);
       handleClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create");
+      const { message, fieldErrors: nextFieldErrors } = getApiErrorDetails(
+        err,
+        "Failed to create",
+      );
+      setError(message);
+      setFieldErrors(nextFieldErrors);
     } finally {
       setIsLoading(false);
     }
@@ -60,6 +69,7 @@ export function QuickCreateDrawer({
       heroLabel={heroLabel}
       isLoading={isLoading}
       error={error}
+      serverFieldErrors={fieldErrors}
       width={width}
     />
   );

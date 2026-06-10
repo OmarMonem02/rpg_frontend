@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { getApiErrorDetails } from "@/lib/api/core";
 import { getAuthToken } from "@/lib/auth-session";
 import {
   listSparePartCategories,
@@ -29,6 +30,7 @@ export default function SparePartCategoriesPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<SparePartCategoryRecord | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submitFieldErrors, setSubmitFieldErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const loadCategories = async () => {
@@ -55,6 +57,7 @@ export default function SparePartCategoriesPage() {
   const handleOpenModal = (category?: SparePartCategoryRecord) => {
     setEditingCategory(category || null);
     setSubmitError(null);
+    setSubmitFieldErrors({});
     setIsModalOpen(true);
   };
 
@@ -66,6 +69,8 @@ export default function SparePartCategoriesPage() {
   const handleSubmit = async (formData: Record<string, unknown>) => {
     try {
       setIsSubmitting(true);
+      setSubmitError(null);
+      setSubmitFieldErrors({});
       const token = getAuthToken();
       if (!token) throw new Error("Authentication required");
 
@@ -82,7 +87,9 @@ export default function SparePartCategoriesPage() {
       await loadCategories();
       handleCloseModal();
     } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : "Failed to save category");
+      const { message, fieldErrors } = getApiErrorDetails(err, "Failed to save category");
+      setSubmitError(message);
+      setSubmitFieldErrors(fieldErrors);
     } finally {
       setIsSubmitting(false);
     }
@@ -206,6 +213,7 @@ export default function SparePartCategoriesPage() {
         isOpen={isModalOpen}
         isLoading={isSubmitting}
         error={submitError || undefined}
+        serverFieldErrors={submitFieldErrors}
         onClose={handleCloseModal}
         onSubmit={handleSubmit}
       />

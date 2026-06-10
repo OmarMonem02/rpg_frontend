@@ -90,11 +90,11 @@ async function settingsFetch<T>(path: string, token: string, init?: RequestInit)
 
   if (!response.ok) {
     const parsedError = await parseApiError(response);
-    const error = new ApiError(parsedError.message, response.status) as ApiError & {
-      fieldErrors?: SettingsValidationErrors;
-    };
-    error.fieldErrors = parsedError.fieldErrors;
-    throw error;
+    throw new ApiError(
+      parsedError.message,
+      response.status,
+      parsedError.fieldErrors as Record<string, string>,
+    );
   }
 
   if (response.status === 204) {

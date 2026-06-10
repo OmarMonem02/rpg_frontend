@@ -82,6 +82,7 @@ export type EntityFormProps = {
   fields: FieldConfig[];
   isLoading?: boolean;
   error?: string;
+  serverFieldErrors?: Record<string, string>;
   onCancel: () => void;
   onSubmit: (formData: Record<string, unknown>) => Promise<void>;
   submitLabel?: string | ((formData: Record<string, unknown>) => string);
@@ -120,6 +121,7 @@ export const EntityForm = forwardRef<EntityFormHandle, EntityFormProps>(
       fields,
       isLoading = false,
       error,
+      serverFieldErrors,
       onCancel,
       onSubmit,
       submitLabel = "Save",
@@ -202,6 +204,14 @@ export const EntityForm = forwardRef<EntityFormHandle, EntityFormProps>(
       setCurrentSectionIndex(0);
       // eslint-disable-next-line react-hooks/exhaustive-deps -- reset only when form identity changes
     }, [formKey]);
+
+    useEffect(() => {
+      if (!serverFieldErrors || Object.keys(serverFieldErrors).length === 0) {
+        return;
+      }
+
+      setFieldErrors((prev) => ({ ...prev, ...serverFieldErrors }));
+    }, [serverFieldErrors]);
 
     const setFieldValue = useCallback((name: string, value: unknown) => {
       setFormData((prev) => {
@@ -430,7 +440,7 @@ export const EntityForm = forwardRef<EntityFormHandle, EntityFormProps>(
       try {
         await onSubmit(formData);
       } catch {
-        // Parent handles errors
+        // Parent sets error state; keep the form open.
       } finally {
         setIsSubmitting(false);
       }

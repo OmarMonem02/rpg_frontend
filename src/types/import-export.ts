@@ -22,10 +22,28 @@ export type ImportExportEntity = {
   };
 };
 
+export type ImportIssueActionType =
+  | 'create_brand'
+  | 'add_brand_type'
+  | 'create_product_category'
+  | 'create_spare_part_category'
+  | 'create_maintenance_service_sector'
+  | 'create_bike_blueprint';
+
+export type ImportIssueAction = {
+  type: ImportIssueActionType;
+  name?: string;
+  brand_type?: 'products' | 'spare_parts' | 'bikes';
+  brand_id?: number;
+  model?: string;
+  year?: number;
+};
+
 export type ImportIssue = {
   row_number: number;
   code: string;
   message: string;
+  action?: ImportIssueAction;
 };
 
 export type ImportPreviewRow = {

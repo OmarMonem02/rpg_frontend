@@ -1,15 +1,11 @@
 import { getApiUrl } from "@/lib/config";
+import { parseApiValidationError } from "@/lib/api/core";
 import type { ImportExportEntity, ImportPreview, ImportResult } from "@/types/import-export";
 import { ApiError } from "@/lib/auth-api";
 
-async function parseErrorMessage(response: Response): Promise<string> {
-  try {
-    const json = (await response.json()) as { message?: string };
-    if (json.message) return json.message;
-  } catch {
-    // Ignore parse errors and use fallback message.
-  }
-  return "Request failed. Please try again.";
+async function throwApiError(response: Response): Promise<never> {
+  const { message, fieldErrors } = await parseApiValidationError(response);
+  throw new ApiError(message, response.status, fieldErrors);
 }
 
 export async function fetchImportExportEntities(token: string): Promise<ImportExportEntity[]> {
@@ -21,7 +17,7 @@ export async function fetchImportExportEntities(token: string): Promise<ImportEx
   });
 
   if (!response.ok) {
-    throw new ApiError(await parseErrorMessage(response), response.status);
+    await throwApiError(response);
   }
 
   return (await response.json()) as ImportExportEntity[];
@@ -58,7 +54,7 @@ export async function downloadFile(url: string, token: string, filename: string)
   });
 
   if (!response.ok) {
-    throw new ApiError(await parseErrorMessage(response), response.status);
+    await throwApiError(response);
   }
 
   const blob = await response.blob();
@@ -114,7 +110,7 @@ export async function importFile(
             // ignore
         }
     }
-    throw new ApiError(await parseErrorMessage(response), response.status);
+    await throwApiError(response);
   }
   
   if (isJson) {
@@ -142,7 +138,7 @@ export async function parseImportFile(
   });
 
   if (!response.ok) {
-    throw new ApiError(await parseErrorMessage(response), response.status);
+    await throwApiError(response);
   }
 
   return (await response.json()) as ImportPreview;

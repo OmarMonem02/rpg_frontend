@@ -3,8 +3,103 @@ import { ApiError } from "@/lib/auth-api";
 
 export type ValidationErrorResponse = {
   message?: string;
-  errors?: Record<string, string[]>;
+  errors?: Record<string, string[] | string>;
 };
+
+export function extractValidationErrors(
+  json: ValidationErrorResponse,
+): { message: string; fieldErrors: Record<string, string> } {
+  const fieldErrors: Record<string, string> = {};
+
+  if (json.errors && typeof json.errors === "object") {
+    for (const [field, rawValue] of Object.entries(json.errors)) {
+      const nextMessage = Array.isArray(rawValue) ? rawValue[0] : rawValue;
+      if (typeof nextMessage === "string" && nextMessage.trim() !== "") {
+        fieldErrors[field] = nextMessage;
+      }
+    }
+  }
+
+  const firstFieldMessage = Object.values(fieldErrors)[0];
+  const message =
+    json.message ??
+    firstFieldMessage ??
+    "Request failed. Please try again.";
+
+  return { message, fieldErrors };
+}
+
+export function getApiErrorDetails(
+  err: unknown,
+  fallback = "Request failed. Please try again.",
+): { message: string; fieldErrors: Record<string, string> } {
+  if (err instanceof ApiError) {
+    let fieldErrors = err.fieldErrors ?? {};
+
+    if (
+      err.status === 422 &&
+      Object.keys(fieldErrors).length === 0 &&
+      err.message &&
+      !/please review your form inputs/i.test(err.message)
+    ) {
+      if (/name already exists/i.test(err.message)) {
+        fieldErrors = { name: err.message };
+      }
+    }
+
+    return {
+      message: err.message,
+      fieldErrors,
+    };
+  }
+
+  if (err instanceof Error) {
+    return { message: err.message, fieldErrors: {} };
+  }
+
+  return { message: fallback, fieldErrors: {} };
+}
+
+export async function parseApiValidationError(
+  response: Response,
+): Promise<{ message: string; fieldErrors: Record<string, string> }> {
+  let message = "Request failed. Please try again.";
+  let fieldErrors: Record<string, string> = {};
+
+  try {
+    const text = await response.text();
+    if (text) {
+      try {
+        const parsed = extractValidationErrors(
+          JSON.parse(text) as ValidationErrorResponse,
+        );
+        message = parsed.message;
+        fieldErrors = parsed.fieldErrors;
+      } catch {
+        message = text.slice(0, 200);
+      }
+    }
+  } catch {
+    // Fall through to status-based messages below.
+  }
+
+  if (response.status === 401) {
+    message = "Your session expired. Please log in again.";
+  } else if (response.status === 403) {
+    message = "You don't have permission to perform this action.";
+  } else if (
+    response.status === 422 &&
+    Object.keys(fieldErrors).length === 0 &&
+    (message === "Request failed. Please try again." ||
+      message === "The given data was invalid.")
+  ) {
+    message = "Please review your form inputs and try again.";
+  } else if (response.status === 500) {
+    message = "Server error. Check browser console for details.";
+  }
+
+  return { message, fieldErrors };
+}
 
 export type PaginationMeta = {
   current_page?: number;
@@ -47,44 +142,8 @@ export function toNumber(value: unknown): number {
 }
 
 export async function parseErrorMessage(response: Response): Promise<string> {
-  try {
-    const text = await response.text();
-    console.error(`[API Error ${response.status}] Response:`, text);
-
-    // Try to parse as JSON
-    try {
-      const json = JSON.parse(text) as ValidationErrorResponse;
-      if (json.errors) {
-        const allErrors = Object.entries(json.errors)
-          .map(
-            ([field, messages]) =>
-              `${field}: ${Array.isArray(messages) ? messages.join(", ") : messages}`,
-          )
-          .join("; ");
-        if (allErrors) return allErrors;
-      }
-      if (json.message) return json.message;
-    } catch {
-      // Not valid JSON, will use text below
-    }
-
-    // If we got text but not JSON, return a snippet
-    if (text) {
-      return text.substring(0, 200);
-    }
-  } catch {
-    // Intentionally ignored; fallback message is used below.
-  }
-
-  if (response.status === 401)
-    return "Your session expired. Please log in again.";
-  if (response.status === 403)
-    return "You don't have permission to perform this action.";
-  if (response.status === 422)
-    return "Please review your form inputs and try again.";
-  if (response.status === 500)
-    return "Server error. Check browser console for details.";
-  return "Request failed. Please try again.";
+  const { message } = await parseApiValidationError(response);
+  return message;
 }
 
 export async function authorizedFetch<T>(
@@ -115,21 +174,29 @@ export async function authorizedFetch<T>(
   });
 
   if (!response.ok) {
-    const errorMsg = await parseErrorMessage(response);
-    console.error(`[API Error ${response.status}] ${path} - ${errorMsg}`, {
-      requestBody,
-    });
-    
-    // Enhanced error messaging for 403 Forbidden
-    let enhancedMsg = errorMsg;
+    const { message, fieldErrors } = await parseApiValidationError(response);
+
+    if (response.status === 422) {
+      console.warn(`[API Validation ${response.status}] ${path} - ${message}`, {
+        requestBody,
+        fieldErrors,
+      });
+    } else {
+      console.error(`[API Error ${response.status}] ${path} - ${message}`, {
+        requestBody,
+        fieldErrors,
+      });
+    }
+
+    let enhancedMsg = message;
     if (response.status === 403) {
       const resourceMatch = path.match(/(\w+)/)?.[1];
       if (resourceMatch) {
         enhancedMsg = `Permission denied: You don't have access to ${resourceMatch}. Please contact your administrator.`;
       }
     }
-    
-    throw new ApiError(enhancedMsg, response.status);
+
+    throw new ApiError(enhancedMsg, response.status, fieldErrors);
   }
 
   if (response.status === 204) {
