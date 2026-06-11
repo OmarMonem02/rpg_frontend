@@ -24,6 +24,7 @@ import {
 } from "@/components/entity-form-modal";
 import {
   ActionButton,
+  ConfirmDialog,
   EmptyState,
   InlineMessage,
   InputGroupCard,
@@ -509,8 +510,8 @@ export default function PaymentMethodsPage() {
                 <span className="font-medium text-on-surface">EGP per 1 USD</span>
                 <input
                   type="number"
-                  min="1"
-                  step="1"
+                  min="0"
+                  step="any"
                   inputMode="decimal"
                   autoComplete="off"
                   value={settingsForm.exchange_rate}
@@ -576,7 +577,7 @@ export default function PaymentMethodsPage() {
                 <input
                   type="number"
                   min="1"
-                  step="1"
+                  step="any"
                   inputMode="decimal"
                   autoComplete="off"
                   value={settingsForm.exchange_rate_eur}
@@ -724,72 +725,40 @@ export default function PaymentMethodsPage() {
         onSubmit={handleSubmit}
       />
 
-      {ratePreview ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="w-full max-w-lg rounded-[1.25rem] border border-outline-variant/20 bg-surface p-6 shadow-lg">
-            <h3 className="font-display text-lg font-semibold text-on-surface">
-              Confirm exchange rate change
-            </h3>
-            <p className="mt-2 text-sm text-on-surface-variant">
-              Margin-based catalog items will update automatically when you
-              confirm. Manual items at a loss should be reviewed afterward.
-            </p>
-            <div className="mt-6 flex justify-end gap-2">
-              <ActionButton
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  setRatePreview(null);
-                  setPendingSettingsPayload(null);
-                }}
-                disabled={isSettingsSaving}
-              >
-                Cancel
-              </ActionButton>
-              <ActionButton
-                type="button"
-                tone="primary"
-                onClick={() => void handleConfirmRateChange()}
-                disabled={isSettingsSaving}
-              >
-                {isSettingsSaving ? "Saving…" : "Confirm and save"}
-              </ActionButton>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <ConfirmDialog
+        isOpen={ratePreview !== null}
+        onClose={() => {
+          setRatePreview(null);
+          setPendingSettingsPayload(null);
+        }}
+        title="Confirm exchange rate change"
+        confirmLabel="Confirm and save"
+        isLoading={isSettingsSaving}
+        onConfirm={() => void handleConfirmRateChange()}
+      >
+        <p className="text-sm text-on-surface-variant">
+          Margin-based catalog items will update automatically when you
+          confirm. Manual items at a loss should be reviewed afterward.
+        </p>
+      </ConfirmDialog>
 
-      {deleteTarget ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="w-full max-w-md rounded-[1.25rem] border border-outline-variant/20 bg-surface p-6 shadow-lg">
-            <h3 className="font-display text-lg font-semibold text-on-surface">
-              Delete payment method?
-            </h3>
-            <p className="mt-2 text-sm text-on-surface-variant">
-              Remove <span className="font-medium text-on-surface">{deleteTarget.name}</span>
-              ? This cannot be undone if the server allows deletion.
-            </p>
-            <div className="mt-6 flex justify-end gap-2">
-              <ActionButton
-                type="button"
-                variant="outline"
-                onClick={() => setDeleteTarget(null)}
-                disabled={isDeleting}
-              >
-                Cancel
-              </ActionButton>
-              <ActionButton
-                type="button"
-                tone="danger"
-                onClick={() => void handleConfirmDelete()}
-                disabled={isDeleting}
-              >
-                {isDeleting ? "Deleting…" : "Delete"}
-              </ActionButton>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <ConfirmDialog
+        isOpen={deleteTarget !== null}
+        onClose={() => setDeleteTarget(null)}
+        title="Delete payment method?"
+        confirmLabel="Delete"
+        confirmTone="danger"
+        isLoading={isDeleting}
+        onConfirm={() => void handleConfirmDelete()}
+      >
+        <p className="text-sm text-on-surface-variant">
+          Remove{" "}
+          <span className="font-medium text-on-surface">
+            {deleteTarget?.name}
+          </span>
+          ? This cannot be undone if the server allows deletion.
+        </p>
+      </ConfirmDialog>
     </PageShell>
   );
 }
