@@ -891,7 +891,6 @@ export default function RequestsPage() {
                       <input
                         type="number"
                         onWheel={(event) => {
-                          event.preventDefault();
                           event.currentTarget.blur();
                         }}
                         min={0}

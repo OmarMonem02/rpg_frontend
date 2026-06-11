@@ -7,6 +7,7 @@ import { getAuthToken } from "@/lib/auth-session";
 import { useEntityFilters } from "@/hooks/useEntityFilters";
 import { useExchangeRates } from "@/hooks/useExchangeRates";
 import { useLiveDataRefresh } from "@/hooks/useLiveDataRefresh";
+import { isPricingLoss } from "@/lib/catalog-pricing";
 import { formatCatalogPriceInEGP } from "@/lib/currencies";
 import {
   listSpareParts,
@@ -542,7 +543,7 @@ export default function SparePartsPage() {
                       ) : (
                         formatCatalogPriceInEGP(
                           part.cost_price,
-                          part.currency_pricing,
+                          part.cost_currency ?? part.currency_pricing,
                           rates,
                         )
                       )}
@@ -560,11 +561,29 @@ export default function SparePartsPage() {
                           aria-label="Sale price"
                         />
                       ) : (
-                        formatCatalogPriceInEGP(
-                          part.sale_price,
-                          part.currency_pricing,
-                          rates,
-                        )
+                        <span className="inline-flex items-center gap-2">
+                          {formatCatalogPriceInEGP(
+                            part.sale_price,
+                            part.sale_currency ?? part.currency_pricing,
+                            rates,
+                          )}
+                          {rates &&
+                          isPricingLoss(
+                            {
+                              cost_price: part.cost_price,
+                              cost_currency:
+                                part.cost_currency ?? part.currency_pricing,
+                              sale_price: part.sale_price,
+                              sale_currency:
+                                part.sale_currency ?? part.currency_pricing,
+                            },
+                            rates,
+                          ) ? (
+                            <span className="rounded-full bg-error/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-error">
+                              Loss
+                            </span>
+                          ) : null}
+                        </span>
                       )}
                     </InventoryListTableTd>
                     <InventoryListTableTd>

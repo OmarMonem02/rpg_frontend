@@ -112,7 +112,6 @@ export function BulkEditConfigureStep({
                       step={field.price ? "0.01" : "1"}
                       value={d.value}
                       onWheel={(event) => {
-                        event.preventDefault();
                         event.currentTarget.blur();
                       }}
                       onChange={(e) => updateField(field.key, { value: e.target.value })}

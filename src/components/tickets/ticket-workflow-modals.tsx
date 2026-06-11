@@ -248,7 +248,6 @@ export function PaymentCloseModal({
         <input
           type="number"
           onWheel={(event) => {
-            event.preventDefault();
             event.currentTarget.blur();
           }}
           step="1"

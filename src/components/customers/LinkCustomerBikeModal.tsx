@@ -170,7 +170,11 @@ export function LinkCustomerBikeModal({
             />
             <input
               type="number"
-              min={1900}
+              min={1970}
+              step="1"
+              onWheel={(event) => {
+                event.currentTarget.blur();
+              }}
               className="w-full rounded-xl border border-outline-variant/30 bg-surface-container-lowest px-4 py-2 text-on-surface outline-none focus:border-primary focus:ring-2 focus:ring-primary/30 [&::-webkit-inner-spin-button]:appearance-none"
               placeholder="Year"
               value={blueprintSearch.year}
@@ -233,8 +237,8 @@ export function LinkCustomerBikeModal({
             <input
               type="number"
               min={0}
+              step="1"
               onWheel={(event) => {
-                event.preventDefault();
                 event.currentTarget.blur();
               }}
               className="w-full rounded-xl border border-outline-variant/30 bg-surface px-4 py-2 outline-none focus:border-primary [&::-webkit-inner-spin-button]:appearance-none"

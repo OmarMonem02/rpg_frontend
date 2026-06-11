@@ -9,9 +9,9 @@ export const CURRENCY_SELECT_OPTIONS: ReadonlyArray<{
   value: PricingCurrency;
   label: string;
 }> = [
-  { value: "EGP", label: "Egyptian Pound (EGP)" },
-  { value: "USD", label: "US Dollar (USD)" },
-  { value: "EUR", label: "Euro (EUR)" },
+  { value: "EGP", label: "(EGP)" },
+  { value: "USD", label: "(USD)" },
+  { value: "EUR", label: "(EUR)" },
 ];
 
 export function isPricingCurrency(value: string): value is PricingCurrency {

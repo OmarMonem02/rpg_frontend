@@ -9,6 +9,7 @@ import {
   buildQuery,
   type PaginatedResult,
 } from "./core";
+import type { CatalogPricingFields } from "@/lib/catalog-pricing";
 import type { PricingCurrency } from "@/lib/currencies";
 import { toPricingCurrency } from "@/lib/currencies";
 import { getApiUrl } from "@/lib/config";
@@ -285,8 +286,13 @@ export type SparePartRecord = {
   spare_parts_category_id: number;
   brand_id: number;
   currency_pricing: PricingCurrency;
+  cost_currency: PricingCurrency;
+  sale_currency: PricingCurrency;
   cost_price: number;
   sale_price: number;
+  sale_price_mode: CatalogPricingFields["sale_price_mode"];
+  sale_margin_type?: CatalogPricingFields["sale_margin_type"];
+  sale_margin_value?: number;
   max_discount_type: "fixed" | "percentage";
   max_discount_value: number;
   universal: boolean;
@@ -307,8 +313,13 @@ export type CreateSparePartPayload = {
   spare_parts_category_id: number;
   brand_id: number;
   currency_pricing: PricingCurrency;
+  cost_currency: PricingCurrency;
+  sale_currency: PricingCurrency;
   cost_price: number;
   sale_price: number;
+  sale_price_mode?: CatalogPricingFields["sale_price_mode"];
+  sale_margin_type?: CatalogPricingFields["sale_margin_type"];
+  sale_margin_value?: number;
   max_discount_type: "fixed" | "percentage";
   max_discount_value: number;
   universal?: boolean;
@@ -328,8 +339,13 @@ export type UpdateSparePartPayload = {
   spare_parts_category_id: number;
   brand_id: number;
   currency_pricing: PricingCurrency;
+  cost_currency: PricingCurrency;
+  sale_currency: PricingCurrency;
   cost_price: number;
   sale_price: number;
+  sale_price_mode?: CatalogPricingFields["sale_price_mode"];
+  sale_margin_type?: CatalogPricingFields["sale_margin_type"];
+  sale_margin_value?: number;
   max_discount_type: "fixed" | "percentage";
   max_discount_value: number;
   universal?: boolean;
@@ -366,8 +382,33 @@ function coalesceBikeBlueprintIds(record: Record<string, unknown>): number[] | u
   return undefined;
 }
 
+function normalizeCatalogPricingFields(record: Record<string, unknown>) {
+  const legacy = toPricingCurrency(record.currency_pricing);
+  const saleCurrency = toPricingCurrency(record.sale_currency ?? legacy);
+  const costCurrency = toPricingCurrency(record.cost_currency ?? legacy);
+
+  return {
+    currency_pricing: saleCurrency,
+    cost_currency: costCurrency,
+    sale_currency: saleCurrency,
+    sale_price_mode:
+      record.sale_price_mode === "margin" ? ("margin" as const) : ("manual" as const),
+    sale_margin_type:
+      record.sale_margin_type === "fixed"
+        ? ("fixed" as const)
+        : record.sale_margin_type === "percentage"
+          ? ("percentage" as const)
+          : undefined,
+    sale_margin_value:
+      record.sale_margin_value !== undefined && record.sale_margin_value !== null
+        ? toNumber(record.sale_margin_value)
+        : undefined,
+  };
+}
+
 export function normalizeSparePart(raw: unknown): SparePartRecord {
   const record = asRecord(raw);
+  const pricing = normalizeCatalogPricingFields(record);
   return {
     id: toNumber(record.id),
     name: toText(record.name),
@@ -379,7 +420,7 @@ export function normalizeSparePart(raw: unknown): SparePartRecord {
     low_stock_alarm: toNumber(record.low_stock_alarm),
     spare_parts_category_id: toNumber(record.spare_parts_category_id),
     brand_id: toNumber(record.brand_id),
-    currency_pricing: toPricingCurrency(record.currency_pricing),
+    ...pricing,
     cost_price: toNumber(record.cost_price),
     sale_price: toNumber(record.sale_price),
     max_discount_type: toText(record.max_discount_type) as "fixed" | "percentage",
@@ -497,8 +538,13 @@ export type ProductRecord = {
   products_category_id: number;
   brand_id: number;
   currency_pricing: PricingCurrency;
+  cost_currency: PricingCurrency;
+  sale_currency: PricingCurrency;
   cost_price: number;
   sale_price: number;
+  sale_price_mode: CatalogPricingFields["sale_price_mode"];
+  sale_margin_type?: CatalogPricingFields["sale_margin_type"];
+  sale_margin_value?: number;
   max_discount_type: "fixed" | "percentage";
   max_discount_value: number;
   universal: boolean;
@@ -519,8 +565,13 @@ export type CreateProductPayload = {
   products_category_id: number;
   brand_id: number;
   currency_pricing: PricingCurrency;
+  cost_currency: PricingCurrency;
+  sale_currency: PricingCurrency;
   cost_price: number;
   sale_price: number;
+  sale_price_mode?: CatalogPricingFields["sale_price_mode"];
+  sale_margin_type?: CatalogPricingFields["sale_margin_type"];
+  sale_margin_value?: number;
   max_discount_type: "fixed" | "percentage";
   max_discount_value: number;
   universal?: boolean;
@@ -536,6 +587,7 @@ export type UpdateProductPayload = CreateProductPayload & {
 
 export function normalizeProduct(raw: unknown): ProductRecord {
   const record = asRecord(raw);
+  const pricing = normalizeCatalogPricingFields(record);
   return {
     id: toNumber(record.id),
     name: toText(record.name),
@@ -547,7 +599,7 @@ export function normalizeProduct(raw: unknown): ProductRecord {
     low_stock_alarm: toNumber(record.low_stock_alarm),
     products_category_id: toNumber(record.products_category_id),
     brand_id: toNumber(record.brand_id),
-    currency_pricing: toPricingCurrency(record.currency_pricing),
+    ...pricing,
     cost_price: toNumber(record.cost_price),
     sale_price: toNumber(record.sale_price),
     max_discount_type: toText(record.max_discount_type) as "fixed" | "percentage",
@@ -660,6 +712,8 @@ export function buildSparePartQuickEditPayload(
   changes: SparePartQuickEditFields,
 ): UpdateSparePartPayload {
   return {
+    cost_currency: record.cost_currency,
+    sale_currency: record.sale_currency,
     name: changes.name ?? record.name,
     sku: record.sku,
     image: record.image,

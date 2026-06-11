@@ -378,7 +378,6 @@ export default function ExpensesPage() {
                 step="0.01"
                 value={form.amount}
                 onWheel={(event) => {
-                  event.preventDefault();
                   event.currentTarget.blur();
                 }}
                 onChange={(event) =>

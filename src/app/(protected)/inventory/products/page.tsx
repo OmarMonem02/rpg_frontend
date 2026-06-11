@@ -7,6 +7,7 @@ import { getAuthToken } from "@/lib/auth-session";
 import { useEntityFilters } from "@/hooks/useEntityFilters";
 import { useExchangeRates } from "@/hooks/useExchangeRates";
 import { useLiveDataRefresh } from "@/hooks/useLiveDataRefresh";
+import { isPricingLoss } from "@/lib/catalog-pricing";
 import { formatCatalogPriceInEGP } from "@/lib/currencies";
 import {
   listProducts,
@@ -562,7 +563,7 @@ export default function ProductsPage() {
                       ) : (
                         formatCatalogPriceInEGP(
                           product.cost_price,
-                          product.currency_pricing,
+                          product.cost_currency ?? product.currency_pricing,
                           rates,
                         )
                       )}
@@ -580,11 +581,29 @@ export default function ProductsPage() {
                           aria-label="Sale price"
                         />
                       ) : (
-                        formatCatalogPriceInEGP(
-                          product.sale_price,
-                          product.currency_pricing,
-                          rates,
-                        )
+                        <span className="inline-flex items-center gap-2">
+                          {formatCatalogPriceInEGP(
+                            product.sale_price,
+                            product.sale_currency ?? product.currency_pricing,
+                            rates,
+                          )}
+                          {rates &&
+                          isPricingLoss(
+                            {
+                              cost_price: product.cost_price,
+                              cost_currency:
+                                product.cost_currency ?? product.currency_pricing,
+                              sale_price: product.sale_price,
+                              sale_currency:
+                                product.sale_currency ?? product.currency_pricing,
+                            },
+                            rates,
+                          ) ? (
+                            <span className="rounded-full bg-error/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-error">
+                              Loss
+                            </span>
+                          ) : null}
+                        </span>
                       )}
                     </InventoryListTableTd>
                     <InventoryListTableTd>

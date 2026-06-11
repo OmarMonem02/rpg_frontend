@@ -417,7 +417,6 @@ export default function SellersPage() {
                     }))
                   }
                   onWheel={(event) => {
-                    event.preventDefault();
                     event.currentTarget.blur();
                   }}
                   required

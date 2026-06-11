@@ -239,6 +239,9 @@ function FormMoneyInput({
           disabled={disabled}
           value={value || ""}
           onChange={(e) => onChange(Number(e.target.value) || 0)}
+          onWheel={(event) => {
+            event.currentTarget.blur();
+          }}
           onBlur={onBlur}
           placeholder="0.00"
           className="w-full appearance-none bg-transparent py-3.5 pl-10 pr-14 text-sm font-medium text-on-surface outline-none disabled:cursor-not-allowed"

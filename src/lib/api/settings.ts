@@ -25,11 +25,17 @@ function normalizeSettings(payload: unknown): SettingsResponse {
   const nestedData = isRecord(data.data) ? data.data : null;
   const source = nestedData ?? data;
 
-  return {
+  const result: SettingsResponse = {
     tax_rate: toNumberOrNull(source.tax_rate),
     exchange_rate: toNumberOrNull(source.exchange_rate),
     exchange_rate_eur: toNumberOrNull(source.exchange_rate_eur),
   };
+
+  if (isRecord(source.pricing_impact)) {
+    result.pricing_impact = source.pricing_impact as SettingsResponse["pricing_impact"];
+  }
+
+  return result;
 }
 
 async function parseApiError(response: Response): Promise<{ message: string; fieldErrors: SettingsValidationErrors }> {

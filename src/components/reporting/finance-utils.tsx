@@ -327,10 +327,10 @@ export function YearPicker({
     <InputGroup label="Year">
       <input
         type="number"
+        step="1"
         min="2000"
         max="2100"
         onWheel={(event) => {
-          event.preventDefault();
           event.currentTarget.blur();
         }}
         value={year}

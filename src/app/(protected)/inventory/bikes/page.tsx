@@ -7,6 +7,7 @@ import { getAuthToken } from "@/lib/auth-session";
 import { useEntityFilters } from "@/hooks/useEntityFilters";
 import { useExchangeRates } from "@/hooks/useExchangeRates";
 import { useGlobalDataRefresh } from "@/hooks/useGlobalDataRefresh";
+import { isPricingLoss } from "@/lib/catalog-pricing";
 import { formatCatalogPriceInEGP, toPricingCurrency } from "@/lib/currencies";
 import {
   listBikes,
@@ -343,11 +344,33 @@ export default function BikesPage() {
                             aria-label="Sale price"
                           />
                         ) : (
-                          formatCatalogPriceInEGP(
-                            bike.sale_price,
-                            toPricingCurrency(bike.currency_pricing),
-                            rates,
-                          )
+                          <span className="inline-flex items-center justify-end gap-2">
+                            {formatCatalogPriceInEGP(
+                              bike.sale_price,
+                              toPricingCurrency(
+                                bike.sale_currency ?? bike.currency_pricing,
+                              ),
+                              rates,
+                            )}
+                            {rates &&
+                            isPricingLoss(
+                              {
+                                cost_price: bike.cost_price,
+                                cost_currency: toPricingCurrency(
+                                  bike.cost_currency ?? bike.currency_pricing,
+                                ),
+                                sale_price: bike.sale_price,
+                                sale_currency: toPricingCurrency(
+                                  bike.sale_currency ?? bike.currency_pricing,
+                                ),
+                              },
+                              rates,
+                            ) ? (
+                              <span className="rounded-full bg-error/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-error">
+                                Loss
+                              </span>
+                            ) : null}
+                          </span>
                         )}
                       </InventoryListTableTd>
                       <InventoryListTableTd align="right" variant="mono">
@@ -366,7 +389,9 @@ export default function BikesPage() {
                         ) : (
                           formatCatalogPriceInEGP(
                             bike.cost_price,
-                            toPricingCurrency(bike.currency_pricing),
+                            toPricingCurrency(
+                              bike.cost_currency ?? bike.currency_pricing,
+                            ),
                             rates,
                           )
                         )}

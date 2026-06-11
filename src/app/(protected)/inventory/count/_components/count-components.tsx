@@ -240,7 +240,6 @@ export function QuantityStepper({
           onChange(raw === "" ? 0 : event.target.valueAsNumber);
         }}
         onWheel={(event) => {
-          event.preventDefault();
           event.currentTarget.blur();
         }}
         className="form-input-base w-16 px-2 py-1.5 text-center text-sm [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"

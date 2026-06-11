@@ -752,7 +752,6 @@ function SalesPageContent() {
                   setPage(1);
                 }}
                 onWheel={(event) => {
-                  event.preventDefault();
                   event.currentTarget.blur();
                 }}
                 placeholder="0.00"
@@ -769,7 +768,6 @@ function SalesPageContent() {
                   setPage(1);
                 }}
                 onWheel={(event) => {
-                  event.preventDefault();
                   event.currentTarget.blur();
                 }}
                 placeholder="0.00"

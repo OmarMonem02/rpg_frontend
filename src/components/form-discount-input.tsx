@@ -134,6 +134,9 @@ export function FormDiscountInput({
         <input
           id={id}
           type="number"
+          onWheel={(event) => {
+            event.currentTarget.blur();
+          }}
           step="0.01"
           min="0"
           disabled={disabled}

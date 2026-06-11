@@ -26,7 +26,7 @@ import {
   buildBlueprintYearRangeFields,
   createBlueprintsFromFormData,
 } from "@/lib/blueprint-year-range-fields";
-import { CURRENCY_SELECT_OPTIONS, toPricingCurrency } from "@/lib/currencies";
+import { buildCatalogPricingPayload } from "@/lib/catalog-pricing";
 import { EntityForm, type FieldConfig } from "@/components/entity-form";
 import { filterBrandsByType } from "@/lib/brand-types";
 
@@ -247,9 +247,7 @@ export function SparePartForm({ mode, initialData }: SparePartFormProps) {
         low_stock_alarm: toNumber(formData.low_stock_alarm),
         spare_parts_category_id: Number(formData.spare_parts_category_id),
         brand_id: Number(formData.brand_id),
-        currency_pricing: toPricingCurrency(String(formData.currency_pricing)),
-        cost_price: Number(formData.cost_price),
-        sale_price: Number(formData.sale_price),
+        ...buildCatalogPricingPayload(formData),
         max_discount_type: String(formData.max_discount_type) as "fixed" | "percentage",
         max_discount_value: Number(formData.max_discount_value),
         universal: Boolean(formData.universal),
@@ -413,72 +411,20 @@ export function SparePartForm({ mode, initialData }: SparePartFormProps) {
       span: 2,
     },
     {
-      name: "stock_quantity",
-      label: "Stock Quantity",
-      type: "number",
-      section: "Inventory",
-      sectionDescription: "Set the operational numbers that drive stock visibility.",
-      description: "Add the opening stock count for this part.",
-      placeholder: "0",
-      value: initialData?.stock_quantity ?? 0,
-      min: 0,
-      helperTone: "featured",
-    },
-    {
-      name: "low_stock_alarm",
-      label: "Low Stock Alarm",
-      type: "number",
-      section: "Inventory",
-      description: "Set when the team should treat this part as low stock.",
-      placeholder: "5",
-      value: initialData?.low_stock_alarm ?? 0,
-      min: 0,
-    },
-    {
-      name: "cost_price",
-      label: "Cost Price",
-      type: "number",
+      name: "catalog_pricing",
+      label: "Pricing",
+      type: "pricing",
       required: true,
       section: "Pricing",
-      sectionDescription: "Define the financial baseline before the part goes live.",
-      description: "Enter your landed or purchase cost per unit.",
-      placeholder: "0.00",
-      value: initialData?.cost_price ?? 0,
-      min: 0,
-      step: "0.01",
-    },
-    {
-      name: "sale_price",
-      label: "Sale Price",
-      type: "number",
-      required: true,
-      section: "Pricing",
-      description: "Set the selling price your staff should use.",
-      placeholder: "0.00",
-      value: initialData?.sale_price ?? 0,
-      min: 0,
-      step: "0.01",
-      helperTone: "featured",
-    },
-    {
-      name: "currency_pricing",
-      label: "Currency",
-      type: "select",
-      required: true,
-      section: "Pricing",
-      description: "Choose the currency shown in inventory and sales.",
-      options: CURRENCY_SELECT_OPTIONS.map((o) => ({
-        value: o.value,
-        label: o.label,
-      })),
-      value: initialData?.currency_pricing ?? "EGP",
+      sectionDescription: "Define cost and sale currencies, optional margin-based sale pricing, and discount policy.",
+      value: initialData,
     },
     {
       name: "max_discount_type",
       label: "Discount Type",
       type: "select",
       required: true,
-      section: "Pricing",
+      section: "Discount",
       sectionDescription: "Control discount policy and where this part can be used.",
       description: "Choose whether the discount cap is percentage-based or fixed.",
       options: [
@@ -491,13 +437,39 @@ export function SparePartForm({ mode, initialData }: SparePartFormProps) {
       name: "max_discount_value",
       label: "Max Discount Value",
       type: "number",
-      section: "Pricing",
+      section: "Discount",
       description: "Set the highest discount your team can apply.",
       placeholder: "0",
       value: initialData?.max_discount_value ?? 0,
       min: 0,
       step: "0.01",
     },
+    {
+      name: "stock_quantity",
+      label: "Stock Quantity",
+      type: "number",
+      section: "Inventory",
+      sectionDescription: "Set the operational numbers that drive stock visibility.",
+      description: "Add the opening stock count for this part.",
+      placeholder: "0",
+      value: initialData?.stock_quantity ?? 0,
+      min: 0,
+      helperTone: "featured",
+    },
+
+    {
+      name: "low_stock_alarm",
+      label: "Low Stock Alarm",
+      type: "number",
+      section: "Inventory",
+      description: "Set when the team should treat this part as low stock.",
+      placeholder: "5",
+      required: true,
+      value: initialData?.low_stock_alarm ?? 0,
+      min: 0,
+    },
+
+    
     {
       name: "universal",
       label: "Universal Part",
@@ -691,27 +663,27 @@ export function SparePartForm({ mode, initialData }: SparePartFormProps) {
 
   return (
     <div className="w-full py-4 md:py-6">
-    <EntityForm
-      formKey={formKey}
-      variant="page"
-      title={
-        mode === "create"
-          ? "Create Spare Part"
-          : `Edit ${initialData?.name ?? "Spare Part"}`
-      }
-      description={
-        mode === "create"
-          ? "Build a spare part entry with inventory, pricing, and compatibility details in one view."
-          : "Refine stock, pricing, and compatibility details for this spare part."
-      }
-      fields={fields}
-      isLoading={isSubmitting}
-      error={error || undefined}
-      onCancel={() => router.push("/inventory/spare-parts")}
-      onSubmit={handleSubmit}
-      submitLabel={mode === "create" ? "Create Spare Part" : "Save Changes"}
-      heroLabel="Spare Parts"
-    />
+      <EntityForm
+        formKey={formKey}
+        variant="page"
+        title={
+          mode === "create"
+            ? "Create Spare Part"
+            : `Edit ${initialData?.name ?? "Spare Part"}`
+        }
+        description={
+          mode === "create"
+            ? "Build a spare part entry with inventory, pricing, and compatibility details in one view."
+            : "Refine stock, pricing, and compatibility details for this spare part."
+        }
+        fields={fields}
+        isLoading={isSubmitting}
+        error={error || undefined}
+        onCancel={() => router.push("/inventory/spare-parts")}
+        onSubmit={handleSubmit}
+        submitLabel={mode === "create" ? "Create Spare Part" : "Save Changes"}
+        heroLabel="Spare Parts"
+      />
     </div>
   );
 }

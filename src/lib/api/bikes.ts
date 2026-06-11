@@ -9,6 +9,8 @@ import {
   buildQuery,
   type PaginatedResult,
 } from "./core";
+import type { CatalogPricingFields } from "@/lib/catalog-pricing";
+import { toPricingCurrency, type PricingCurrency } from "@/lib/currencies";
 import type { CreateSparePartPayload } from "./inventory";
 
 // --- BIKE BLUEPRINTS ---
@@ -247,9 +249,14 @@ export type BikeRecord = {
   bike_blueprint_id: number;
   image?: string;
   image_public_id?: string;
-  currency_pricing: string;
+  currency_pricing: PricingCurrency;
+  cost_currency: PricingCurrency;
+  sale_currency: PricingCurrency;
   cost_price: number;
   sale_price: number;
+  sale_price_mode: CatalogPricingFields["sale_price_mode"];
+  sale_margin_type?: CatalogPricingFields["sale_margin_type"];
+  sale_margin_value?: number;
   status: string;
   max_discount_type: string;
   max_discount_value: number;
@@ -263,9 +270,14 @@ export type CreateBikePayload = {
   bike_blueprint_id: number;
   image?: string;
   image_public_id?: string;
-  currency_pricing: string;
+  currency_pricing: PricingCurrency;
+  cost_currency: PricingCurrency;
+  sale_currency: PricingCurrency;
   cost_price: number;
   sale_price: number;
+  sale_price_mode?: CatalogPricingFields["sale_price_mode"];
+  sale_margin_type?: CatalogPricingFields["sale_margin_type"];
+  sale_margin_value?: number;
   status: string;
   max_discount_type: string;
   max_discount_value: number;
@@ -278,12 +290,29 @@ export type UpdateBikePayload = CreateBikePayload;
 
 export function normalizeBike(raw: unknown): BikeRecord {
   const record = asRecord(raw);
+  const legacy = toPricingCurrency(record.currency_pricing);
+  const saleCurrency = toPricingCurrency(record.sale_currency ?? legacy);
+  const costCurrency = toPricingCurrency(record.cost_currency ?? legacy);
   return {
     id: toNumber(record.id),
     bike_blueprint_id: toNumber(record.bike_blueprint_id),
     image: toText(record.image) || undefined,
     image_public_id: toText(record.image_public_id) || undefined,
-    currency_pricing: toText(record.currency_pricing),
+    currency_pricing: saleCurrency,
+    cost_currency: costCurrency,
+    sale_currency: saleCurrency,
+    sale_price_mode:
+      record.sale_price_mode === "margin" ? "margin" : "manual",
+    sale_margin_type:
+      record.sale_margin_type === "fixed"
+        ? "fixed"
+        : record.sale_margin_type === "percentage"
+          ? "percentage"
+          : undefined,
+    sale_margin_value:
+      record.sale_margin_value !== undefined && record.sale_margin_value !== null
+        ? toNumber(record.sale_margin_value)
+        : undefined,
     cost_price: toNumber(record.cost_price),
     sale_price: toNumber(record.sale_price),
     status: toText(record.status),

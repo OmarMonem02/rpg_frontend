@@ -198,7 +198,6 @@ export function ItemInlineDiscountEditor({
           type="number"
           disabled={disabled || approval.isPending}
           onWheel={(event) => {
-            event.preventDefault();
             event.currentTarget.blur();
           }}
           value={draft}

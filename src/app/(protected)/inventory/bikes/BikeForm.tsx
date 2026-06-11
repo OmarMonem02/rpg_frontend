@@ -12,7 +12,7 @@ import {
   type BikeBlueprintRecord,
   fetchAllPages,
 } from "@/lib/crud-api";
-import { CURRENCY_SELECT_OPTIONS, toPricingCurrency } from "@/lib/currencies";
+import { buildCatalogPricingPayload } from "@/lib/catalog-pricing";
 import { EntityForm, type FieldConfig } from "@/components/entity-form";
 
 interface BikeFormProps {
@@ -68,9 +68,7 @@ export function BikeForm({ mode, initialData }: BikeFormProps) {
         image_public_id: formData.image_public_id
           ? String(formData.image_public_id)
           : undefined,
-        currency_pricing: toPricingCurrency(String(formData.currency_pricing || "EGP")),
-        cost_price: Number(formData.cost_price),
-        sale_price: Number(formData.sale_price),
+        ...buildCatalogPricingPayload(formData),
         status: String(formData.status),
         max_discount_type: String(formData.max_discount_type),
         max_discount_value: Number(formData.max_discount_value),
@@ -158,44 +156,14 @@ export function BikeForm({ mode, initialData }: BikeFormProps) {
       value: initialData?.mileage ?? 0,
     },
     {
-      name: "cost_price",
-      label: "Cost Price",
-      type: "number",
+      name: "catalog_pricing",
+      label: "Pricing",
+      type: "pricing",
       required: true,
       section: "Pricing",
       sectionDescription:
-        "Set the core financial position before publishing the listing.",
-      description: "Enter what this bike cost your business.",
-      placeholder: "50000.00",
-      min: 0,
-      step: "0.01",
-      value: initialData?.cost_price ?? 0,
-    },
-    {
-      name: "sale_price",
-      label: "Sale Price",
-      type: "number",
-      required: true,
-      section: "Pricing",
-      description: "Set the standard listed selling price.",
-      placeholder: "75000.00",
-      min: 0,
-      step: "0.01",
-      value: initialData?.sale_price ?? 0,
-      helperTone: "featured",
-    },
-    {
-      name: "currency_pricing",
-      label: "Currency",
-      type: "select",
-      required: true,
-      section: "Pricing",
-      description: "Choose the pricing currency used in the listing.",
-      options: CURRENCY_SELECT_OPTIONS.map((o) => ({
-        value: o.value,
-        label: o.label,
-      })),
-      value: initialData?.currency_pricing ?? "EGP",
+        "Set cost and sale currencies and optional margin-based sale pricing for this listing.",
+      value: initialData,
     },
     {
       name: "max_discount_type",

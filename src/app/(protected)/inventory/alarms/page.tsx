@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { PricingLossPanel } from "@/app/(protected)/inventory/alarms/pricing-loss-panel";
 import { usePermissions } from "@/components/permission-provider";
 import {
   ActionButton,
@@ -321,10 +323,20 @@ function AlertPanels({
   );
 }
 
+type MainAlarmTab = "stock" | "pricing";
+
 export default function InventoryAlarmsPage() {
+  const searchParams = useSearchParams();
   const permissions = usePermissions();
   const showSpareParts = permissions.canReadPage("spare-parts");
   const showProducts = permissions.canReadPage("products");
+  const initialTab =
+    searchParams.get("tab") === "pricing" ? "pricing" : "stock";
+  const [mainTab, setMainTab] = useState<MainAlarmTab>(initialTab);
+
+  useEffect(() => {
+    setMainTab(searchParams.get("tab") === "pricing" ? "pricing" : "stock");
+  }, [searchParams]);
 
   const [sparePartRows, setSparePartRows] = useState<StockAlertRow[]>([]);
   const [productRows, setProductRows] = useState<StockAlertRow[]>([]);
@@ -423,105 +435,132 @@ export default function InventoryAlarmsPage() {
     <PageShell>
       <PageHero
         eyebrow="Inventory"
-        title="Stock alarms"
+        title="Inventory alarms"
         subtitle={
           <p className="max-w-2xl text-sm leading-6 text-on-surface-variant">
-            Items listed here are at or below their per-item{" "}
-            <span className="font-medium text-on-surface">low stock alarm</span>{" "}
-            setting. Out-of-stock lines are shown separately from low-stock
-            items that still have units on hand.
+            {mainTab === "stock"
+              ? "Items at or below their low stock alarm threshold."
+              : "Items where EGP cost exceeds sale price at current exchange rates."}
           </p>
         }
         meta={
-          <StatGrid>
-            <StatCard
-              label="Out of stock"
-              value={String(stats.outCount)}
-              hint="Zero units on hand"
-              tone="danger"
-            />
-            <StatCard
-              label="Low stock"
-              value={String(stats.lowCount)}
-              hint="Above zero, at or below alarm"
-              tone="warning"
-            />
-            <StatCard
-              label="Total alerts"
-              value={String(stats.total)}
-              hint="Matching current filters"
-            />
-            <StatCard
-              label="By catalog"
-              value={`${stats.spareCount} / ${stats.productCount}`}
-              hint="Spare parts / products"
-              tone="primary"
-            />
-          </StatGrid>
+          mainTab === "stock" ? (
+            <StatGrid>
+              <StatCard
+                label="Out of stock"
+                value={String(stats.outCount)}
+                hint="Zero units on hand"
+                tone="danger"
+              />
+              <StatCard
+                label="Low stock"
+                value={String(stats.lowCount)}
+                hint="Above zero, at or below alarm"
+                tone="warning"
+              />
+              <StatCard
+                label="Total alerts"
+                value={String(stats.total)}
+                hint="Matching current filters"
+              />
+              <StatCard
+                label="By catalog"
+                value={`${stats.spareCount} / ${stats.productCount}`}
+                hint="Spare parts / products"
+                tone="primary"
+              />
+            </StatGrid>
+          ) : null
         }
       />
 
-      {error ? (
-        <div className="rounded-2xl border border-error/20 bg-error/10 p-4 text-error">
-          {error}
-        </div>
-      ) : null}
-
-      <FilterBar className="md:grid-cols-12">
-        <InputGroup label="Search" className="md:col-span-6">
-          <input
-            type="search"
-            placeholder="Search by name, SKU, or part number…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="form-input-base"
-          />
-        </InputGroup>
-        <InputGroup label="Catalog" className="md:col-span-6">
-          <select
-            value={entityFilter}
-            onChange={(e) => setEntityFilter(e.target.value as EntityFilter)}
-            className="form-input-base"
-          >
-            <option value="all">All catalogs</option>
-            {showSpareParts ? (
-              <option value="spare-part">Spare parts only</option>
-            ) : null}
-            {showProducts ? (
-              <option value="product">Products only</option>
-            ) : null}
-          </select>
-        </InputGroup>
-      </FilterBar>
-
-      {loading ? (
-        <div className="flex h-64 flex-col items-center justify-center gap-4 text-on-surface-variant">
-          <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-          <p className="font-medium">Loading stock alarms…</p>
-        </div>
-      ) : (
+      <div className="mt-2">
         <TabsWrapper
-          variant="card"
-          activeTabId={alertTab}
-          onTabChange={(id) => setAlertTab(id as AlertTab)}
+          variant="pills"
+          activeTabId={mainTab}
+          onTabChange={(id) => setMainTab(id as MainAlarmTab)}
           tabs={[
             {
-              id: "all",
-              label: `All alerts (${stats.total})`,
-              content: tabPanels,
+              id: "stock",
+              label: "Stock alarms",
+              content: null,
             },
             {
-              id: "out",
-              label: `Out of stock (${stats.outCount})`,
-              content: tabPanels,
-            },
-            {
-              id: "low",
-              label: `Low stock (${stats.lowCount})`,
-              content: tabPanels,
+              id: "pricing",
+              label: "Pricing loss",
+              content: null,
             },
           ]}
         />
+      </div>
+
+      {mainTab === "pricing" ? (
+        <PricingLossPanel />
+      ) : (
+        <div className="mt-6 space-y-6">
+          {error ? (
+            <div className="rounded-2xl border border-error/20 bg-error/10 p-4 text-error">
+              {error}
+            </div>
+          ) : null}
+
+          <FilterBar className="md:grid-cols-12">
+            <InputGroup label="Search" className="md:col-span-6">
+              <input
+                type="search"
+                placeholder="Search by name, SKU, or part number…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="form-input-base"
+              />
+            </InputGroup>
+            <InputGroup label="Catalog" className="md:col-span-6">
+              <select
+                value={entityFilter}
+                onChange={(e) => setEntityFilter(e.target.value as EntityFilter)}
+                className="form-input-base"
+              >
+                <option value="all">All catalogs</option>
+                {showSpareParts ? (
+                  <option value="spare-part">Spare parts only</option>
+                ) : null}
+                {showProducts ? (
+                  <option value="product">Products only</option>
+                ) : null}
+              </select>
+            </InputGroup>
+          </FilterBar>
+
+          {loading ? (
+            <div className="flex h-64 flex-col items-center justify-center gap-4 text-on-surface-variant">
+              <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+              <p className="font-medium">Loading stock alarms…</p>
+            </div>
+          ) : (
+            <TabsWrapper
+              variant="card"
+              activeTabId={alertTab}
+              onTabChange={(id) => setAlertTab(id as AlertTab)}
+              tabs={[
+                {
+                  id: "all",
+                  label: `All alerts (${stats.total})`,
+                  content: tabPanels,
+                },
+                {
+                  id: "out",
+                  label: `Out of stock (${stats.outCount})`,
+                  content: tabPanels,
+                },
+                {
+                  id: "low",
+                  label: `Low stock (${stats.lowCount})`,
+                  content: tabPanels,
+                },
+              ]}
+            />
+          )}
+        </div>
       )}
     </PageShell>
   );

@@ -161,7 +161,6 @@ function DebouncedQuantityInput({
           }
         }}
         onWheel={(event) => {
-          event.preventDefault();
           event.currentTarget.blur();
         }}
         onKeyDown={(e) => {

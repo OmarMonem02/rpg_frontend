@@ -413,8 +413,8 @@ export function CreateTicketModal({
                     <InputGroup label="Mileage (km)">
                       <input
                         type="number"
+                        step="1"
                         onWheel={(event) => {
-                          event.preventDefault();
                           event.currentTarget.blur();
                         }}
                         className="w-full rounded-xl border border-outline-variant/30 bg-surface px-4 py-2 outline-none focus:border-primary [&::-webkit-inner-spin-button]:appearance-none"

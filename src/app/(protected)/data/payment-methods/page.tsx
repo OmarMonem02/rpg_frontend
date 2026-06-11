@@ -6,6 +6,11 @@ import { ApiError } from "@/lib/auth-api";
 import { getAuthToken, getAuthUser } from "@/lib/auth-session";
 import { getSettings, updateSettings } from "@/lib/api/settings";
 import {
+  previewRateChangePricing,
+  type RateChangePreviewResponse,
+} from "@/lib/api/pricing-alarms";
+import Link from "next/link";
+import {
   listPaymentMethods,
   createPaymentMethod,
   updatePaymentMethod,
@@ -105,6 +110,13 @@ export default function PaymentMethodsPage() {
   const [settingsSuccess, setSettingsSuccess] = useState<string | null>(null);
   const [isSettingsLoading, setIsSettingsLoading] = useState(isAdmin);
   const [isSettingsSaving, setIsSettingsSaving] = useState(false);
+  const [ratePreview, setRatePreview] = useState<RateChangePreviewResponse | null>(
+    null,
+  );
+  const [pendingSettingsPayload, setPendingSettingsPayload] =
+    useState<UpdateSettingsPayload | null>(null);
+  const [isPreviewLoading, setIsPreviewLoading] = useState(false);
+  const [lastManualLossCount, setLastManualLossCount] = useState(0);
 
   const canCreatePaymentMethods = permissions.canCreate("payment-methods");
   const canUpdatePaymentMethods = permissions.canUpdate("payment-methods");
@@ -300,6 +312,41 @@ export default function PaymentMethodsPage() {
     }
 
     try {
+      setSettingsError(null);
+      setSettingsSuccess(null);
+
+      const token = getAuthToken();
+      if (!token) throw new Error("Authentication required");
+
+      setIsPreviewLoading(true);
+      const preview = await previewRateChangePricing(token, payload);
+      setRatePreview(preview);
+      setPendingSettingsPayload(payload);
+      setIsPreviewLoading(false);
+      return;
+    } catch (err) {
+      setIsPreviewLoading(false);
+      if (err instanceof ApiError) {
+        const fieldErrors = (
+          err as ApiError & { fieldErrors?: SettingsValidationErrors }
+        ).fieldErrors;
+        if (fieldErrors) {
+          setSettingsErrors(fieldErrors);
+        }
+        setSettingsError(err.message);
+      } else {
+        setSettingsError(
+          err instanceof Error
+            ? err.message
+            : "Failed to save payment settings",
+        );
+      }
+    }
+  };
+
+  const handleConfirmRateChange = async () => {
+    if (!pendingSettingsPayload) return;
+    try {
       setIsSettingsSaving(true);
       setSettingsError(null);
       setSettingsSuccess(null);
@@ -307,11 +354,26 @@ export default function PaymentMethodsPage() {
       const token = getAuthToken();
       if (!token) throw new Error("Authentication required");
 
-      const updatedSettings = await updateSettings(token, payload);
-
+      const updatedSettings = await updateSettings(token, pendingSettingsPayload);
       syncSettingsForm(updatedSettings);
       setSettingsErrors({});
-      setSettingsSuccess("Exchange rates saved successfully.");
+      setRatePreview(null);
+      setPendingSettingsPayload(null);
+
+      const manualLoss =
+        updatedSettings.pricing_impact?.manual_loss_items?.length ?? 0;
+      const marginUpdated =
+        updatedSettings.pricing_impact?.margin_items_updated ?? 0;
+
+      let message = "Exchange rates saved successfully.";
+      if (marginUpdated > 0) {
+        message += ` ${marginUpdated} margin-based item(s) updated automatically.`;
+      }
+      if (manualLoss > 0) {
+        message += ` ${manualLoss} manual item(s) need pricing review.`;
+      }
+      setLastManualLossCount(manualLoss);
+      setSettingsSuccess(message);
     } catch (err) {
       if (err instanceof ApiError) {
         const fieldErrors = (
@@ -383,7 +445,20 @@ export default function PaymentMethodsPage() {
           <InlineMessage tone="danger">{settingsError}</InlineMessage>
         ) : null}
         {settingsSuccess ? (
-          <InlineMessage tone="primary">{settingsSuccess}</InlineMessage>
+          <InlineMessage tone="primary">
+            <span>{settingsSuccess}</span>
+            {lastManualLossCount > 0 ? (
+              <>
+                {" "}
+                <Link
+                  href="/inventory/alarms?tab=pricing"
+                  className="font-semibold underline"
+                >
+                  Review pricing loss alarms
+                </Link>
+              </>
+            ) : null}
+          </InlineMessage>
         ) : null}
 
         {isAdmin && isSettingsLoading ? (
@@ -416,9 +491,15 @@ export default function PaymentMethodsPage() {
                     <ActionButton
                       type="submit"
                       tone="primary"
-                      disabled={isSettingsSaving || !hasSettingsChanges}
+                      disabled={
+                        isSettingsSaving || isPreviewLoading || !hasSettingsChanges
+                      }
                     >
-                      {isSettingsSaving ? "Saving..." : "Save rate changes"}
+                      {isPreviewLoading
+                        ? "Checking impact…"
+                        : isSettingsSaving
+                          ? "Saving..."
+                          : "Save rate changes"}
                     </ActionButton>
                   </div>
                 </div>
@@ -437,7 +518,6 @@ export default function PaymentMethodsPage() {
                     handleSettingsFieldChange("exchange_rate", event.target.value)
                   }
                   onWheel={(event) => {
-                    event.preventDefault();
                     event.currentTarget.blur();
                   }}
                   className={`form-input-base max-w-xs [&::-webkit-inner-spin-button]:appearance-none ${settingsErrors.exchange_rate ? "form-input-error" : ""}`}
@@ -477,9 +557,15 @@ export default function PaymentMethodsPage() {
                     <ActionButton
                       type="submit"
                       tone="primary"
-                      disabled={isSettingsSaving || !hasSettingsChanges}
+                      disabled={
+                        isSettingsSaving || isPreviewLoading || !hasSettingsChanges
+                      }
                     >
-                      {isSettingsSaving ? "Saving..." : "Save rate changes"}
+                      {isPreviewLoading
+                        ? "Checking impact…"
+                        : isSettingsSaving
+                          ? "Saving..."
+                          : "Save rate changes"}
                     </ActionButton>
                   </div>
                 </div>
@@ -501,7 +587,6 @@ export default function PaymentMethodsPage() {
                     )
                   }
                   onWheel={(event) => {
-                    event.preventDefault();
                     event.currentTarget.blur();
                   }}
                   className={`form-input-base max-w-xs [&::-webkit-inner-spin-button]:appearance-none ${settingsErrors.exchange_rate_eur ? "form-input-error" : ""}`}
@@ -638,6 +723,51 @@ export default function PaymentMethodsPage() {
         onClose={handleCloseModal}
         onSubmit={handleSubmit}
       />
+
+      {ratePreview ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-lg rounded-[1.25rem] border border-outline-variant/20 bg-surface p-6 shadow-lg">
+            <h3 className="font-display text-lg font-semibold text-on-surface">
+              Confirm exchange rate change
+            </h3>
+            <p className="mt-2 text-sm text-on-surface-variant">
+              Margin-based catalog items will update automatically when you
+              confirm. Manual items at a loss should be reviewed afterward.
+            </p>
+            <ul className="mt-4 space-y-2 text-sm text-on-surface">
+              <li>
+                <span className="font-medium">Margin items to update:</span>{" "}
+                {ratePreview.margin_items_to_update}
+              </li>
+              <li>
+                <span className="font-medium">Manual items at pricing loss:</span>{" "}
+                {ratePreview.manual_loss_items.length}
+              </li>
+            </ul>
+            <div className="mt-6 flex justify-end gap-2">
+              <ActionButton
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setRatePreview(null);
+                  setPendingSettingsPayload(null);
+                }}
+                disabled={isSettingsSaving}
+              >
+                Cancel
+              </ActionButton>
+              <ActionButton
+                type="button"
+                tone="primary"
+                onClick={() => void handleConfirmRateChange()}
+                disabled={isSettingsSaving}
+              >
+                {isSettingsSaving ? "Saving…" : "Confirm and save"}
+              </ActionButton>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {deleteTarget ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">

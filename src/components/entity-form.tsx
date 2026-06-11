@@ -15,6 +15,11 @@ import { QuickCreateButton } from "@/components/quick-create/QuickCreateButton";
 import { QuickCreateDrawer } from "@/components/quick-create/QuickCreateDrawer";
 import type { QuickCreateConfig } from "@/components/quick-create/types";
 import { TagInput } from "@/components/TagInput";
+import { PricingFields } from "@/components/inventory/pricing-fields";
+import {
+  defaultCatalogPricingFromRecord,
+  type CatalogPricingFields,
+} from "@/lib/catalog-pricing";
 
 type SectionSummaryResolver = (args: {
   field: FieldConfig;
@@ -41,7 +46,8 @@ export type FieldConfig = {
   | "image"
   | "password"
   | "date"
-  | "time";
+  | "time"
+  | "pricing";
   required?: boolean;
   placeholder?: string;
   options?:
@@ -59,7 +65,7 @@ export type FieldConfig = {
   min?: number;
   max?: number;
   step?: number | string;
-  span?: 1 | 2;
+  span?: 1 | 2 | 3;
   helperTone?: "default" | "featured" | "muted";
   imagePublicIdField?: string;
   uploadFolder?: string;
@@ -94,9 +100,30 @@ export type EntityFormProps = {
   formKey?: string | number;
 };
 
+function seedPricingFields(
+  initialData: Record<string, unknown>,
+  pricing: CatalogPricingFields,
+): void {
+  initialData.cost_price = pricing.cost_price;
+  initialData.cost_currency = pricing.cost_currency;
+  initialData.sale_price = pricing.sale_price;
+  initialData.sale_currency = pricing.sale_currency;
+  initialData.sale_price_mode = pricing.sale_price_mode;
+  initialData.sale_margin_type = pricing.sale_margin_type ?? "percentage";
+  initialData.sale_margin_value = pricing.sale_margin_value ?? 0;
+  initialData.currency_pricing = pricing.currency_pricing ?? pricing.sale_currency;
+}
+
 function buildInitialFormData(fields: FieldConfig[]) {
   const initialData: Record<string, unknown> = {};
   fields.forEach((field) => {
+    if (field.type === "pricing") {
+      const pricing = defaultCatalogPricingFromRecord(
+        (field.value as Partial<CatalogPricingFields>) ?? {},
+      );
+      seedPricingFields(initialData, pricing);
+      return;
+    }
     if (field.type === "toggle") {
       initialData[field.name] = field.value === true;
     } else if (field.type === "multiselect" || field.type === "tags") {
@@ -262,6 +289,15 @@ export const EntityForm = forwardRef<EntityFormHandle, EntityFormProps>(
     };
 
     const isEmptyValue = (field: FieldConfig, value: unknown) => {
+      if (field.type === "pricing") {
+        const cost = Number(formData.cost_price);
+        const sale = Number(formData.sale_price);
+        if (!Number.isFinite(cost) || cost < 0) return true;
+        if (formData.sale_price_mode !== "margin") {
+          return !Number.isFinite(sale) || sale < 0;
+        }
+        return false;
+      }
       if (field.type === "multiselect" || field.type === "tags")
         return !Array.isArray(value) || value.length === 0;
       if (field.type === "toggle") return value !== true;
@@ -276,7 +312,10 @@ export const EntityForm = forwardRef<EntityFormHandle, EntityFormProps>(
         if (!field.required || isFieldDisabled(field)) return;
         const value = formData[field.name];
         if (isEmptyValue(field, value)) {
-          errors[field.name] = `${field.label} is required`;
+          errors[field.name] =
+            field.type === "pricing"
+              ? "Complete cost and sale pricing"
+              : `${field.label} is required`;
         }
       });
       return errors;
@@ -454,6 +493,7 @@ export const EntityForm = forwardRef<EntityFormHandle, EntityFormProps>(
           field.type === "image" ||
           field.type === "multiselect" ||
           field.type === "tags" ||
+          field.type === "pricing" ||
           field.span === 2,
       );
       return shouldUseSingleColumn ? "space-y-4" : "grid gap-4 md:grid-cols-2";
@@ -465,7 +505,8 @@ export const EntityForm = forwardRef<EntityFormHandle, EntityFormProps>(
         field.type === "textarea" ||
         field.type === "toggle" ||
         field.type === "multiselect" ||
-        field.type === "tags"
+        field.type === "tags" ||
+        field.type === "pricing"
       )
         return "md:col-span-2";
       return "";
@@ -477,7 +518,8 @@ export const EntityForm = forwardRef<EntityFormHandle, EntityFormProps>(
           field.span === 2 ||
           field.type === "multiselect" ||
           field.type === "tags" ||
-          field.type === "image",
+          field.type === "image" ||
+          field.type === "pricing",
       ) || section.fields.length > 5;
 
     const getStackedSectionSpanClassName = (section: SectionConfig) =>
@@ -524,6 +566,24 @@ export const EntityForm = forwardRef<EntityFormHandle, EntityFormProps>(
                   )}
                 </div>
               </label>
+            ) : field.type === "pricing" ? (
+              <div className="w-full">
+                {field.sectionDescription && (
+                  <p className="mb-4 text-sm leading-relaxed text-on-surface-variant">
+                    {field.sectionDescription}
+                  </p>
+                )}
+                <PricingFields
+                  values={defaultCatalogPricingFromRecord(formData)}
+                  onChange={(partial) => {
+                    Object.entries(partial).forEach(([key, value]) => {
+                      handleChange(key, value);
+                    });
+                  }}
+                  errors={fieldErrors}
+                  disabled={isSubmitting || isLoading || fieldDisabled}
+                />
+              </div>
             ) : field.type === "image" ? (
               <div className="group">
                 <label className="label-caps mb-2 ml-1 block">
@@ -738,6 +798,9 @@ export const EntityForm = forwardRef<EntityFormHandle, EntityFormProps>(
                     <input
                       type={field.type}
                       value={String(fieldValue ?? "")}
+                      onWheel={(event) => {
+                        event.currentTarget.blur();
+                      }}
                       onChange={(e) =>
                         handleChange(
                           field.name,

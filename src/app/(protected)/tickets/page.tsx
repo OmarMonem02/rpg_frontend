@@ -687,7 +687,11 @@ export default function TicketsPage() {
                   <input
                     type="number"
                     min={0}
+                    step="1"
                     placeholder="0"
+                    onWheel={(event) => {
+                      event.currentTarget.blur();
+                    }}
                     value={filters.total_min ?? ""}
                     onChange={(event) =>
                       updateFilter(
@@ -702,7 +706,10 @@ export default function TicketsPage() {
                   <input
                     type="number"
                     min={0}
-                    placeholder="No limit"
+                    step="1"
+                    onWheel={(event) => {
+                      event.currentTarget.blur();
+                    }}
                     value={filters.total_max ?? ""}
                     onChange={(event) =>
                       updateFilter(
@@ -718,6 +725,9 @@ export default function TicketsPage() {
                     type="number"
                     min={0}
                     placeholder="0"
+                    onWheel={(event) => {
+                      event.currentTarget.blur();
+                    }}
                     value={filters.discount_min ?? ""}
                     onChange={(event) =>
                       updateFilter(
@@ -734,6 +744,9 @@ export default function TicketsPage() {
                     min={0}
                     placeholder="No limit"
                     value={filters.discount_max ?? ""}
+                    onWheel={(event) => {
+                      event.currentTarget.blur();
+                    }}
                     onChange={(event) =>
                       updateFilter(
                         "discount_max",
@@ -749,6 +762,9 @@ export default function TicketsPage() {
                     min={0}
                     placeholder="0"
                     value={filters.amount_paid_min ?? ""}
+                    onWheel={(event) => {
+                      event.currentTarget.blur();
+                    }}
                     onChange={(event) =>
                       updateFilter(
                         "amount_paid_min",
@@ -764,6 +780,9 @@ export default function TicketsPage() {
                     min={0}
                     placeholder="No limit"
                     value={filters.amount_paid_max ?? ""}
+                    onWheel={(event) => {
+                      event.currentTarget.blur();
+                    }}
                     onChange={(event) =>
                       updateFilter(
                         "amount_paid_max",
