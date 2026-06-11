@@ -21,6 +21,7 @@ import {
   PageHero,
   PageShell,
   PaginationControls,
+  SearchableSelect,
   SurfaceCard,
 } from "@/components/ops-ui";
 
@@ -150,20 +151,13 @@ export default function BikeBlueprintsPage() {
             />
           </InputGroup>
           <InputGroup label="Brand" className="md:col-span-6">
-            <select
+            <SearchableSelect
               value={filters.brand_id || ""}
-              onChange={(e) =>
-                setBrand(e.target.value ? parseInt(e.target.value) : "")
-              }
+              onChange={(v) => setBrand(v ? parseInt(v) : "")}
+              placeholder="All Brands"
+              options={brands.map((b) => ({ value: b.id, label: b.name }))}
               className="form-input-base"
-            >
-              <option value="">All Brands</option>
-              {brands.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.name}
-                </option>
-              ))}
-            </select>
+            />
           </InputGroup>
         </FilterBar>
 

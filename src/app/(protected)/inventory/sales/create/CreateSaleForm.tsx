@@ -58,7 +58,9 @@ import {
   PageShell,
   ActionButton,
   PageHero,
+  SearchableSelect,
   SurfaceCard,
+  type SearchableSelectOption,
 } from "@/components/ops-ui";
 import {
   CubeIcon,
@@ -76,7 +78,6 @@ import {
   CurrencyDollarIcon,
   TagIcon,
   CheckIcon,
-  ChevronDownIcon,
   GlobeAltIcon,
 } from "@heroicons/react/24/outline";
 import type { DiscountInputType } from "@/lib/discount-input";
@@ -122,16 +123,20 @@ function FormSelect({
   id,
   label,
   icon: Icon,
+  searchable = true,
   required,
   value,
   onChange,
   disabled,
   hint,
   headerAction,
-  children,
+  options,
+  placeholder,
+  placeholderSelectable = true,
 }: {
   id: string;
   label: string;
+  searchable?: boolean;
   icon: ComponentType<{ className?: string }>;
   required?: boolean;
   value: string | number;
@@ -139,7 +144,9 @@ function FormSelect({
   disabled?: boolean;
   hint?: string;
   headerAction?: ReactNode;
-  children: ReactNode;
+  options: SearchableSelectOption[];
+  placeholder?: string;
+  placeholderSelectable?: boolean;
 }) {
   return (
     <div className={`space-y-2 ${disabled ? "opacity-70" : ""}`}>
@@ -154,26 +161,19 @@ function FormSelect({
         </label>
         {headerAction}
       </div>
-      <div
-        className={`relative rounded-2xl border border-outline-variant/30 bg-surface shadow-sm transition-shadow focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/20 ${disabled ? "cursor-not-allowed bg-surface-container/50" : "hover:shadow-md"
-          }`}
-      >
-        <select
-          id={id}
-          required={required}
-          disabled={disabled}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          aria-describedby={hint ? `${id}-hint` : undefined}
-          className="w-full appearance-none bg-transparent py-3.5 pl-4 pr-10 text-sm font-medium text-on-surface outline-none disabled:cursor-not-allowed"
-        >
-          {children}
-        </select>
-        <ChevronDownIcon
-          className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-on-surface-variant"
-          aria-hidden
-        />
-      </div>
+      <SearchableSelect
+        id={id}
+        searchable={searchable}
+        required={required}
+        disabled={disabled}
+        value={value}
+        onChange={onChange}
+        options={options}
+        placeholder={placeholder}
+        placeholderSelectable={placeholderSelectable}
+        aria-describedby={hint ? `${id}-hint` : undefined}
+        className="w-full rounded-2xl border border-outline-variant/30 bg-surface py-3.5 pl-4 pr-4 text-sm font-medium text-on-surface shadow-sm transition-shadow hover:shadow-md focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:bg-surface-container/50"
+      />
       {hint ? (
         <p id={`${id}-hint`} className="text-xs text-on-surface-variant/90">
           {hint}
@@ -1157,6 +1157,14 @@ export function CreateSaleForm() {
                 required
                 value={customerId || ""}
                 onChange={(v) => setCustomerId(Number(v) || null)}
+                placeholder="Select a customer…"
+                placeholderSelectable={false}
+                options={customers.map((customer) => ({
+                  value: customer.id,
+                  label: customer.phone
+                    ? `${customer.name} · ${customer.phone}`
+                    : customer.name,
+                }))}
                 headerAction={
                   <button
                     type="button"
@@ -1167,54 +1175,39 @@ export function CreateSaleForm() {
                     New
                   </button>
                 }
-              >
-                <option value="" disabled>
-                  Select a customer…
-                </option>
-                {customers.map((customer) => (
-                  <option key={customer.id} value={customer.id}>
-                    {customer.phone
-                      ? `${customer.name} · ${customer.phone}`
-                      : customer.name}
-                  </option>
-                ))}
-              </FormSelect>
+              />
 
               <FormSelect
+                searchable={false}
                 id="sale-seller"
                 label="Seller"
                 icon={UserCircleIcon}
                 required
                 value={sellerId || ""}
                 onChange={(v) => setSellerId(Number(v) || null)}
-              >
-                <option value="" disabled>
-                  Assign a seller…
-                </option>
-                {sellers.map((seller) => (
-                  <option key={seller.id} value={seller.id}>
-                    {seller.name}
-                  </option>
-                ))}
-              </FormSelect>
+                placeholder="Assign a seller…"
+                placeholderSelectable={false}
+                options={sellers.map((seller) => ({
+                  value: seller.id,
+                  label: seller.name,
+                }))}
+              />
 
               <FormSelect
+                searchable={false}
                 id="sale-payment"
                 label="Payment method"
                 icon={CreditCardIcon}
                 required
                 value={paymentMethodId || ""}
                 onChange={(v) => setPaymentMethodId(Number(v) || null)}
-              >
-                <option value="" disabled>
-                  Choose payment type…
-                </option>
-                {paymentMethods.map((method) => (
-                  <option key={method.id} value={method.id}>
-                    {method.name}
-                  </option>
-                ))}
-              </FormSelect>
+                placeholder="Choose payment type…"
+                placeholderSelectable={false}
+                options={paymentMethods.map((method) => ({
+                  value: method.id,
+                  label: method.name,
+                }))}
+              />
 
               {selectedCustomer ? (
                 <div className="col-span-full flex flex-col gap-1 rounded-2xl border border-primary/15 bg-primary/5 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
@@ -1316,6 +1309,7 @@ export function CreateSaleForm() {
               </div>
 
               <FormSelect
+                searchable={false}
                 id="sale-status"
                 label="Sale status"
                 icon={ShieldCheckIcon}
@@ -1329,13 +1323,15 @@ export function CreateSaleForm() {
                 onChange={(v) =>
                   setSaleStatus(v as "pending" | "partial" | "completed")
                 }
-              >
-                <option value="pending">Pending</option>
-                <option value="partial">Partial</option>
-                <option value="completed">Completed</option>
-              </FormSelect>
+                options={[
+                  { value: "pending", label: "Pending" },
+                  { value: "partial", label: "Partial" },
+                  { value: "completed", label: "Completed" },
+                ]}
+              />
 
               <FormSelect
+                searchable={false}
                 id="sale-delivery-status"
                 label="Delivery status"
                 icon={TruckIcon}
@@ -1347,11 +1343,12 @@ export function CreateSaleForm() {
                     : undefined
                 }
                 onChange={setDeliveryStatus}
-              >
-                <option value="pending">Pending</option>
-                <option value="in-transit">In transit</option>
-                <option value="delivered">Delivered</option>
-              </FormSelect>
+                options={[
+                  { value: "pending", label: "Pending" },
+                  { value: "in-transit", label: "In transit" },
+                  { value: "delivered", label: "Delivered" },
+                ]}
+              />
               {isRemoteSale ? (
                   <FormMoneyInput
                     id="sale-shipping"

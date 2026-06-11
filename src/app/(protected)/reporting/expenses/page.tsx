@@ -34,6 +34,7 @@ import {
   InputGroup,
   PageShell,
   PaginationControls,
+  SearchableSelect,
   StatCard,
   StatGrid,
   SurfaceCard,
@@ -353,22 +354,17 @@ export default function ExpensesPage() {
             </div>
 
             <InputGroup label="Category">
-              <select
+              <SearchableSelect
                 value={form.category}
-                onChange={(event) =>
+                onChange={(value) =>
                   setForm((current) => ({
                     ...current,
-                    category: event.target.value as ExpenseCategory,
+                    category: value as ExpenseCategory,
                   }))
                 }
+                options={EXPENSE_CATEGORY_OPTIONS}
                 className="form-input-base"
-              >
-                {EXPENSE_CATEGORY_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+              />
             </InputGroup>
 
             <InputGroup label="Amount">
@@ -391,38 +387,37 @@ export default function ExpensesPage() {
             </InputGroup>
 
             <InputGroup label="Currency">
-              <select
+              <SearchableSelect
                 value={form.currency}
-                onChange={(event) =>
+                onChange={(value) =>
                   setForm((current) => ({
                     ...current,
-                    currency: event.target.value as ReportingCurrency,
+                    currency: value as ReportingCurrency,
                   }))
                 }
+                options={SUPPORTED_PRICING_CURRENCIES.map((code) => ({
+                  value: code,
+                  label: code,
+                }))}
                 className="form-input-base"
-              >
-                {SUPPORTED_PRICING_CURRENCIES.map((code) => (
-                  <option key={code} value={code}>
-                    {code}
-                  </option>
-                ))}
-              </select>
+              />
             </InputGroup>
 
             <InputGroup label="Payment Status">
-              <select
+              <SearchableSelect
                 value={form.payment_status}
-                onChange={(event) =>
+                onChange={(value) =>
                   setForm((current) => ({
                     ...current,
-                    payment_status: event.target.value as ExpensePaymentStatus,
+                    payment_status: value as ExpensePaymentStatus,
                   }))
                 }
+                options={[
+                  { value: "unpaid", label: "Unpaid" },
+                  { value: "paid", label: "Paid" },
+                ]}
                 className="form-input-base"
-              >
-                <option value="unpaid">Unpaid</option>
-                <option value="paid">Paid</option>
-              </select>
+              />
             </InputGroup>
 
             <InputGroup label="Incurred On">
@@ -532,54 +527,50 @@ export default function ExpensesPage() {
                 />
               </InputGroup>
               <InputGroup label="Currency">
-                <select
+                <SearchableSelect
                   value={currency}
-                  onChange={(event) => {
+                  onChange={(value) => {
                     setPage(1);
-                    setCurrency(event.target.value as ReportingCurrency | "");
+                    setCurrency(value as ReportingCurrency | "");
                   }}
+                  options={[
+                    { value: "", label: "All currencies" },
+                    ...SUPPORTED_PRICING_CURRENCIES.map((code) => ({
+                      value: code,
+                      label: code,
+                    })),
+                  ]}
                   className="form-input-base"
-                >
-                  <option value="">All currencies</option>
-                  {SUPPORTED_PRICING_CURRENCIES.map((code) => (
-                    <option key={code} value={code}>
-                      {code}
-                    </option>
-                  ))}
-                </select>
+                />
               </InputGroup>
               <InputGroup label="Payment Status">
-                <select
+                <SearchableSelect
                   value={paymentStatus}
-                  onChange={(event) => {
+                  onChange={(value) => {
                     setPage(1);
-                    setPaymentStatus(
-                      event.target.value as ExpensePaymentStatus | "",
-                    );
+                    setPaymentStatus(value as ExpensePaymentStatus | "");
                   }}
+                  options={[
+                    { value: "", label: "All statuses" },
+                    { value: "paid", label: "Paid" },
+                    { value: "unpaid", label: "Unpaid" },
+                  ]}
                   className="form-input-base"
-                >
-                  <option value="">All statuses</option>
-                  <option value="paid">Paid</option>
-                  <option value="unpaid">Unpaid</option>
-                </select>
+                />
               </InputGroup>
               <InputGroup label="Category" className="md:col-span-2">
-                <select
+                <SearchableSelect
                   value={category}
-                  onChange={(event) => {
+                  onChange={(value) => {
                     setPage(1);
-                    setCategory(event.target.value as ExpenseCategory | "");
+                    setCategory(value as ExpenseCategory | "");
                   }}
+                  options={[
+                    { value: "", label: "All categories" },
+                    ...EXPENSE_CATEGORY_OPTIONS,
+                  ]}
                   className="form-input-base"
-                >
-                  <option value="">All categories</option>
-                  {EXPENSE_CATEGORY_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
+                />
               </InputGroup>
             </div>
           </SurfaceCard>

@@ -3,6 +3,7 @@
 import {
   ActionButton,
   InlineMessage,
+  SearchableSelect,
   SurfaceCard,
 } from "@/components/ops-ui";
 import {
@@ -93,17 +94,15 @@ export function BulkEditConfigureStep({
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div>
                     <label className="label-caps mb-1.5 block">Mode</label>
-                    <select
+                    <SearchableSelect
                       value={d.mode}
-                      onChange={(e) => updateField(field.key, { mode: e.target.value })}
+                      onChange={(value) => updateField(field.key, { mode: value })}
+                      options={modes.map((m) => ({
+                        value: m.value,
+                        label: m.label,
+                      }))}
                       className="form-input-base py-2 text-sm"
-                    >
-                      {modes.map((m) => (
-                        <option key={m.value} value={m.value}>
-                          {m.label}
-                        </option>
-                      ))}
-                    </select>
+                    />
                   </div>
                   <div>
                     <label className="label-caps mb-1.5 block">Value</label>

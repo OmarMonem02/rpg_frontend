@@ -3,7 +3,7 @@
 import { useEffect, useId, useSyncExternalStore, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { XMarkIcon, LockClosedIcon, BanknotesIcon, DocumentTextIcon } from "@heroicons/react/24/outline";
-import { ActionButton, InputGroup } from "@/components/ops-ui";
+import { ActionButton, InputGroup, SearchableSelect } from "@/components/ops-ui";
 import { formatEgp } from "@/lib/currencies";
 import { InvoiceTemplate } from "@/components/invoice-template";
 import type { SaleRecord } from "@/lib/crud-api";
@@ -267,17 +267,15 @@ export function PaymentCloseModal({
       ) : null}
 
       <InputGroup label="Payment method" className="mb-2">
-        <select
+        <SearchableSelect
           className="w-full rounded-2xl border border-outline-variant/30 bg-surface px-5 py-3 outline-none transition-all focus:border-primary"
           value={paymentMethod}
-          onChange={(event) => onPaymentMethodChange(event.target.value)}
-        >
-          {PAYMENT_METHODS.map((method) => (
-            <option key={method.value} value={method.value}>
-              {method.label}
-            </option>
-          ))}
-        </select>
+          onChange={onPaymentMethodChange}
+          options={PAYMENT_METHODS.map((method) => ({
+            value: method.value,
+            label: method.label,
+          }))}
+        />
       </InputGroup>
 
       {requiresAdminPassword && onAdminPasswordChange && (

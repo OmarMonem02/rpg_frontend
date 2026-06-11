@@ -1,6 +1,6 @@
 import React from "react";
 import { SUPPORTED_PRICING_CURRENCIES } from "@/lib/currencies";
-import { FilterBar, InputGroup } from "@/components/ops-ui";
+import { FilterBar, InputGroup, SearchableSelect } from "@/components/ops-ui";
 
 type AdvancedFiltersProps = {
   priceMin?: number;
@@ -27,19 +27,19 @@ export function AdvancedFilters({
     <FilterBar className="md:grid-cols-12">
       {showCurrencyFilter && (
         <InputGroup label="Currency" className="md:col-span-4">
-          <select
+          <SearchableSelect
             id="currency"
             value={currency}
-            onChange={(e) => setCurrency(e.target.value)}
+            onChange={setCurrency}
+            options={[
+              { value: "all", label: "All Currencies" },
+              ...SUPPORTED_PRICING_CURRENCIES.map((code) => ({
+                value: code,
+                label: code,
+              })),
+            ]}
             className="form-input-base py-2 text-sm"
-          >
-            <option value="all">All Currencies</option>
-            {SUPPORTED_PRICING_CURRENCIES.map((code) => (
-              <option key={code} value={code}>
-                {code}
-              </option>
-            ))}
-          </select>
+          />
         </InputGroup>
       )}
       {showPriceFilters ? (

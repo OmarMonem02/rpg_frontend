@@ -39,6 +39,7 @@ import {
   PageHero,
   PageShell,
   PaginationControls,
+  SearchableSelect,
 } from "@/components/ops-ui";
 import Link from "next/link";
 import { TabsWrapper } from "@/components/tabs-wrapper";
@@ -334,18 +335,13 @@ export default function MaintenanceServicesPage() {
           />
         </InputGroup>
         <InputGroup label="Sector" className="md:col-span-4">
-          <select
+          <SearchableSelect
             value={filters.sector_id || ""}
-            onChange={(e) => setSector(e.target.value ? parseInt(e.target.value) : "")}
+            onChange={(v) => setSector(v ? parseInt(v) : "")}
+            placeholder="All Sectors"
+            options={allSectors.map((s) => ({ value: s.id, label: s.name }))}
             className="form-input-base"
-          >
-            <option value="">All Sectors</option>
-            {allSectors.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
+          />
         </InputGroup>
       </FilterBar>
 

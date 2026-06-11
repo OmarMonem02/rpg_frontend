@@ -604,3 +604,9 @@ export function ConfirmDialog({
     portalTarget,
   );
 }
+
+export { SearchableSelect } from "@/components/searchable-select";
+export type {
+  SearchableSelectOption,
+  SearchableSelectProps,
+} from "@/components/searchable-select";

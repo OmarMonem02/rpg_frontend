@@ -17,7 +17,7 @@ import {
   type PricingCurrency,
 } from "@/lib/currencies";
 import { useExchangeRates } from "@/hooks/useExchangeRates";
-import { InlineMessage, SurfaceCard } from "@/components/ops-ui";
+import { InlineMessage, SearchableSelect, SurfaceCard } from "@/components/ops-ui";
 
 type PricingFieldsProps = {
   values: CatalogPricingFields;
@@ -156,22 +156,18 @@ export function PricingFields({
           </div>
           <div>
             <label className="mb-1 block text-xs text-on-surface-variant">Currency</label>
-            <select
+            <SearchableSelect
+              searchable={false}
               disabled={disabled}
               value={values.cost_currency}
-              onChange={(e) =>
+              onChange={(value) =>
                 onChange({
-                  cost_currency: toPricingCurrency(e.target.value) as PricingCurrency,
+                  cost_currency: toPricingCurrency(value) as PricingCurrency,
                 })
               }
+              options={CURRENCY_SELECT_OPTIONS}
               className={compactInput}
-            >
-              {CURRENCY_SELECT_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
+            />
             {errors.cost_currency ? (
               <p className="mt-0.5 text-xs text-error">{errors.cost_currency}</p>
             ) : null}
@@ -216,19 +212,21 @@ export function PricingFields({
           <div className="grid gap-2 sm:grid-cols-2">
             <div>
               <label className="mb-1 block text-xs text-on-surface-variant">Margin type</label>
-              <select
+              <SearchableSelect
+                searchable={false}
                 disabled={disabled}
                 value={marginType}
-                onChange={(e) =>
+                onChange={(value) =>
                   onChange({
-                    sale_margin_type: e.target.value as SaleMarginType,
+                    sale_margin_type: value as SaleMarginType,
                   })
                 }
+                options={[
+                  { value: "percentage", label: "Percentage (%)" },
+                  { value: "fixed", label: "Fixed (EGP)" },
+                ]}
                 className={compactInput}
-              >
-                <option value="percentage">Percentage (%)</option>
-                <option value="fixed">Fixed (EGP)</option>
-              </select>
+              />
             </div>
             <div>
               <label className="mb-1 block text-xs text-on-surface-variant">Margin value</label>
@@ -283,24 +281,20 @@ export function PricingFields({
           </div>
           <div>
             <label className="mb-1 block text-xs text-on-surface-variant">Currency</label>
-            <select
+            <SearchableSelect
+              searchable={false}
               disabled={disabled || values.sale_price_mode === "margin"}
               value={values.sale_currency}
-              onChange={(e) => {
-                const saleCurrency = toPricingCurrency(e.target.value) as PricingCurrency;
+              onChange={(value) => {
+                const saleCurrency = toPricingCurrency(value) as PricingCurrency;
                 onChange({
                   sale_currency: saleCurrency,
                   currency_pricing: saleCurrency,
                 });
               }}
+              options={CURRENCY_SELECT_OPTIONS}
               className={compactInput}
-            >
-              {CURRENCY_SELECT_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
+            />
             {values.sale_price_mode === "margin" ? (
               <p className="mt-0.5 text-xs text-on-surface-variant">EGP only</p>
             ) : null}

@@ -7,6 +7,7 @@ import {
   listBikeBlueprintFilterYears,
   type BrandRecord,
 } from "@/lib/crud-api";
+import { SearchableSelect } from "@/components/ops-ui";
 import { filterBrandsByType } from "@/lib/brand-types";
 
 interface BikeCompatibilityFilterProps {
@@ -146,60 +147,48 @@ export function BikeCompatibilityFilter({
         <label htmlFor="bike-brand" className="block text-sm font-medium text-foreground">
           Bike Brand
         </label>
-        <select
+        <SearchableSelect
           id="bike-brand"
           value={selectedBrandId || ""}
-          onChange={(e) => handleBrandChange(e.target.value)}
+          onChange={handleBrandChange}
+          placeholder="Select a brand"
+          placeholderSelectable={false}
           disabled={isLoading}
+          options={bikeBrands.map((brand) => ({ value: brand.id, label: brand.name }))}
           className="mt-1 w-full rounded border border-outline bg-surface px-3 py-2 text-sm text-foreground disabled:opacity-50"
-        >
-          <option value="">Select a brand</option>
-          {bikeBrands.map((brand) => (
-            <option key={brand.id} value={brand.id}>
-              {brand.name}
-            </option>
-          ))}
-        </select>
+        />
       </div>
 
       <div>
         <label htmlFor="bike-model" className="block text-sm font-medium text-foreground">
           Model
         </label>
-        <select
+        <SearchableSelect
           id="bike-model"
           value={selectedModel || ""}
-          onChange={(e) => handleModelChange(e.target.value)}
+          onChange={handleModelChange}
+          placeholder="Select a model"
+          placeholderSelectable={false}
           disabled={!selectedBrandId || modelsLoading || isLoading}
+          options={models.map((model) => ({ value: model.value, label: model.label }))}
           className="mt-1 w-full rounded border border-outline bg-surface px-3 py-2 text-sm text-foreground disabled:opacity-50"
-        >
-          <option value="">Select a model</option>
-          {models.map((model) => (
-            <option key={model.value} value={model.value}>
-              {model.label}
-            </option>
-          ))}
-        </select>
+        />
       </div>
 
       <div>
         <label htmlFor="bike-year" className="block text-sm font-medium text-foreground">
           Year
         </label>
-        <select
+        <SearchableSelect
           id="bike-year"
           value={selectedYear || ""}
-          onChange={(e) => handleYearChange(e.target.value)}
+          onChange={handleYearChange}
+          placeholder="Select a year"
+          placeholderSelectable={false}
           disabled={!selectedBrandId || !selectedModel || yearsLoading || isLoading}
+          options={years.map((year) => ({ value: year.value, label: year.label }))}
           className="mt-1 w-full rounded border border-outline bg-surface px-3 py-2 text-sm text-foreground disabled:opacity-50"
-        >
-          <option value="">Select a year</option>
-          {years.map((year) => (
-            <option key={year.value} value={year.value}>
-              {year.label}
-            </option>
-          ))}
-        </select>
+        />
       </div>
     </div>
   );

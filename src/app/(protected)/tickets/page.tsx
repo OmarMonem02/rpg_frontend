@@ -19,6 +19,7 @@ import {
   EmptyState,
   InputGroup,
   FilterBar,
+  SearchableSelect,
   SurfaceCard,
 } from "@/components/ops-ui";
 import { useExchangeRates } from "@/hooks/useExchangeRates";
@@ -443,38 +444,33 @@ export default function TicketsPage() {
               />
             </InputGroup>
             <InputGroup label="Status" className="md:col-span-2">
-              <select
+              <SearchableSelect
                 value={filters.status || ""}
-                onChange={(event) => updateFilter("status", event.target.value)}
+                onChange={(value) => updateFilter("status", value)}
+                options={TICKET_STATUSES}
                 className="form-input-base"
                 aria-label="Filter by status"
-              >
-                {TICKET_STATUSES.map((option) => (
-                  <option key={option.value || "all"} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+              />
             </InputGroup>
             <InputGroup label="Customer" className="md:col-span-3">
-              <select
+              <SearchableSelect
                 value={filters.customer_id || ""}
-                onChange={(event) =>
+                onChange={(value) =>
                   updateFilter(
                     "customer_id",
-                    event.target.value ? Number(event.target.value) : undefined,
+                    value ? Number(value) : undefined,
                   )
                 }
+                options={[
+                  { value: "", label: "All customers" },
+                  ...filterOptions.customers.map((customer) => ({
+                    value: customer.id,
+                    label: customer.name,
+                  })),
+                ]}
                 className="form-input-base"
                 aria-label="Filter by customer"
-              >
-                <option value="">All customers</option>
-                {filterOptions.customers.map((customer) => (
-                  <option key={customer.id} value={customer.id}>
-                    {customer.name}
-                  </option>
-                ))}
-              </select>
+              />
             </InputGroup>
             <div className="flex items-end md:col-span-3">
               <ActionButton
@@ -540,57 +536,51 @@ export default function TicketsPage() {
                   />
                 </InputGroup>
                 <InputGroup label="Vehicle">
-                  <select
+                  <SearchableSelect
                     value={filters.customer_bike_id || ""}
-                    onChange={(event) =>
+                    onChange={(value) =>
                       updateFilter(
                         "customer_bike_id",
-                        event.target.value
-                          ? Number(event.target.value)
-                          : undefined,
+                        value ? Number(value) : undefined,
                       )
                     }
+                    options={[
+                      { value: "", label: "All vehicles" },
+                      ...filterOptions.bikes.map((bike) => ({
+                        value: bike.id,
+                        label: bike.label,
+                      })),
+                    ]}
                     className="form-input-base"
-                  >
-                    <option value="">All vehicles</option>
-                    {filterOptions.bikes.map((bike) => (
-                      <option key={bike.id} value={bike.id}>
-                        {bike.label}
-                      </option>
-                    ))}
-                  </select>
+                  />
                 </InputGroup>
                 <InputGroup label="Bike brand">
-                  <select
+                  <SearchableSelect
                     value={filters.bike_brand || ""}
-                    onChange={(event) =>
-                      updateFilter("bike_brand", event.target.value)
-                    }
+                    onChange={(value) => updateFilter("bike_brand", value)}
+                    options={[
+                      { value: "", label: "All brands" },
+                      ...filterOptions.brands.map((brand) => ({
+                        value: brand,
+                        label: brand,
+                      })),
+                    ]}
                     className="form-input-base"
-                  >
-                    <option value="">All brands</option>
-                    {filterOptions.brands.map((brand) => (
-                      <option key={brand} value={brand}>
-                        {brand}
-                      </option>
-                    ))}
-                  </select>
+                  />
                 </InputGroup>
                 <InputGroup label="Bike model">
-                  <select
+                  <SearchableSelect
                     value={filters.bike_model || ""}
-                    onChange={(event) =>
-                      updateFilter("bike_model", event.target.value)
-                    }
+                    onChange={(value) => updateFilter("bike_model", value)}
+                    options={[
+                      { value: "", label: "All models" },
+                      ...filterOptions.models.map((model) => ({
+                        value: model,
+                        label: model,
+                      })),
+                    ]}
                     className="form-input-base"
-                  >
-                    <option value="">All models</option>
-                    {filterOptions.models.map((model) => (
-                      <option key={model} value={model}>
-                        {model}
-                      </option>
-                    ))}
-                  </select>
+                  />
                 </InputGroup>
                 <InputGroup label="VIN contains">
                   <input
@@ -602,37 +592,25 @@ export default function TicketsPage() {
                   />
                 </InputGroup>
                 <InputGroup label="Payment method">
-                  <select
+                  <SearchableSelect
                     value={filters.payment_method || ""}
-                    onChange={(event) =>
-                      updateFilter("payment_method", event.target.value)
-                    }
+                    onChange={(value) => updateFilter("payment_method", value)}
+                    options={TICKET_PAYMENT_METHODS}
                     className="form-input-base"
-                  >
-                    {TICKET_PAYMENT_METHODS.map((option) => (
-                      <option key={option.value || "all"} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
+                  />
                 </InputGroup>
                 <InputGroup label="Tracking link">
-                  <select
+                  <SearchableSelect
                     value={filters.tracking_link_sent || ""}
-                    onChange={(event) =>
+                    onChange={(value) =>
                       updateFilter(
                         "tracking_link_sent",
-                        event.target.value as TicketFilters["tracking_link_sent"],
+                        value as TicketFilters["tracking_link_sent"],
                       )
                     }
+                    options={TRACKING_LINK_FILTERS}
                     className="form-input-base"
-                  >
-                    {TRACKING_LINK_FILTERS.map((option) => (
-                      <option key={option.value || "all"} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
+                  />
                 </InputGroup>
                 <InputGroup label="Notes contain">
                   <input
@@ -811,20 +789,13 @@ export default function TicketsPage() {
                   </h2>
                 </div>
                 <InputGroup label="Sort by" className="w-full sm:w-56">
-                  <select
+                  <SearchableSelect
                     value={sortBy}
-                    onChange={(event) =>
-                      setSortBy(event.target.value as TicketSort)
-                    }
+                    onChange={(value) => setSortBy(value as TicketSort)}
+                    options={TICKET_SORT_OPTIONS}
                     className="form-input-base"
                     aria-label="Sort tickets"
-                  >
-                    {TICKET_SORT_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
+                  />
                 </InputGroup>
               </div>
             </div>

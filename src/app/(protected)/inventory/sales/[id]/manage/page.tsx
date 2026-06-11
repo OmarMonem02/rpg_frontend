@@ -20,6 +20,7 @@ import {
   StatusBadge,
   InputGroup,
   InlineMessage,
+  SearchableSelect,
 } from "@/components/ops-ui";
 import { CatalogPickerModal } from "@/components/catalog-picker-modal";
 import {
@@ -421,20 +422,22 @@ export default function ManageSaleItemsPage() {
 
                 {activeTab === "exchange" && (
                   <InputGroup label="Replacement Catalog">
-                    <select
+                    <SearchableSelect
                       value={exchangeType}
-                      onChange={(e) =>
-                        setExchangeType(e.target.value as CatalogType)
+                      onChange={(value) =>
+                        setExchangeType(value as CatalogType)
                       }
+                      options={[
+                        { value: "products", label: "Products Gallery" },
+                        { value: "spare_parts", label: "Spare Parts Bin" },
+                        { value: "bikes", label: "Bikes Store" },
+                        {
+                          value: "maintenance_services",
+                          label: "Maintenance Services",
+                        },
+                      ]}
                       className="w-full rounded-xl border border-outline-variant/30 px-4 py-3 bg-surface focus:ring-2 focus:ring-primary/20 outline-none transition-all font-semibold"
-                    >
-                      <option value="products">Products Gallery</option>
-                      <option value="spare_parts">Spare Parts Bin</option>
-                      <option value="bikes">Bikes Store</option>
-                      <option value="maintenance_services">
-                        Maintenance Services
-                      </option>
-                    </select>
+                    />
                   </InputGroup>
                 )}
               </div>

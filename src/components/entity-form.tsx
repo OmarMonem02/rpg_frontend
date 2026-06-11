@@ -10,7 +10,7 @@ import {
   useState,
 } from "react";
 import { ImageUpload } from "@/components/ui/ImageUpload";
-import { ActionButton } from "@/components/ops-ui";
+import { ActionButton, SearchableSelect } from "@/components/ops-ui";
 import { QuickCreateButton } from "@/components/quick-create/QuickCreateButton";
 import { QuickCreateDrawer } from "@/components/quick-create/QuickCreateDrawer";
 import type { QuickCreateConfig } from "@/components/quick-create/types";
@@ -651,19 +651,17 @@ export const EntityForm = forwardRef<EntityFormHandle, EntityFormProps>(
                       disabled={isSubmitting || isLoading || fieldDisabled}
                     />
                   ) : field.type === "select" ? (
-                    <select
+                    <SearchableSelect
                       value={String(fieldValue ?? "")}
-                      onChange={(e) => handleChange(field.name, e.target.value)}
+                      onChange={(value) => handleChange(field.name, value)}
+                      placeholder="Select Option"
+                      options={getFieldOptions(field).map((option) => ({
+                        value: option.value,
+                        label: option.label,
+                      }))}
                       className={`form-input-base !rounded-2xl !bg-surface-container-lowest transition-all focus:ring-8 ${fieldErrors[field.name] ? "form-input-error" : ""}`}
                       disabled={isSubmitting || isLoading || fieldDisabled}
-                    >
-                      <option value="">Select Option</option>
-                      {getFieldOptions(field).map((o) => (
-                        <option key={o.value} value={o.value}>
-                          {o.label}
-                        </option>
-                      ))}
-                    </select>
+                    />
                   ) : field.type === "tags" ? (
                     <TagInput
                       value={

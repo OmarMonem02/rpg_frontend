@@ -14,6 +14,7 @@ import {
   PageHero,
   PageShell,
   PaginationControls,
+  SearchableSelect,
   StatusBadge,
   SurfaceCard,
 } from "@/components/ops-ui";
@@ -386,17 +387,15 @@ export default function UsersPage() {
 
               <label className="space-y-2 md:col-span-2">
                 <span className="label-caps">Role</span>
-                <select
+                <SearchableSelect
                   value={form.role}
-                  onChange={(event) => setForm((prev) => ({ ...prev, role: event.target.value }))}
+                  onChange={(v) => setForm((prev) => ({ ...prev, role: v }))}
+                  options={roleOptions.map((role) => ({
+                    value: role,
+                    label: getRoleLabel(role),
+                  }))}
                   className="form-input-base"
-                >
-                  {roleOptions.map((role) => (
-                    <option key={role} value={role}>
-                      {getRoleLabel(role)}
-                    </option>
-                  ))}
-                </select>
+                />
               </label>
 
               <label className="space-y-2">

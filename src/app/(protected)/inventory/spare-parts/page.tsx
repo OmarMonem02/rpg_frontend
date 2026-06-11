@@ -68,6 +68,7 @@ import {
   PageHero,
   PageShell,
   PaginationControls,
+  SearchableSelect,
   TabsWrapper,
 } from "@/components/ops-ui";
 
@@ -347,36 +348,32 @@ export default function SparePartsPage() {
           />
         </InputGroup>
         <InputGroup label="Category" className="md:col-span-4">
-          <select
+          <SearchableSelect
             value={filters.category_id || ""}
-            onChange={(e) =>
-              setCategory(e.target.value ? parseInt(e.target.value) : "")
+            onChange={(value) =>
+              setCategory(value ? parseInt(value) : "")
             }
+            placeholder="All Categories"
+            options={allCategories.map((c) => ({
+              value: c.id,
+              label: c.name,
+            }))}
             className="form-input-base"
-          >
-            <option value="">All Categories</option>
-            {allCategories.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
+          />
         </InputGroup>
         <InputGroup label="Brand" className="md:col-span-4">
-          <select
+          <SearchableSelect
             value={filters.brand_id || ""}
-            onChange={(e) =>
-              setBrand(e.target.value ? parseInt(e.target.value) : "")
+            onChange={(value) =>
+              setBrand(value ? parseInt(value) : "")
             }
+            placeholder="All Brands"
+            options={brands.map((b) => ({
+              value: b.id,
+              label: b.name,
+            }))}
             className="form-input-base"
-          >
-            <option value="">All Brands</option>
-            {brands.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.name}
-              </option>
-            ))}
-          </select>
+          />
         </InputGroup>
       </FilterBar>
 

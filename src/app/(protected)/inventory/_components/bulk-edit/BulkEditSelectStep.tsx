@@ -7,6 +7,7 @@ import {
   InputGroup,
   InlineMessage,
   PaginationControls,
+  SearchableSelect,
   SurfaceCard,
 } from "@/components/ops-ui";
 import type { BrandRecord, ProductCategoryRecord, SparePartCategoryRecord } from "@/lib/crud-api";
@@ -81,46 +82,42 @@ export function BulkEditSelectStep({
             />
           </InputGroup>
           <InputGroup label="Brand" className="md:col-span-3">
-            <select
+            <SearchableSelect
               value={brandId}
-              onChange={(e) => setBrandId(e.target.value)}
+              onChange={setBrandId}
+              placeholder="All brands"
+              options={brands.map((b) => ({
+                value: b.id,
+                label: b.name,
+              }))}
               className="form-input-base py-2 text-sm"
-            >
-              <option value="">All brands</option>
-              {brands.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.name}
-                </option>
-              ))}
-            </select>
+            />
           </InputGroup>
           <InputGroup label="Category" className="md:col-span-3">
-            <select
+            <SearchableSelect
               value={categoryId}
-              onChange={(e) => setCategoryId(e.target.value)}
+              onChange={setCategoryId}
+              placeholder="All categories"
+              options={categories.map((c) => ({
+                value: c.id,
+                label: c.name,
+              }))}
               className="form-input-base py-2 text-sm"
-            >
-              <option value="">All categories</option>
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
+            />
           </InputGroup>
           <InputGroup label="Currency" className="md:col-span-3">
-            <select
+            <SearchableSelect
               value={currency}
-              onChange={(e) => setCurrency(e.target.value)}
+              onChange={setCurrency}
+              options={[
+                { value: "all", label: "All currencies" },
+                ...SUPPORTED_PRICING_CURRENCIES.map((code) => ({
+                  value: code,
+                  label: code,
+                })),
+              ]}
               className="form-input-base py-2 text-sm"
-            >
-              <option value="all">All currencies</option>
-              {SUPPORTED_PRICING_CURRENCIES.map((code) => (
-                <option key={code} value={code}>
-                  {code}
-                </option>
-              ))}
-            </select>
+            />
           </InputGroup>
         </FilterBar>
       </SurfaceCard>

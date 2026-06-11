@@ -24,6 +24,7 @@ import {
   PageHero,
   PageShell,
   PaginationControls,
+  SearchableSelect,
   StatusBadge,
   SurfaceCard,
 } from "@/components/ops-ui";
@@ -206,18 +207,17 @@ export default function BrandsPage() {
             />
           </InputGroup>
           <InputGroup label="Filter by Type" className="md:col-span-6">
-            <select
+            <SearchableSelect
               value={filters.type || ""}
-              onChange={(event) => {
-                setType(event.target.value);
-              }}
+              onChange={setType}
+              placeholder="All Types"
+              options={[
+                { value: "spare_parts", label: "Spare Parts" },
+                { value: "products", label: "Products" },
+                { value: "bikes", label: "Bikes" },
+              ]}
               className="form-input-base"
-            >
-              <option value="">All Types</option>
-              <option value="spare_parts">Spare Parts</option>
-              <option value="products">Products</option>
-              <option value="bikes">Bikes</option>
-            </select>
+            />
           </InputGroup>
         </FilterBar>
         {loading ? (

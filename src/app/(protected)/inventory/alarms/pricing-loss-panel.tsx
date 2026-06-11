@@ -10,6 +10,7 @@ import {
   FilterBar,
   InputGroup,
   InlineMessage,
+  SearchableSelect,
   SectionHeading,
   StatCard,
   StatGrid,
@@ -212,16 +213,17 @@ export function PricingLossPanel() {
           />
         </InputGroup>
         <InputGroup label="Catalog" className="md:col-span-4">
-          <select
+          <SearchableSelect
             value={entityFilter}
-            onChange={(e) => setEntityFilter(e.target.value as EntityFilter)}
+            onChange={(value) => setEntityFilter(value as EntityFilter)}
+            options={[
+              { value: "all", label: "All types" },
+              { value: "spare_part", label: "Spare parts" },
+              { value: "product", label: "Products" },
+              { value: "bike", label: "Bikes" },
+            ]}
             className="form-input-base"
-          >
-            <option value="all">All types</option>
-            <option value="spare_part">Spare parts</option>
-            <option value="product">Products</option>
-            <option value="bike">Bikes</option>
-          </select>
+          />
         </InputGroup>
       </FilterBar>
 

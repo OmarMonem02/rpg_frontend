@@ -15,7 +15,7 @@ import {
   YearPicker,
   formatMoney,
 } from "@/components/reporting/finance-utils";
-import { FilterBar, InlineMessage, InputGroup, PageShell, SurfaceCard } from "@/components/ops-ui";
+import { FilterBar, InlineMessage, InputGroup, PageShell, SearchableSelect, SurfaceCard } from "@/components/ops-ui";
 
 export default function AnnualStatementPage() {
   const [year, setYear] = useState(new Date().getFullYear());
@@ -68,18 +68,16 @@ export default function AnnualStatementPage() {
           <YearPicker year={year} onChange={setYear} />
         </div>
         <InputGroup label="Currency" className="md:col-span-4">
-          <select
+          <SearchableSelect
             value={currency}
-            onChange={(event) => setCurrency(event.target.value as ReportingCurrency | "")}
+            onChange={(v) => setCurrency(v as ReportingCurrency | "")}
+            placeholder="All currencies"
+            options={SUPPORTED_PRICING_CURRENCIES.map((code) => ({
+              value: code,
+              label: code,
+            }))}
             className="form-input-base"
-          >
-            <option value="">All currencies</option>
-            {SUPPORTED_PRICING_CURRENCIES.map((code) => (
-              <option key={code} value={code}>
-                {code}
-              </option>
-            ))}
-          </select>
+          />
         </InputGroup>
       </FilterBar>
 

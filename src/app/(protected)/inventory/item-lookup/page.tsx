@@ -19,6 +19,7 @@ import {
   PageHero,
   PageShell,
   PaginationControls,
+  SearchableSelect,
   SectionHeading,
 } from "@/components/ops-ui";
 import { useExchangeRates } from "@/hooks/useExchangeRates";
@@ -515,19 +516,20 @@ export default function ItemLookupPage() {
         <div className="space-y-4 rounded-[1.5rem] border border-outline-variant/15 bg-surface-container-lowest p-4 sm:p-5">
           <FilterBar className="md:grid-cols-12">
             <InputGroup label="Item type" className="md:col-span-3">
-              <select
+              <SearchableSelect
                 value={entityFilter}
-                onChange={(event) => {
-                  setEntityFilter(event.target.value as EntityFilter);
+                onChange={(value) => {
+                  setEntityFilter(value as EntityFilter);
                   setBrowsePage(1);
                 }}
+                options={[
+                  { value: "all", label: "All items" },
+                  { value: "product", label: "Products only" },
+                  { value: "spare_part", label: "Spare parts only" },
+                ]}
                 className="form-input-base"
                 aria-label="Item type"
-              >
-                <option value="all">All items</option>
-                <option value="product">Products only</option>
-                <option value="spare_part">Spare parts only</option>
-              </select>
+              />
             </InputGroup>
 
             <InputGroup label="Search by name" className="md:col-span-9">
@@ -546,50 +548,38 @@ export default function ItemLookupPage() {
             {showProductFilters ? (
               <>
                 <InputGroup label="Product brand" className="md:col-span-3">
-                  <select
+                  <SearchableSelect
                     value={productBrandId}
-                    onChange={(event) => {
-                      setProductBrandId(
-                        event.target.value
-                          ? parseInt(event.target.value, 10)
-                          : "",
-                      );
+                    onChange={(value) => {
+                      setProductBrandId(value ? parseInt(value, 10) : "");
                       setBrowsePage(1);
                     }}
+                    placeholder="All product brands"
+                    options={productBrands.map((brand) => ({
+                      value: brand.id,
+                      label: brand.name,
+                    }))}
                     className="form-input-base"
                     disabled={metadataLoading}
                     aria-label="Product brand"
-                  >
-                    <option value="">All product brands</option>
-                    {productBrands.map((brand) => (
-                      <option key={brand.id} value={brand.id}>
-                        {brand.name}
-                      </option>
-                    ))}
-                  </select>
+                  />
                 </InputGroup>
                 <InputGroup label="Product category" className="md:col-span-3">
-                  <select
+                  <SearchableSelect
                     value={productCategoryId}
-                    onChange={(event) => {
-                      setProductCategoryId(
-                        event.target.value
-                          ? parseInt(event.target.value, 10)
-                          : "",
-                      );
+                    onChange={(value) => {
+                      setProductCategoryId(value ? parseInt(value, 10) : "");
                       setBrowsePage(1);
                     }}
+                    placeholder="All product categories"
+                    options={productCategories.map((category) => ({
+                      value: category.id,
+                      label: category.name,
+                    }))}
                     className="form-input-base"
                     disabled={metadataLoading}
                     aria-label="Product category"
-                  >
-                    <option value="">All product categories</option>
-                    {productCategories.map((category) => (
-                      <option key={category.id} value={category.id}>
-                        {category.name}
-                      </option>
-                    ))}
-                  </select>
+                  />
                 </InputGroup>
               </>
             ) : null}
@@ -597,50 +587,38 @@ export default function ItemLookupPage() {
             {showSpareFilters ? (
               <>
                 <InputGroup label="Spare part brand" className="md:col-span-3">
-                  <select
+                  <SearchableSelect
                     value={spareBrandId}
-                    onChange={(event) => {
-                      setSpareBrandId(
-                        event.target.value
-                          ? parseInt(event.target.value, 10)
-                          : "",
-                      );
+                    onChange={(value) => {
+                      setSpareBrandId(value ? parseInt(value, 10) : "");
                       setBrowsePage(1);
                     }}
+                    placeholder="All spare part brands"
+                    options={sparePartBrands.map((brand) => ({
+                      value: brand.id,
+                      label: brand.name,
+                    }))}
                     className="form-input-base"
                     disabled={metadataLoading}
                     aria-label="Spare part brand"
-                  >
-                    <option value="">All spare part brands</option>
-                    {sparePartBrands.map((brand) => (
-                      <option key={brand.id} value={brand.id}>
-                        {brand.name}
-                      </option>
-                    ))}
-                  </select>
+                  />
                 </InputGroup>
                 <InputGroup label="Spare part category" className="md:col-span-3">
-                  <select
+                  <SearchableSelect
                     value={spareCategoryId}
-                    onChange={(event) => {
-                      setSpareCategoryId(
-                        event.target.value
-                          ? parseInt(event.target.value, 10)
-                          : "",
-                      );
+                    onChange={(value) => {
+                      setSpareCategoryId(value ? parseInt(value, 10) : "");
                       setBrowsePage(1);
                     }}
+                    placeholder="All spare part categories"
+                    options={sparePartCategories.map((category) => ({
+                      value: category.id,
+                      label: category.name,
+                    }))}
                     className="form-input-base"
                     disabled={metadataLoading}
                     aria-label="Spare part category"
-                  >
-                    <option value="">All spare part categories</option>
-                    {sparePartCategories.map((category) => (
-                      <option key={category.id} value={category.id}>
-                        {category.name}
-                      </option>
-                    ))}
-                  </select>
+                  />
                 </InputGroup>
               </>
             ) : null}

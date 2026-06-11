@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { EntityFormModal, type FieldConfig } from "@/components/entity-form-modal";
-import { PageShell } from "@/components/ops-ui";
+import { PageShell, SearchableSelect } from "@/components/ops-ui";
 import { getAuthToken } from "@/lib/auth-session";
 import {
   assignSparePartToBikeBlueprint,
@@ -621,36 +621,29 @@ export default function BikeBlueprintSparePartsPage() {
           }}
           className="form-input-base"
         />
-        <select
+        <SearchableSelect
           value={categoryFilter}
-          onChange={(event) => {
-            setCategoryFilter(event.target.value ? Number(event.target.value) : "");
+          onChange={(v) => {
+            setCategoryFilter(v ? Number(v) : "");
             setPage(1);
           }}
+          placeholder="All Categories"
+          options={categories.map((category) => ({
+            value: category.id,
+            label: category.name,
+          }))}
           className="form-input-base"
-        >
-          <option value="">All Categories</option>
-          {categories.map((category) => (
-            <option key={category.id} value={category.id}>
-              {category.name}
-            </option>
-          ))}
-        </select>
-        <select
+        />
+        <SearchableSelect
           value={brandFilter}
-          onChange={(event) => {
-            setBrandFilter(event.target.value ? Number(event.target.value) : "");
+          onChange={(v) => {
+            setBrandFilter(v ? Number(v) : "");
             setPage(1);
           }}
+          placeholder="All Brands"
+          options={brands.map((brand) => ({ value: brand.id, label: brand.name }))}
           className="form-input-base"
-        >
-          <option value="">All Brands</option>
-          {brands.map((brand) => (
-            <option key={brand.id} value={brand.id}>
-              {brand.name}
-            </option>
-          ))}
-        </select>
+        />
       </div>
 
       {loading ? (

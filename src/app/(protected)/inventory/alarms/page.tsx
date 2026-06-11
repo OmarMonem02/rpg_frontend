@@ -13,6 +13,7 @@ import {
   InputGroup,
   PageHero,
   PageShell,
+  SearchableSelect,
   SectionHeading,
   StatCard,
   StatGrid,
@@ -515,19 +516,20 @@ export default function InventoryAlarmsPage() {
               />
             </InputGroup>
             <InputGroup label="Catalog" className="md:col-span-6">
-              <select
+              <SearchableSelect
                 value={entityFilter}
-                onChange={(e) => setEntityFilter(e.target.value as EntityFilter)}
+                onChange={(value) => setEntityFilter(value as EntityFilter)}
+                options={[
+                  { value: "all", label: "All catalogs" },
+                  ...(showSpareParts
+                    ? [{ value: "spare-part", label: "Spare parts only" }]
+                    : []),
+                  ...(showProducts
+                    ? [{ value: "product", label: "Products only" }]
+                    : []),
+                ]}
                 className="form-input-base"
-              >
-                <option value="all">All catalogs</option>
-                {showSpareParts ? (
-                  <option value="spare-part">Spare parts only</option>
-                ) : null}
-                {showProducts ? (
-                  <option value="product">Products only</option>
-                ) : null}
-              </select>
+              />
             </InputGroup>
           </FilterBar>
 

@@ -25,6 +25,7 @@ import {
   PageHero,
   PageShell,
   PaginationControls,
+  SearchableSelect,
   StatCard,
   StatGrid,
   StatusBadge,
@@ -351,61 +352,58 @@ function HistoryPageContent() {
 
       <FilterBar>
         <InputGroup label="Entity" className="md:col-span-3">
-          <select
+          <SearchableSelect
             className="form-input-base"
             value={draftFilters.entity_type}
-            onChange={(event) =>
+            onChange={(value) =>
               setDraftFilters((current) => ({
                 ...current,
-                entity_type: event.target.value,
+                entity_type: value,
               }))
             }
-          >
-            <option value="">All entities</option>
-            {entityOptions.map((option) => (
-              <option key={option.key} value={option.key}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+            placeholder="All entities"
+            options={entityOptions.map((option) => ({
+              value: option.key,
+              label: option.label,
+            }))}
+          />
         </InputGroup>
 
         <InputGroup label="Action" className="md:col-span-2">
-          <select
+          <SearchableSelect
             className="form-input-base"
             value={draftFilters.action}
-            onChange={(event) =>
+            onChange={(value) =>
               setDraftFilters((current) => ({
                 ...current,
-                action: event.target.value,
+                action: value,
               }))
             }
-          >
-            <option value="">All actions</option>
-            <option value="create">Create</option>
-            <option value="update">Update</option>
-            <option value="delete">Delete</option>
-          </select>
+            placeholder="All actions"
+            options={[
+              { value: "create", label: "Create" },
+              { value: "update", label: "Update" },
+              { value: "delete", label: "Delete" },
+            ]}
+          />
         </InputGroup>
 
         <InputGroup label="User" className="md:col-span-3">
-          <select
+          <SearchableSelect
             className="form-input-base"
             value={draftFilters.user_id}
-            onChange={(event) =>
+            onChange={(value) =>
               setDraftFilters((current) => ({
                 ...current,
-                user_id: event.target.value,
+                user_id: value,
               }))
             }
-          >
-            <option value="">All users</option>
-            {users.map((user) => (
-              <option key={user.id} value={user.id}>
-                {user.name} ({user.email})
-              </option>
-            ))}
-          </select>
+            placeholder="All users"
+            options={users.map((user) => ({
+              value: user.id,
+              label: `${user.name} (${user.email})`,
+            }))}
+          />
         </InputGroup>
 
         <InputGroup label="Record ID" className="md:col-span-2">

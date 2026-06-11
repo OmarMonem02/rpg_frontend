@@ -55,6 +55,7 @@ import {
   PageHero,
   PageShell,
   PaginationControls,
+  SearchableSelect,
   StatusBadge,
   SurfaceCard,
 } from "@/components/ops-ui";
@@ -230,46 +231,40 @@ export default function BikesPage() {
             />
           </InputGroup>
           <InputGroup label="Blueprint" className="md:col-span-3">
-            <select
+            <SearchableSelect
               value={filters.blueprint_id || ""}
-              onChange={(e) => setBlueprint(e.target.value ? parseInt(e.target.value) : "")}
+              onChange={(value) => setBlueprint(value ? parseInt(value) : "")}
+              placeholder="All Blueprints"
+              options={blueprints.map((b) => ({
+                value: b.id,
+                label: `${b.model} ${b.year}`,
+              }))}
               className="form-input-base"
-            >
-              <option value="">All Blueprints</option>
-              {blueprints.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.model} {b.year}
-                </option>
-              ))}
-            </select>
+            />
           </InputGroup>
           <InputGroup label="Brand" className="md:col-span-3">
-            <select
+            <SearchableSelect
               value={filters.brand_id || ""}
-              onChange={(e) => setBrand(e.target.value ? parseInt(e.target.value) : "")}
+              onChange={(value) => setBrand(value ? parseInt(value) : "")}
+              placeholder="All Brands"
+              options={brands.map((b) => ({
+                value: b.id,
+                label: b.name,
+              }))}
               className="form-input-base"
-            >
-              <option value="">All Brands</option>
-              {brands.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.name}
-                </option>
-              ))}
-            </select>
+            />
           </InputGroup>
           <InputGroup label="Status" className="md:col-span-3">
-            <select
+            <SearchableSelect
               value={filters.status || ""}
-              onChange={(e) => setStatus(e.target.value)}
+              onChange={setStatus}
+              placeholder="All Statuses"
+              options={STATUSES.map((s) => ({
+                value: s.value,
+                label: s.label,
+              }))}
               className="form-input-base"
-            >
-              <option value="">All Statuses</option>
-              {STATUSES.map((s) => (
-                <option key={s.value} value={s.value}>
-                  {s.label}
-                </option>
-              ))}
-            </select>
+            />
           </InputGroup>
         </FilterBar>
 

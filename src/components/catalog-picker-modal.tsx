@@ -31,7 +31,7 @@ import {
   type PricingCurrency,
 } from "@/lib/currencies";
 import { useExchangeRates } from "@/hooks/useExchangeRates";
-import { ActionButton, StatusBadge } from "@/components/ops-ui";
+import { ActionButton, SearchableSelect, StatusBadge } from "@/components/ops-ui";
 import { BikeCompatibilityFilter } from "@/components/BikeCompatibilityFilter";
 import { useLiveDataRefresh } from "@/hooks/useLiveDataRefresh";
 import {
@@ -75,14 +75,6 @@ interface CatalogPickerModalProps {
   onAddItems: (items: CatalogItem[]) => void;
   selectedIds?: number[];
   blueprintId?: number;
-}
-
-function NativeSelectChevron() {
-  return (
-    <span className="pointer-events-none absolute inset-y-0 right-2 flex items-center text-on-surface-variant/70">
-      <ChevronDownIcon className="h-4 w-4 shrink-0" aria-hidden />
-    </span>
-  );
 }
 
 function ItemThumbnail({ src, name }: { src?: string; name: string }) {
@@ -720,30 +712,25 @@ export function CatalogPickerModal({
                         >
                           Brand
                         </label>
-                        <div className="relative">
-                          <select
-                            id="catalog-picker-brand"
-                            value={filters.brandId || ""}
-                            onChange={(e) => {
-                              setFilters({
-                                ...filters,
-                                brandId: e.target.value
-                                  ? Number(e.target.value)
-                                  : undefined,
-                              });
-                              setPage(1);
-                            }}
-                            className="form-input-base w-full appearance-none bg-surface-container-lowest/80 py-2.5 pl-3 pr-9 font-medium"
-                          >
-                            <option value="">All brands</option>
-                            {brands.map((brand) => (
-                              <option key={brand.id} value={brand.id}>
-                                {brand.name}
-                              </option>
-                            ))}
-                          </select>
-                          <NativeSelectChevron />
-                        </div>
+                        <SearchableSelect
+                          id="catalog-picker-brand"
+                          value={filters.brandId || ""}
+                          onChange={(value) => {
+                            setFilters({
+                              ...filters,
+                              brandId: value ? Number(value) : undefined,
+                            });
+                            setPage(1);
+                          }}
+                          options={[
+                            { value: "", label: "All brands" },
+                            ...brands.map((brand) => ({
+                              value: brand.id,
+                              label: brand.name,
+                            })),
+                          ]}
+                          className="form-input-base w-full bg-surface-container-lowest/80 py-2.5 font-medium"
+                        />
                       </div>
                     )}
 
@@ -755,30 +742,25 @@ export function CatalogPickerModal({
                         >
                           Category
                         </label>
-                        <div className="relative">
-                          <select
-                            id="catalog-picker-product-category"
-                            value={filters.categoryId || ""}
-                            onChange={(e) => {
-                              setFilters({
-                                ...filters,
-                                categoryId: e.target.value
-                                  ? Number(e.target.value)
-                                  : undefined,
-                              });
-                              setPage(1);
-                            }}
-                            className="form-input-base w-full appearance-none bg-surface-container-lowest/80 py-2.5 pl-3 pr-9 font-medium"
-                          >
-                            <option value="">All categories</option>
-                            {productCategories.map((cat) => (
-                              <option key={cat.id} value={cat.id}>
-                                {cat.name}
-                              </option>
-                            ))}
-                          </select>
-                          <NativeSelectChevron />
-                        </div>
+                        <SearchableSelect
+                          id="catalog-picker-product-category"
+                          value={filters.categoryId || ""}
+                          onChange={(value) => {
+                            setFilters({
+                              ...filters,
+                              categoryId: value ? Number(value) : undefined,
+                            });
+                            setPage(1);
+                          }}
+                          options={[
+                            { value: "", label: "All categories" },
+                            ...productCategories.map((cat) => ({
+                              value: cat.id,
+                              label: cat.name,
+                            })),
+                          ]}
+                          className="form-input-base w-full bg-surface-container-lowest/80 py-2.5 font-medium"
+                        />
                       </div>
                     )}
 
@@ -790,30 +772,25 @@ export function CatalogPickerModal({
                         >
                           Category
                         </label>
-                        <div className="relative">
-                          <select
-                            id="catalog-picker-spare-category"
-                            value={filters.categoryId || ""}
-                            onChange={(e) => {
-                              setFilters({
-                                ...filters,
-                                categoryId: e.target.value
-                                  ? Number(e.target.value)
-                                  : undefined,
-                              });
-                              setPage(1);
-                            }}
-                            className="form-input-base w-full appearance-none bg-surface-container-lowest/80 py-2.5 pl-3 pr-9 font-medium"
-                          >
-                            <option value="">All categories</option>
-                            {sparePartCategories.map((cat) => (
-                              <option key={cat.id} value={cat.id}>
-                                {cat.name}
-                              </option>
-                            ))}
-                          </select>
-                          <NativeSelectChevron />
-                        </div>
+                        <SearchableSelect
+                          id="catalog-picker-spare-category"
+                          value={filters.categoryId || ""}
+                          onChange={(value) => {
+                            setFilters({
+                              ...filters,
+                              categoryId: value ? Number(value) : undefined,
+                            });
+                            setPage(1);
+                          }}
+                          options={[
+                            { value: "", label: "All categories" },
+                            ...sparePartCategories.map((cat) => ({
+                              value: cat.id,
+                              label: cat.name,
+                            })),
+                          ]}
+                          className="form-input-base w-full bg-surface-container-lowest/80 py-2.5 font-medium"
+                        />
                       </div>
                     )}
 
@@ -825,30 +802,25 @@ export function CatalogPickerModal({
                         >
                           Sector
                         </label>
-                        <div className="relative">
-                          <select
-                            id="catalog-picker-sector"
-                            value={filters.sectorId || ""}
-                            onChange={(e) => {
-                              setFilters({
-                                ...filters,
-                                sectorId: e.target.value
-                                  ? Number(e.target.value)
-                                  : undefined,
-                              });
-                              setPage(1);
-                            }}
-                            className="form-input-base w-full appearance-none bg-surface-container-lowest/80 py-2.5 pl-3 pr-9 font-medium"
-                          >
-                            <option value="">All sectors</option>
-                            {sectors.map((sector) => (
-                              <option key={sector.id} value={sector.id}>
-                                {sector.name}
-                              </option>
-                            ))}
-                          </select>
-                          <NativeSelectChevron />
-                        </div>
+                        <SearchableSelect
+                          id="catalog-picker-sector"
+                          value={filters.sectorId || ""}
+                          onChange={(value) => {
+                            setFilters({
+                              ...filters,
+                              sectorId: value ? Number(value) : undefined,
+                            });
+                            setPage(1);
+                          }}
+                          options={[
+                            { value: "", label: "All sectors" },
+                            ...sectors.map((sector) => ({
+                              value: sector.id,
+                              label: sector.name,
+                            })),
+                          ]}
+                          className="form-input-base w-full bg-surface-container-lowest/80 py-2.5 font-medium"
+                        />
                       </div>
                     )}
 
@@ -859,31 +831,28 @@ export function CatalogPickerModal({
                       >
                         Currency
                       </label>
-                      <div className="relative">
-                        <select
-                          id="catalog-picker-currency"
-                          value={filters.currency}
-                          onChange={(e) => {
-                            setFilters({
-                              ...filters,
-                              currency:
-                                e.target.value === ""
-                                  ? ""
-                                  : (e.target.value as PricingCurrency),
-                            });
-                            setPage(1);
-                          }}
-                          className="form-input-base w-full appearance-none bg-surface-container-lowest/80 py-2.5 pl-3 pr-9 font-medium"
-                        >
-                          <option value="">Any currency</option>
-                          {SUPPORTED_PRICING_CURRENCIES.map((code) => (
-                            <option key={code} value={code}>
-                              {code}
-                            </option>
-                          ))}
-                        </select>
-                        <NativeSelectChevron />
-                      </div>
+                      <SearchableSelect
+                        id="catalog-picker-currency"
+                        value={filters.currency}
+                        onChange={(value) => {
+                          setFilters({
+                            ...filters,
+                            currency:
+                              value === ""
+                                ? ""
+                                : (value as PricingCurrency),
+                          });
+                          setPage(1);
+                        }}
+                        options={[
+                          { value: "", label: "Any currency" },
+                          ...SUPPORTED_PRICING_CURRENCIES.map((code) => ({
+                            value: code,
+                            label: code,
+                          })),
+                        ]}
+                        className="form-input-base w-full bg-surface-container-lowest/80 py-2.5 font-medium"
+                      />
                     </div>
                   </div>
 

@@ -5,6 +5,7 @@ import {
   ActionButton,
   FilterBar,
   InputGroup,
+  SearchableSelect,
   SurfaceCard,
   StatCard,
   StatGrid,
@@ -163,18 +164,19 @@ export function FinanceFilterBar({
         />
       </InputGroup>
       <InputGroup label="Currency" className="md:col-span-3">
-        <select
+        <SearchableSelect
+          searchable={false}
           value={currency}
-          onChange={(event) => onCurrencyChange(event.target.value)}
+          onChange={onCurrencyChange}
+          options={[
+            { value: "", label: "All currencies" },
+            ...SUPPORTED_PRICING_CURRENCIES.map((code) => ({
+              value: code,
+              label: code,
+            })),
+          ]}
           className="form-input-base"
-        >
-          <option value="">All currencies</option>
-          {SUPPORTED_PRICING_CURRENCIES.map((code) => (
-            <option key={code} value={code}>
-              {code}
-            </option>
-          ))}
-        </select>
+        />
       </InputGroup>
       <div className="md:col-span-3">{extra}</div>
     </FilterBar>
@@ -382,20 +384,21 @@ export function CurrencySelector({
 }) {
   return (
     <InputGroup label={label}>
-      <select
+      <SearchableSelect
+        searchable={false}
         value={value}
-        onChange={(event) =>
-          onChange(event.target.value as ReportingCurrency | "")
+        onChange={(nextValue) =>
+          onChange(nextValue as ReportingCurrency | "")
         }
+        options={[
+          { value: "", label: "All currencies" },
+          ...SUPPORTED_PRICING_CURRENCIES.map((code) => ({
+            value: code,
+            label: code,
+          })),
+        ]}
         className="form-input-base"
-      >
-        <option value="">All currencies</option>
-        {SUPPORTED_PRICING_CURRENCIES.map((code) => (
-          <option key={code} value={code}>
-            {code}
-          </option>
-        ))}
-      </select>
+      />
     </InputGroup>
   );
 }

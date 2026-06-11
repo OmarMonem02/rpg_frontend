@@ -23,6 +23,7 @@ import {
   PageHero,
   PageShell,
   PaginationControls,
+  SearchableSelect,
   SurfaceCard,
   StatusBadge,
   DataTableCard,
@@ -554,53 +555,47 @@ function SalesPageContent() {
         </InputGroup>
 
         <InputGroup label="Status" className="md:col-span-2">
-          <select
+          <SearchableSelect
             value={statusFilter}
-            onChange={(event) => {
-              setStatusFilter(event.target.value);
+            onChange={(value) => {
+              setStatusFilter(value);
               setPage(1);
             }}
+            options={SALE_STATUSES}
             className="form-input-base"
-          >
-            {SALE_STATUSES.map((option) => (
-              <option key={option.value || "all"} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+          />
         </InputGroup>
 
         <InputGroup label="Sort" className="md:col-span-2">
-          <select
+          <SearchableSelect
             value={sortBy}
-            onChange={(event) => {
-              setSortBy(event.target.value as SaleSort);
+            onChange={(value) => {
+              setSortBy(value as SaleSort);
               setPage(1);
             }}
+            options={[
+              { value: "newest", label: "Newest first" },
+              { value: "oldest", label: "Oldest first" },
+              { value: "highest", label: "Highest total" },
+              { value: "lowest", label: "Lowest total" },
+            ]}
             className="form-input-base"
-          >
-            <option value="newest">Newest first</option>
-            <option value="oldest">Oldest first</option>
-            <option value="highest">Highest total</option>
-            <option value="lowest">Lowest total</option>
-          </select>
+          />
         </InputGroup>
 
         <InputGroup label="Rows" className="md:col-span-1">
-          <select
+          <SearchableSelect
             value={perPage}
-            onChange={(event) => {
-              setPerPage(Number(event.target.value));
+            onChange={(value) => {
+              setPerPage(Number(value));
               setPage(1);
             }}
+            options={[10, 20, 50, 100].map((value) => ({
+              value,
+              label: String(value),
+            }))}
             className="form-input-base"
-          >
-            {[10, 20, 50, 100].map((value) => (
-              <option key={value} value={value}>
-                {value}
-              </option>
-            ))}
-          </select>
+          />
         </InputGroup>
 
         <div className="flex items-end md:col-span-2 xl:col-span-1">
@@ -695,52 +690,37 @@ function SalesPageContent() {
               />
             </InputGroup>
             <InputGroup label="Delivery status">
-              <select
+              <SearchableSelect
                 value={deliveryStatusFilter}
-                onChange={(event) => {
-                  setDeliveryStatusFilter(event.target.value);
+                onChange={(value) => {
+                  setDeliveryStatusFilter(value);
                   setPage(1);
                 }}
+                options={DELIVERY_STATUSES}
                 className="form-input-base"
-              >
-                {DELIVERY_STATUSES.map((option) => (
-                  <option key={option.value || "all"} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+              />
             </InputGroup>
             <InputGroup label="Sales channel">
-              <select
+              <SearchableSelect
                 value={saleTypeFilter}
-                onChange={(event) => {
-                  setSaleTypeFilter(event.target.value);
+                onChange={(value) => {
+                  setSaleTypeFilter(value);
                   setPage(1);
                 }}
+                options={SALE_TYPES}
                 className="form-input-base"
-              >
-                {SALE_TYPES.map((option) => (
-                  <option key={option.value || "all"} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+              />
             </InputGroup>
             <InputGroup label="Item type">
-              <select
+              <SearchableSelect
                 value={itemTypeFilter}
-                onChange={(event) => {
-                  setItemTypeFilter(event.target.value as ItemTypeFilter);
+                onChange={(value) => {
+                  setItemTypeFilter(value as ItemTypeFilter);
                   setPage(1);
                 }}
+                options={ITEM_TYPES}
                 className="form-input-base"
-              >
-                {ITEM_TYPES.map((option) => (
-                  <option key={option.value || "all"} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+              />
             </InputGroup>
             <InputGroup label="Min total">
               <input

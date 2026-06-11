@@ -9,7 +9,12 @@ import {
   PlusIcon,
   TrashIcon,
 } from "@heroicons/react/24/outline";
-import { ActionButton, DataTableCard, StatusBadge } from "@/components/ops-ui";
+import {
+  ActionButton,
+  DataTableCard,
+  SearchableSelect,
+  StatusBadge,
+} from "@/components/ops-ui";
 import { getLookupItemKindLabel } from "@/lib/item-lookup";
 import {
   computeVariance,
@@ -503,18 +508,13 @@ export function SortControl({
   return (
     <div className="flex items-center gap-2">
       <ArrowsUpDownIcon className="h-4 w-4 text-on-surface-variant" aria-hidden />
-      <select
+      <SearchableSelect
         value={sortKey}
-        onChange={(e) => onChange(e.target.value as CountSortKey)}
-        className="form-input-base appearance-none py-1.5 pl-2 pr-8 text-xs font-semibold"
+        onChange={(value) => onChange(value as CountSortKey)}
+        options={options.map((opt) => ({ value: opt.id, label: opt.label }))}
+        className="form-input-base py-1.5 pl-2 pr-2 text-xs font-semibold"
         aria-label="Sort items by"
-      >
-        {options.map((opt) => (
-          <option key={opt.id} value={opt.id}>
-            {opt.label}
-          </option>
-        ))}
-      </select>
+      />
     </div>
   );
 }
