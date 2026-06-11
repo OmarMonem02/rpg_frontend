@@ -169,6 +169,9 @@ export async function authorizedFetch<T>(
     headers: {
       Accept: "application/json",
       Authorization: `Bearer ${token}`,
+      ...(init?.body && typeof init.body === "string"
+        ? { "Content-Type": "application/json" }
+        : {}),
       ...(init?.headers ?? {}),
     },
   });
