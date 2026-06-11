@@ -138,7 +138,7 @@ export function PricingFields({
             <input
               type="number"
               min={0}
-              step="0.01"
+              step="1"
               onWheel={(event) => {
                 event.currentTarget.blur();
               }}
@@ -235,7 +235,7 @@ export function PricingFields({
               <input
                 type="number"
                 min={0}
-                step="0.01"
+                step="1"
                 onWheel={(event) => {
                   event.currentTarget.blur();
                 }}
@@ -262,7 +262,7 @@ export function PricingFields({
             <input
               type="number"
               min={0}
-              step="0.01"
+              step="1"
               onWheel={(event) => {
                 event.currentTarget.blur();
               }}

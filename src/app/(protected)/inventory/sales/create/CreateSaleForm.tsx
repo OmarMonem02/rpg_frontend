@@ -234,7 +234,7 @@ function FormMoneyInput({
         <input
           id={id}
           type="number"
-          step="0.01"
+          step="1"
           min="0"
           disabled={disabled}
           value={value || ""}

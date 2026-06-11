@@ -99,7 +99,7 @@ export function ServiceForm({ initialData, mode }: ServiceFormProps) {
     {
       name: "maintenance_service_sector_id",
       label: "Sector",
-      type: "select",
+      type: "multiselect",
       required: true,
       section: "Basic Info",
       description: "Choose the sector tab this service should appear under.",

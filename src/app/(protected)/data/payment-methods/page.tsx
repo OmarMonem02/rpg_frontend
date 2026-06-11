@@ -510,7 +510,7 @@ export default function PaymentMethodsPage() {
                 <input
                   type="number"
                   min="0.01"
-                  step="0.01"
+                  step="1"
                   inputMode="decimal"
                   autoComplete="off"
                   value={settingsForm.exchange_rate}
@@ -576,7 +576,7 @@ export default function PaymentMethodsPage() {
                 <input
                   type="number"
                   min="0.01"
-                  step="0.01"
+                  step="1"
                   inputMode="decimal"
                   autoComplete="off"
                   value={settingsForm.exchange_rate_eur}

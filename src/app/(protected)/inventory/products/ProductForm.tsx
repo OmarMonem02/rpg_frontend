@@ -254,6 +254,15 @@ export function ProductForm({ initialData, mode }: ProductFormProps) {
       value: initialData?.sku,
     },
     {
+      name: "part_number",
+      label: "Part Number",
+      type: "text",
+      section: "Basic Info",
+      description: "Add the maker reference if your team uses manufacturer numbers.",
+      placeholder: "e.g., MPN-12345",
+      value: initialData?.part_number,
+    },
+    {
       name: "image",
       label: "Product Photo",
       type: "image",

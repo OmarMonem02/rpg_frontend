@@ -848,34 +848,35 @@ export const EntityForm = forwardRef<EntityFormHandle, EntityFormProps>(
           className={`form-section-card scroll-mt-24 shadow-sm ${isStackedLayout ? `h-full ${getStackedSectionSpanClassName(section)}` : ""
             } ${isInvalidHighlight ? "border-error/30" : ""}`}
         >
-          <div className="form-section-header mb-6">
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex items-start gap-3">
-                <span className="mono-data label-caps rounded-lg bg-primary/8 px-2 py-1 text-primary">
-                  {String(index + 1).padStart(2, "0")}
-                </span>
-                <div>
-                  <h3 className="mt-1 text-2xl font-bold text-on-surface">
-                    {section.name}
-                  </h3>
-                  {section.description ? (
-                    <p className="mt-1 text-caption leading-relaxed text-on-surface-variant/70">
-                      {section.description}
-                    </p>
-                  ) : null}
-                </div>
+          <div className="flex items-start justify-between gap-3 mb-6">
+            <div className="flex flex-1 items-start gap-3 min-w-0">
+              <span className="mono-data label-caps rounded-lg bg-primary/8 px-2 py-1 text-primary">
+                {String(index + 1).padStart(2, "0")}
+              </span>
+
+              <div className="flex-1 min-w-0">
+                <h3 className="mt-1 text-2xl font-bold text-on-surface">
+                  {section.name}
+                </h3>
+
+                {section.description ? (
+                  <p className="mt-1 text-caption leading-relaxed text-on-surface-variant/70">
+                    {section.description}
+                  </p>
+                ) : null}
               </div>
-              {isStackedLayout && stackedStatus !== "neutral" ? (
-                <span
-                  className={`form-chip shrink-0 ${stackedStatus === "complete"
-                    ? "border-success/30 bg-success-container text-success"
-                    : "border-error/30 bg-error-container text-error"
-                    }`}
-                >
-                  {stackedStatus === "complete" ? "Complete" : "Required"}
-                </span>
-              ) : null}
             </div>
+
+            {isStackedLayout && stackedStatus !== "neutral" ? (
+              <span
+                className={`form-chip shrink-0 ${stackedStatus === "complete"
+                  ? "border-success/30 bg-success-container text-success"
+                  : "border-error/30 bg-error-container text-error"
+                  }`}
+              >
+                {stackedStatus === "complete" ? "Complete" : "Required"}
+              </span>
+            ) : null}
           </div>
 
           <div
@@ -979,95 +980,95 @@ export const EntityForm = forwardRef<EntityFormHandle, EntityFormProps>(
         {/* Header — omitted when title is empty (e.g. EntityDrawer supplies its own) */}
         {title ? (
           <div className={headerClassName}>
-          {isStackedLayout ? (
-            <>
-              <div className="mb-4">
-                <div className="mb-3 flex flex-wrap items-center gap-2">
-                  <span className="form-chip">{heroLabel}</span>
-                  <span className="form-chip">
-                    {contentSections.length} sections
-                  </span>
-                  <span className="form-chip">{requiredFieldsCount} required</span>
-                </div>
-                <h2 className="text-display-md font-bold tracking-tight text-on-surface">
-                  {title}
-                </h2>
-                {description ? (
-                  <p className="mt-2 max-w-3xl text-sm leading-6 text-on-surface-variant lg:max-w-none">
-                    {description}
-                  </p>
-                ) : null}
-              </div>
-
-              {contentSections.length > 1
-                ? (
-                  <div className="mt-4">{renderStackedSectionNav("horizontal")}</div>
-                )
-                : null}
-            </>
-          ) : (
-            <>
-              <div className="grid gap-2 border-b border-outline-variant/10 pb-4 md:grid-cols-[1fr_0.7fr]">
-                <div>
-                  <div
-                    className={`mb-3 flex flex-wrap items-center gap-2 ${isModalStyleChrome ? "scale-90 origin-left" : ""}`}
-                  >
+            {isStackedLayout ? (
+              <>
+                <div className="mb-4">
+                  <div className="mb-3 flex flex-wrap items-center gap-2">
                     <span className="form-chip">{heroLabel}</span>
-                    <span className="form-chip">{sections.length} steps</span>
+                    <span className="form-chip">
+                      {contentSections.length} sections
+                    </span>
                     <span className="form-chip">{requiredFieldsCount} required</span>
                   </div>
-                  <h2
-                    className={`${isModalStyleChrome ? "text-2xl" : "text-display-md"} font-bold tracking-tight text-on-surface`}
-                  >
+                  <h2 className="text-display-md font-bold tracking-tight text-on-surface">
                     {title}
                   </h2>
-                  {description && !isModalStyleChrome && (
-                    <p className="mt-2 max-w-2xl text-sm leading-6 text-on-surface-variant">
+                  {description ? (
+                    <p className="mt-2 max-w-3xl text-sm leading-6 text-on-surface-variant lg:max-w-none">
                       {description}
                     </p>
-                  )}
+                  ) : null}
                 </div>
-              </div>
 
-              <div
-                className={`mt-6 grid gap-2 ${isModalStyleChrome ? "md:grid-cols-3 lg:grid-cols-5" : "md:grid-cols-5"}`}
-              >
-                {sections.map((section, index) => (
-                  <button
-                    key={section.name}
-                    type="button"
-                    onClick={() => handleGoToSection(index)}
-                    disabled={
-                      index > currentSectionIndex &&
-                      getSectionStatus(index) === "upcoming"
-                    }
-                    className={`group flex items-center gap-2.5 rounded-xl border p-2 text-left transition-all ${index === currentSectionIndex
-                      ? "border-primary/30 bg-surface-container-lowest shadow-sm"
-                      : "border-outline-variant/5 bg-surface-container-lowest/30 hover:border-outline-variant/30"
-                      } disabled:opacity-40 disabled:cursor-not-allowed`}
-                  >
-                    <span
-                      className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-caption font-bold transition-colors ${getSectionStatus(index) === "complete"
-                        ? "bg-primary text-on-primary"
-                        : index === currentSectionIndex
-                          ? "bg-primary/10 text-primary border border-primary/20"
-                          : "bg-surface-container text-on-surface-variant"
-                        }`}
+                {contentSections.length > 1
+                  ? (
+                    <div className="mt-4">{renderStackedSectionNav("horizontal")}</div>
+                  )
+                  : null}
+              </>
+            ) : (
+              <>
+                <div className="grid gap-2 border-b border-outline-variant/10 pb-4 md:grid-cols-[1fr_0.7fr]">
+                  <div>
+                    <div
+                      className={`mb-3 flex flex-wrap items-center gap-2 ${isModalStyleChrome ? "scale-90 origin-left" : ""}`}
                     >
-                      {getSectionStatus(index) === "complete"
-                        ? "✓"
-                        : String(index + 1).padStart(2, "0")}
-                    </span>
-                    <span
-                      className={`truncate text-caption font-bold transition-colors ${index === currentSectionIndex ? "text-on-surface" : "text-on-surface-variant group-hover:text-on-surface"}`}
+                      <span className="form-chip">{heroLabel}</span>
+                      <span className="form-chip">{sections.length} steps</span>
+                      <span className="form-chip">{requiredFieldsCount} required</span>
+                    </div>
+                    <h2
+                      className={`${isModalStyleChrome ? "text-2xl" : "text-display-md"} font-bold tracking-tight text-on-surface`}
                     >
-                      {section.name}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
+                      {title}
+                    </h2>
+                    {description && !isModalStyleChrome && (
+                      <p className="mt-2 max-w-2xl text-sm leading-6 text-on-surface-variant">
+                        {description}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <div
+                  className={`mt-6 grid gap-2 ${isModalStyleChrome ? "md:grid-cols-3 lg:grid-cols-5" : "md:grid-cols-5"}`}
+                >
+                  {sections.map((section, index) => (
+                    <button
+                      key={section.name}
+                      type="button"
+                      onClick={() => handleGoToSection(index)}
+                      disabled={
+                        index > currentSectionIndex &&
+                        getSectionStatus(index) === "upcoming"
+                      }
+                      className={`group flex items-center gap-2.5 rounded-xl border p-2 text-left transition-all ${index === currentSectionIndex
+                        ? "border-primary/30 bg-surface-container-lowest shadow-sm"
+                        : "border-outline-variant/5 bg-surface-container-lowest/30 hover:border-outline-variant/30"
+                        } disabled:opacity-40 disabled:cursor-not-allowed`}
+                    >
+                      <span
+                        className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-caption font-bold transition-colors ${getSectionStatus(index) === "complete"
+                          ? "bg-primary text-on-primary"
+                          : index === currentSectionIndex
+                            ? "bg-primary/10 text-primary border border-primary/20"
+                            : "bg-surface-container text-on-surface-variant"
+                          }`}
+                      >
+                        {getSectionStatus(index) === "complete"
+                          ? "✓"
+                          : String(index + 1).padStart(2, "0")}
+                      </span>
+                      <span
+                        className={`truncate text-caption font-bold transition-colors ${index === currentSectionIndex ? "text-on-surface" : "text-on-surface-variant group-hover:text-on-surface"}`}
+                      >
+                        {section.name}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         ) : null}
 

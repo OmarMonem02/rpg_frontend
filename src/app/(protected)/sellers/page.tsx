@@ -408,7 +408,7 @@ export default function SellersPage() {
                 <input
                   type="number"
                   min="0"
-                  step="0.01"
+                  step="1"
                   value={form.commission_rate}
                   onChange={(event) =>
                     setForm((prev) => ({

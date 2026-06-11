@@ -132,30 +132,6 @@ export function BikeForm({ mode, initialData }: BikeFormProps) {
       span: 2,
     },
     {
-      name: "status",
-      label: "Status",
-      type: "select",
-      required: true,
-      section: "Status",
-      sectionDescription:
-        "Set the live sale state and the opening condition of the bike.",
-      description:
-        "Choose where this bike currently sits in the sales lifecycle.",
-      options: STATUSES,
-      value: initialData?.status ?? "available",
-      helperTone: "featured",
-    },
-    {
-      name: "mileage",
-      label: "Initial Mileage (km)",
-      type: "number",
-      section: "Status",
-      description: "Record the mileage the moment this bike enters inventory.",
-      placeholder: "0",
-      min: 0,
-      value: initialData?.mileage ?? 0,
-    },
-    {
       name: "catalog_pricing",
       label: "Pricing",
       type: "pricing",
@@ -189,6 +165,30 @@ export function BikeForm({ mode, initialData }: BikeFormProps) {
       min: 0,
       step: "0.01",
       value: initialData?.max_discount_value ?? 0,
+    },
+    {
+      name: "status",
+      label: "Status",
+      type: "select",
+      required: true,
+      section: "Status",
+      sectionDescription:
+        "Set the live sale state and the opening condition of the bike.",
+      description:
+        "Choose where this bike currently sits in the sales lifecycle.",
+      options: STATUSES,
+      value: initialData?.status ?? "available",
+      helperTone: "featured",
+    },
+    {
+      name: "mileage",
+      label: "Initial Mileage (km)",
+      type: "number",
+      section: "Status",
+      description: "Record the mileage the moment this bike enters inventory.",
+      placeholder: "0",
+      min: 0,
+      value: initialData?.mileage ?? 0,
     },
     {
       name: "notes",

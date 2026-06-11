@@ -137,7 +137,7 @@ export function FormDiscountInput({
           onWheel={(event) => {
             event.currentTarget.blur();
           }}
-          step="0.01"
+          step="1"
           min="0"
           disabled={disabled}
           value={value || ""}

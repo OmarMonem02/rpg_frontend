@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  ArrowUpTrayIcon,
-  ExclamationTriangleIcon,
-  InformationCircleIcon,
-  PhotoIcon,
-  XMarkIcon,
-} from "@heroicons/react/24/outline";
+import { PhotoIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { useEffect, useId, useRef, useState, type DragEvent } from "react";
 
 import { compressImageIfNeeded } from "@/lib/compressImage";
@@ -33,15 +27,10 @@ const acceptedImageExtensions = [".jpg", ".jpeg", ".png", ".webp"];
 
 function isAcceptedImageFile(file: File): boolean {
   const lowerName = file.name.toLowerCase();
-
   return (
     acceptedImageTypes.has(file.type) ||
     acceptedImageExtensions.some((extension) => lowerName.endsWith(extension))
   );
-}
-
-function formatFileSize(bytes: number): string {
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
 function isValidImageUrl(value: string): boolean {
@@ -53,26 +42,10 @@ function isValidImageUrl(value: string): boolean {
   }
 }
 
-/**
- * Reusable authenticated image upload drop zone for RPG forms.
- *
- * @example
- * <ImageUpload
- *   value={form.watch("image_url")}
- *   onChange={(url, publicId) => {
- *     form.setValue("image_url", url);
- *     form.setValue("image_public_id", publicId);
- *   }}
- *   onError={(message) => toast.error(message)}
- *   folder="Bikes"
- *   maxSizeMB={5}
- * />
- */
 export function ImageUpload({
   value,
   onChange,
   onError,
-  folder = "General",
   uploadFolder = "rpg-system/general",
   accept = "image/*",
   maxSizeMB = 5,
@@ -86,9 +59,8 @@ export function ImageUpload({
   const [imageUrlInput, setImageUrlInput] = useState("");
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
-  const [isCompressing, setIsCompressing] = useState(false);
+  const [status, setStatus] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [infoMessage, setInfoMessage] = useState<string | null>(null);
 
   useEffect(() => {
     setPreviewUrl(value);
@@ -104,6 +76,7 @@ export function ImageUpload({
 
   function surfaceError(message: string): void {
     setErrorMessage(message);
+    setStatus(null);
     onError?.(message);
   }
 
@@ -111,7 +84,6 @@ export function ImageUpload({
     if (objectUrlRef.current) {
       URL.revokeObjectURL(objectUrlRef.current);
     }
-
     const objectUrl = URL.createObjectURL(file);
     objectUrlRef.current = objectUrl;
     setPreviewUrl(objectUrl);
@@ -127,36 +99,24 @@ export function ImageUpload({
       return;
     }
 
-    const needsCompression = file.size > maxBytes;
-
     setErrorMessage(null);
-    if (needsCompression) {
-      setInfoMessage(
-        `This image is ${formatFileSize(file.size)} (over the ${maxSizeMB}MB limit). We will automatically compress and resize it before uploading.`,
-      );
-    } else {
-      setInfoMessage(null);
-    }
-
     replaceLocalPreview(file);
     setIsUploading(true);
 
     try {
       let fileToUpload = file;
 
-      if (needsCompression) {
-        setIsCompressing(true);
-        setInfoMessage("Compressing and resizing your image…");
+      if (file.size > maxBytes) {
+        setStatus("Compressing…");
         const compressed = await compressImageIfNeeded(file, { maxBytes });
         fileToUpload = compressed.file;
-        setInfoMessage(
-          `Optimized from ${formatFileSize(compressed.originalSize)} to ${formatFileSize(compressed.finalSize)} (${compressed.originalWidth}×${compressed.originalHeight} → ${compressed.finalWidth}×${compressed.finalHeight}).`,
-        );
       }
 
+      setStatus("Uploading…");
       const uploaded = await uploadImage(fileToUpload, uploadFolder);
       onChange(uploaded.url, uploaded.public_id);
       setPreviewUrl(uploaded.url);
+      setStatus(null);
       if (objectUrlRef.current) {
         URL.revokeObjectURL(objectUrlRef.current);
         objectUrlRef.current = null;
@@ -165,11 +125,10 @@ export function ImageUpload({
       const message =
         error instanceof UploadImageError
           ? error.message
-          : "Network error. Please check your connection and try again.";
+          : "Upload failed. Check your connection and try again.";
       surfaceError(message);
     } finally {
       setIsUploading(false);
-      setIsCompressing(false);
       if (inputRef.current) {
         inputRef.current.value = "";
       }
@@ -187,24 +146,26 @@ export function ImageUpload({
     if (!trimmedUrl || isUploading) return;
 
     if (!isValidImageUrl(trimmedUrl)) {
-      surfaceError("Enter a valid image URL starting with http:// or https://");
+      surfaceError("Enter a valid http:// or https:// image URL.");
       return;
     }
 
     setErrorMessage(null);
     setPreviewUrl(trimmedUrl);
     setIsUploading(true);
+    setStatus("Importing…");
 
     try {
       const uploaded = await uploadImageFromUrl(trimmedUrl, uploadFolder);
       onChange(uploaded.url, uploaded.public_id);
       setPreviewUrl(uploaded.url);
       setImageUrlInput("");
+      setStatus(null);
     } catch (error) {
       const message =
         error instanceof UploadImageError
           ? error.message
-          : "Network error. Please check your connection and try again.";
+          : "Import failed. Check your connection and try again.";
       surfaceError(message);
       setPreviewUrl(value);
     } finally {
@@ -212,8 +173,14 @@ export function ImageUpload({
     }
   }
 
+  const labelText = isUploading
+    ? status ?? "Working…"
+    : previewUrl
+      ? "Change image"
+      : "Choose or drop image";
+
   return (
-    <div className="grid gap-3">
+    <div className="space-y-2">
       <label
         htmlFor={inputId}
         onDragEnter={(event) => {
@@ -224,12 +191,11 @@ export function ImageUpload({
         onDragLeave={() => setIsDragging(false)}
         onDrop={handleDrop}
         className={[
-          "group relative flex min-h-56 cursor-pointer overflow-hidden rounded-[1.5rem] border border-dashed p-5 transition-all duration-200",
-          "bg-surface-container-low hover:bg-surface-container shadow-ambient",
+          "flex cursor-pointer items-center gap-3 rounded-xl border border-dashed px-3 py-2.5 transition-colors",
           isDragging
-            ? "border-primary ring-4 ring-primary/20 bg-primary/5"
-            : "border-outline-variant/25 hover:border-primary/50",
-          errorMessage ? "border-error/70 ring-4 ring-error/15 bg-error/5" : "",
+            ? "border-primary bg-primary/5"
+            : "border-outline-variant/25 hover:border-outline-variant/50",
+          errorMessage ? "border-error/60" : "",
         ].join(" ")}
       >
         <input
@@ -244,157 +210,86 @@ export function ImageUpload({
           }}
         />
 
-        {previewUrl ? (
-          <>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
+        <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-surface-container-low">
+          {previewUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
             <img
               src={previewUrl}
               alt=""
-              className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+              className="h-full w-full object-cover"
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-black/40" />
-          </>
-        ) : null}
-
-        <div className="relative z-10 flex w-full flex-col justify-between gap-6">
-          <div className="flex items-start justify-between gap-3">
-            <div
-              className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold uppercase backdrop-blur shadow-sm ${
-                previewUrl
-                  ? "border-white/20 bg-black/40 text-white"
-                  : "border-outline-variant/20 bg-surface text-on-surface-variant"
-              }`}
-            >
-              <PhotoIcon className="h-4 w-4" aria-hidden="true" />
-              {folder}
+          ) : (
+            <div className="flex h-full w-full items-center justify-center text-on-surface-variant">
+              <PhotoIcon className="h-6 w-6" aria-hidden="true" />
             </div>
-            {previewUrl ? (
-              <button
-                type="button"
-                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-black/40 text-white backdrop-blur transition-all hover:bg-error hover:border-error shadow-sm"
-                aria-label="Clear selected preview"
-                onClick={(event) => {
-                  event.preventDefault();
-                  setPreviewUrl(value);
-                  setErrorMessage(null);
-                  setInfoMessage(null);
-                }}
-              >
-                <XMarkIcon className="h-5 w-5" aria-hidden="true" />
-              </button>
-            ) : null}
-          </div>
-
-          <div>
-            <div
-              className={`mb-3 inline-flex h-12 w-12 items-center justify-center rounded-2xl shadow-lg transition-transform group-hover:-translate-y-1 ${
-                previewUrl
-                  ? "bg-white/20 text-white backdrop-blur border border-white/10"
-                  : "bg-primary text-on-primary shadow-primary/25"
-              }`}
-            >
-              {isUploading ? (
-                <span
-                  className={`h-5 w-5 animate-spin rounded-full border-2 ${
-                    previewUrl
-                      ? "border-white/40 border-t-white"
-                      : "border-on-primary/40 border-t-on-primary"
-                  }`}
-                  aria-hidden="true"
-                />
-              ) : (
-                <ArrowUpTrayIcon className="h-6 w-6" aria-hidden="true" />
-              )}
+          )}
+          {isUploading ? (
+            <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+              <span
+                className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white"
+                aria-hidden="true"
+              />
             </div>
-            <p
-              className={`text-lg font-bold ${
-                previewUrl
-                  ? "text-white shadow-black/50 drop-shadow-sm"
-                  : "text-on-surface"
-              }`}
-            >
-              {isCompressing
-                ? "Compressing image"
-                : isUploading
-                  ? "Uploading image"
-                  : previewUrl
-                    ? "Change image"
-                    : "Drop image or browse"}
-            </p>
-            <p
-              className={`mt-1 max-w-md text-sm leading-6 ${
-                previewUrl
-                  ? "text-white/80 shadow-black/50 drop-shadow-sm"
-                  : "text-on-surface-variant"
-              }`}
-            >
-              JPG, PNG, or WebP. Target size {maxSizeMB}MB — larger files are
-              automatically compressed and resized before upload.
-              {allowUrl ? " Or paste an image URL below." : ""}
-            </p>
-          </div>
+          ) : null}
         </div>
+
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium text-on-surface">{labelText}</p>
+          <p className="text-xs text-on-surface-variant">
+            JPG, PNG, WebP · {maxSizeMB}MB max
+            {allowUrl ? " · or paste URL below" : ""}
+          </p>
+        </div>
+
+        {previewUrl && !isUploading ? (
+          <button
+            type="button"
+            className="shrink-0 rounded-md p-1 text-on-surface-variant hover:bg-surface-container hover:text-error"
+            aria-label="Clear preview"
+            onClick={(event) => {
+              event.preventDefault();
+              setPreviewUrl(value);
+              setErrorMessage(null);
+              setStatus(null);
+            }}
+          >
+            <XMarkIcon className="h-4 w-4" aria-hidden="true" />
+          </button>
+        ) : null}
       </label>
 
       {allowUrl ? (
-        <div className="rounded-2xl border border-outline-variant/20 bg-surface-container-low p-4 shadow-ambient">
-          <label htmlFor={urlInputId} className="label-caps mb-2 block text-on-surface">
-            Image URL
-          </label>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <input
-              id={urlInputId}
-              type="url"
-              inputMode="url"
-              autoComplete="off"
-              placeholder="https://example.com/photo.jpg"
-              value={imageUrlInput}
-              disabled={isUploading}
-              onChange={(event) => setImageUrlInput(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  event.preventDefault();
-                  void handleImageUrl();
-                }
-              }}
-              className="w-full flex-1 rounded-xl border border-outline-variant/25 bg-surface px-4 py-2.5 text-sm text-on-surface outline-none transition-colors placeholder:text-on-surface-variant/50 focus:border-primary"
-            />
-            <button
-              type="button"
-              disabled={isUploading || !imageUrlInput.trim()}
-              onClick={() => void handleImageUrl()}
-              className="inline-flex shrink-0 items-center justify-center rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-on-primary transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {isUploading ? "Importing…" : "Use URL"}
-            </button>
-          </div>
-          <p className="mt-2 text-xs leading-relaxed text-on-surface-variant">
-            The image is imported to Cloudinary so it works the same as an upload.
-          </p>
+        <div className="flex gap-2">
+          <input
+            id={urlInputId}
+            type="url"
+            inputMode="url"
+            autoComplete="off"
+            placeholder="https://…"
+            value={imageUrlInput}
+            disabled={isUploading}
+            onChange={(event) => setImageUrlInput(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                void handleImageUrl();
+              }
+            }}
+            className="form-input-base min-w-0 flex-1 py-2 text-sm"
+          />
+          <button
+            type="button"
+            disabled={isUploading || !imageUrlInput.trim()}
+            onClick={() => void handleImageUrl()}
+            className="shrink-0 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-on-primary disabled:opacity-50"
+          >
+            Use URL
+          </button>
         </div>
       ) : null}
 
-      {infoMessage ? (
-        <p
-          role="status"
-          className="flex items-start gap-2 rounded-xl border border-primary/20 bg-primary/10 px-3 py-2 text-sm text-on-surface"
-        >
-          <InformationCircleIcon
-            className="mt-0.5 h-4 w-4 flex-none text-primary"
-            aria-hidden="true"
-          />
-          <span>{infoMessage}</span>
-        </p>
-      ) : null}
-
       {errorMessage ? (
-        <p className="flex items-start gap-2 rounded-xl border border-error/20 bg-error/10 px-3 py-2 text-sm text-error">
-          <ExclamationTriangleIcon
-            className="mt-0.5 h-4 w-4 flex-none"
-            aria-hidden="true"
-          />
-          <span>{errorMessage}</span>
-        </p>
+        <p className="text-xs text-error">{errorMessage}</p>
       ) : null}
     </div>
   );

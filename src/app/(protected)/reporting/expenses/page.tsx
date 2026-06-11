@@ -375,7 +375,7 @@ export default function ExpensesPage() {
               <input
                 type="number"
                 min="0"
-                step="0.01"
+                step="1"
                 value={form.amount}
                 onWheel={(event) => {
                   event.currentTarget.blur();

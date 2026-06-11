@@ -894,7 +894,7 @@ export default function RequestsPage() {
                           event.currentTarget.blur();
                         }}
                         min={0}
-                        step="0.01"
+                        step="1"
                         value={approveDraft}
                         onChange={(event) =>
                           setApproveDraft(Number(event.target.value) || 0)
