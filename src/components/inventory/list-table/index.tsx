@@ -155,7 +155,7 @@ export function InventoryListTableTd({
 }) {
   return (
     <td
-      className={`px-4 py-3.5 md:px-5 ${alignClass[align]} ${tdVariantClass[variant]} ${className}`.trim()}
+      className={`whitespace-nowrap px-4 py-3.5 md:px-5 ${alignClass[align]} ${tdVariantClass[variant]} ${className}`.trim()}
     >
       {children}
     </td>
