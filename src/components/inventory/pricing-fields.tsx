@@ -320,7 +320,11 @@ export function PricingFields({
             {formatEgp(costEgpHint)} cost +{" "}
             {marginType === "fixed"
               ? formatEgp(values.sale_margin_value ?? 0)
-              : `${values.sale_margin_value ?? 0}%`}
+              : `${formatEgp(
+                  Math.round(
+                    costEgpHint * ((values.sale_margin_value ?? 0) / 100) * 100,
+                  ) / 100,
+                )} (${values.sale_margin_value ?? 0}%)`}
           </p>
         ) : null}
       </SurfaceCard>
