@@ -509,7 +509,7 @@ export default function PaymentMethodsPage() {
                 <span className="font-medium text-on-surface">EGP per 1 USD</span>
                 <input
                   type="number"
-                  min="0.01"
+                  min="1"
                   step="1"
                   inputMode="decimal"
                   autoComplete="off"
@@ -575,7 +575,7 @@ export default function PaymentMethodsPage() {
                 <span className="font-medium text-on-surface">EGP per 1 EUR</span>
                 <input
                   type="number"
-                  min="0.01"
+                  min="1"
                   step="1"
                   inputMode="decimal"
                   autoComplete="off"
@@ -734,16 +734,6 @@ export default function PaymentMethodsPage() {
               Margin-based catalog items will update automatically when you
               confirm. Manual items at a loss should be reviewed afterward.
             </p>
-            <ul className="mt-4 space-y-2 text-sm text-on-surface">
-              <li>
-                <span className="font-medium">Margin items to update:</span>{" "}
-                {ratePreview.margin_items_to_update}
-              </li>
-              <li>
-                <span className="font-medium">Manual items at pricing loss:</span>{" "}
-                {ratePreview.manual_loss_items.length}
-              </li>
-            </ul>
             <div className="mt-6 flex justify-end gap-2">
               <ActionButton
                 type="button"
