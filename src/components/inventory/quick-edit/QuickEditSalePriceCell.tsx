@@ -5,6 +5,7 @@ import {
   formatMarginQuickEditHint,
   isPricingLoss,
   type MarginAwarePricingRecord,
+  type SaleMarginType,
   type SalePriceQuickEditStrategy,
 } from "@/lib/catalog-pricing";
 import {
@@ -12,7 +13,9 @@ import {
   type ExchangeRates,
   type PricingCurrency,
 } from "@/lib/currencies";
+import { SearchableSelect } from "@/components/ops-ui";
 import { QuickEditInput } from "./QuickEditInput";
+import { QuickEditPriceInput } from "./QuickEditPriceInput";
 
 type QuickEditSalePriceCellProps = {
   editing: boolean;
@@ -20,8 +23,12 @@ type QuickEditSalePriceCellProps = {
   rates: ExchangeRates | null;
   salePriceValue: string;
   salePriceStrategy: SalePriceQuickEditStrategy;
+  saleMarginType: SaleMarginType;
+  saleMarginValue: string;
   onSalePriceChange: (value: string) => void;
   onStrategyChange: (strategy: SalePriceQuickEditStrategy) => void;
+  onSaleMarginTypeChange: (type: SaleMarginType) => void;
+  onSaleMarginValueChange: (value: string) => void;
   align?: "left" | "right" | "center";
 };
 
@@ -42,21 +49,38 @@ const STRATEGY_OPTIONS: Array<{
   },
 ];
 
+const MARGIN_TYPE_OPTIONS = [
+  { value: "percentage", label: "Percentage (%)" },
+  { value: "fixed", label: "Fixed (EGP)" },
+] as const;
+
 export function QuickEditSalePriceCell({
   editing,
   pricing,
   rates,
   salePriceValue,
   salePriceStrategy,
+  saleMarginType,
+  saleMarginValue,
   onSalePriceChange,
   onStrategyChange,
+  onSaleMarginTypeChange,
+  onSaleMarginValueChange,
   align = "left",
 }: QuickEditSalePriceCellProps) {
   const saleCurrency = pricing.sale_currency;
   const effectiveRates = rates ?? { usdToEgp: 1, eurToEgp: 1 };
   const isMargin = pricing.sale_price_mode === "margin";
   const marginLabel = formatMarginModeLabel(pricing);
-  const marginHint = formatMarginQuickEditHint(pricing);
+  const draftMarginValue = Number(saleMarginValue);
+  const draftHintPricing = {
+    sale_price_mode: pricing.sale_price_mode,
+    sale_margin_type: saleMarginType,
+    sale_margin_value: Number.isFinite(draftMarginValue)
+      ? draftMarginValue
+      : (pricing.sale_margin_value ?? 0),
+  };
+  const marginHint = formatMarginQuickEditHint(draftHintPricing);
   const showLoss = isPricingLoss(
     {
       cost_price: pricing.cost_price,
@@ -70,9 +94,10 @@ export function QuickEditSalePriceCell({
   if (editing) {
     return (
       <div className="flex min-w-[10rem] flex-col gap-1.5">
-        <QuickEditInput
+        <QuickEditPriceInput
           value={salePriceValue}
           onChange={onSalePriceChange}
+          currency={saleCurrency as PricingCurrency}
           type="number"
           min={0}
           step="any"
@@ -119,6 +144,48 @@ export function QuickEditSalePriceCell({
               );
             })}
           </fieldset>
+        ) : null}
+        {isMargin && salePriceStrategy === "adjust_margin" ? (
+          <div className="space-y-1.5">
+            <div>
+              <label className="mb-1 block text-[10px] font-medium text-on-surface-variant">
+                Margin type
+              </label>
+              <SearchableSelect
+                searchable={false}
+                value={saleMarginType}
+                onChange={(value) =>
+                  onSaleMarginTypeChange(value as SaleMarginType)
+                }
+                options={[...MARGIN_TYPE_OPTIONS]}
+                className="form-input-base !px-2 !py-1.5 text-xs"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-[10px] font-medium text-on-surface-variant">
+                Margin value
+              </label>
+              <div
+                className={`inline-flex max-w-full flex-nowrap items-center gap-1.5 ${align === "right" ? "justify-end" : ""}`}
+              >
+                <QuickEditInput
+                  value={saleMarginValue}
+                  onChange={onSaleMarginValueChange}
+                  type="number"
+                  min={0}
+                  step="any"
+                  align={align}
+                  aria-label="Margin value"
+                />
+                <span
+                  className="form-chip mono-data shrink-0 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-on-surface-variant"
+                  aria-hidden
+                >
+                  {saleMarginType === "fixed" ? "EGP" : "%"}
+                </span>
+              </div>
+            </div>
+          </div>
         ) : null}
       </div>
     );

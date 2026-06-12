@@ -193,21 +193,36 @@ export type MarginQuickEditPricingResult =
 
 export function resolveMarginQuickEditPricing(
   record: MarginAwarePricingRecord,
-  changes: { cost_price?: number; sale_price?: number },
+  changes: {
+    cost_price?: number;
+    sale_price?: number;
+    sale_margin_type?: SaleMarginType;
+    sale_margin_value?: number;
+  },
   rates: ExchangeRates,
   strategy: SalePriceQuickEditStrategy,
 ): MarginQuickEditPricingResult {
-  if (changes.sale_price === undefined) {
+  const hasSaleChange = changes.sale_price !== undefined;
+  const hasMarginTypeChange = changes.sale_margin_type !== undefined;
+  const hasMarginValueChange = changes.sale_margin_value !== undefined;
+
+  if (!hasSaleChange && !hasMarginTypeChange && !hasMarginValueChange) {
     return { ok: true, fields: {} };
   }
 
-  const salePrice = changes.sale_price;
+  const salePrice = changes.sale_price ?? record.sale_price;
 
   if (record.sale_price_mode !== "margin") {
+    if (!hasSaleChange) {
+      return { ok: true, fields: {} };
+    }
     return { ok: true, fields: { sale_price: salePrice } };
   }
 
   if (strategy === "switch_manual") {
+    if (!hasSaleChange) {
+      return { ok: true, fields: {} };
+    }
     return {
       ok: true,
       fields: {
@@ -218,7 +233,39 @@ export function resolveMarginQuickEditPricing(
   }
 
   const costPrice = changes.cost_price ?? record.cost_price;
-  const marginType = record.sale_margin_type ?? "percentage";
+  const marginType =
+    changes.sale_margin_type ?? record.sale_margin_type ?? "percentage";
+
+  if (hasMarginValueChange) {
+    const marginValue = changes.sale_margin_value ?? 0;
+
+    if (marginValue < 0) {
+      return {
+        ok: false,
+        error: "Margin value must be a number ≥ 0.",
+      };
+    }
+
+    const computedSale = computeSaleFromMargin(
+      costPrice,
+      record.cost_currency,
+      marginType,
+      marginValue,
+      record.sale_currency,
+      rates,
+    );
+
+    return {
+      ok: true,
+      fields: {
+        sale_price_mode: "margin",
+        sale_margin_type: marginType,
+        sale_margin_value: marginValue,
+        sale_price: computedSale,
+      },
+    };
+  }
+
   const marginValue = computeMarginFromSale(
     costPrice,
     record.cost_currency,

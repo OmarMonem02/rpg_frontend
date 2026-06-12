@@ -10,9 +10,10 @@ import { useLiveDataRefresh } from "@/hooks/useLiveDataRefresh";
 import {
   pricingRecordFromItem,
   resolveMarginQuickEditPricing,
+  type SaleMarginType,
   type SalePriceQuickEditStrategy,
 } from "@/lib/catalog-pricing";
-import { formatCatalogPriceInEGP } from "@/lib/currencies";
+import { formatCatalogPriceInEGP, toPricingCurrency } from "@/lib/currencies";
 import {
   listSpareParts,
   listSparePartCategories,
@@ -33,6 +34,7 @@ import { filterBrandsByType } from "@/lib/brand-types";
 import {
   QuickEditActions,
   QuickEditInput,
+  QuickEditPriceInput,
   QuickEditSalePriceCell,
   combineValidators,
   useQuickEditRow,
@@ -83,6 +85,8 @@ const SPARE_PART_QUICK_EDIT_KEYS = [
   "low_stock_alarm",
   "cost_price",
   "sale_price",
+  "sale_margin_type",
+  "sale_margin_value",
 ] as const;
 
 function parseSparePartQuickEditChanges(
@@ -173,7 +177,11 @@ export default function SparePartsPage() {
         "low_stock_alarm",
       ]),
     (draft) =>
-      validateNonNegativeNumbers(draft, ["cost_price", "sale_price"]),
+      validateNonNegativeNumbers(draft, [
+        "cost_price",
+        "sale_price",
+        "sale_margin_value",
+      ]),
   );
 
   const loadDropdowns = useCallback(async () => {
@@ -243,16 +251,34 @@ export default function SparePartsPage() {
       async (changes) => {
         let payload = parseSparePartQuickEditChanges(changes);
 
-        if ("sale_price" in changes) {
+        const marginPricingTouched =
+          "sale_price" in changes ||
+          "sale_margin_type" in changes ||
+          "sale_margin_value" in changes;
+
+        if (marginPricingTouched) {
           const strategy = (quickEdit.draft.sale_price_strategy ===
           "switch_manual"
             ? "switch_manual"
             : "adjust_margin") as SalePriceQuickEditStrategy;
+          const draftMarginType = (
+            quickEdit.draft.sale_margin_type === "fixed"
+              ? "fixed"
+              : "percentage"
+          ) as SaleMarginType;
           const pricingResult = resolveMarginQuickEditPricing(
             pricingRecordFromItem(part),
             {
               cost_price: payload.cost_price ?? part.cost_price,
-              sale_price: payload.sale_price,
+              sale_price: "sale_price" in changes
+                ? (payload.sale_price ??
+                    Number(quickEdit.draft.sale_price)) ||
+                  part.sale_price
+                : undefined,
+              sale_margin_type: draftMarginType,
+              sale_margin_value: "sale_margin_value" in changes
+                ? Number(quickEdit.draft.sale_margin_value) || 0
+                : undefined,
             },
             rates ?? { usdToEgp: 1, eurToEgp: 1 },
             strategy,
@@ -551,11 +577,14 @@ export default function SparePartsPage() {
                     </InventoryListTableTd>
                     <InventoryListTableTd variant="primary">
                       {editing ? (
-                        <QuickEditInput
+                        <QuickEditPriceInput
                           value={quickEdit.draft.cost_price ?? ""}
                           onChange={(value) =>
                             quickEdit.updateField("cost_price", value)
                           }
+                          currency={toPricingCurrency(
+                            part.cost_currency ?? part.currency_pricing,
+                          )}
                           type="number"
                           min={0}
                           step="any"
@@ -581,11 +610,25 @@ export default function SparePartsPage() {
                             ? "switch_manual"
                             : "adjust_margin"
                         }
+                        saleMarginType={
+                          quickEdit.draft.sale_margin_type === "fixed"
+                            ? "fixed"
+                            : "percentage"
+                        }
+                        saleMarginValue={
+                          quickEdit.draft.sale_margin_value ?? ""
+                        }
                         onSalePriceChange={(value) =>
                           quickEdit.updateField("sale_price", value)
                         }
                         onStrategyChange={(strategy) =>
                           quickEdit.updateField("sale_price_strategy", strategy)
+                        }
+                        onSaleMarginTypeChange={(type) =>
+                          quickEdit.updateField("sale_margin_type", type)
+                        }
+                        onSaleMarginValueChange={(value) =>
+                          quickEdit.updateField("sale_margin_value", value)
                         }
                       />
                     </InventoryListTableTd>
@@ -627,6 +670,9 @@ export default function SparePartsPage() {
                             cost_price: part.cost_price,
                             sale_price: part.sale_price,
                             sale_price_strategy: "adjust_margin",
+                            sale_margin_type:
+                              part.sale_margin_type ?? "percentage",
+                            sale_margin_value: part.sale_margin_value ?? 0,
                           })
                         }
                         onSave={() => handleSaveSparePartQuickEdit(part)}

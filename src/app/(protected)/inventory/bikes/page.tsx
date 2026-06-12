@@ -10,6 +10,7 @@ import { useGlobalDataRefresh } from "@/hooks/useGlobalDataRefresh";
 import {
   pricingRecordFromItem,
   resolveMarginQuickEditPricing,
+  type SaleMarginType,
   type SalePriceQuickEditStrategy,
 } from "@/lib/catalog-pricing";
 import { formatCatalogPriceInEGP, toPricingCurrency } from "@/lib/currencies";
@@ -28,6 +29,7 @@ import {
 import {
   QuickEditActions,
   QuickEditInput,
+  QuickEditPriceInput,
   QuickEditSalePriceCell,
   combineValidators,
   useQuickEditRow,
@@ -75,6 +77,8 @@ const STATUSES = [
 const BIKE_QUICK_EDIT_KEYS = [
   "cost_price",
   "sale_price",
+  "sale_margin_type",
+  "sale_margin_value",
   "mileage",
 ] as const;
 
@@ -104,7 +108,12 @@ export default function BikesPage() {
 
   const quickEdit = useQuickEditRow();
   const validateBikeQuickEdit = combineValidators(
-    (draft) => validateNonNegativeNumbers(draft, ["cost_price", "sale_price"]),
+    (draft) =>
+      validateNonNegativeNumbers(draft, [
+        "cost_price",
+        "sale_price",
+        "sale_margin_value",
+      ]),
     (draft) => validateNonNegativeIntegers(draft, ["mileage"]),
   );
 
@@ -164,16 +173,34 @@ export default function BikesPage() {
       async (changes) => {
         let payload = parseBikeQuickEditChanges(changes);
 
-        if ("sale_price" in changes) {
+        const marginPricingTouched =
+          "sale_price" in changes ||
+          "sale_margin_type" in changes ||
+          "sale_margin_value" in changes;
+
+        if (marginPricingTouched) {
           const strategy = (quickEdit.draft.sale_price_strategy ===
           "switch_manual"
             ? "switch_manual"
             : "adjust_margin") as SalePriceQuickEditStrategy;
+          const draftMarginType = (
+            quickEdit.draft.sale_margin_type === "fixed"
+              ? "fixed"
+              : "percentage"
+          ) as SaleMarginType;
           const pricingResult = resolveMarginQuickEditPricing(
             pricingRecordFromItem(bike),
             {
               cost_price: payload.cost_price ?? bike.cost_price,
-              sale_price: payload.sale_price,
+              sale_price: "sale_price" in changes
+                ? (payload.sale_price ??
+                    Number(quickEdit.draft.sale_price)) ||
+                  bike.sale_price
+                : undefined,
+              sale_margin_type: draftMarginType,
+              sale_margin_value: "sale_margin_value" in changes
+                ? Number(quickEdit.draft.sale_margin_value) || 0
+                : undefined,
             },
             rates ?? { usdToEgp: 1, eurToEgp: 1 },
             strategy,
@@ -360,22 +387,39 @@ export default function BikesPage() {
                               ? "switch_manual"
                               : "adjust_margin"
                           }
+                          saleMarginType={
+                            quickEdit.draft.sale_margin_type === "fixed"
+                              ? "fixed"
+                              : "percentage"
+                          }
+                          saleMarginValue={
+                            quickEdit.draft.sale_margin_value ?? ""
+                          }
                           onSalePriceChange={(value) =>
                             quickEdit.updateField("sale_price", value)
                           }
                           onStrategyChange={(strategy) =>
                             quickEdit.updateField("sale_price_strategy", strategy)
                           }
+                          onSaleMarginTypeChange={(type) =>
+                            quickEdit.updateField("sale_margin_type", type)
+                          }
+                          onSaleMarginValueChange={(value) =>
+                            quickEdit.updateField("sale_margin_value", value)
+                          }
                           align="right"
                         />
                       </InventoryListTableTd>
                       <InventoryListTableTd align="right" variant="mono">
                         {editing ? (
-                          <QuickEditInput
+                          <QuickEditPriceInput
                             value={quickEdit.draft.cost_price ?? ""}
                             onChange={(value) =>
                               quickEdit.updateField("cost_price", value)
                             }
+                            currency={toPricingCurrency(
+                              bike.cost_currency ?? bike.currency_pricing,
+                            )}
                             type="number"
                             min={0}
                             step="any"
@@ -431,6 +475,9 @@ export default function BikesPage() {
                               sale_price: bike.sale_price,
                               mileage: bike.mileage,
                               sale_price_strategy: "adjust_margin",
+                              sale_margin_type:
+                                bike.sale_margin_type ?? "percentage",
+                              sale_margin_value: bike.sale_margin_value ?? 0,
                             })
                           }
                           onSave={() => handleSaveBikeQuickEdit(bike)}
