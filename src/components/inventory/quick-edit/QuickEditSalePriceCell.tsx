@@ -40,12 +40,12 @@ const STRATEGY_OPTIONS: Array<{
   {
     value: "adjust_margin",
     label: "Adjust margin",
-    description: "Keep margin mode; update margin value to match this sale price",
+    description: "Keep margin mode.",
   },
   {
     value: "switch_manual",
     label: "Switch to manual",
-    description: "Stop auto-calculating; use this sale price as-is",
+    description: "Stop auto-calculating.",
   },
 ];
 
@@ -110,7 +110,7 @@ export function QuickEditSalePriceCell({
           </p>
         ) : null}
         {isMargin ? (
-          <fieldset className="space-y-1">
+          <fieldset className="space-y-1 grid grid-cols-2">
             <legend className="sr-only">How to apply sale price change</legend>
             {STRATEGY_OPTIONS.map((option) => {
               const active = salePriceStrategy === option.value;
