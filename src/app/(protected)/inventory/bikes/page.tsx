@@ -7,7 +7,11 @@ import { getAuthToken } from "@/lib/auth-session";
 import { useEntityFilters } from "@/hooks/useEntityFilters";
 import { useExchangeRates } from "@/hooks/useExchangeRates";
 import { useGlobalDataRefresh } from "@/hooks/useGlobalDataRefresh";
-import { isPricingLoss } from "@/lib/catalog-pricing";
+import {
+  pricingRecordFromItem,
+  resolveMarginQuickEditPricing,
+  type SalePriceQuickEditStrategy,
+} from "@/lib/catalog-pricing";
 import { formatCatalogPriceInEGP, toPricingCurrency } from "@/lib/currencies";
 import {
   listBikes,
@@ -24,6 +28,7 @@ import {
 import {
   QuickEditActions,
   QuickEditInput,
+  QuickEditSalePriceCell,
   combineValidators,
   useQuickEditRow,
   validateNonNegativeIntegers,
@@ -157,11 +162,29 @@ export default function BikesPage() {
       [...BIKE_QUICK_EDIT_KEYS],
       validateBikeQuickEdit,
       async (changes) => {
-        const updated = await patchBike(
-          token,
-          bike.id,
-          parseBikeQuickEditChanges(changes),
-        );
+        let payload = parseBikeQuickEditChanges(changes);
+
+        if ("sale_price" in changes) {
+          const strategy = (quickEdit.draft.sale_price_strategy ===
+          "switch_manual"
+            ? "switch_manual"
+            : "adjust_margin") as SalePriceQuickEditStrategy;
+          const pricingResult = resolveMarginQuickEditPricing(
+            pricingRecordFromItem(bike),
+            {
+              cost_price: payload.cost_price ?? bike.cost_price,
+              sale_price: payload.sale_price,
+            },
+            rates ?? { usdToEgp: 1, eurToEgp: 1 },
+            strategy,
+          );
+          if (!pricingResult.ok) {
+            throw new Error(pricingResult.error);
+          }
+          payload = { ...payload, ...pricingResult.fields };
+        }
+
+        const updated = await patchBike(token, bike.id, payload);
         setBikes((prev) =>
           prev.map((row) => (row.id === bike.id ? updated : row)),
         );
@@ -326,47 +349,25 @@ export default function BikesPage() {
                       </InventoryListTableTd>
                       <InventoryListTableTd variant="mono">{bike.vin}</InventoryListTableTd>
                       <InventoryListTableTd align="right" variant="primary">
-                        {editing ? (
-                          <QuickEditInput
-                            value={quickEdit.draft.sale_price ?? ""}
-                            onChange={(value) =>
-                              quickEdit.updateField("sale_price", value)
-                            }
-                            type="number"
-                            min={0}
-                            step="any"
-                            align="right"
-                            aria-label="Sale price"
-                          />
-                        ) : (
-                          <span className="inline-flex items-center justify-end gap-2">
-                            {formatCatalogPriceInEGP(
-                              bike.sale_price,
-                              toPricingCurrency(
-                                bike.sale_currency ?? bike.currency_pricing,
-                              ),
-                              rates,
-                            )}
-                            {rates &&
-                            isPricingLoss(
-                              {
-                                cost_price: bike.cost_price,
-                                cost_currency: toPricingCurrency(
-                                  bike.cost_currency ?? bike.currency_pricing,
-                                ),
-                                sale_price: bike.sale_price,
-                                sale_currency: toPricingCurrency(
-                                  bike.sale_currency ?? bike.currency_pricing,
-                                ),
-                              },
-                              rates,
-                            ) ? (
-                              <span className="rounded-full bg-error/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-error">
-                                Loss
-                              </span>
-                            ) : null}
-                          </span>
-                        )}
+                        <QuickEditSalePriceCell
+                          editing={editing}
+                          pricing={pricingRecordFromItem(bike)}
+                          rates={rates}
+                          salePriceValue={quickEdit.draft.sale_price ?? ""}
+                          salePriceStrategy={
+                            quickEdit.draft.sale_price_strategy ===
+                            "switch_manual"
+                              ? "switch_manual"
+                              : "adjust_margin"
+                          }
+                          onSalePriceChange={(value) =>
+                            quickEdit.updateField("sale_price", value)
+                          }
+                          onStrategyChange={(strategy) =>
+                            quickEdit.updateField("sale_price_strategy", strategy)
+                          }
+                          align="right"
+                        />
                       </InventoryListTableTd>
                       <InventoryListTableTd align="right" variant="mono">
                         {editing ? (
@@ -429,6 +430,7 @@ export default function BikesPage() {
                               cost_price: bike.cost_price,
                               sale_price: bike.sale_price,
                               mileage: bike.mileage,
+                              sale_price_strategy: "adjust_margin",
                             })
                           }
                           onSave={() => handleSaveBikeQuickEdit(bike)}

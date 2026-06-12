@@ -682,7 +682,14 @@ export async function updateProduct(
 export type ProductQuickEditFields = Partial<
   Pick<
     ProductRecord,
-    "name" | "stock_quantity" | "low_stock_alarm" | "cost_price" | "sale_price"
+    | "name"
+    | "stock_quantity"
+    | "low_stock_alarm"
+    | "cost_price"
+    | "sale_price"
+    | "sale_price_mode"
+    | "sale_margin_type"
+    | "sale_margin_value"
   >
 >;
 
@@ -703,7 +710,14 @@ export async function patchProduct(
 export type SparePartQuickEditFields = Partial<
   Pick<
     SparePartRecord,
-    "name" | "stock_quantity" | "low_stock_alarm" | "cost_price" | "sale_price"
+    | "name"
+    | "stock_quantity"
+    | "low_stock_alarm"
+    | "cost_price"
+    | "sale_price"
+    | "sale_price_mode"
+    | "sale_margin_type"
+    | "sale_margin_value"
   >
 >;
 
@@ -726,6 +740,9 @@ export function buildSparePartQuickEditPayload(
     currency_pricing: record.currency_pricing,
     cost_price: changes.cost_price ?? record.cost_price,
     sale_price: changes.sale_price ?? record.sale_price,
+    sale_price_mode: changes.sale_price_mode ?? record.sale_price_mode,
+    sale_margin_type: changes.sale_margin_type ?? record.sale_margin_type,
+    sale_margin_value: changes.sale_margin_value ?? record.sale_margin_value,
     max_discount_type: record.max_discount_type,
     max_discount_value: record.max_discount_value,
     universal: record.universal,

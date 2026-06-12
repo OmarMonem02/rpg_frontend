@@ -7,7 +7,11 @@ import { getAuthToken } from "@/lib/auth-session";
 import { useEntityFilters } from "@/hooks/useEntityFilters";
 import { useExchangeRates } from "@/hooks/useExchangeRates";
 import { useLiveDataRefresh } from "@/hooks/useLiveDataRefresh";
-import { isPricingLoss } from "@/lib/catalog-pricing";
+import {
+  pricingRecordFromItem,
+  resolveMarginQuickEditPricing,
+  type SalePriceQuickEditStrategy,
+} from "@/lib/catalog-pricing";
 import { formatCatalogPriceInEGP } from "@/lib/currencies";
 import {
   listProducts,
@@ -28,6 +32,7 @@ import { filterBrandsByType } from "@/lib/brand-types";
 import {
   QuickEditActions,
   QuickEditInput,
+  QuickEditSalePriceCell,
   combineValidators,
   useQuickEditRow,
   validateNonEmptyName,
@@ -241,11 +246,29 @@ export default function ProductsPage() {
       [...PRODUCT_QUICK_EDIT_KEYS],
       validateProductQuickEdit,
       async (changes) => {
-        const updated = await patchProduct(
-          token,
-          product.id,
-          parseProductQuickEditChanges(changes),
-        );
+        let payload = parseProductQuickEditChanges(changes);
+
+        if ("sale_price" in changes) {
+          const strategy = (quickEdit.draft.sale_price_strategy ===
+          "switch_manual"
+            ? "switch_manual"
+            : "adjust_margin") as SalePriceQuickEditStrategy;
+          const pricingResult = resolveMarginQuickEditPricing(
+            pricingRecordFromItem(product),
+            {
+              cost_price: payload.cost_price ?? product.cost_price,
+              sale_price: payload.sale_price,
+            },
+            rates ?? { usdToEgp: 1, eurToEgp: 1 },
+            strategy,
+          );
+          if (!pricingResult.ok) {
+            throw new Error(pricingResult.error);
+          }
+          payload = { ...payload, ...pricingResult.fields };
+        }
+
+        const updated = await patchProduct(token, product.id, payload);
         setProducts((prev) =>
           prev.map((row) => (row.id === product.id ? updated : row)),
         );
@@ -566,42 +589,24 @@ export default function ProductsPage() {
                       )}
                     </InventoryListTableTd>
                     <InventoryListTableTd variant="primary">
-                      {editing ? (
-                        <QuickEditInput
-                          value={quickEdit.draft.sale_price ?? ""}
-                          onChange={(value) =>
-                            quickEdit.updateField("sale_price", value)
-                          }
-                          type="number"
-                          min={0}
-                          step="any"
-                          aria-label="Sale price"
-                        />
-                      ) : (
-                        <span className="inline-flex items-center gap-2">
-                          {formatCatalogPriceInEGP(
-                            product.sale_price,
-                            product.sale_currency ?? product.currency_pricing,
-                            rates,
-                          )}
-                          {rates &&
-                          isPricingLoss(
-                            {
-                              cost_price: product.cost_price,
-                              cost_currency:
-                                product.cost_currency ?? product.currency_pricing,
-                              sale_price: product.sale_price,
-                              sale_currency:
-                                product.sale_currency ?? product.currency_pricing,
-                            },
-                            rates,
-                          ) ? (
-                            <span className="rounded-full bg-error/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-error">
-                              Loss
-                            </span>
-                          ) : null}
-                        </span>
-                      )}
+                      <QuickEditSalePriceCell
+                        editing={editing}
+                        pricing={pricingRecordFromItem(product)}
+                        rates={rates}
+                        salePriceValue={quickEdit.draft.sale_price ?? ""}
+                        salePriceStrategy={
+                          quickEdit.draft.sale_price_strategy ===
+                          "switch_manual"
+                            ? "switch_manual"
+                            : "adjust_margin"
+                        }
+                        onSalePriceChange={(value) =>
+                          quickEdit.updateField("sale_price", value)
+                        }
+                        onStrategyChange={(strategy) =>
+                          quickEdit.updateField("sale_price_strategy", strategy)
+                        }
+                      />
                     </InventoryListTableTd>
                     <InventoryListTableTd>
                       <span className="form-chip">
@@ -640,6 +645,7 @@ export default function ProductsPage() {
                             low_stock_alarm: product.low_stock_alarm,
                             cost_price: product.cost_price,
                             sale_price: product.sale_price,
+                            sale_price_strategy: "adjust_margin",
                           })
                         }
                         onSave={() => handleSaveProductQuickEdit(product)}

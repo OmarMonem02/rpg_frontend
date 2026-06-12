@@ -7,7 +7,11 @@ import { getAuthToken } from "@/lib/auth-session";
 import { useEntityFilters } from "@/hooks/useEntityFilters";
 import { useExchangeRates } from "@/hooks/useExchangeRates";
 import { useLiveDataRefresh } from "@/hooks/useLiveDataRefresh";
-import { isPricingLoss } from "@/lib/catalog-pricing";
+import {
+  pricingRecordFromItem,
+  resolveMarginQuickEditPricing,
+  type SalePriceQuickEditStrategy,
+} from "@/lib/catalog-pricing";
 import { formatCatalogPriceInEGP } from "@/lib/currencies";
 import {
   listSpareParts,
@@ -29,6 +33,7 @@ import { filterBrandsByType } from "@/lib/brand-types";
 import {
   QuickEditActions,
   QuickEditInput,
+  QuickEditSalePriceCell,
   combineValidators,
   useQuickEditRow,
   validateNonEmptyName,
@@ -236,13 +241,32 @@ export default function SparePartsPage() {
       [...SPARE_PART_QUICK_EDIT_KEYS],
       validateSparePartQuickEdit,
       async (changes) => {
+        let payload = parseSparePartQuickEditChanges(changes);
+
+        if ("sale_price" in changes) {
+          const strategy = (quickEdit.draft.sale_price_strategy ===
+          "switch_manual"
+            ? "switch_manual"
+            : "adjust_margin") as SalePriceQuickEditStrategy;
+          const pricingResult = resolveMarginQuickEditPricing(
+            pricingRecordFromItem(part),
+            {
+              cost_price: payload.cost_price ?? part.cost_price,
+              sale_price: payload.sale_price,
+            },
+            rates ?? { usdToEgp: 1, eurToEgp: 1 },
+            strategy,
+          );
+          if (!pricingResult.ok) {
+            throw new Error(pricingResult.error);
+          }
+          payload = { ...payload, ...pricingResult.fields };
+        }
+
         const updated = await updateSparePart(
           token,
           part.id,
-          buildSparePartQuickEditPayload(
-            part,
-            parseSparePartQuickEditChanges(changes),
-          ),
+          buildSparePartQuickEditPayload(part, payload),
         );
         setSpareParts((prev) =>
           prev.map((row) => (row.id === part.id ? updated : row)),
@@ -546,42 +570,24 @@ export default function SparePartsPage() {
                       )}
                     </InventoryListTableTd>
                     <InventoryListTableTd variant="primary">
-                      {editing ? (
-                        <QuickEditInput
-                          value={quickEdit.draft.sale_price ?? ""}
-                          onChange={(value) =>
-                            quickEdit.updateField("sale_price", value)
-                          }
-                          type="number"
-                          min={0}
-                          step="any"
-                          aria-label="Sale price"
-                        />
-                      ) : (
-                        <span className="inline-flex items-center gap-2">
-                          {formatCatalogPriceInEGP(
-                            part.sale_price,
-                            part.sale_currency ?? part.currency_pricing,
-                            rates,
-                          )}
-                          {rates &&
-                          isPricingLoss(
-                            {
-                              cost_price: part.cost_price,
-                              cost_currency:
-                                part.cost_currency ?? part.currency_pricing,
-                              sale_price: part.sale_price,
-                              sale_currency:
-                                part.sale_currency ?? part.currency_pricing,
-                            },
-                            rates,
-                          ) ? (
-                            <span className="rounded-full bg-error/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-error">
-                              Loss
-                            </span>
-                          ) : null}
-                        </span>
-                      )}
+                      <QuickEditSalePriceCell
+                        editing={editing}
+                        pricing={pricingRecordFromItem(part)}
+                        rates={rates}
+                        salePriceValue={quickEdit.draft.sale_price ?? ""}
+                        salePriceStrategy={
+                          quickEdit.draft.sale_price_strategy ===
+                          "switch_manual"
+                            ? "switch_manual"
+                            : "adjust_margin"
+                        }
+                        onSalePriceChange={(value) =>
+                          quickEdit.updateField("sale_price", value)
+                        }
+                        onStrategyChange={(strategy) =>
+                          quickEdit.updateField("sale_price_strategy", strategy)
+                        }
+                      />
                     </InventoryListTableTd>
                     <InventoryListTableTd>
                       <span className="form-chip">
@@ -620,6 +626,7 @@ export default function SparePartsPage() {
                             low_stock_alarm: part.low_stock_alarm,
                             cost_price: part.cost_price,
                             sale_price: part.sale_price,
+                            sale_price_strategy: "adjust_margin",
                           })
                         }
                         onSave={() => handleSaveSparePartQuickEdit(part)}

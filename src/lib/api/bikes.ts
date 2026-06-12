@@ -388,7 +388,15 @@ export async function updateBike(
 }
 
 export type BikeQuickEditFields = Partial<
-  Pick<BikeRecord, "cost_price" | "sale_price" | "mileage">
+  Pick<
+    BikeRecord,
+    | "cost_price"
+    | "sale_price"
+    | "mileage"
+    | "sale_price_mode"
+    | "sale_margin_type"
+    | "sale_margin_value"
+  >
 >;
 
 export async function patchBike(

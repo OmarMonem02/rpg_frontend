@@ -112,6 +112,155 @@ export function formatPricingLossHint(
   return `Cost (${formatEgp(costEgp)}) exceeds sale (${formatEgp(saleEgp)}) by ${formatEgp(loss)}.`;
 }
 
+export type SalePriceQuickEditStrategy = "adjust_margin" | "switch_manual";
+
+export type MarginAwarePricingRecord = Pick<
+  CatalogPricingFields,
+  | "cost_price"
+  | "cost_currency"
+  | "sale_price"
+  | "sale_currency"
+  | "sale_price_mode"
+  | "sale_margin_type"
+  | "sale_margin_value"
+>;
+
+export function computeMarginFromSale(
+  costPrice: number,
+  costCurrency: PricingCurrency,
+  marginType: SaleMarginType,
+  salePrice: number,
+  saleCurrency: PricingCurrency,
+  rates: ExchangeRates,
+): number {
+  const costEgp = computeCostInEgp(costPrice, costCurrency, rates);
+  const saleEgp = computeSaleInEgp(salePrice, saleCurrency, rates);
+
+  if (costEgp <= 0) {
+    return 0;
+  }
+
+  if (marginType === "percentage") {
+    return Math.round(((saleEgp / costEgp - 1) * 100) * 100) / 100;
+  }
+
+  return Math.round((saleEgp - costEgp) * 100) / 100;
+}
+
+export function formatMarginModeLabel(
+  record: Pick<
+    CatalogPricingFields,
+    "sale_price_mode" | "sale_margin_type" | "sale_margin_value"
+  >,
+): string | null {
+  if (record.sale_price_mode !== "margin") {
+    return null;
+  }
+
+  const marginType = record.sale_margin_type ?? "percentage";
+  const marginValue = record.sale_margin_value ?? 0;
+
+  if (marginType === "fixed") {
+    return `Margin · ${formatEgp(marginValue)} fixed`;
+  }
+
+  return `Margin · ${marginValue}%`;
+}
+
+export function formatMarginQuickEditHint(
+  record: Pick<
+    CatalogPricingFields,
+    "sale_price_mode" | "sale_margin_type" | "sale_margin_value"
+  >,
+): string | null {
+  if (record.sale_price_mode !== "margin") {
+    return null;
+  }
+
+  const marginType = record.sale_margin_type ?? "percentage";
+  const marginValue = record.sale_margin_value ?? 0;
+
+  if (marginType === "fixed") {
+    return `Sale price is auto-calculated from cost plus a fixed ${formatEgp(marginValue)} margin.`;
+  }
+
+  return `Sale price is auto-calculated from cost plus a ${marginValue}% margin.`;
+}
+
+export type MarginQuickEditPricingResult =
+  | { ok: true; fields: Partial<CatalogPricingFields> }
+  | { ok: false; error: string };
+
+export function resolveMarginQuickEditPricing(
+  record: MarginAwarePricingRecord,
+  changes: { cost_price?: number; sale_price?: number },
+  rates: ExchangeRates,
+  strategy: SalePriceQuickEditStrategy,
+): MarginQuickEditPricingResult {
+  if (changes.sale_price === undefined) {
+    return { ok: true, fields: {} };
+  }
+
+  const salePrice = changes.sale_price;
+
+  if (record.sale_price_mode !== "margin") {
+    return { ok: true, fields: { sale_price: salePrice } };
+  }
+
+  if (strategy === "switch_manual") {
+    return {
+      ok: true,
+      fields: {
+        sale_price_mode: "manual",
+        sale_price: salePrice,
+      },
+    };
+  }
+
+  const costPrice = changes.cost_price ?? record.cost_price;
+  const marginType = record.sale_margin_type ?? "percentage";
+  const marginValue = computeMarginFromSale(
+    costPrice,
+    record.cost_currency,
+    marginType,
+    salePrice,
+    record.sale_currency,
+    rates,
+  );
+
+  if (marginValue < 0) {
+    return {
+      ok: false,
+      error: "Sale price must be at least the EGP cost when adjusting margin.",
+    };
+  }
+
+  return {
+    ok: true,
+    fields: {
+      sale_price_mode: "margin",
+      sale_margin_type: marginType,
+      sale_margin_value: marginValue,
+      sale_price: salePrice,
+    },
+  };
+}
+
+export function pricingRecordFromItem(
+  item: Partial<CatalogPricingFields> & { currency_pricing?: string },
+): MarginAwarePricingRecord {
+  const pricing = defaultCatalogPricingFromRecord(item);
+  return {
+    cost_price: pricing.cost_price,
+    cost_currency: pricing.cost_currency,
+    sale_price: pricing.sale_price,
+    sale_currency: pricing.sale_currency,
+    sale_price_mode: pricing.sale_price_mode,
+    sale_margin_type: pricing.sale_margin_type,
+    sale_margin_value: pricing.sale_margin_value,
+  };
+}
+
 export function buildCatalogPricingPayload(
   formData: Record<string, unknown>,
 ): CatalogPricingFields & { currency_pricing: PricingCurrency } {

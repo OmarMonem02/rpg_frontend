@@ -1,5 +1,6 @@
 export { QuickEditActions } from "./QuickEditActions";
 export { QuickEditInput } from "./QuickEditInput";
+export { QuickEditSalePriceCell } from "./QuickEditSalePriceCell";
 export {
   combineValidators,
   useQuickEditRow,
