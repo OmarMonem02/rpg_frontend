@@ -146,7 +146,7 @@ export function QuickEditSalePriceCell({
           </fieldset>
         ) : null}
         {isMargin && salePriceStrategy === "adjust_margin" ? (
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 grid grid-cols-2">
             <div>
               <label className="mb-1 block text-[10px] font-medium text-on-surface-variant">
                 Margin type
