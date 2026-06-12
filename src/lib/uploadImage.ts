@@ -99,3 +99,29 @@ export async function uploadImageFromUrl(
 
   return (await response.json()) as UploadedImage;
 }
+
+type ImageUploadHandle = {
+  uploadIfPending: () => Promise<UploadedImage | null>;
+  hasPendingUpload: () => boolean;
+};
+
+/**
+ * Uploads a deferred image selection, or returns the existing Cloudinary values.
+ */
+export async function resolvePendingImageUpload(
+  handle: ImageUploadHandle | null,
+  fallback?: Partial<UploadedImage>,
+): Promise<{ url?: string; public_id?: string }> {
+  if (handle?.hasPendingUpload()) {
+    const uploaded = await handle.uploadIfPending();
+    if (!uploaded) {
+      throw new UploadImageError("Image upload failed.", 500);
+    }
+    return uploaded;
+  }
+
+  return {
+    url: fallback?.url,
+    public_id: fallback?.public_id,
+  };
+}

@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { getAuthToken } from "@/lib/auth-session";
 import { createCustomerBike } from "@/lib/api/customers";
 import { listBikeBlueprints, type BikeBlueprintRecord } from "@/lib/api/bikes";
 import { ActionButton, InputGroup } from "@/components/ops-ui";
-import { ImageUpload } from "@/components/ui/ImageUpload";
+import { ImageUpload, type ImageUploadHandle } from "@/components/ui/ImageUpload";
+import { resolvePendingImageUpload } from "@/lib/uploadImage";
 import { ModalShell } from "@/components/tickets/ticket-workflow-modals";
 
 export function LinkCustomerBikeModal({
@@ -21,6 +22,7 @@ export function LinkCustomerBikeModal({
 }) {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const imageUploadRef = useRef<ImageUploadHandle>(null);
   const [blueprintSearch, setBlueprintSearch] = useState({
     brand: "",
     model: "",
@@ -83,12 +85,16 @@ export function LinkCustomerBikeModal({
       setError("");
       const token = getAuthToken();
       if (!token) throw new Error("Authentication required");
+      const uploadedImage = await resolvePendingImageUpload(imageUploadRef.current, {
+        url: details.image || undefined,
+        public_id: details.image_public_id || undefined,
+      });
       await createCustomerBike(token, customerId, {
         bike_blueprint_id: selectedBlueprint.id,
         vin: details.vin || undefined,
         mileage: Number(details.mileage) || undefined,
-        image: details.image || undefined,
-        image_public_id: details.image_public_id || undefined,
+        image: uploadedImage.url || undefined,
+        image_public_id: uploadedImage.public_id || undefined,
         notes: details.notes || undefined,
       });
       onSuccess();
@@ -251,6 +257,7 @@ export function LinkCustomerBikeModal({
         </div>
 
         <ImageUpload
+          ref={imageUploadRef}
           value={details.image || undefined}
           folder="Customer Bike Photo"
           uploadFolder="rpg-system/Customer-Bike"

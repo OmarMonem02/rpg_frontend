@@ -9,7 +9,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { ImageUpload } from "@/components/ui/ImageUpload";
+import { ImageUpload, type ImageUploadHandle } from "@/components/ui/ImageUpload";
 import { ActionButton, SearchableSelect } from "@/components/ops-ui";
 import { QuickCreateButton } from "@/components/quick-create/QuickCreateButton";
 import { QuickCreateDrawer } from "@/components/quick-create/QuickCreateDrawer";
@@ -172,6 +172,7 @@ export const EntityForm = forwardRef<EntityFormHandle, EntityFormProps>(
     const [highlightInvalidSectionIndex, setHighlightInvalidSectionIndex] =
       useState<number | null>(null);
     const sectionRefs = useRef<(HTMLElement | null)[]>([]);
+    const imageUploadRefs = useRef<Map<string, ImageUploadHandle>>(new Map());
 
     const isStackedLayout = variant === "page";
     const requiredFieldsCount = fields.filter((field) => field.required).length;
@@ -301,7 +302,12 @@ export const EntityForm = forwardRef<EntityFormHandle, EntityFormProps>(
       if (field.type === "multiselect" || field.type === "tags")
         return !Array.isArray(value) || value.length === 0;
       if (field.type === "toggle") return value !== true;
-      if (field.type === "image") return !value;
+      if (field.type === "image") {
+        if (imageUploadRefs.current.get(field.name)?.hasPendingUpload()) {
+          return false;
+        }
+        return !value;
+      }
       if (typeof value === "number") return Number.isNaN(value);
       return value === "" || value === null || value === undefined;
     };
@@ -477,7 +483,32 @@ export const EntityForm = forwardRef<EntityFormHandle, EntityFormProps>(
       setHighlightInvalidSectionIndex(null);
       setIsSubmitting(true);
       try {
-        await onSubmit(formData);
+        const updatedFormData = { ...formData };
+
+        for (const section of sectionsToValidate) {
+          for (const field of section.fields) {
+            if (field.type !== "image") continue;
+
+            const imageRef = imageUploadRefs.current.get(field.name);
+            if (!imageRef?.hasPendingUpload()) continue;
+
+            const uploaded = await imageRef.uploadIfPending();
+            if (!uploaded) {
+              setFieldErrors((prev) => ({
+                ...prev,
+                [field.name]: "Image upload failed. Please try again.",
+              }));
+              return;
+            }
+
+            updatedFormData[field.name] = uploaded.url;
+            if (field.imagePublicIdField) {
+              updatedFormData[field.imagePublicIdField] = uploaded.public_id;
+            }
+          }
+        }
+
+        await onSubmit(updatedFormData);
       } catch {
         // Parent sets error state; keep the form open.
       } finally {
@@ -591,6 +622,13 @@ export const EntityForm = forwardRef<EntityFormHandle, EntityFormProps>(
                   {field.required && <span className="text-error">*</span>}
                 </label>
                 <ImageUpload
+                  ref={(handle) => {
+                    if (handle) {
+                      imageUploadRefs.current.set(field.name, handle);
+                    } else {
+                      imageUploadRefs.current.delete(field.name);
+                    }
+                  }}
                   value={String(fieldValue || "") || undefined}
                   folder={field.label}
                   uploadFolder={field.uploadFolder}

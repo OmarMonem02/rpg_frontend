@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ApiError } from "@/lib/auth-api";
 import { getAuthToken } from "@/lib/auth-session";
 import {
@@ -39,7 +39,8 @@ import {
   StatGrid,
   SurfaceCard,
 } from "@/components/ops-ui";
-import { ImageUpload } from "@/components/ui/ImageUpload";
+import { ImageUpload, type ImageUploadHandle } from "@/components/ui/ImageUpload";
+import { resolvePendingImageUpload } from "@/lib/uploadImage";
 
 type ExpenseFormState = {
   title: string;
@@ -79,6 +80,7 @@ export default function ExpensesPage() {
   const [category, setCategory] = useState<ExpenseCategory | "">("");
   const [page, setPage] = useState(1);
   const [form, setForm] = useState<ExpenseFormState>(initialFormState);
+  const imageUploadRef = useRef<ImageUploadHandle>(null);
   const [editingExpense, setEditingExpense] = useState<ExpenseRecord | null>(
     null,
   );
@@ -198,10 +200,15 @@ export default function ExpensesPage() {
         throw new Error("Expense amount must be greater than 0.");
       if (!form.incurred_on) throw new Error("Incurred date is required.");
 
+      const uploadedImage = await resolvePendingImageUpload(imageUploadRef.current, {
+        url: form.image || undefined,
+        public_id: form.image_public_id || undefined,
+      });
+
       const payload: ExpensePayload = {
         title: form.title.trim(),
-        image: form.image || undefined,
-        image_public_id: form.image_public_id || undefined,
+        image: uploadedImage.url || undefined,
+        image_public_id: uploadedImage.public_id || undefined,
         category: form.category,
         amount: Number(form.amount),
         currency: form.currency,
@@ -339,6 +346,7 @@ export default function ExpensesPage() {
 
             <div className="md:col-span-2">
               <ImageUpload
+                ref={imageUploadRef}
                 value={form.image || undefined}
                 folder="Receipt or Expense Photo"
                 uploadFolder="rpg-system/expenses"
