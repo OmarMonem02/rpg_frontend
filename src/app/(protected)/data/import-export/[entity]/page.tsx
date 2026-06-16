@@ -161,19 +161,7 @@ export default function EntityImportExportPage() {
 
       <PageHero eyebrow="Import / Export" title={`Manage ${entity.label}`} />
 
-      {canExportData || canImportData ? (
-        <div className="mb-6">
-          <ExportColumnPicker
-            allColumns={allColumns}
-            orderedKeys={columnState.orderedKeys}
-            isVisible={columnState.isVisible}
-            onToggle={columnState.toggle}
-            onMove={columnState.move}
-            onReset={columnState.reset}
-            hiddenRequiredCount={columnState.hiddenRequiredCount}
-          />
-        </div>
-      ) : null}
+
 
       <div className="grid gap-6 md:grid-cols-1">
         {canExportData ? (
@@ -191,7 +179,19 @@ export default function EntityImportExportPage() {
           />
         ) : null}
       </div>
-
+      {canExportData || canImportData ? (
+        <div className="mb-6">
+          <ExportColumnPicker
+            allColumns={allColumns}
+            orderedKeys={columnState.orderedKeys}
+            isVisible={columnState.isVisible}
+            onToggle={columnState.toggle}
+            onMove={columnState.move}
+            onReset={columnState.reset}
+            hiddenRequiredCount={columnState.hiddenRequiredCount}
+          />
+        </div>
+      ) : null}
       {!canExportData && !canImportData ? (
         <InlineMessage tone="warning">
           Your account can read import/export pages, but it cannot import or export data.

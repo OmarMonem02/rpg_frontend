@@ -550,6 +550,8 @@ function SalesPageContent() {
             onToggle={salesColumnState.toggle}
             onMove={salesColumnState.move}
             onReset={salesColumnState.reset}
+            collapsible
+            defaultCollapsed
           />
         </div>
       ) : null}

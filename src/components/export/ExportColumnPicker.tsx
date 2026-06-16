@@ -16,7 +16,8 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Bars3Icon } from "@heroicons/react/24/outline";
+import { Bars3Icon, ChevronDownIcon } from "@heroicons/react/24/outline";
+import { useState } from "react";
 import type { ExportColumnDef } from "@/types/export-columns";
 
 type ExportColumnPickerProps = {
@@ -27,6 +28,8 @@ type ExportColumnPickerProps = {
   onMove: (fromIndex: number, toIndex: number) => void;
   onReset: () => void;
   hiddenRequiredCount?: number;
+  collapsible?: boolean;
+  defaultCollapsed?: boolean;
 };
 
 function SortableRow({
@@ -115,7 +118,11 @@ export function ExportColumnPicker({
   onMove,
   onReset,
   hiddenRequiredCount = 0,
+  collapsible = false,
+  defaultCollapsed = true,
 }: ExportColumnPickerProps) {
+  const [collapsed, setCollapsed] = useState(collapsible && defaultCollapsed);
+
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
@@ -139,33 +146,65 @@ export function ExportColumnPicker({
 
   return (
     <div className="rounded-[1.25rem] border border-outline-variant/15 bg-surface-container-lowest p-5 shadow-sm">
-      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h3 className="text-lg font-semibold text-on-surface">Columns</h3>
-          <p className="mt-1 text-sm text-on-surface-variant">
-            Choose which columns to include and drag to reorder exports and templates.
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <span className="text-xs font-medium text-on-surface-variant">
-            {orderedKeys.length} of {allColumns.length} selected
-          </span>
+      <div className={`flex flex-wrap items-start justify-between gap-3 ${collapsed ? "" : "mb-4"}`}>
+        {collapsible ? (
           <button
             type="button"
-            onClick={onReset}
-            className="text-xs font-semibold text-primary transition-colors hover:text-primary/80"
+            className="flex min-w-0 flex-1 items-start gap-2 text-left"
+            aria-expanded={!collapsed}
+            onClick={() => setCollapsed((current) => !current)}
           >
-            Reset to default
+            <ChevronDownIcon
+              className={`mt-1 h-5 w-5 shrink-0 text-on-surface-variant transition-transform ${
+                collapsed ? "" : "rotate-180"
+              }`}
+              aria-hidden
+            />
+            <div className="min-w-0">
+              <h3 className="text-lg font-semibold text-on-surface">Columns</h3>
+              {collapsed ? (
+                <p className="mt-1 text-sm text-on-surface-variant">
+                  {orderedKeys.length} of {allColumns.length} columns selected for export.
+                </p>
+              ) : (
+                <p className="mt-1 text-sm text-on-surface-variant">
+                  Choose which columns to include and drag to reorder exports and templates.
+                </p>
+              )}
+            </div>
           </button>
-        </div>
+        ) : (
+          <div className="min-w-0 flex-1">
+            <h3 className="text-lg font-semibold text-on-surface">Columns</h3>
+            <p className="mt-1 text-sm text-on-surface-variant">
+              Choose which columns to include and drag to reorder exports and templates.
+            </p>
+          </div>
+        )}
+
+        {!collapsed ? (
+          <div className="flex items-center gap-3">
+            <span className="text-xs font-medium text-on-surface-variant">
+              {orderedKeys.length} of {allColumns.length} selected
+            </span>
+            <button
+              type="button"
+              onClick={onReset}
+              className="text-xs font-semibold text-primary transition-colors hover:text-primary/80"
+            >
+              Reset to default
+            </button>
+          </div>
+        ) : null}
       </div>
 
-      {hiddenRequiredCount > 0 ? (
+      {!collapsed && hiddenRequiredCount > 0 ? (
         <div className="mb-4 rounded-xl bg-warning/10 px-3 py-2 text-sm text-on-warning-container">
           Some required import columns are hidden. Include them before generating import templates.
         </div>
       ) : null}
 
+      {!collapsed ? (
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <div className="grid gap-4 lg:grid-cols-2">
           <div className="rounded-xl border border-outline-variant/15 bg-surface">
@@ -216,6 +255,7 @@ export function ExportColumnPicker({
           </div>
         </div>
       </DndContext>
+      ) : null}
     </div>
   );
 }
