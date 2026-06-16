@@ -1,6 +1,7 @@
 "use client";
 
 import { ActionButton, StatusBadge } from "@/components/ops-ui";
+import type { ExportColumnDef } from "@/types/export-columns";
 import type { ImportExportEntity, ImportPreview, ImportResult } from "@/types/import-export";
 import { useMemo, useRef, useState } from "react";
 import { importFile, parseImportFile } from "@/lib/api/import-export";
@@ -21,7 +22,15 @@ const MAX_SIZE_MB = 10;
 const MAX_SIZE_BYTES = MAX_SIZE_MB * 1024 * 1024;
 const ALLOWED_EXTS = [".xlsx", ".xls", ".csv"];
 
-export function ImportPanel({ entity }: { entity: ImportExportEntity }) {
+export function ImportPanel({
+  entity,
+  previewColumns,
+  columnsParam,
+}: {
+  entity: ImportExportEntity;
+  previewColumns: ExportColumnDef[];
+  columnsParam: () => string | undefined;
+}) {
   const [file, setFile] = useState<File | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
   const [isParsing, setIsParsing] = useState(false);
@@ -91,7 +100,7 @@ export function ImportPanel({ entity }: { entity: ImportExportEntity }) {
     setResult(null);
 
     try {
-      setPreview(await parseImportFile(entity.slug, file, getToken()));
+      setPreview(await parseImportFile(entity.slug, file, getToken(), columnsParam()));
     } catch (err) {
       const { message } = getApiErrorDetails(err, "Could not preview this file.");
       setHttpError(message);
@@ -110,7 +119,7 @@ export function ImportPanel({ entity }: { entity: ImportExportEntity }) {
     setHttpError(null);
 
     try {
-      setResult(await importFile(entity.slug, file, getToken()));
+      setResult(await importFile(entity.slug, file, getToken(), columnsParam()));
       setFile(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
     } catch (err) {
@@ -210,7 +219,11 @@ export function ImportPanel({ entity }: { entity: ImportExportEntity }) {
                   <tr>
                     <th className="px-3 py-2">Row</th>
                     <th className="px-3 py-2">Status</th>
-                    <th className="px-3 py-2">Preview</th>
+                    {previewColumns.map((column) => (
+                      <th key={column.key} className="px-3 py-2">
+                        {column.label}
+                      </th>
+                    ))}
                     <th className="px-3 py-2">Issues</th>
                   </tr>
                 </thead>
@@ -223,14 +236,11 @@ export function ImportPanel({ entity }: { entity: ImportExportEntity }) {
                           {row.status}
                         </StatusBadge>
                       </td>
-                      <td className="px-3 py-3 text-on-surface-variant">
-                        {entity.columns.slice(0, 4).map((column) => (
-                          <span key={column.key} className="mr-3 inline-block">
-                            <span className="font-semibold text-on-surface">{column.label}:</span>{" "}
-                            {String(row.data[column.key] ?? "-")}
-                          </span>
-                        ))}
-                      </td>
+                      {previewColumns.map((column) => (
+                        <td key={column.key} className="px-3 py-3 text-on-surface-variant">
+                          {String(row.data[column.key] ?? "-")}
+                        </td>
+                      ))}
                       <td className="px-3 py-3">
                         {row.issues.length > 0 ? (
                           <ul className="space-y-1 text-on-surface-variant">

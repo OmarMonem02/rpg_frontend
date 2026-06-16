@@ -399,12 +399,14 @@ export async function exportSales(
   token: string,
   filters: SaleListFilters | undefined,
   format: "xlsx" | "csv",
+  columns?: string,
 ): Promise<void> {
   const qs = buildSalesExportQuery(filters, format);
+  const columnsQuery = columns ? `&columns=${encodeURIComponent(columns)}` : "";
   const ext = format === "csv" ? "csv" : "xlsx";
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
   const filename = `sales_export_${stamp}.${ext}`;
-  await downloadFile(`/sales/export?${qs}`, token, filename);
+  await downloadFile(`/sales/export?${qs}${columnsQuery}`, token, filename);
 }
 
 export async function getSale(token: string, id: number): Promise<SaleRecord> {

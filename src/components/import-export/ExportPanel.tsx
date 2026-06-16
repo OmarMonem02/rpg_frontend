@@ -7,7 +7,17 @@ import { downloadFile } from "@/lib/api/import-export";
 import { getAuthToken } from "@/lib/auth-session";
 import { ArrowDownTrayIcon, ArrowPathIcon, DocumentArrowDownIcon, TableCellsIcon } from "@heroicons/react/24/outline";
 
-export function ExportPanel({ entity }: { entity: ImportExportEntity }) {
+type ExportPanelProps = {
+  entity: ImportExportEntity;
+  exportColumnsParam: () => string | undefined;
+  templateColumnsParam: () => string | undefined;
+};
+
+export function ExportPanel({
+  entity,
+  exportColumnsParam,
+  templateColumnsParam,
+}: ExportPanelProps) {
   const [downloading, setDownloading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -19,11 +29,12 @@ export function ExportPanel({ entity }: { entity: ImportExportEntity }) {
       const token = getAuthToken();
       if (!token) throw new Error("Authentication required");
 
+      const columns = action === "export" ? exportColumnsParam() : templateColumnsParam();
       const path =
         action === "export"
           ? `/import-export/${entity.slug}/export?format=${format}`
           : `/import-export/${entity.slug}/template?format=${format}`;
-      await downloadFile(path, token, `${entity.slug}_${action}.${format}`);
+      await downloadFile(path, token, `${entity.slug}_${action}.${format}`, columns);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Download failed");
     } finally {

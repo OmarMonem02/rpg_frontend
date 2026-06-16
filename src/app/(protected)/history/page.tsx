@@ -31,6 +31,8 @@ import {
   StatusBadge,
 } from "@/components/ops-ui";
 import { useGlobalDataRefresh } from "@/hooks/useGlobalDataRefresh";
+import { useExportColumns } from "@/hooks/useExportColumns";
+import { fetchExportColumnCatalog, toExportColumnDefs } from "@/lib/api/export-columns";
 import { fetchAllPages } from "@/lib/api/core";
 import { ApiError } from "@/lib/auth-api";
 import { getAuthToken } from "@/lib/auth-session";
@@ -43,6 +45,7 @@ import {
   type HistorySummary,
 } from "@/lib/api/history";
 import { listUsers, type UserRecord } from "@/lib/api/users";
+import { ExportColumnPicker } from "@/components/export/ExportColumnPicker";
 
 type DraftFilters = {
   entity_type: string;
@@ -130,6 +133,25 @@ function HistoryPageContent() {
   const [isLoading, setIsLoading] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
   const [error, setError] = useState("");
+  const [historyExportColumns, setHistoryExportColumns] = useState(
+    () => [] as ReturnType<typeof toExportColumnDefs>,
+  );
+
+  const historyColumnState = useExportColumns("export-cols:history", historyExportColumns);
+
+  useEffect(() => {
+    const loadColumns = async () => {
+      try {
+        const token = getAuthToken();
+        if (!token) return;
+        const catalog = await fetchExportColumnCatalog(token);
+        setHistoryExportColumns(toExportColumnDefs(catalog.history.columns));
+      } catch {
+        // Keep empty defaults until catalog loads.
+      }
+    };
+    void loadColumns();
+  }, []);
 
   const selected = useMemo(
     () => records.find((record) => record.id === selectedId) ?? null,
@@ -268,7 +290,7 @@ function HistoryPageContent() {
     setError("");
 
     try {
-      const blob = await exportHistoryCsv(token, appliedFilters);
+      const blob = await exportHistoryCsv(token, appliedFilters, historyColumnState.columnsParam());
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
       anchor.href = url;
@@ -327,6 +349,19 @@ function HistoryPageContent() {
           </StatGrid>
         }
       />
+
+      {historyExportColumns.length > 0 ? (
+        <div className="mb-6">
+          <ExportColumnPicker
+            allColumns={historyExportColumns}
+            orderedKeys={historyColumnState.orderedKeys}
+            isVisible={historyColumnState.isVisible}
+            onToggle={historyColumnState.toggle}
+            onMove={historyColumnState.move}
+            onReset={historyColumnState.reset}
+          />
+        </div>
+      ) : null}
 
       <div className="flex flex-wrap gap-2">
         {(

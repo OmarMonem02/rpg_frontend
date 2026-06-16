@@ -181,7 +181,7 @@ export function ImageHoverPreview({
         {children}
       </div>
 
-      {preview ? createPortal(preview, portalTarget) : null}
+      {preview && portalTarget ? createPortal(preview, portalTarget) : null}
     </>
   );
 }

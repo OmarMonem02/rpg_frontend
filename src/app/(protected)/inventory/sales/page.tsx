@@ -5,7 +5,9 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { getAuthToken } from "@/lib/auth-session";
 import { usePermissions } from "@/components/permission-provider";
 import { useEntityFilters } from "@/hooks/useEntityFilters";
+import { useExportColumns } from "@/hooks/useExportColumns";
 import { useGlobalDataRefresh } from "@/hooks/useGlobalDataRefresh";
+import { fetchExportColumnCatalog, toExportColumnDefs } from "@/lib/api/export-columns";
 import {
   listSales,
   deleteSale,
@@ -47,6 +49,7 @@ import {
   TruckIcon,
   XMarkIcon,
 } from "@heroicons/react/24/outline";
+import { ExportColumnPicker } from "@/components/export/ExportColumnPicker";
 
 type SaleSort = "newest" | "oldest" | "highest" | "lowest";
 type ItemTypeFilter = "" | "product" | "spare_part" | "maintenance_service" | "bike";
@@ -120,6 +123,25 @@ function SalesPageContent() {
   const [exportingFormat, setExportingFormat] = useState<"xlsx" | "csv" | null>(
     null,
   );
+  const [salesExportColumns, setSalesExportColumns] = useState(
+    () => [] as ReturnType<typeof toExportColumnDefs>,
+  );
+
+  const salesColumnState = useExportColumns("export-cols:sales", salesExportColumns);
+
+  useEffect(() => {
+    const loadColumns = async () => {
+      try {
+        const token = getAuthToken();
+        if (!token) return;
+        const catalog = await fetchExportColumnCatalog(token);
+        setSalesExportColumns(toExportColumnDefs(catalog.sales.columns));
+      } catch {
+        // Keep empty defaults until catalog loads.
+      }
+    };
+    void loadColumns();
+  }, []);
 
   const { filters, page, setPage, setSearch } = useEntityFilters();
   const sellerFilterId = Number(searchParams.get("seller_id") || 0) || undefined;
@@ -412,14 +434,14 @@ function SalesPageContent() {
         setError(null);
         const token = getAuthToken();
         if (!token) throw new Error("Authentication required");
-        await exportSales(token, exportFilters, format);
+        await exportSales(token, exportFilters, format, salesColumnState.columnsParam());
       } catch (err) {
         setError(err instanceof Error ? err.message : "Export failed");
       } finally {
         setExportingFormat(null);
       }
     },
-    [exportFilters],
+    [exportFilters, salesColumnState],
   );
 
   function resetOperationsFilters() {
@@ -519,6 +541,18 @@ function SalesPageContent() {
           ) : null
         }
       />
+      {permissions.canExport("sales") && salesExportColumns.length > 0 ? (
+        <div className="mb-6">
+          <ExportColumnPicker
+            allColumns={salesExportColumns}
+            orderedKeys={salesColumnState.orderedKeys}
+            isVisible={salesColumnState.isVisible}
+            onToggle={salesColumnState.toggle}
+            onMove={salesColumnState.move}
+            onReset={salesColumnState.reset}
+          />
+        </div>
+      ) : null}
       {sellerFilterId ? (
         <InlineMessage tone="primary">
           <div className="flex flex-wrap items-center justify-between gap-3">

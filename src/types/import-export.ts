@@ -8,6 +8,7 @@ export type ImportExportColumn = {
   description: string;
   accepted_values: string[];
   reference?: string | null;
+  export_only?: boolean;
 };
 
 export type ImportExportEntity = {

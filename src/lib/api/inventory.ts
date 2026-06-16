@@ -807,6 +807,7 @@ export type BulkInventoryPreviewRow = {
   id: number;
   name: string;
   sku: string;
+  sale_currency: PricingCurrency;
   before: Partial<Record<keyof BulkInventoryChanges, number>>;
   after: Partial<Record<keyof BulkInventoryChanges, number>>;
   changed_fields: (keyof BulkInventoryChanges)[];
@@ -948,6 +949,7 @@ export async function bulkApplySpareParts(
 export async function exportStocktakeDiscrepancies(
   token: string,
   rows: StocktakeExportRow[],
+  columns?: string,
 ): Promise<void> {
   const response = await fetch(getApiUrl("/stocktake/discrepancy-export"), {
     method: "POST",
@@ -956,7 +958,10 @@ export async function exportStocktakeDiscrepancies(
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ items: rows }),
+    body: JSON.stringify({
+      items: rows,
+      ...(columns ? { columns: columns.split(",") } : {}),
+    }),
   });
 
   if (!response.ok) {

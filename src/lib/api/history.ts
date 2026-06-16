@@ -229,6 +229,7 @@ export async function listHistory(
 export async function exportHistoryCsv(
   token: string,
   filters?: HistoryFilters,
+  columns?: string,
 ): Promise<Blob> {
   const query = buildQuery({
     per_page: 50,
@@ -239,6 +240,7 @@ export async function exportHistoryCsv(
     date_from: filters?.date_from,
     date_to: filters?.date_to,
     search: filters?.search,
+    columns,
   });
 
   const response = await fetch(getApiUrl(`/history/export?${query}`), {

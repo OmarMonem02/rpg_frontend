@@ -1,7 +1,7 @@
 "use client";
 
 import type { FormEvent, KeyboardEvent } from "react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   ArrowDownTrayIcon,
   MagnifyingGlassIcon,
@@ -41,6 +41,10 @@ import {
   BulkRecapTable,
 } from "./_components/count-components";
 import { useInventoryCount } from "./_components/useInventoryCount";
+import { ExportColumnPicker } from "@/components/export/ExportColumnPicker";
+import { useExportColumns } from "@/hooks/useExportColumns";
+import { fetchExportColumnCatalog, toExportColumnDefs } from "@/lib/api/export-columns";
+import { getAuthToken } from "@/lib/auth-session";
 
 const EMPTY_STATE_COPY = {
   all: {
@@ -121,6 +125,30 @@ export default function InventoryCountPage() {
     applyError,
     applyDiscrepancies,
   } = useInventoryCount();
+
+  const [stocktakeExportColumns, setStocktakeExportColumns] = useState(
+    () => [] as ReturnType<typeof toExportColumnDefs>,
+  );
+
+  const stocktakeColumnState = useExportColumns("export-cols:stocktake", stocktakeExportColumns);
+
+  useEffect(() => {
+    const loadColumns = async () => {
+      try {
+        const token = getAuthToken();
+        if (!token) return;
+        const catalog = await fetchExportColumnCatalog(token);
+        setStocktakeExportColumns(toExportColumnDefs(catalog.stocktake.columns));
+      } catch {
+        // Keep empty defaults until catalog loads.
+      }
+    };
+    void loadColumns();
+  }, []);
+
+  const exportWithColumns = useCallback(() => {
+    handleExport(stocktakeColumnState.columnsParam());
+  }, [handleExport, stocktakeColumnState]);
 
   const [bulkTab, setBulkTab] = useState<"products" | "spare_parts">("products");
 
@@ -208,7 +236,7 @@ export default function InventoryCountPage() {
             <ActionButton
               type="button"
               tone="primary"
-              onClick={handleExport}
+              onClick={exportWithColumns}
               disabled={summary.discrepancies === 0 || exporting}
             >
               <ArrowDownTrayIcon className="h-4 w-4" aria-hidden />
@@ -217,6 +245,19 @@ export default function InventoryCountPage() {
           </>
         }
       />
+
+      {stocktakeExportColumns.length > 0 ? (
+        <div className="mb-6">
+          <ExportColumnPicker
+            allColumns={stocktakeExportColumns}
+            orderedKeys={stocktakeColumnState.orderedKeys}
+            isVisible={stocktakeColumnState.isVisible}
+            onToggle={stocktakeColumnState.toggle}
+            onMove={stocktakeColumnState.move}
+            onReset={stocktakeColumnState.reset}
+          />
+        </div>
+      ) : null}
 
       {restoredAt ? (
         <InlineMessage tone="primary">
@@ -679,7 +720,7 @@ export default function InventoryCountPage() {
             <ActionButton
               type="button"
               tone="primary"
-              onClick={handleExport}
+              onClick={exportWithColumns}
               disabled={exporting}
             >
               <ArrowDownTrayIcon className="h-4 w-4" aria-hidden />

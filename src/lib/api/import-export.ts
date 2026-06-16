@@ -40,8 +40,16 @@ function resolveDownloadUrl(url: string): string {
   return getApiUrl(url.startsWith("/") ? url : `/${url}`);
 }
 
-export async function downloadFile(url: string, token: string, filename: string): Promise<void> {
-  const fullUrl = resolveDownloadUrl(url);
+export async function downloadFile(
+  url: string,
+  token: string,
+  filename: string,
+  columns?: string,
+): Promise<void> {
+  const separator = url.includes("?") ? "&" : "?";
+  const fullUrl = resolveDownloadUrl(
+    columns ? `${url}${separator}columns=${encodeURIComponent(columns)}` : url,
+  );
 
   const response = await fetch(fullUrl, {
     method: "GET",
@@ -83,10 +91,14 @@ export async function downloadFile(url: string, token: string, filename: string)
 export async function importFile(
   entitySlug: string,
   file: File,
-  token: string
+  token: string,
+  columns?: string,
 ): Promise<ImportResult> {
   const formData = new FormData();
   formData.append("file", file);
+  if (columns) {
+    formData.append("columns", columns);
+  }
 
   const response = await fetch(getApiUrl(`/import-export/${entitySlug}/import`), {
     method: "POST",
@@ -123,12 +135,17 @@ export async function importFile(
 export async function parseImportFile(
   entitySlug: string,
   file: File,
-  token: string
+  token: string,
+  columns?: string,
 ): Promise<ImportPreview> {
   const formData = new FormData();
   formData.append("file", file);
+  if (columns) {
+    formData.append("columns", columns);
+  }
 
-  const response = await fetch(getApiUrl(`/import-export/${entitySlug}/parse`), {
+  const query = columns ? `?columns=${encodeURIComponent(columns)}` : "";
+  const response = await fetch(getApiUrl(`/import-export/${entitySlug}/parse${query}`), {
     method: "POST",
     headers: {
       Accept: "application/json",

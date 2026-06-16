@@ -392,14 +392,14 @@ export function useInventoryCount() {
     refocusScanInput();
   }, [refocusScanInput]);
 
-  const handleExport = useCallback(async () => {
+  const handleExport = useCallback(async (columns?: string) => {
     if (summary.discrepancies === 0 || exporting) return;
     try {
       setExporting(true);
       setExportError(null);
       const token = getAuthToken();
       if (!token) throw new Error("Authentication required");
-      await exportStocktakeDiscrepancies(token, toExportRows(lines));
+      await exportStocktakeDiscrepancies(token, toExportRows(lines), columns);
     } catch (err) {
       setExportError(
         err instanceof Error ? err.message : "Failed to generate the report",
