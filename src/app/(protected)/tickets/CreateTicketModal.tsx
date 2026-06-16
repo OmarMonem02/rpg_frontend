@@ -2,9 +2,11 @@
 
 import { useRef, useState } from "react";
 import { ActionButton, InputGroup, StatusBadge } from "@/components/ops-ui";
+import { CustomerBikeBlueprintPicker } from "@/components/customers/CustomerBikeBlueprintPicker";
 import { ImageUpload, type ImageUploadHandle } from "@/components/ui/ImageUpload";
 import { resolvePendingImageUpload } from "@/lib/uploadImage";
-import { ticketsApi, type Customer, type Bike, type BikeBlueprint, type CreateTicketCustomerPayload } from "@/lib/tickets-api";
+import { type BikeBlueprintRecord } from "@/lib/api/bikes";
+import { ticketsApi, type Customer, type Bike, type CreateTicketCustomerPayload } from "@/lib/tickets-api";
 
 export function CreateTicketModal({
   onClose,
@@ -35,9 +37,7 @@ export function CreateTicketModal({
   const [bikes, setBikes] = useState<Bike[]>([]);
   const [selectedBike, setSelectedBike] = useState<Bike | null>(null);
   const [isCreatingBike, setIsCreatingBike] = useState(false);
-  const [blueprintSearchQuery, setBlueprintSearchQuery] = useState("");
-  const [blueprints, setBlueprints] = useState<BikeBlueprint[]>([]);
-  const [selectedBlueprint, setSelectedBlueprint] = useState<BikeBlueprint | null>(null);
+  const [selectedBlueprint, setSelectedBlueprint] = useState<BikeBlueprintRecord | null>(null);
   const [newBikeDetails, setNewBikeDetails] = useState({
     vin: "",
     mileage: "",
@@ -58,21 +58,6 @@ export function CreateTicketModal({
       if (data.length === 0) setError("No customers found matching that search.");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to search customers");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const searchBlueprints = async () => {
-    if (!blueprintSearchQuery.trim()) return;
-    try {
-      setLoading(true);
-      setError("");
-      const data = await ticketsApi.searchBlueprints(blueprintSearchQuery);
-      setBlueprints(data);
-      if (data.length === 0) setError("No bike models found.");
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to search blueprints");
     } finally {
       setLoading(false);
     }
@@ -175,7 +160,7 @@ export function CreateTicketModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md transition-all duration-300">
-      <div className="w-full max-w-xl rounded-[2.5rem] bg-surface p-8 shadow-2xl border border-outline-variant/20 max-h-[90vh] overflow-hidden flex flex-col animate-in zoom-in-95 duration-300">
+      <div className="w-full max-w-3xl rounded-[2.5rem] bg-surface p-8 shadow-2xl border border-outline-variant/20 max-h-[90vh] overflow-hidden flex flex-col animate-in zoom-in-95 duration-300">
         
         {/* Header */}
         <div className="mb-8 flex items-center justify-between">
@@ -382,33 +367,12 @@ export function CreateTicketModal({
                 </>
               ) : (
                 <div className="flex flex-col gap-5 p-6 rounded-[1.5rem] bg-surface-container-low border border-outline-variant/10">
-                  <InputGroup label="Find Model (Blueprint)">
-                    <div className="flex gap-2">
-                      <input
-                        autoFocus
-                        type="text"
-                        className="flex-1 rounded-xl border border-outline-variant/30 bg-surface px-4 py-2 text-on-surface outline-none focus:border-primary transition-all"
-                        placeholder="Search model (e.g. R1, CBR)..."
-                        value={blueprintSearchQuery}
-                        onChange={(e) => setBlueprintSearchQuery(e.target.value)}
-                        onKeyDown={(e) => e.key === "Enter" && searchBlueprints()}
-                      />
-                      <ActionButton onClick={searchBlueprints} disabled={loading}>Find</ActionButton>
-                    </div>
-                    {blueprints.length > 0 && (
-                      <div className="mt-2 max-h-40 overflow-y-auto rounded-xl border border-outline-variant/10 bg-surface shadow-sm">
-                        {blueprints.map((bp) => (
-                          <div
-                            key={bp.id}
-                            className={`cursor-pointer p-3 text-sm transition-all hover:bg-primary/5 ${selectedBlueprint?.id === bp.id ? "bg-primary/10 font-bold text-primary" : "text-on-surface"}`}
-                            onClick={() => setSelectedBlueprint(bp)}
-                          >
-                            {bp.brand?.name} {bp.model} ({bp.year})
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </InputGroup>
+                  <CustomerBikeBlueprintPicker
+                    selectedBlueprint={selectedBlueprint}
+                    onSelectBlueprint={setSelectedBlueprint}
+                    onError={setError}
+                    loading={loading}
+                  />
                   <div className="grid grid-cols-2 gap-4">
                     <InputGroup label="VIN Number">
                       <input

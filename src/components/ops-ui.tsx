@@ -181,10 +181,10 @@ export function InputGroup({
   className?: string;
 }) {
   return (
-    <label className={`flex flex-col gap-2 ${className}`.trim()}>
+    <div className={`flex flex-col gap-2 ${className}`.trim()}>
       <span className="label-caps">{label}</span>
       {children}
-    </label>
+    </div>
   );
 }
 

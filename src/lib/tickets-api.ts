@@ -322,10 +322,6 @@ export const ticketsApi = {
     const res = await authorizedFetch<{ data: Bike[] }>(`/customer_bikes?customer_id=${customerId}`);
     return res.data;
   },
-  searchBlueprints: async (search: string) => {
-    const res = await authorizedFetch<{ data: BikeBlueprint[] }>(`/bike_blueprints?search=${encodeURIComponent(search)}`);
-    return res.data;
-  },
   createBike: async (data: {
     customer_id: number;
     bike_blueprint_id: number;

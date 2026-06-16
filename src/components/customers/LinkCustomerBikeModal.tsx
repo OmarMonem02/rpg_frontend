@@ -3,8 +3,9 @@
 import { useRef, useState } from "react";
 import { getAuthToken } from "@/lib/auth-session";
 import { createCustomerBike } from "@/lib/api/customers";
-import { listBikeBlueprints, type BikeBlueprintRecord } from "@/lib/api/bikes";
+import { type BikeBlueprintRecord } from "@/lib/api/bikes";
 import { ActionButton, InputGroup } from "@/components/ops-ui";
+import { CustomerBikeBlueprintPicker } from "@/components/customers/CustomerBikeBlueprintPicker";
 import { ImageUpload, type ImageUploadHandle } from "@/components/ui/ImageUpload";
 import { resolvePendingImageUpload } from "@/lib/uploadImage";
 import { ModalShell } from "@/components/tickets/ticket-workflow-modals";
@@ -23,12 +24,6 @@ export function LinkCustomerBikeModal({
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const imageUploadRef = useRef<ImageUploadHandle>(null);
-  const [blueprintSearch, setBlueprintSearch] = useState({
-    brand: "",
-    model: "",
-    year: "",
-  });
-  const [blueprints, setBlueprints] = useState<BikeBlueprintRecord[]>([]);
   const [selectedBlueprint, setSelectedBlueprint] =
     useState<BikeBlueprintRecord | null>(null);
   const [details, setDetails] = useState({
@@ -38,45 +33,6 @@ export function LinkCustomerBikeModal({
     image_public_id: "",
     notes: "",
   });
-
-  const searchBlueprints = async () => {
-    const brand = blueprintSearch.brand.trim();
-    const model = blueprintSearch.model.trim();
-    const yearText = blueprintSearch.year.trim();
-    if (!brand && !model && !yearText) return;
-
-    const parsedYear = yearText ? Number(yearText) : undefined;
-    if (
-      yearText &&
-      (parsedYear === undefined ||
-        !Number.isInteger(parsedYear) ||
-        parsedYear < 1900)
-    ) {
-      setError("Enter a valid year (e.g. 2024).");
-      return;
-    }
-
-    try {
-      setLoading(true);
-      setError("");
-      const token = getAuthToken();
-      if (!token) throw new Error("Authentication required");
-      const res = await listBikeBlueprints(token, 1, {
-        brand: brand || undefined,
-        model: model || undefined,
-        year: parsedYear,
-      });
-      setBlueprints(res.items);
-      setSelectedBlueprint(null);
-      if (res.items.length === 0) setError("No bike models found.");
-    } catch (err: unknown) {
-      setError(
-        err instanceof Error ? err.message : "Failed to search bike models",
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleSubmit = async () => {
     if (!selectedBlueprint) return;
@@ -143,90 +99,12 @@ export function LinkCustomerBikeModal({
           </div>
         ) : null}
 
-        <InputGroup label="Find model (blueprint)">
-          <p className="mb-3 text-xs text-on-surface-variant">
-            Search by brand, model, or year — use one field or combine them.
-          </p>
-          <div className="flex grid-cols-1 gap-3 sm:grid-cols-4">
-            <input
-              type="text"
-              className="w-full rounded-xl border border-outline-variant/30 bg-surface-container-lowest px-4 py-2 text-on-surface outline-none focus:border-primary focus:ring-2 focus:ring-primary/30"
-              placeholder="Brand"
-              value={blueprintSearch.brand}
-              onChange={(e) =>
-                setBlueprintSearch((current) => ({
-                  ...current,
-                  brand: e.target.value,
-                }))
-              }
-              onKeyDown={(e) => e.key === "Enter" && void searchBlueprints()}
-            />
-            <input
-              type="text"
-              className="w-full rounded-xl border border-outline-variant/30 bg-surface-container-lowest px-4 py-2 text-on-surface outline-none focus:border-primary focus:ring-2 focus:ring-primary/30"
-              placeholder="Model"
-              value={blueprintSearch.model}
-              onChange={(e) =>
-                setBlueprintSearch((current) => ({
-                  ...current,
-                  model: e.target.value,
-                }))
-              }
-              onKeyDown={(e) => e.key === "Enter" && void searchBlueprints()}
-            />
-            <input
-              type="number"
-              min={1970}
-              step="1"
-              onWheel={(event) => {
-                event.currentTarget.blur();
-              }}
-              className="w-full rounded-xl border border-outline-variant/30 bg-surface-container-lowest px-4 py-2 text-on-surface outline-none focus:border-primary focus:ring-2 focus:ring-primary/30 [&::-webkit-inner-spin-button]:appearance-none"
-              placeholder="Year"
-              value={blueprintSearch.year}
-              onChange={(e) =>
-                setBlueprintSearch((current) => ({
-                  ...current,
-                  year: e.target.value,
-                }))
-              }
-              onKeyDown={(e) => e.key === "Enter" && void searchBlueprints()}
-            />
-          <div className="mt-3 flex justify-end">
-            <ActionButton
-              type="button"
-              onClick={() => void searchBlueprints()}
-              disabled={
-                loading ||
-                (!blueprintSearch.brand.trim() &&
-                  !blueprintSearch.model.trim() &&
-                  !blueprintSearch.year.trim())
-              }
-            >
-              Find
-            </ActionButton>
-          </div>
-          </div>
-          {blueprints.length > 0 ? (
-            <div className="mt-2 max-h-40 overflow-y-auto rounded-xl border border-outline-variant/10 bg-surface-container-lowest">
-              {blueprints.map((bp) => (
-                <button
-                  key={bp.id}
-                  type="button"
-                  className={`block w-full px-4 py-3 text-left text-sm transition-colors hover:bg-primary/5 ${
-                    selectedBlueprint?.id === bp.id
-                      ? "bg-primary/10 font-semibold text-primary"
-                      : "text-on-surface"
-                  }`}
-                  onClick={() => setSelectedBlueprint(bp)}
-                >
-                  {bp.brand?.name ? `${bp.brand.name} ` : ""}
-                  {bp.model} ({bp.year})
-                </button>
-              ))}
-            </div>
-          ) : null}
-        </InputGroup>
+        <CustomerBikeBlueprintPicker
+          selectedBlueprint={selectedBlueprint}
+          onSelectBlueprint={setSelectedBlueprint}
+          onError={setError}
+          loading={loading}
+        />
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <InputGroup label="VIN (optional)">
