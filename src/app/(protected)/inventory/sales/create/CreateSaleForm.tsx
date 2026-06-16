@@ -467,7 +467,7 @@ export function CreateSaleForm() {
           discount_amount: 0,
           quantity: 1,
           currency: toPricingCurrency(
-            "currency_pricing" in item ? item.currency_pricing : "EGP",
+            "sale_currency" in item ? item.sale_currency : "EGP",
           ),
           catalogItem: item,
         };
@@ -518,7 +518,7 @@ export function CreateSaleForm() {
             selling_price: item.sale_price,
             discount_amount: 0,
             quantity: 1,
-            currency: toPricingCurrency(item.currency_pricing),
+            currency: toPricingCurrency(item.sale_currency),
             catalogItem: item,
           },
         ];

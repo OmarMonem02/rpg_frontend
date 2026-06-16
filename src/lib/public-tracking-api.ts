@@ -21,7 +21,7 @@ export type PublicTrackingItem = {
   unit_price: number;
   discount: number;
   subtotal: number;
-  currency_pricing?: string;
+  sale_currency?: string;
   catalog_unit_price?: number;
 };
 

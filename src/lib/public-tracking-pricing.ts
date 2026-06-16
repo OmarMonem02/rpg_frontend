@@ -20,7 +20,7 @@ export function toPublicExchangeRates(
 }
 
 function isLegacyPublicItem(item: PublicTrackingItem): boolean {
-  const currency = toPricingCurrency(item.currency_pricing);
+  const currency = toPricingCurrency(item.sale_currency);
   if (currency === "EGP") return false;
   if (item.catalog_unit_price == null) return true;
   return Math.abs(item.unit_price - item.catalog_unit_price) < 0.01;
@@ -36,7 +36,7 @@ export function convertPublicItemAmount(
   }
   return convertToEGP(
     amount,
-    toPricingCurrency(item.currency_pricing) as PricingCurrency,
+    toPricingCurrency(item.sale_currency) as PricingCurrency,
     rates,
   );
 }

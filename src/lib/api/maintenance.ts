@@ -102,7 +102,7 @@ export async function deleteMaintenanceServiceSector(
 export type MaintenanceServiceRecord = {
   id: number;
   name: string;
-  currency_pricing: PricingCurrency;
+  sale_currency: PricingCurrency;
   service_price: number;
   max_discount_type: "fixed" | "percentage";
   max_discount_value: number;
@@ -112,7 +112,7 @@ export type MaintenanceServiceRecord = {
 
 export type CreateMaintenanceServicePayload = {
   name: string;
-  currency_pricing: PricingCurrency;
+  sale_currency: PricingCurrency;
   service_price: number;
   max_discount_type: "fixed" | "percentage";
   max_discount_value: number;
@@ -126,7 +126,7 @@ export function normalizeMaintenanceService(raw: unknown): MaintenanceServiceRec
   return {
     id: toNumber(record.id),
     name: toText(record.name),
-    currency_pricing: toPricingCurrency(record.currency_pricing),
+    sale_currency: toPricingCurrency(record.sale_currency),
     service_price: toNumber(record.service_price),
     max_discount_type: toText(record.max_discount_type) as
       | "fixed"

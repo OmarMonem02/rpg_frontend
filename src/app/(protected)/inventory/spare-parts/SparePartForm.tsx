@@ -27,6 +27,10 @@ import {
   createBlueprintsFromFormData,
 } from "@/lib/blueprint-year-range-fields";
 import { buildCatalogPricingPayload } from "@/lib/catalog-pricing";
+import {
+  ensurePrimaryInventoryImages,
+  type InventoryImageRecord,
+} from "@/lib/inventory-images";
 import { EntityForm, type FieldConfig } from "@/components/entity-form";
 import { filterBrandsByType } from "@/lib/brand-types";
 
@@ -235,13 +239,14 @@ export function SparePartForm({ mode, initialData }: SparePartFormProps) {
         return Number.isFinite(n) ? n : undefined;
       };
 
+      const images = Array.isArray(formData.images)
+        ? ensurePrimaryInventoryImages(formData.images as InventoryImageRecord[])
+        : [];
+
       const basePayload: UpdateSparePartPayload = {
         name: String(formData.name),
         sku: String(formData.sku),
-        image: formData.image ? String(formData.image) : undefined,
-        image_public_id: formData.image_public_id
-          ? String(formData.image_public_id)
-          : undefined,
+        images,
         part_number: formData.part_number ? String(formData.part_number) : undefined,
         stock_quantity: toNumber(formData.stock_quantity),
         low_stock_alarm: toNumber(formData.low_stock_alarm),
@@ -319,14 +324,26 @@ export function SparePartForm({ mode, initialData }: SparePartFormProps) {
       value: initialData?.part_number,
     },
     {
-      name: "image",
-      label: "Spare Part Photo",
-      type: "image",
+      name: "images",
+      label: "Spare Part Photos",
+      type: "images",
       section: "Basic Info",
-      description: "Upload a file or paste an image URL so the team can identify the part quickly.",
-      value: initialData?.image,
-      imagePublicIdField: "image_public_id",
+      description: "Upload up to 4 photos. Star your favorite — it appears in the catalog list.",
+      value:
+        initialData?.images && initialData.images.length > 0
+          ? initialData.images
+          : initialData?.image
+            ? [
+                {
+                  url: initialData.image,
+                  public_id: initialData.image_public_id,
+                  is_primary: true,
+                  sort_order: 0,
+                },
+              ]
+            : [],
       uploadFolder: "rpg-system/spare-parts",
+      maxImages: 4,
       span: 2,
     },
     {

@@ -680,7 +680,7 @@ export default function TicketDetailsPage() {
     product_id: catalogType === "products" ? item.id : undefined,
     price_snapshot: convertToEGP(
       taskPickerPrice(item),
-      toPricingCurrency(item.currency_pricing),
+      toPricingCurrency(item.sale_currency),
       rates,
     ),
     qty: 1,

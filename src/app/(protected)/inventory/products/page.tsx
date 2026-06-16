@@ -583,6 +583,7 @@ export default function ProductsPage() {
                       <InventoryListTableTd>
                         <InventoryItemThumbnail
                           image={product.image}
+                          images={product.images}
                           name={product.name}
                         />
                       </InventoryListTableTd>
@@ -659,7 +660,7 @@ export default function ProductsPage() {
                               quickEdit.updateField("cost_price", value)
                             }
                             currency={toPricingCurrency(
-                              product.cost_currency ?? product.currency_pricing,
+                              product.cost_currency,
                             )}
                             type="number"
                             min={0}
@@ -669,7 +670,7 @@ export default function ProductsPage() {
                         ) : (
                           formatCatalogPriceInEGP(
                             product.cost_price,
-                            product.cost_currency ?? product.currency_pricing,
+                            product.cost_currency,
                             rates,
                           )
                         )}

@@ -135,7 +135,7 @@ export function BulkEditPreviewStep({
                             <div>
                               <div className="font-medium text-on-surface">{row.name}</div>
                               <div className="mono-data text-xs text-on-surface-variant">
-                                {row.sku} · {row.currency_pricing}
+                                {row.sku} · {row.sale_currency}
                               </div>
                             </div>
                           ) : null}

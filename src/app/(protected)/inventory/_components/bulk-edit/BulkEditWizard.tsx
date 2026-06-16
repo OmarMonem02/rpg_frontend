@@ -98,7 +98,7 @@ export function BulkEditWizard({ config }: BulkEditWizardProps) {
         config.listItems(token, p, listFilters),
       );
       const selected = all.filter((i) => selection.selectedIds.has(i.id));
-      const currencies = new Set(selected.map((i) => i.currency_pricing));
+      const currencies = new Set(selected.map((i) => i.sale_currency));
       setMixedCurrency(currencies.size > 1);
     } catch {
       setMixedCurrency(false);

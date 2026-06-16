@@ -12,6 +12,12 @@ import {
 import type { CatalogPricingFields } from "@/lib/catalog-pricing";
 import { toPricingCurrency, type PricingCurrency } from "@/lib/currencies";
 import type { CreateSparePartPayload } from "./inventory";
+import {
+  normalizeInventoryImages,
+  type InventoryImageRecord,
+} from "@/lib/inventory-images";
+
+export type { InventoryImageRecord };
 
 // --- BIKE BLUEPRINTS ---
 export type BikeBlueprintRecord = {
@@ -249,7 +255,7 @@ export type BikeRecord = {
   bike_blueprint_id: number;
   image?: string;
   image_public_id?: string;
-  currency_pricing: PricingCurrency;
+  images?: InventoryImageRecord[];
   cost_currency: PricingCurrency;
   sale_currency: PricingCurrency;
   cost_price: number;
@@ -270,7 +276,7 @@ export type CreateBikePayload = {
   bike_blueprint_id: number;
   image?: string;
   image_public_id?: string;
-  currency_pricing: PricingCurrency;
+  images?: InventoryImageRecord[];
   cost_currency: PricingCurrency;
   sale_currency: PricingCurrency;
   cost_price: number;
@@ -290,15 +296,14 @@ export type UpdateBikePayload = CreateBikePayload;
 
 export function normalizeBike(raw: unknown): BikeRecord {
   const record = asRecord(raw);
-  const legacy = toPricingCurrency(record.currency_pricing);
-  const saleCurrency = toPricingCurrency(record.sale_currency ?? legacy);
-  const costCurrency = toPricingCurrency(record.cost_currency ?? legacy);
+  const saleCurrency = toPricingCurrency(record.sale_currency ?? "EGP");
+  const costCurrency = toPricingCurrency(record.cost_currency ?? saleCurrency);
   return {
     id: toNumber(record.id),
     bike_blueprint_id: toNumber(record.bike_blueprint_id),
     image: toText(record.image) || undefined,
     image_public_id: toText(record.image_public_id) || undefined,
-    currency_pricing: saleCurrency,
+    images: normalizeInventoryImages(record.images),
     cost_currency: costCurrency,
     sale_currency: saleCurrency,
     sale_price_mode:
@@ -454,7 +459,7 @@ export type BlueprintSparePartRowRecord = {
     sku: string;
     stock_quantity: number;
     sale_price: number;
-    currency_pricing?: string;
+    sale_currency?: string;
     category?: {
       id: number;
       name: string;
@@ -487,7 +492,7 @@ export function normalizeBlueprintSparePartRow(
             sku: toText(sparePart.sku),
             stock_quantity: toNumber(sparePart.stock_quantity),
             sale_price: toNumber(sparePart.sale_price),
-            currency_pricing: toText(sparePart.currency_pricing) || undefined,
+            sale_currency: toText(sparePart.sale_currency) || undefined,
             category:
               category && Object.keys(category).length > 0
                 ? {

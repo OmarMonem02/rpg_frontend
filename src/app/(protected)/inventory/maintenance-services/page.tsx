@@ -459,7 +459,7 @@ export default function MaintenanceServicesPage() {
                         ) : (
                           formatCatalogPriceInEGP(
                             service.service_price,
-                            service.currency_pricing,
+                            service.sale_currency,
                             rates,
                           )
                         )}
@@ -471,7 +471,7 @@ export default function MaintenanceServicesPage() {
                           ? `${service.max_discount_value}%`
                           : formatCatalogPriceInEGP(
                               service.max_discount_value,
-                              service.currency_pricing,
+                              service.sale_currency,
                               rates,
                             )}
                       </InventoryListTableTd>

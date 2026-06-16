@@ -78,7 +78,7 @@ export type Bike = {
 export type TicketCatalogDiscount = {
   max_discount_type?: "fixed" | "percentage";
   max_discount_value?: number;
-  currency_pricing?: PricingCurrency;
+  sale_currency?: PricingCurrency;
   sale_price?: number;
   service_price?: number;
 };
@@ -113,7 +113,7 @@ function normalizeTicketCatalog(
     max_discount_type:
       type === "fixed" || type === "percentage" ? (type as MaxDiscountType) : undefined,
     max_discount_value: toNumber(record.max_discount_value),
-    currency_pricing: toPricingCurrency(record.currency_pricing),
+    sale_currency: toPricingCurrency(record.sale_currency),
     sale_price: toNumber(record.sale_price) || undefined,
     service_price: toNumber(record.service_price) || undefined,
   };

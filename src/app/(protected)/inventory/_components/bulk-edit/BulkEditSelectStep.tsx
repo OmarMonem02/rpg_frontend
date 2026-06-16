@@ -211,7 +211,7 @@ export function BulkEditSelectStep({
                     </td>
                     <td className="px-4 py-3 font-medium text-on-surface">{item.name}</td>
                     <td className="px-4 py-3 mono-data text-on-surface-variant">{item.sku}</td>
-                    <td className="px-4 py-3 mono-data">{item.currency_pricing}</td>
+                    <td className="px-4 py-3 mono-data">{item.sale_currency}</td>
                     <td className="px-4 py-3 mono-data">{item.sale_price}</td>
                     <td className="px-4 py-3 mono-data">{item.stock_quantity}</td>
                   </tr>

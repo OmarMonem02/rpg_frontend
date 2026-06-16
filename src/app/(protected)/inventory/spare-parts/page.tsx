@@ -562,7 +562,7 @@ export default function SparePartsPage() {
                   <InventoryListTableRow key={part.id} editing={editing}>
                     {isVisible("image") && (
                       <InventoryListTableTd>
-                        <InventoryItemThumbnail image={part.image} name={part.name} />
+                        <InventoryItemThumbnail image={part.image} images={part.images} name={part.name} />
                       </InventoryListTableTd>
                     )}
                     {isVisible("sku") && (
@@ -639,7 +639,7 @@ export default function SparePartsPage() {
                               quickEdit.updateField("cost_price", value)
                             }
                             currency={toPricingCurrency(
-                              part.cost_currency ?? part.currency_pricing,
+                              part.cost_currency,
                             )}
                             type="number"
                             min={0}
@@ -649,7 +649,7 @@ export default function SparePartsPage() {
                         ) : (
                           formatCatalogPriceInEGP(
                             part.cost_price,
-                            part.cost_currency ?? part.currency_pricing,
+                            part.cost_currency,
                             rates,
                           )
                         )}

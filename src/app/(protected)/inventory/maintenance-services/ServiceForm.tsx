@@ -57,7 +57,7 @@ export function ServiceForm({ initialData, mode }: ServiceFormProps) {
 
       const payload: CreateMaintenanceServicePayload = {
         name: String(formData.name),
-        currency_pricing: toPricingCurrency(String(formData.currency_pricing)),
+        sale_currency: toPricingCurrency(String(formData.sale_currency)),
         service_price: Number(formData.service_price),
         max_discount_type: String(formData.max_discount_type) as "fixed" | "percentage",
         max_discount_value: Number(formData.max_discount_value),
@@ -149,7 +149,7 @@ export function ServiceForm({ initialData, mode }: ServiceFormProps) {
       helperTone: "featured",
     },
     {
-      name: "currency_pricing",
+      name: "sale_currency",
       label: "Currency",
       type: "select",
       required: true,
@@ -159,7 +159,7 @@ export function ServiceForm({ initialData, mode }: ServiceFormProps) {
         value: o.value,
         label: o.label,
       })),
-      value: initialData?.currency_pricing ?? "EGP",
+      value: initialData?.sale_currency ?? "EGP",
     },
     {
       name: "max_discount_type",

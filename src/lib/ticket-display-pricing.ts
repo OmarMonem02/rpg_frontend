@@ -9,8 +9,8 @@ import type { Ticket, TicketItem } from "@/lib/tickets-api";
 export function getTicketItemSourceCurrency(item: TicketItem): PricingCurrency {
   const catalog =
     item.spare_part ?? item.product ?? item.maintenance_service;
-  if (catalog?.currency_pricing) {
-    return toPricingCurrency(catalog.currency_pricing);
+  if (catalog?.sale_currency) {
+    return toPricingCurrency(catalog.sale_currency);
   }
   return "EGP";
 }

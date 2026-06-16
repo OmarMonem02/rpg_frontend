@@ -409,6 +409,7 @@ export default function BikesPage() {
                           <div className="flex items-center gap-3">
                             <InventoryItemThumbnail
                               image={bike.image}
+                              images={bike.images}
                               name={getBlueprintLabel(bike.bike_blueprint_id)}
                             />
                             <span>{getBlueprintLabel(bike.bike_blueprint_id)}</span>
@@ -464,7 +465,7 @@ export default function BikesPage() {
                                 quickEdit.updateField("cost_price", value)
                               }
                               currency={toPricingCurrency(
-                                bike.cost_currency ?? bike.currency_pricing,
+                                bike.cost_currency,
                               )}
                               type="number"
                               min={0}
@@ -476,7 +477,7 @@ export default function BikesPage() {
                             formatCatalogPriceInEGP(
                               bike.cost_price,
                               toPricingCurrency(
-                                bike.cost_currency ?? bike.currency_pricing,
+                                bike.cost_currency,
                               ),
                               rates,
                             )
@@ -511,7 +512,7 @@ export default function BikesPage() {
                             ? `${bike.max_discount_value}%`
                             : formatCatalogPriceInEGP(
                                 bike.max_discount_value,
-                                toPricingCurrency(bike.currency_pricing),
+                                toPricingCurrency(bike.sale_currency),
                                 rates,
                               )}
                         </InventoryListTableTd>

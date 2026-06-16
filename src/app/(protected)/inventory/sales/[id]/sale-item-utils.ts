@@ -70,7 +70,7 @@ export function buildPayload(item: CatalogItem) {
     return {
       label: item.name,
       kind: "products" as const,
-      currency: toPricingCurrency(item.currency_pricing),
+      currency: toPricingCurrency(item.sale_currency),
       payload: {
         product_id: item.id,
         selling_price: item.sale_price,
@@ -84,7 +84,7 @@ export function buildPayload(item: CatalogItem) {
     return {
       label: item.name,
       kind: "spare_parts" as const,
-      currency: toPricingCurrency(item.currency_pricing),
+      currency: toPricingCurrency(item.sale_currency),
       payload: {
         spare_part_id: item.id,
         selling_price: item.sale_price,
@@ -98,7 +98,7 @@ export function buildPayload(item: CatalogItem) {
     label: "vin" in item && item.vin ? `Bike ${item.vin}` : `Bike #${item.id}`,
     kind: "bikes" as const,
     currency: toPricingCurrency(
-      "currency_pricing" in item ? item.currency_pricing : "EGP",
+      "sale_currency" in item ? item.sale_currency : "EGP",
     ),
     payload: {
       bike_for_sale_id: item.id,

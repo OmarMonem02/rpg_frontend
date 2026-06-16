@@ -111,7 +111,7 @@ function BlueprintQuickAssignModal({
                       </div>
                       <div className="mt-3 flex flex-wrap gap-2 text-xs">
                         <span className="form-chip">
-                          {item.sale_price} {item.currency_pricing}
+                          {item.sale_price} {item.sale_currency}
                         </span>
                         <span className="form-chip">Stock {item.stock_quantity}</span>
                       </div>
@@ -337,10 +337,9 @@ export default function BikeBlueprintSparePartsPage() {
         low_stock_alarm: formData.low_stock_alarm ? Number(formData.low_stock_alarm) : 0,
         spare_parts_category_id: Number(formData.spare_parts_category_id),
         brand_id: Number(formData.brand_id),
-        currency_pricing: toPricingCurrency(String(formData.currency_pricing)),
         cost_currency: toPricingCurrency(String(formData.cost_currency)),
         sale_currency: toPricingCurrency(String(formData.sale_currency)),
-          cost_price: Number(formData.cost_price),
+        cost_price: Number(formData.cost_price),
         sale_price: Number(formData.sale_price),
         max_discount_type: String(formData.max_discount_type) as "fixed" | "percentage",
         max_discount_value: Number(formData.max_discount_value),
@@ -467,7 +466,7 @@ export default function BikeBlueprintSparePartsPage() {
       min: 0,
       step: "0.01",
       summaryValue: ({ value, formData }) =>
-        value !== "" && value !== undefined ? `${String(value)} ${String(formData.currency_pricing ?? "EGP")}` : undefined,
+        value !== "" && value !== undefined ? `${String(value)} ${String(formData.sale_currency ?? "EGP")}` : undefined,
     },
     {
       name: "sale_price",
@@ -481,10 +480,10 @@ export default function BikeBlueprintSparePartsPage() {
       step: "0.01",
       helperTone: "featured",
       summaryValue: ({ value, formData }) =>
-        value !== "" && value !== undefined ? `${String(value)} ${String(formData.currency_pricing ?? "EGP")}` : undefined,
+        value !== "" && value !== undefined ? `${String(value)} ${String(formData.sale_currency ?? "EGP")}` : undefined,
     },
     {
-      name: "currency_pricing",
+      name: "sale_currency",
       label: "Currency",
       type: "select",
       required: true,
@@ -680,7 +679,7 @@ export default function BikeBlueprintSparePartsPage() {
                   <td className="px-4 py-3 text-xs text-on-surface-variant">{row.spare_part?.brand?.name ?? "-"}</td>
                   <td className="px-4 py-3 text-center text-on-surface">{row.spare_part?.stock_quantity ?? 0}</td>
                   <td className="px-4 py-3 text-on-surface">
-                    {row.spare_part?.sale_price ?? 0} {row.spare_part?.currency_pricing ?? "EGP"}
+                    {row.spare_part?.sale_price ?? 0} {row.spare_part?.sale_currency ?? "EGP"}
                   </td>
                   <td className="px-4 py-3 text-right">
                     <button

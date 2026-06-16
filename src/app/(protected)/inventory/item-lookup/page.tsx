@@ -146,7 +146,7 @@ function LookupResultCard({
           <dd className="mono-data mt-1 text-lg font-semibold text-primary">
             {formatCatalogPriceInEGP(
               record.sale_price,
-              record.currency_pricing,
+              record.sale_currency,
               rates,
             )}
           </dd>
@@ -723,7 +723,7 @@ export default function ItemLookupPage() {
                         <td className="mono-data px-4 py-3 text-primary">
                           {formatCatalogPriceInEGP(
                             record.sale_price,
-                            record.currency_pricing,
+                            record.sale_currency,
                             rates,
                           )}
                         </td>

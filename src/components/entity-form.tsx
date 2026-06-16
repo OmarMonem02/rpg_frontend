@@ -10,6 +10,10 @@ import {
   useState,
 } from "react";
 import { ImageUpload, type ImageUploadHandle } from "@/components/ui/ImageUpload";
+import {
+  MultiImageUpload,
+  type MultiImageUploadHandle,
+} from "@/components/ui/MultiImageUpload";
 import { ActionButton, SearchableSelect } from "@/components/ops-ui";
 import { QuickCreateButton } from "@/components/quick-create/QuickCreateButton";
 import { QuickCreateDrawer } from "@/components/quick-create/QuickCreateDrawer";
@@ -20,6 +24,7 @@ import {
   defaultCatalogPricingFromRecord,
   type CatalogPricingFields,
 } from "@/lib/catalog-pricing";
+import type { InventoryImageRecord } from "@/lib/inventory-images";
 
 type SectionSummaryResolver = (args: {
   field: FieldConfig;
@@ -44,6 +49,7 @@ export type FieldConfig = {
   | "tags"
   | "toggle"
   | "image"
+  | "images"
   | "password"
   | "date"
   | "time"
@@ -69,6 +75,7 @@ export type FieldConfig = {
   helperTone?: "default" | "featured" | "muted";
   imagePublicIdField?: string;
   uploadFolder?: string;
+  maxImages?: number;
   summaryValue?: string | SectionSummaryResolver;
   onValueChange?: (args: {
     value: unknown;
@@ -111,7 +118,6 @@ function seedPricingFields(
   initialData.sale_price_mode = pricing.sale_price_mode;
   initialData.sale_margin_type = pricing.sale_margin_type ?? "percentage";
   initialData.sale_margin_value = pricing.sale_margin_value ?? 0;
-  initialData.currency_pricing = pricing.currency_pricing ?? pricing.sale_currency;
 }
 
 function buildInitialFormData(fields: FieldConfig[]) {
@@ -127,6 +133,8 @@ function buildInitialFormData(fields: FieldConfig[]) {
     if (field.type === "toggle") {
       initialData[field.name] = field.value === true;
     } else if (field.type === "multiselect" || field.type === "tags") {
+      initialData[field.name] = Array.isArray(field.value) ? field.value : [];
+    } else if (field.type === "images") {
       initialData[field.name] = Array.isArray(field.value) ? field.value : [];
     } else {
       initialData[field.name] = field.value ?? "";
@@ -173,6 +181,9 @@ export const EntityForm = forwardRef<EntityFormHandle, EntityFormProps>(
       useState<number | null>(null);
     const sectionRefs = useRef<(HTMLElement | null)[]>([]);
     const imageUploadRefs = useRef<Map<string, ImageUploadHandle>>(new Map());
+    const multiImageUploadRefs = useRef<Map<string, MultiImageUploadHandle>>(
+      new Map(),
+    );
 
     const isStackedLayout = variant === "page";
     const requiredFieldsCount = fields.filter((field) => field.required).length;
@@ -307,6 +318,12 @@ export const EntityForm = forwardRef<EntityFormHandle, EntityFormProps>(
           return false;
         }
         return !value;
+      }
+      if (field.type === "images") {
+        if (multiImageUploadRefs.current.get(field.name)?.hasPendingUpload()) {
+          return false;
+        }
+        return !Array.isArray(value) || value.length === 0;
       }
       if (typeof value === "number") return Number.isNaN(value);
       return value === "" || value === null || value === undefined;
@@ -487,24 +504,33 @@ export const EntityForm = forwardRef<EntityFormHandle, EntityFormProps>(
 
         for (const section of sectionsToValidate) {
           for (const field of section.fields) {
-            if (field.type !== "image") continue;
+            if (field.type === "image") {
+              const imageRef = imageUploadRefs.current.get(field.name);
+              if (!imageRef?.hasPendingUpload()) continue;
 
-            const imageRef = imageUploadRefs.current.get(field.name);
-            if (!imageRef?.hasPendingUpload()) continue;
+              const uploaded = await imageRef.uploadIfPending();
+              if (!uploaded) {
+                setFieldErrors((prev) => ({
+                  ...prev,
+                  [field.name]: "Image upload failed. Please try again.",
+                }));
+                return;
+              }
 
-            const uploaded = await imageRef.uploadIfPending();
-            if (!uploaded) {
-              setFieldErrors((prev) => ({
-                ...prev,
-                [field.name]: "Image upload failed. Please try again.",
-              }));
-              return;
+              updatedFormData[field.name] = uploaded.url;
+              if (field.imagePublicIdField) {
+                updatedFormData[field.imagePublicIdField] = uploaded.public_id;
+              }
+              continue;
             }
 
-            updatedFormData[field.name] = uploaded.url;
-            if (field.imagePublicIdField) {
-              updatedFormData[field.imagePublicIdField] = uploaded.public_id;
-            }
+            if (field.type !== "images") continue;
+
+            const imagesRef = multiImageUploadRefs.current.get(field.name);
+            if (!imagesRef?.hasPendingUpload()) continue;
+
+            const uploadedImages = await imagesRef.uploadIfPending();
+            updatedFormData[field.name] = uploadedImages;
           }
         }
 
@@ -522,6 +548,7 @@ export const EntityForm = forwardRef<EntityFormHandle, EntityFormProps>(
           field.type === "textarea" ||
           field.type === "toggle" ||
           field.type === "image" ||
+          field.type === "images" ||
           field.type === "multiselect" ||
           field.type === "tags" ||
           field.type === "pricing" ||
@@ -537,6 +564,7 @@ export const EntityForm = forwardRef<EntityFormHandle, EntityFormProps>(
         field.type === "toggle" ||
         field.type === "multiselect" ||
         field.type === "tags" ||
+        field.type === "images" ||
         field.type === "pricing"
       )
         return "md:col-span-2";
@@ -550,6 +578,7 @@ export const EntityForm = forwardRef<EntityFormHandle, EntityFormProps>(
           field.type === "multiselect" ||
           field.type === "tags" ||
           field.type === "image" ||
+          field.type === "images" ||
           field.type === "pricing",
       ) || section.fields.length > 5;
 
@@ -614,6 +643,46 @@ export const EntityForm = forwardRef<EntityFormHandle, EntityFormProps>(
                   errors={fieldErrors}
                   disabled={isSubmitting || isLoading || fieldDisabled}
                 />
+              </div>
+            ) : field.type === "images" ? (
+              <div className="group">
+                <label className="label-caps mb-2 ml-1 block">
+                  {field.label}{" "}
+                  {field.required && <span className="text-error">*</span>}
+                </label>
+                <MultiImageUpload
+                  ref={(handle) => {
+                    if (handle) {
+                      multiImageUploadRefs.current.set(field.name, handle);
+                    } else {
+                      multiImageUploadRefs.current.delete(field.name);
+                    }
+                  }}
+                  value={
+                    Array.isArray(fieldValue)
+                      ? (fieldValue as InventoryImageRecord[])
+                      : []
+                  }
+                  uploadFolder={field.uploadFolder}
+                  maxImages={field.maxImages}
+                  onChange={(images) => handleChange(field.name, images)}
+                  onError={(message) => {
+                    setFieldErrors((prev) => ({
+                      ...prev,
+                      [field.name]: message,
+                    }));
+                  }}
+                />
+                {field.description && (
+                  <p className="mt-2 ml-2 text-xs leading-relaxed text-on-surface-variant">
+                    {field.description}
+                  </p>
+                )}
+                {fieldErrors[field.name] && (
+                  <p className="mt-2 ml-2 text-xs font-bold text-error">
+                    {fieldErrors[field.name]}
+                  </p>
+                )}
               </div>
             ) : field.type === "image" ? (
               <div className="group">

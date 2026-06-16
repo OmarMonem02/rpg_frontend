@@ -15,7 +15,7 @@ export type LookupItem =
 export type DiscountDisplayItem = {
   max_discount_type: "fixed" | "percentage";
   max_discount_value: number;
-  currency_pricing: PricingCurrency;
+  sale_currency: PricingCurrency;
 };
 
 export function findExactSkuOrPartNumberMatch(
@@ -65,7 +65,7 @@ export function formatMaxDiscount(
 
   return formatCatalogPriceInEGP(
     item.max_discount_value,
-    item.currency_pricing,
+    item.sale_currency,
     rates,
   );
 }

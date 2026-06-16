@@ -16,7 +16,7 @@ export function debugFilters() {
   testUrl.searchParams.append("brand_id", "1");
   testUrl.searchParams.append("price_min", "100");
   testUrl.searchParams.append("price_max", "500");
-  testUrl.searchParams.append("currency_pricing", "EGP");
+  testUrl.searchParams.append("sale_currency", "EGP");
 
   console.log("[DEBUG] Test URL:", testUrl.toString());
   console.log("[DEBUG] URL search params:");

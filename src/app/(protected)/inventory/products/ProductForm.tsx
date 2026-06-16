@@ -22,6 +22,10 @@ import {
 } from "@/lib/crud-api";
 import { buildCatalogPricingPayload } from "@/lib/catalog-pricing";
 import {
+  ensurePrimaryInventoryImages,
+  type InventoryImageRecord,
+} from "@/lib/inventory-images";
+import {
   buildBlueprintYearRangeFields,
   createBlueprintsFromFormData,
 } from "@/lib/blueprint-year-range-fields";
@@ -184,13 +188,14 @@ export function ProductForm({ initialData, mode }: ProductFormProps) {
 
       const selectedBlueprints = isUniversal ? [] : selectedBlueprintsRaw;
 
+      const images = Array.isArray(formData.images)
+        ? ensurePrimaryInventoryImages(formData.images as InventoryImageRecord[])
+        : [];
+
       const basePayload: UpdateProductPayload = {
         name: String(formData.name),
         sku: String(formData.sku),
-        image: formData.image ? String(formData.image) : undefined,
-        image_public_id: formData.image_public_id
-          ? String(formData.image_public_id)
-          : undefined,
+        images,
         stock_quantity: formData.stock_quantity ? Number(formData.stock_quantity) : 0,
         low_stock_alarm: formData.low_stock_alarm ? Number(formData.low_stock_alarm) : 0,
         products_category_id: Number(formData.products_category_id),
@@ -263,14 +268,26 @@ export function ProductForm({ initialData, mode }: ProductFormProps) {
       value: initialData?.part_number,
     },
     {
-      name: "image",
-      label: "Product Photo",
-      type: "image",
+      name: "images",
+      label: "Product Photos",
+      type: "images",
       section: "Basic Info",
-      description: "Upload a file or paste an image URL for the main catalog photo.",
-      value: initialData?.image,
-      imagePublicIdField: "image_public_id",
+      description: "Upload up to 4 photos. Star your favorite — it appears in the catalog list.",
+      value:
+        initialData?.images && initialData.images.length > 0
+          ? initialData.images
+          : initialData?.image
+            ? [
+                {
+                  url: initialData.image,
+                  public_id: initialData.image_public_id,
+                  is_primary: true,
+                  sort_order: 0,
+                },
+              ]
+            : [],
       uploadFolder: "rpg-system/products",
+      maxImages: 4,
       span: 2,
     },
     {

@@ -17,15 +17,13 @@ export type CatalogPricingFields = {
   sale_price_mode: SalePriceMode;
   sale_margin_type?: SaleMarginType;
   sale_margin_value?: number;
-  currency_pricing?: PricingCurrency;
 };
 
 export function defaultCatalogPricingFromRecord(
-  record?: Partial<CatalogPricingFields> & { currency_pricing?: string },
+  record?: Partial<CatalogPricingFields>,
 ): CatalogPricingFields {
-  const legacy = toPricingCurrency(record?.currency_pricing ?? "EGP");
-  const costCurrency = toPricingCurrency(record?.cost_currency ?? legacy);
-  const saleCurrency = toPricingCurrency(record?.sale_currency ?? legacy);
+  const costCurrency = toPricingCurrency(record?.cost_currency ?? "EGP");
+  const saleCurrency = toPricingCurrency(record?.sale_currency ?? costCurrency);
 
   return {
     cost_price: Number(record?.cost_price) || 0,
@@ -36,7 +34,6 @@ export function defaultCatalogPricingFromRecord(
     sale_margin_type:
       record?.sale_margin_type === "fixed" ? "fixed" : "percentage",
     sale_margin_value: Number(record?.sale_margin_value) || 0,
-    currency_pricing: saleCurrency,
   };
 }
 
@@ -294,7 +291,7 @@ export function resolveMarginQuickEditPricing(
 }
 
 export function pricingRecordFromItem(
-  item: Partial<CatalogPricingFields> & { currency_pricing?: string },
+  item: Partial<CatalogPricingFields>,
 ): MarginAwarePricingRecord {
   const pricing = defaultCatalogPricingFromRecord(item);
   return {
@@ -310,14 +307,13 @@ export function pricingRecordFromItem(
 
 export function buildCatalogPricingPayload(
   formData: Record<string, unknown>,
-): CatalogPricingFields & { currency_pricing: PricingCurrency } {
-  const saleCurrency = toPricingCurrency(String(formData.sale_currency ?? formData.currency_pricing ?? "EGP"));
+): CatalogPricingFields {
+  const saleCurrency = toPricingCurrency(String(formData.sale_currency ?? "EGP"));
   const mode = formData.sale_price_mode === "margin" ? "margin" : "manual";
 
   return {
     cost_currency: toPricingCurrency(String(formData.cost_currency ?? saleCurrency)),
     sale_currency: saleCurrency,
-    currency_pricing: saleCurrency,
     cost_price: Number(formData.cost_price) || 0,
     sale_price: Number(formData.sale_price) || 0,
     sale_price_mode: mode,

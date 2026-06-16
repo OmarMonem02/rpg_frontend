@@ -13,6 +13,10 @@ import {
   fetchAllPages,
 } from "@/lib/crud-api";
 import { buildCatalogPricingPayload } from "@/lib/catalog-pricing";
+import {
+  ensurePrimaryInventoryImages,
+  type InventoryImageRecord,
+} from "@/lib/inventory-images";
 import { EntityForm, type FieldConfig } from "@/components/entity-form";
 
 interface BikeFormProps {
@@ -62,12 +66,13 @@ export function BikeForm({ mode, initialData }: BikeFormProps) {
       const token = getAuthToken();
       if (!token) throw new Error("Authentication required");
 
+      const images = Array.isArray(formData.images)
+        ? ensurePrimaryInventoryImages(formData.images as InventoryImageRecord[])
+        : [];
+
       const payload: CreateBikePayload = {
         bike_blueprint_id: Number(formData.bike_blueprint_id),
-        image: formData.image ? String(formData.image) : undefined,
-        image_public_id: formData.image_public_id
-          ? String(formData.image_public_id)
-          : undefined,
+        images,
         ...buildCatalogPricingPayload(formData),
         status: String(formData.status),
         max_discount_type: String(formData.max_discount_type),
@@ -121,14 +126,26 @@ export function BikeForm({ mode, initialData }: BikeFormProps) {
       value: initialData?.vin,
     },
     {
-      name: "image",
-      label: "Bike Photo",
-      type: "image",
+      name: "images",
+      label: "Bike Photos",
+      type: "images",
       section: "Bike Identity",
-      description: "Upload a file or paste an image URL for this bike listing.",
-      value: initialData?.image,
-      imagePublicIdField: "image_public_id",
+      description: "Upload up to 4 photos. Star your favorite — it appears in the catalog list.",
+      value:
+        initialData?.images && initialData.images.length > 0
+          ? initialData.images
+          : initialData?.image
+            ? [
+                {
+                  url: initialData.image,
+                  public_id: initialData.image_public_id,
+                  is_primary: true,
+                  sort_order: 0,
+                },
+              ]
+            : [],
       uploadFolder: "rpg-system/bikes",
+      maxImages: 4,
       span: 2,
     },
     {

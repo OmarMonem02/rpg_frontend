@@ -49,7 +49,7 @@ type StockAlertRow = {
   stock_quantity: number;
   low_stock_alarm: number;
   sale_price: number;
-  currency_pricing: string;
+  sale_currency: string;
   editHref: string;
 };
 
@@ -67,7 +67,7 @@ function toSparePartRow(part: SparePartRecord): StockAlertRow {
     stock_quantity: part.stock_quantity,
     low_stock_alarm: part.low_stock_alarm,
     sale_price: part.sale_price,
-    currency_pricing: part.currency_pricing,
+    sale_currency: part.sale_currency,
     editHref: `/inventory/spare-parts/edit/${part.id}`,
   };
 }
@@ -83,7 +83,7 @@ function toProductRow(product: ProductRecord): StockAlertRow {
     stock_quantity: product.stock_quantity,
     low_stock_alarm: product.low_stock_alarm,
     sale_price: product.sale_price,
-    currency_pricing: product.currency_pricing,
+    sale_currency: product.sale_currency,
     editHref: `/inventory/products/edit/${product.id}`,
   };
 }

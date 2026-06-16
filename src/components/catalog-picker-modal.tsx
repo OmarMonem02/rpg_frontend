@@ -457,8 +457,8 @@ export function CatalogPickerModal({
   };
 
   const getItemCurrency = (item: CatalogItem): PricingCurrency => {
-    if ("currency_pricing" in item) {
-      return toPricingCurrency(item.currency_pricing);
+    if ("sale_currency" in item) {
+      return toPricingCurrency(item.sale_currency);
     }
     return toPricingCurrency(filters.currency || "EGP");
   };
@@ -1146,7 +1146,7 @@ export function CatalogPickerModal({
                                     ? `${item.max_discount_value}%`
                                     : formatCatalogPriceInEGP(
                                         item.max_discount_value,
-                                        toPricingCurrency(item.currency_pricing),
+                                        toPricingCurrency(item.sale_currency),
                                         rates,
                                       )}
                                 </span>

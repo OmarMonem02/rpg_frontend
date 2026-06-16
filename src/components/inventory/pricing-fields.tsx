@@ -84,7 +84,7 @@ export function PricingFields({
   useEffect(() => {
     if (values.sale_price_mode !== "margin" || marginSalePrice === null) return;
     if (Math.abs(marginSalePrice - values.sale_price) < 0.01) return;
-    onChange({ sale_price: marginSalePrice, currency_pricing: values.sale_currency });
+    onChange({ sale_price: marginSalePrice });
   }, [marginSalePrice, onChange, values.sale_price, values.sale_currency, values.sale_price_mode]);
 
   const costEgpHint = computeCostInEgp(
@@ -112,7 +112,6 @@ export function PricingFields({
       onChange({
         sale_price_mode: mode,
         sale_currency: "EGP",
-        currency_pricing: "EGP",
         cost_currency:
           values.cost_currency === "EGP" ? "USD" : values.cost_currency,
       });
@@ -269,7 +268,6 @@ export function PricingFields({
               onChange={(e) =>
                 onChange({
                   sale_price: Number(e.target.value) || 0,
-                  currency_pricing: values.sale_currency,
                 })
               }
               className={compactInput}
@@ -289,7 +287,6 @@ export function PricingFields({
                 const saleCurrency = toPricingCurrency(value) as PricingCurrency;
                 onChange({
                   sale_currency: saleCurrency,
-                  currency_pricing: saleCurrency,
                 });
               }}
               options={CURRENCY_SELECT_OPTIONS}

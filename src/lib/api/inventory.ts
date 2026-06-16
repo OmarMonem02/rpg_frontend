@@ -17,6 +17,12 @@ import { ApiError } from "@/lib/auth-api";
 import type { StocktakeExportRow } from "@/lib/stocktake";
 
 import type { BrandType } from "@/lib/brand-types";
+import {
+  normalizeInventoryImages,
+  type InventoryImageRecord,
+} from "@/lib/inventory-images";
+
+export type { InventoryImageRecord };
 
 // --- BRANDS ---
 export type BrandRecord = {
@@ -280,12 +286,12 @@ export type SparePartRecord = {
   sku: string;
   image?: string;
   image_public_id?: string;
+  images?: InventoryImageRecord[];
   part_number?: string;
   stock_quantity: number;
   low_stock_alarm: number;
   spare_parts_category_id: number;
   brand_id: number;
-  currency_pricing: PricingCurrency;
   cost_currency: PricingCurrency;
   sale_currency: PricingCurrency;
   cost_price: number;
@@ -307,12 +313,12 @@ export type CreateSparePartPayload = {
   sku: string;
   image?: string;
   image_public_id?: string;
+  images?: InventoryImageRecord[];
   part_number?: string;
   stock_quantity?: number;
   low_stock_alarm?: number;
   spare_parts_category_id: number;
   brand_id: number;
-  currency_pricing: PricingCurrency;
   cost_currency: PricingCurrency;
   sale_currency: PricingCurrency;
   cost_price: number;
@@ -333,12 +339,12 @@ export type UpdateSparePartPayload = {
   sku: string;
   image?: string;
   image_public_id?: string;
+  images?: InventoryImageRecord[];
   part_number?: string;
   stock_quantity?: number;
   low_stock_alarm?: number;
   spare_parts_category_id: number;
   brand_id: number;
-  currency_pricing: PricingCurrency;
   cost_currency: PricingCurrency;
   sale_currency: PricingCurrency;
   cost_price: number;
@@ -383,12 +389,10 @@ function coalesceBikeBlueprintIds(record: Record<string, unknown>): number[] | u
 }
 
 function normalizeCatalogPricingFields(record: Record<string, unknown>) {
-  const legacy = toPricingCurrency(record.currency_pricing);
-  const saleCurrency = toPricingCurrency(record.sale_currency ?? legacy);
-  const costCurrency = toPricingCurrency(record.cost_currency ?? legacy);
+  const saleCurrency = toPricingCurrency(record.sale_currency ?? "EGP");
+  const costCurrency = toPricingCurrency(record.cost_currency ?? saleCurrency);
 
   return {
-    currency_pricing: saleCurrency,
     cost_currency: costCurrency,
     sale_currency: saleCurrency,
     sale_price_mode:
@@ -415,6 +419,7 @@ export function normalizeSparePart(raw: unknown): SparePartRecord {
     sku: toText(record.sku),
     image: toText(record.image) || undefined,
     image_public_id: toText(record.image_public_id) || undefined,
+    images: normalizeInventoryImages(record.images),
     part_number: toText(record.part_number) || undefined,
     stock_quantity: toNumber(record.stock_quantity),
     low_stock_alarm: toNumber(record.low_stock_alarm),
@@ -534,12 +539,12 @@ export type ProductRecord = {
   sku: string;
   image?: string;
   image_public_id?: string;
+  images?: InventoryImageRecord[];
   part_number?: string;
   stock_quantity: number;
   low_stock_alarm: number;
   products_category_id: number;
   brand_id: number;
-  currency_pricing: PricingCurrency;
   cost_currency: PricingCurrency;
   sale_currency: PricingCurrency;
   cost_price: number;
@@ -561,12 +566,12 @@ export type CreateProductPayload = {
   sku: string;
   image?: string;
   image_public_id?: string;
+  images?: InventoryImageRecord[];
   part_number?: string;
   stock_quantity?: number;
   low_stock_alarm?: number;
   products_category_id: number;
   brand_id: number;
-  currency_pricing: PricingCurrency;
   cost_currency: PricingCurrency;
   sale_currency: PricingCurrency;
   cost_price: number;
@@ -596,6 +601,7 @@ export function normalizeProduct(raw: unknown): ProductRecord {
     sku: toText(record.sku),
     image: toText(record.image) || undefined,
     image_public_id: toText(record.image_public_id) || undefined,
+    images: normalizeInventoryImages(record.images),
     part_number: toText(record.part_number),
     stock_quantity: toNumber(record.stock_quantity),
     low_stock_alarm: toNumber(record.low_stock_alarm),
@@ -741,7 +747,6 @@ export function buildSparePartQuickEditPayload(
     low_stock_alarm: changes.low_stock_alarm ?? record.low_stock_alarm,
     spare_parts_category_id: record.spare_parts_category_id,
     brand_id: record.brand_id,
-    currency_pricing: record.currency_pricing,
     cost_price: changes.cost_price ?? record.cost_price,
     sale_price: changes.sale_price ?? record.sale_price,
     sale_price_mode: changes.sale_price_mode ?? record.sale_price_mode,
@@ -802,7 +807,6 @@ export type BulkInventoryPreviewRow = {
   id: number;
   name: string;
   sku: string;
-  currency_pricing: PricingCurrency;
   before: Partial<Record<keyof BulkInventoryChanges, number>>;
   after: Partial<Record<keyof BulkInventoryChanges, number>>;
   changed_fields: (keyof BulkInventoryChanges)[];
@@ -830,7 +834,7 @@ function normalizeBulkPreviewRow(raw: unknown): BulkInventoryPreviewRow {
     id: toNumber(record.id),
     name: toText(record.name),
     sku: toText(record.sku),
-    currency_pricing: toPricingCurrency(record.currency_pricing),
+    sale_currency: toPricingCurrency(record.sale_currency),
     before: {
       sale_price: before.sale_price !== undefined ? toNumber(before.sale_price) : undefined,
       cost_price: before.cost_price !== undefined ? toNumber(before.cost_price) : undefined,
