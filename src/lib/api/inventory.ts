@@ -449,10 +449,12 @@ export async function listSpareParts(
     bike_year_from?: number;
     bike_year_to?: number;
     tags?: string[];
+    per_page?: number;
   },
 ): Promise<PaginatedResult<SparePartRecord>> {
   const query = buildQuery({
     page,
+    per_page: filters?.per_page,
     search: filters?.search,
     category_id: filters?.category_id,
     brand_id: filters?.brand_id,
@@ -626,10 +628,12 @@ export async function listProducts(
     bike_model?: string;
     bike_year?: number;
     tags?: string[];
+    per_page?: number;
   },
 ): Promise<PaginatedResult<ProductRecord>> {
   const query = buildQuery({
     page,
+    per_page: filters?.per_page,
     search: filters?.search,
     category_id: filters?.category_id,
     brand_id: filters?.brand_id,

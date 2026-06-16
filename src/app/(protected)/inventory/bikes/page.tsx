@@ -66,6 +66,25 @@ import {
   StatusBadge,
   SurfaceCard,
 } from "@/components/ops-ui";
+import { useTableColumns, type TableColumnDef } from "@/hooks/useTableColumns";
+import { ColumnPicker } from "@/components/inventory/ColumnPicker";
+import { useTablePageSize } from "@/hooks/useTablePageSize";
+import { PageSizeSelect } from "@/components/inventory/PageSizeSelect";
+
+type BikesColumnId =
+  | "blueprint" | "vin" | "sale_price" | "cost_price"
+  | "mileage" | "status" | "discount" | "actions";
+
+const BIKES_COLUMNS: readonly TableColumnDef<BikesColumnId>[] = [
+  { id: "blueprint", label: "Blueprint" },
+  { id: "vin", label: "VIN" },
+  { id: "sale_price", label: "Sale Price" },
+  { id: "cost_price", label: "Cost Price" },
+  { id: "mileage", label: "Mileage (km)" },
+  { id: "status", label: "Status" },
+  { id: "discount", label: "Discount" },
+  { id: "actions", label: "Actions", required: true },
+];
 
 const STATUSES = [
   { value: "available", label: "Available" },
@@ -106,6 +125,15 @@ export default function BikesPage() {
   // Use custom filter hook
   const { filters, page, setPage, getCleanFilters, setSearch, setStatus, setBlueprint, setBrand, setPriceMin, setPriceMax, setCurrency, logFilters } = useEntityFilters();
 
+  const { isVisible, toggle: toggleColumn, reset: resetColumns, visible: visibleColumns } = useTableColumns(
+    "table-cols:bikes-catalog",
+    BIKES_COLUMNS,
+  );
+
+  const { pageSize, setPageSize, apiPerPage, isShowAll } = useTablePageSize(
+    "table-page-size:bikes-catalog",
+  );
+
   const quickEdit = useQuickEditRow();
   const validateBikeQuickEdit = combineValidators(
     (draft) =>
@@ -127,7 +155,7 @@ export default function BikesPage() {
       logFilters();
 
       const cleanFilters = getCleanFilters();
-      const result = await listBikes(token, page, cleanFilters as Parameters<typeof listBikes>[2]);
+      const result = await listBikes(token, page, { ...(cleanFilters as Parameters<typeof listBikes>[2]), per_page: apiPerPage });
       setBikes(result.items);
       setTotalPages(result.lastPage);
       setError(null);
@@ -136,7 +164,7 @@ export default function BikesPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, filters, getCleanFilters, logFilters]);
+  }, [page, filters, getCleanFilters, logFilters, apiPerPage]);
 
   const loadBlueprints = useCallback(async () => {
     try {
@@ -345,18 +373,29 @@ export default function BikesPage() {
           />
         ) : (
           <InventoryListTable>
-            <InventoryListTableToolbar label="Showroom listings" count={bikes.length} />
+            <InventoryListTableToolbar label="Showroom listings" count={bikes.length}>
+              <PageSizeSelect
+                value={pageSize}
+                onChange={(size) => { setPageSize(size); setPage(1); }}
+              />
+              <ColumnPicker
+                columns={BIKES_COLUMNS}
+                visible={visibleColumns}
+                onToggle={toggleColumn}
+                onReset={resetColumns}
+              />
+            </InventoryListTableToolbar>
             <InventoryListTableScroll>
               <InventoryListTableElement minWidth="960px">
                 <InventoryListTableHead>
                   <tr>
-                    <InventoryListTableTh>Blueprint</InventoryListTableTh>
-                    <InventoryListTableTh>VIN</InventoryListTableTh>
-                    <InventoryListTableTh align="right">Sale Price</InventoryListTableTh>
-                    <InventoryListTableTh align="right">Cost Price</InventoryListTableTh>
-                    <InventoryListTableTh align="center">Mileage (km)</InventoryListTableTh>
-                    <InventoryListTableTh>Status</InventoryListTableTh>
-                    <InventoryListTableTh>Discount</InventoryListTableTh>
+                    {isVisible("blueprint") && <InventoryListTableTh>Blueprint</InventoryListTableTh>}
+                    {isVisible("vin") && <InventoryListTableTh>VIN</InventoryListTableTh>}
+                    {isVisible("sale_price") && <InventoryListTableTh align="right">Sale Price</InventoryListTableTh>}
+                    {isVisible("cost_price") && <InventoryListTableTh align="right">Cost Price</InventoryListTableTh>}
+                    {isVisible("mileage") && <InventoryListTableTh align="center">Mileage (km)</InventoryListTableTh>}
+                    {isVisible("status") && <InventoryListTableTh>Status</InventoryListTableTh>}
+                    {isVisible("discount") && <InventoryListTableTh>Discount</InventoryListTableTh>}
                     <InventoryListTableTh align="center">Actions</InventoryListTableTh>
                   </tr>
                 </InventoryListTableHead>
@@ -365,104 +404,118 @@ export default function BikesPage() {
                   const editing = quickEdit.isEditing(bike.id);
                   return (
                     <InventoryListTableRow key={bike.id} editing={editing}>
-                      <InventoryListTableTd variant="name">
-                        <div className="flex items-center gap-3">
-                          <InventoryItemThumbnail
-                            image={bike.image}
-                            name={getBlueprintLabel(bike.bike_blueprint_id)}
-                          />
-                          <span>{getBlueprintLabel(bike.bike_blueprint_id)}</span>
-                        </div>
-                      </InventoryListTableTd>
-                      <InventoryListTableTd variant="mono">{bike.vin}</InventoryListTableTd>
-                      <InventoryListTableTd align="right" variant="primary">
-                        <QuickEditSalePriceCell
-                          editing={editing}
-                          pricing={pricingRecordFromItem(bike)}
-                          rates={rates}
-                          salePriceValue={quickEdit.draft.sale_price ?? ""}
-                          salePriceStrategy={
-                            quickEdit.draft.sale_price_strategy ===
-                            "switch_manual"
-                              ? "switch_manual"
-                              : "adjust_margin"
-                          }
-                          saleMarginType={
-                            quickEdit.draft.sale_margin_type === "fixed"
-                              ? "fixed"
-                              : "percentage"
-                          }
-                          saleMarginValue={
-                            quickEdit.draft.sale_margin_value ?? ""
-                          }
-                          onSalePriceChange={(value) =>
-                            quickEdit.updateField("sale_price", value)
-                          }
-                          onStrategyChange={(strategy) =>
-                            quickEdit.updateField("sale_price_strategy", strategy)
-                          }
-                          onSaleMarginTypeChange={(type) =>
-                            quickEdit.updateField("sale_margin_type", type)
-                          }
-                          onSaleMarginValueChange={(value) =>
-                            quickEdit.updateField("sale_margin_value", value)
-                          }
-                          align="right"
-                        />
-                      </InventoryListTableTd>
-                      <InventoryListTableTd align="right" variant="mono">
-                        {editing ? (
-                          <QuickEditPriceInput
-                            value={quickEdit.draft.cost_price ?? ""}
-                            onChange={(value) =>
-                              quickEdit.updateField("cost_price", value)
+                      {isVisible("blueprint") && (
+                        <InventoryListTableTd variant="name">
+                          <div className="flex items-center gap-3">
+                            <InventoryItemThumbnail
+                              image={bike.image}
+                              name={getBlueprintLabel(bike.bike_blueprint_id)}
+                            />
+                            <span>{getBlueprintLabel(bike.bike_blueprint_id)}</span>
+                          </div>
+                        </InventoryListTableTd>
+                      )}
+                      {isVisible("vin") && (
+                        <InventoryListTableTd variant="mono">{bike.vin}</InventoryListTableTd>
+                      )}
+                      {isVisible("sale_price") && (
+                        <InventoryListTableTd align="right" variant="primary">
+                          <QuickEditSalePriceCell
+                            editing={editing}
+                            pricing={pricingRecordFromItem(bike)}
+                            rates={rates}
+                            salePriceValue={quickEdit.draft.sale_price ?? ""}
+                            salePriceStrategy={
+                              quickEdit.draft.sale_price_strategy ===
+                              "switch_manual"
+                                ? "switch_manual"
+                                : "adjust_margin"
                             }
-                            currency={toPricingCurrency(
-                              bike.cost_currency ?? bike.currency_pricing,
-                            )}
-                            type="number"
-                            min={0}
-                            step="any"
+                            saleMarginType={
+                              quickEdit.draft.sale_margin_type === "fixed"
+                                ? "fixed"
+                                : "percentage"
+                            }
+                            saleMarginValue={
+                              quickEdit.draft.sale_margin_value ?? ""
+                            }
+                            onSalePriceChange={(value) =>
+                              quickEdit.updateField("sale_price", value)
+                            }
+                            onStrategyChange={(strategy) =>
+                              quickEdit.updateField("sale_price_strategy", strategy)
+                            }
+                            onSaleMarginTypeChange={(type) =>
+                              quickEdit.updateField("sale_margin_type", type)
+                            }
+                            onSaleMarginValueChange={(value) =>
+                              quickEdit.updateField("sale_margin_value", value)
+                            }
                             align="right"
-                            aria-label="Cost price"
                           />
-                        ) : (
-                          formatCatalogPriceInEGP(
-                            bike.cost_price,
-                            toPricingCurrency(
-                              bike.cost_currency ?? bike.currency_pricing,
-                            ),
-                            rates,
-                          )
-                        )}
-                      </InventoryListTableTd>
-                      <InventoryListTableTd align="center" variant="mono">
-                        {editing ? (
-                          <QuickEditInput
-                            value={quickEdit.draft.mileage ?? ""}
-                            onChange={(value) =>
-                              quickEdit.updateField("mileage", value)
-                            }
-                            type="number"
-                            min={0}
-                            step={1}
-                            align="center"
-                            aria-label="Mileage"
-                          />
-                        ) : (
-                          bike.mileage.toLocaleString()
-                        )}
-                      </InventoryListTableTd>
-                      <InventoryListTableTd>{getStatusBadge(bike.status)}</InventoryListTableTd>
-                      <InventoryListTableTd variant="muted">
-                        {bike.max_discount_type === "percentage"
-                          ? `${bike.max_discount_value}%`
-                          : formatCatalogPriceInEGP(
-                              bike.max_discount_value,
-                              toPricingCurrency(bike.currency_pricing),
+                        </InventoryListTableTd>
+                      )}
+                      {isVisible("cost_price") && (
+                        <InventoryListTableTd align="right" variant="mono">
+                          {editing ? (
+                            <QuickEditPriceInput
+                              value={quickEdit.draft.cost_price ?? ""}
+                              onChange={(value) =>
+                                quickEdit.updateField("cost_price", value)
+                              }
+                              currency={toPricingCurrency(
+                                bike.cost_currency ?? bike.currency_pricing,
+                              )}
+                              type="number"
+                              min={0}
+                              step="any"
+                              align="right"
+                              aria-label="Cost price"
+                            />
+                          ) : (
+                            formatCatalogPriceInEGP(
+                              bike.cost_price,
+                              toPricingCurrency(
+                                bike.cost_currency ?? bike.currency_pricing,
+                              ),
                               rates,
-                            )}
-                      </InventoryListTableTd>
+                            )
+                          )}
+                        </InventoryListTableTd>
+                      )}
+                      {isVisible("mileage") && (
+                        <InventoryListTableTd align="center" variant="mono">
+                          {editing ? (
+                            <QuickEditInput
+                              value={quickEdit.draft.mileage ?? ""}
+                              onChange={(value) =>
+                                quickEdit.updateField("mileage", value)
+                              }
+                              type="number"
+                              min={0}
+                              step={1}
+                              align="center"
+                              aria-label="Mileage"
+                            />
+                          ) : (
+                            bike.mileage.toLocaleString()
+                          )}
+                        </InventoryListTableTd>
+                      )}
+                      {isVisible("status") && (
+                        <InventoryListTableTd>{getStatusBadge(bike.status)}</InventoryListTableTd>
+                      )}
+                      {isVisible("discount") && (
+                        <InventoryListTableTd variant="muted">
+                          {bike.max_discount_type === "percentage"
+                            ? `${bike.max_discount_value}%`
+                            : formatCatalogPriceInEGP(
+                                bike.max_discount_value,
+                                toPricingCurrency(bike.currency_pricing),
+                                rates,
+                              )}
+                        </InventoryListTableTd>
+                      )}
                       <InventoryListTableTd align="right" className="whitespace-nowrap">
                         <QuickEditActions
                           isEditing={editing}
@@ -516,13 +569,15 @@ export default function BikesPage() {
         )}
       </SurfaceCard>
 
-      <PaginationControls
-        page={page}
-        totalPages={totalPages}
-        onPageChange={setPage}
-        onPrevious={() => setPage((p) => Math.max(1, p - 1))}
-        onNext={() => setPage((p) => Math.min(totalPages, p + 1))}
-      />
+      {!isShowAll && (
+        <PaginationControls
+          page={page}
+          totalPages={totalPages}
+          onPageChange={setPage}
+          onPrevious={() => setPage((p) => Math.max(1, p - 1))}
+          onNext={() => setPage((p) => Math.min(totalPages, p + 1))}
+        />
+      )}
     </PageShell>
   );
 }

@@ -147,10 +147,12 @@ export async function listMaintenanceServices(
     sector_id?: number;
     price_range?: string;
     currency?: string;
+    per_page?: number;
   },
 ): Promise<PaginatedResult<MaintenanceServiceRecord>> {
   const query = buildQuery({
     page,
+    per_page: filters?.per_page,
     search: filters?.search,
     sector_id: filters?.sector_id,
     price_range: filters?.price_range,

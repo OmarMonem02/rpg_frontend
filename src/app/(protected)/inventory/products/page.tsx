@@ -77,6 +77,30 @@ import {
   SearchableSelect,
   TabsWrapper,
 } from "@/components/ops-ui";
+import { useTableColumns, type TableColumnDef } from "@/hooks/useTableColumns";
+import { ColumnPicker } from "@/components/inventory/ColumnPicker";
+import { useTablePageSize } from "@/hooks/useTablePageSize";
+import { PageSizeSelect } from "@/components/inventory/PageSizeSelect";
+
+type ProductsColumnId =
+  | "image" | "sku" | "name" | "stock" | "alarm"
+  | "cost_price" | "sale_price" | "category" | "brand"
+  | "tags" | "universal" | "actions";
+
+const PRODUCTS_COLUMNS: readonly TableColumnDef<ProductsColumnId>[] = [
+  { id: "image", label: "Image" },
+  { id: "sku", label: "SKU / Part No." },
+  { id: "name", label: "Name" },
+  { id: "stock", label: "Stock" },
+  { id: "alarm", label: "Alarm on" },
+  { id: "cost_price", label: "Cost Price" },
+  { id: "sale_price", label: "Sale Price" },
+  { id: "category", label: "Category" },
+  { id: "brand", label: "Brand" },
+  { id: "tags", label: "Tags" },
+  { id: "universal", label: "Universal" },
+  { id: "actions", label: "Actions", required: true },
+];
 
 const PRODUCT_QUICK_EDIT_KEYS = [
   "name",
@@ -175,6 +199,15 @@ export default function ProductsPage() {
   const canDeleteProductCategories =
     permissions.canDelete("product-categories");
 
+  const { isVisible, toggle: toggleColumn, reset: resetColumns, visible: visibleColumns } = useTableColumns(
+    "table-cols:products-catalog",
+    PRODUCTS_COLUMNS,
+  );
+
+  const { pageSize, setPageSize, apiPerPage, isShowAll } = useTablePageSize(
+    "table-page-size:products-catalog",
+  );
+
   const quickEdit = useQuickEditRow();
   const validateProductQuickEdit = combineValidators(
     validateNonEmptyName,
@@ -219,7 +252,7 @@ export default function ProductsPage() {
         listProducts(
           token,
           page,
-          cleanFilters as Parameters<typeof listProducts>[2],
+          { ...(cleanFilters as Parameters<typeof listProducts>[2]), per_page: apiPerPage },
         ),
         listProductCategories(token, categoriesPage),
       ]);
@@ -234,7 +267,7 @@ export default function ProductsPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, getCleanFilters, categoriesPage]);
+  }, [page, getCleanFilters, categoriesPage, apiPerPage]);
 
   useEffect(() => {
     loadDropdowns();
@@ -505,26 +538,39 @@ export default function ProductsPage() {
         />
       ) : (
         <InventoryListTable>
-          <InventoryListTableToolbar label="Product catalog" count={products.length} />
+          <InventoryListTableToolbar label="Product catalog" count={products.length}>
+            <PageSizeSelect
+              value={pageSize}
+              onChange={(size) => { setPageSize(size); setPage(1); }}
+            />
+            <ColumnPicker
+              columns={PRODUCTS_COLUMNS}
+              visible={visibleColumns}
+              onToggle={toggleColumn}
+              onReset={resetColumns}
+            />
+          </InventoryListTableToolbar>
           <InventoryListTableScroll>
             <InventoryListTableElement minWidth="1280px">
               <InventoryListTableHead>
                 <tr>
-                  <InventoryListTableTh className="w-14">Image</InventoryListTableTh>
-                  <InventoryListTableTh>
-                    SKU
-                    <br />
-                    Part Number
-                  </InventoryListTableTh>
-                  <InventoryListTableTh>Name</InventoryListTableTh>
-                  <InventoryListTableTh align="center">Stock</InventoryListTableTh>
-                  <InventoryListTableTh align="center">Alarm on</InventoryListTableTh>
-                  <InventoryListTableTh>Cost Price</InventoryListTableTh>
-                  <InventoryListTableTh>Sale Price</InventoryListTableTh>
-                  <InventoryListTableTh>Category</InventoryListTableTh>
-                  <InventoryListTableTh>Brand</InventoryListTableTh>
-                  <InventoryListTableTh>Tags</InventoryListTableTh>
-                  <InventoryListTableTh>Universal</InventoryListTableTh>
+                  {isVisible("image") && <InventoryListTableTh className="w-14">Image</InventoryListTableTh>}
+                  {isVisible("sku") && (
+                    <InventoryListTableTh>
+                      SKU
+                      <br />
+                      Part Number
+                    </InventoryListTableTh>
+                  )}
+                  {isVisible("name") && <InventoryListTableTh>Name</InventoryListTableTh>}
+                  {isVisible("stock") && <InventoryListTableTh align="center">Stock</InventoryListTableTh>}
+                  {isVisible("alarm") && <InventoryListTableTh align="center">Alarm on</InventoryListTableTh>}
+                  {isVisible("cost_price") && <InventoryListTableTh>Cost Price</InventoryListTableTh>}
+                  {isVisible("sale_price") && <InventoryListTableTh>Sale Price</InventoryListTableTh>}
+                  {isVisible("category") && <InventoryListTableTh>Category</InventoryListTableTh>}
+                  {isVisible("brand") && <InventoryListTableTh>Brand</InventoryListTableTh>}
+                  {isVisible("tags") && <InventoryListTableTh>Tags</InventoryListTableTh>}
+                  {isVisible("universal") && <InventoryListTableTh>Universal</InventoryListTableTh>}
                   <InventoryListTableTh align="center">Actions</InventoryListTableTh>
                 </tr>
               </InventoryListTableHead>
@@ -533,146 +579,168 @@ export default function ProductsPage() {
                 const editing = quickEdit.isEditing(product.id);
                 return (
                   <InventoryListTableRow key={product.id} editing={editing}>
-                    <InventoryListTableTd>
-                      <InventoryItemThumbnail
-                        image={product.image}
-                        name={product.name}
-                      />
-                    </InventoryListTableTd>
-                    <InventoryListTableTd variant="mono">
-                      {product.sku}
-                      <br />
-                      {product.part_number || "—"}
-                    </InventoryListTableTd>
-                    <InventoryListTableTd variant="name">
-                      {editing ? (
-                        <QuickEditInput
-                          value={quickEdit.draft.name ?? ""}
-                          onChange={(value) =>
-                            quickEdit.updateField("name", value)
-                          }
-                          aria-label="Product name"
+                    {isVisible("image") && (
+                      <InventoryListTableTd>
+                        <InventoryItemThumbnail
+                          image={product.image}
+                          name={product.name}
                         />
-                      ) : (
-                        product.name
-                      )}
-                    </InventoryListTableTd>
-                    <InventoryListTableTd align="center">
-                      {editing ? (
-                        <QuickEditInput
-                          value={quickEdit.draft.stock_quantity ?? ""}
-                          onChange={(value) =>
-                            quickEdit.updateField("stock_quantity", value)
-                          }
-                          type="number"
-                          min={0}
-                          step={1}
-                          align="center"
-                          aria-label="Stock quantity"
-                        />
-                      ) : (
-                        <StockBadge
-                          stock_quantity={product.stock_quantity}
-                          low_stock_alarm={product.low_stock_alarm}
-                        />
-                      )}
-                    </InventoryListTableTd>
-                    <InventoryListTableTd align="center" variant="mono">
-                      {editing ? (
-                        <QuickEditInput
-                          value={quickEdit.draft.low_stock_alarm ?? ""}
-                          onChange={(value) =>
-                            quickEdit.updateField("low_stock_alarm", value)
-                          }
-                          type="number"
-                          min={0}
-                          step={1}
-                          align="center"
-                          aria-label="Low stock alarm"
-                        />
-                      ) : (
-                        product.low_stock_alarm
-                      )}
-                    </InventoryListTableTd>
-                    <InventoryListTableTd variant="primary">
-                      {editing ? (
-                        <QuickEditPriceInput
-                          value={quickEdit.draft.cost_price ?? ""}
-                          onChange={(value) =>
-                            quickEdit.updateField("cost_price", value)
-                          }
-                          currency={toPricingCurrency(
+                      </InventoryListTableTd>
+                    )}
+                    {isVisible("sku") && (
+                      <InventoryListTableTd variant="mono">
+                        {product.sku}
+                        <br />
+                        {product.part_number || "—"}
+                      </InventoryListTableTd>
+                    )}
+                    {isVisible("name") && (
+                      <InventoryListTableTd variant="name">
+                        {editing ? (
+                          <QuickEditInput
+                            value={quickEdit.draft.name ?? ""}
+                            onChange={(value) =>
+                              quickEdit.updateField("name", value)
+                            }
+                            aria-label="Product name"
+                          />
+                        ) : (
+                          product.name
+                        )}
+                      </InventoryListTableTd>
+                    )}
+                    {isVisible("stock") && (
+                      <InventoryListTableTd align="center">
+                        {editing ? (
+                          <QuickEditInput
+                            value={quickEdit.draft.stock_quantity ?? ""}
+                            onChange={(value) =>
+                              quickEdit.updateField("stock_quantity", value)
+                            }
+                            type="number"
+                            min={0}
+                            step={1}
+                            align="center"
+                            aria-label="Stock quantity"
+                          />
+                        ) : (
+                          <StockBadge
+                            stock_quantity={product.stock_quantity}
+                            low_stock_alarm={product.low_stock_alarm}
+                          />
+                        )}
+                      </InventoryListTableTd>
+                    )}
+                    {isVisible("alarm") && (
+                      <InventoryListTableTd align="center" variant="mono">
+                        {editing ? (
+                          <QuickEditInput
+                            value={quickEdit.draft.low_stock_alarm ?? ""}
+                            onChange={(value) =>
+                              quickEdit.updateField("low_stock_alarm", value)
+                            }
+                            type="number"
+                            min={0}
+                            step={1}
+                            align="center"
+                            aria-label="Low stock alarm"
+                          />
+                        ) : (
+                          product.low_stock_alarm
+                        )}
+                      </InventoryListTableTd>
+                    )}
+                    {isVisible("cost_price") && (
+                      <InventoryListTableTd variant="primary">
+                        {editing ? (
+                          <QuickEditPriceInput
+                            value={quickEdit.draft.cost_price ?? ""}
+                            onChange={(value) =>
+                              quickEdit.updateField("cost_price", value)
+                            }
+                            currency={toPricingCurrency(
+                              product.cost_currency ?? product.currency_pricing,
+                            )}
+                            type="number"
+                            min={0}
+                            step="any"
+                            aria-label="Cost price"
+                          />
+                        ) : (
+                          formatCatalogPriceInEGP(
+                            product.cost_price,
                             product.cost_currency ?? product.currency_pricing,
-                          )}
-                          type="number"
-                          min={0}
-                          step="any"
-                          aria-label="Cost price"
+                            rates,
+                          )
+                        )}
+                      </InventoryListTableTd>
+                    )}
+                    {isVisible("sale_price") && (
+                      <InventoryListTableTd variant="primary">
+                        <QuickEditSalePriceCell
+                          editing={editing}
+                          pricing={pricingRecordFromItem(product)}
+                          rates={rates}
+                          salePriceValue={quickEdit.draft.sale_price ?? ""}
+                          salePriceStrategy={
+                            quickEdit.draft.sale_price_strategy ===
+                            "switch_manual"
+                              ? "switch_manual"
+                              : "adjust_margin"
+                          }
+                          saleMarginType={
+                            quickEdit.draft.sale_margin_type === "fixed"
+                              ? "fixed"
+                              : "percentage"
+                          }
+                          saleMarginValue={
+                            quickEdit.draft.sale_margin_value ?? ""
+                          }
+                          onSalePriceChange={(value) =>
+                            quickEdit.updateField("sale_price", value)
+                          }
+                          onStrategyChange={(strategy) =>
+                            quickEdit.updateField("sale_price_strategy", strategy)
+                          }
+                          onSaleMarginTypeChange={(type) =>
+                            quickEdit.updateField("sale_margin_type", type)
+                          }
+                          onSaleMarginValueChange={(value) =>
+                            quickEdit.updateField("sale_margin_value", value)
+                          }
                         />
-                      ) : (
-                        formatCatalogPriceInEGP(
-                          product.cost_price,
-                          product.cost_currency ?? product.currency_pricing,
-                          rates,
-                        )
-                      )}
-                    </InventoryListTableTd>
-                    <InventoryListTableTd variant="primary">
-                      <QuickEditSalePriceCell
-                        editing={editing}
-                        pricing={pricingRecordFromItem(product)}
-                        rates={rates}
-                        salePriceValue={quickEdit.draft.sale_price ?? ""}
-                        salePriceStrategy={
-                          quickEdit.draft.sale_price_strategy ===
-                          "switch_manual"
-                            ? "switch_manual"
-                            : "adjust_margin"
-                        }
-                        saleMarginType={
-                          quickEdit.draft.sale_margin_type === "fixed"
-                            ? "fixed"
-                            : "percentage"
-                        }
-                        saleMarginValue={
-                          quickEdit.draft.sale_margin_value ?? ""
-                        }
-                        onSalePriceChange={(value) =>
-                          quickEdit.updateField("sale_price", value)
-                        }
-                        onStrategyChange={(strategy) =>
-                          quickEdit.updateField("sale_price_strategy", strategy)
-                        }
-                        onSaleMarginTypeChange={(type) =>
-                          quickEdit.updateField("sale_margin_type", type)
-                        }
-                        onSaleMarginValueChange={(value) =>
-                          quickEdit.updateField("sale_margin_value", value)
-                        }
-                      />
-                    </InventoryListTableTd>
-                    <InventoryListTableTd>
-                      <span className="form-chip">
-                        {
-                          allCategories.find(
-                            (c) => c.id === product.products_category_id,
-                          )?.name
-                        }
-                      </span>
-                    </InventoryListTableTd>
-                    <InventoryListTableTd>
-                      <span className="form-chip bg-primary/8 text-primary border-primary/15">
-                        {brands.find((b) => b.id === product.brand_id)?.name}
-                      </span>
-                    </InventoryListTableTd>
-                    <InventoryListTableTd>
-                      <TagsCell tags={product.tags} />
-                    </InventoryListTableTd>
-                    <InventoryListTableTd>
-                      <span className="form-chip bg-primary/8 text-primary border-primary/15">
-                        {product.universal ? "Universal" : "Specific"}
-                      </span>
-                    </InventoryListTableTd>
+                      </InventoryListTableTd>
+                    )}
+                    {isVisible("category") && (
+                      <InventoryListTableTd>
+                        <span className="form-chip">
+                          {
+                            allCategories.find(
+                              (c) => c.id === product.products_category_id,
+                            )?.name
+                          }
+                        </span>
+                      </InventoryListTableTd>
+                    )}
+                    {isVisible("brand") && (
+                      <InventoryListTableTd>
+                        <span className="form-chip bg-primary/8 text-primary border-primary/15">
+                          {brands.find((b) => b.id === product.brand_id)?.name}
+                        </span>
+                      </InventoryListTableTd>
+                    )}
+                    {isVisible("tags") && (
+                      <InventoryListTableTd>
+                        <TagsCell tags={product.tags} />
+                      </InventoryListTableTd>
+                    )}
+                    {isVisible("universal") && (
+                      <InventoryListTableTd>
+                        <span className="form-chip bg-primary/8 text-primary border-primary/15">
+                          {product.universal ? "Universal" : "Specific"}
+                        </span>
+                      </InventoryListTableTd>
+                    )}
                     <InventoryListTableTd align="right" className="whitespace-nowrap">
                       <QuickEditActions
                         isEditing={editing}
@@ -731,13 +799,15 @@ export default function ProductsPage() {
         </InventoryListTable>
       )}
 
-      <PaginationControls
-        page={page}
-        totalPages={totalPages}
-        onPageChange={setPage}
-        onPrevious={() => setPage((p) => Math.max(1, p - 1))}
-        onNext={() => setPage((p) => Math.min(totalPages, p + 1))}
-      />
+      {!isShowAll && (
+        <PaginationControls
+          page={page}
+          totalPages={totalPages}
+          onPageChange={setPage}
+          onPrevious={() => setPage((p) => Math.max(1, p - 1))}
+          onNext={() => setPage((p) => Math.min(totalPages, p + 1))}
+        />
+      )}
     </div>
   );
 

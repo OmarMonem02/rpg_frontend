@@ -41,6 +41,21 @@ import {
   PaginationControls,
   SearchableSelect,
 } from "@/components/ops-ui";
+import { useTableColumns, type TableColumnDef } from "@/hooks/useTableColumns";
+import { ColumnPicker } from "@/components/inventory/ColumnPicker";
+import { useTablePageSize } from "@/hooks/useTablePageSize";
+import { PageSizeSelect } from "@/components/inventory/PageSizeSelect";
+
+type ServicesColumnId = "name" | "sector" | "price" | "discount" | "created" | "actions";
+
+const SERVICES_COLUMNS: readonly TableColumnDef<ServicesColumnId>[] = [
+  { id: "name", label: "Name" },
+  { id: "sector", label: "Sector" },
+  { id: "price", label: "Price" },
+  { id: "discount", label: "Discount" },
+  { id: "created", label: "Created" },
+  { id: "actions", label: "Actions", required: true },
+];
 import Link from "next/link";
 import { TabsWrapper } from "@/components/tabs-wrapper";
 import { AdvancedFilters } from "@/components/advanced-filters";
@@ -98,6 +113,15 @@ export default function MaintenanceServicesPage() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const { isVisible, toggle: toggleColumn, reset: resetColumns, visible: visibleColumns } = useTableColumns(
+    "table-cols:services-catalog",
+    SERVICES_COLUMNS,
+  );
+
+  const { pageSize, setPageSize, apiPerPage, isShowAll } = useTablePageSize(
+    "table-page-size:services-catalog",
+  );
+
   const quickEdit = useQuickEditRow();
   const validateServiceQuickEdit = combineValidators(
     validateNonEmptyName,
@@ -114,7 +138,7 @@ export default function MaintenanceServicesPage() {
       logFilters();
 
       const cleanFilters = getCleanFilters();
-      const result = await listMaintenanceServices(token, page, cleanFilters as Parameters<typeof listMaintenanceServices>[2]);
+      const result = await listMaintenanceServices(token, page, { ...(cleanFilters as Parameters<typeof listMaintenanceServices>[2]), per_page: apiPerPage });
       setServices(result.items);
       setTotalPages(result.lastPage);
       setError(null);
@@ -123,7 +147,7 @@ export default function MaintenanceServicesPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, filters, logFilters]);
+  }, [page, filters, logFilters, apiPerPage]);
 
   const loadDropdowns = useCallback(async () => {
     try {
@@ -367,16 +391,27 @@ export default function MaintenanceServicesPage() {
         />
       ) : (
         <InventoryListTable>
-          <InventoryListTableToolbar label="Services" count={services.length} />
+          <InventoryListTableToolbar label="Services" count={services.length}>
+            <PageSizeSelect
+              value={pageSize}
+              onChange={(size) => { setPageSize(size); setPage(1); }}
+            />
+            <ColumnPicker
+              columns={SERVICES_COLUMNS}
+              visible={visibleColumns}
+              onToggle={toggleColumn}
+              onReset={resetColumns}
+            />
+          </InventoryListTableToolbar>
           <InventoryListTableScroll>
             <InventoryListTableElement minWidth="880px">
               <InventoryListTableHead>
                 <tr>
-                  <InventoryListTableTh>Name</InventoryListTableTh>
-                  <InventoryListTableTh>Sector</InventoryListTableTh>
-                  <InventoryListTableTh>Price</InventoryListTableTh>
-                  <InventoryListTableTh>Discount</InventoryListTableTh>
-                  <InventoryListTableTh>Created</InventoryListTableTh>
+                  {isVisible("name") && <InventoryListTableTh>Name</InventoryListTableTh>}
+                  {isVisible("sector") && <InventoryListTableTh>Sector</InventoryListTableTh>}
+                  {isVisible("price") && <InventoryListTableTh>Price</InventoryListTableTh>}
+                  {isVisible("discount") && <InventoryListTableTh>Discount</InventoryListTableTh>}
+                  {isVisible("created") && <InventoryListTableTh>Created</InventoryListTableTh>}
                   <InventoryListTableTh align="center">Actions</InventoryListTableTh>
                 </tr>
               </InventoryListTableHead>
@@ -385,59 +420,69 @@ export default function MaintenanceServicesPage() {
                 const editing = quickEdit.isEditing(service.id);
                 return (
                   <InventoryListTableRow key={service.id} editing={editing}>
-                    <InventoryListTableTd variant="name">
-                      {editing ? (
-                        <QuickEditInput
-                          value={quickEdit.draft.name ?? ""}
-                          onChange={(value) =>
-                            quickEdit.updateField("name", value)
-                          }
-                          aria-label="Service name"
-                        />
-                      ) : (
-                        service.name
-                      )}
-                    </InventoryListTableTd>
-                    <InventoryListTableTd variant="muted">
-                      {allSectors.find(
-                        (sector) =>
-                          sector.id === service.maintenance_service_sector_id,
-                      )?.name ?? "-"}
-                    </InventoryListTableTd>
-                    <InventoryListTableTd variant="primary">
-                      {editing ? (
-                        <QuickEditInput
-                          value={quickEdit.draft.service_price ?? ""}
-                          onChange={(value) =>
-                            quickEdit.updateField("service_price", value)
-                          }
-                          type="number"
-                          min={0}
-                          step="any"
-                          aria-label="Service price"
-                        />
-                      ) : (
-                        formatCatalogPriceInEGP(
-                          service.service_price,
-                          service.currency_pricing,
-                          rates,
-                        )
-                      )}
-                    </InventoryListTableTd>
-                    <InventoryListTableTd variant="muted">
-                      {service.max_discount_type === "percentage"
-                        ? `${service.max_discount_value}%`
-                        : formatCatalogPriceInEGP(
-                            service.max_discount_value,
+                    {isVisible("name") && (
+                      <InventoryListTableTd variant="name">
+                        {editing ? (
+                          <QuickEditInput
+                            value={quickEdit.draft.name ?? ""}
+                            onChange={(value) =>
+                              quickEdit.updateField("name", value)
+                            }
+                            aria-label="Service name"
+                          />
+                        ) : (
+                          service.name
+                        )}
+                      </InventoryListTableTd>
+                    )}
+                    {isVisible("sector") && (
+                      <InventoryListTableTd variant="muted">
+                        {allSectors.find(
+                          (sector) =>
+                            sector.id === service.maintenance_service_sector_id,
+                        )?.name ?? "-"}
+                      </InventoryListTableTd>
+                    )}
+                    {isVisible("price") && (
+                      <InventoryListTableTd variant="primary">
+                        {editing ? (
+                          <QuickEditInput
+                            value={quickEdit.draft.service_price ?? ""}
+                            onChange={(value) =>
+                              quickEdit.updateField("service_price", value)
+                            }
+                            type="number"
+                            min={0}
+                            step="any"
+                            aria-label="Service price"
+                          />
+                        ) : (
+                          formatCatalogPriceInEGP(
+                            service.service_price,
                             service.currency_pricing,
                             rates,
-                          )}
-                    </InventoryListTableTd>
-                    <InventoryListTableTd variant="muted">
-                      {service.created_at
-                        ? new Date(service.created_at).toLocaleDateString()
-                        : "-"}
-                    </InventoryListTableTd>
+                          )
+                        )}
+                      </InventoryListTableTd>
+                    )}
+                    {isVisible("discount") && (
+                      <InventoryListTableTd variant="muted">
+                        {service.max_discount_type === "percentage"
+                          ? `${service.max_discount_value}%`
+                          : formatCatalogPriceInEGP(
+                              service.max_discount_value,
+                              service.currency_pricing,
+                              rates,
+                            )}
+                      </InventoryListTableTd>
+                    )}
+                    {isVisible("created") && (
+                      <InventoryListTableTd variant="muted">
+                        {service.created_at
+                          ? new Date(service.created_at).toLocaleDateString()
+                          : "-"}
+                      </InventoryListTableTd>
+                    )}
                     <InventoryListTableTd align="right" className="whitespace-nowrap">
                       <QuickEditActions
                         isEditing={editing}
@@ -485,13 +530,15 @@ export default function MaintenanceServicesPage() {
         </InventoryListTable>
       )}
 
-      <PaginationControls
-        page={page}
-        totalPages={totalPages}
-        onPageChange={setPage}
-        onPrevious={() => setPage((current) => Math.max(1, current - 1))}
-        onNext={() => setPage((current) => Math.min(totalPages, current + 1))}
-      />
+      {!isShowAll && (
+        <PaginationControls
+          page={page}
+          totalPages={totalPages}
+          onPageChange={setPage}
+          onPrevious={() => setPage((current) => Math.max(1, current - 1))}
+          onNext={() => setPage((current) => Math.min(totalPages, current + 1))}
+        />
+      )}
     </div>
   );
 

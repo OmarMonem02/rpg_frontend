@@ -335,10 +335,12 @@ export async function listBikes(
     status?: string;
     price_range?: string;
     currency?: string;
+    per_page?: number;
   },
 ): Promise<PaginatedResult<BikeRecord>> {
   const query = buildQuery({
     page,
+    per_page: filters?.per_page,
     search: filters?.search,
     blueprint_id: filters?.blueprint_id,
     brand_id: filters?.brand_id,
