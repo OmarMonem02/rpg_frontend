@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { usePermissions } from "@/components/permission-provider";
 import { getAuthToken } from "@/lib/auth-session";
@@ -66,19 +66,16 @@ import {
   EntityFormModal,
   type FieldConfig,
 } from "@/components/entity-form-modal";
-import { BikeCompatibilityFilter } from "@/components/BikeCompatibilityFilter";
-import { AdvancedFilters } from "@/components/advanced-filters";
 import { StockBadge } from "@/components/inventory/stock-badge";
-import { TagInput } from "@/components/TagInput";
+import { InventoryModuleFilters } from "@/components/inventory/InventoryModuleFilters";
+import { ActiveFilterChips } from "@/components/inventory/ActiveFilterChips";
+import { buildActiveFilterChips } from "@/lib/inventory-filter-utils";
 import {
   ActionButton,
   EmptyState,
-  FilterBar,
-  InputGroup,
   PageHero,
   PageShell,
   PaginationControls,
-  SearchableSelect,
   TabsWrapper,
 } from "@/components/ops-ui";
 import { useTableColumns, type TableColumnDef } from "@/hooks/useTableColumns";
@@ -184,7 +181,7 @@ export default function ProductsPage() {
     filters,
     page,
     setPage,
-    getCleanFilters,
+    getModuleApiParams,
     setSearch,
     setCategory,
     setBrand,
@@ -193,6 +190,9 @@ export default function ProductsPage() {
     setCurrency,
     setBikeCompatibility,
     setTags,
+    setLowStock,
+    setFilter,
+    resetFilters,
   } = useEntityFilters();
 
   // Category Modal State
@@ -258,13 +258,13 @@ export default function ProductsPage() {
       const token = getAuthToken();
       if (!token) throw new Error("Authentication required");
 
-      const cleanFilters = getCleanFilters();
+      const apiFilters = getModuleApiParams("products");
 
       const [productsRes, catsRes] = await Promise.all([
         listProducts(
           token,
           page,
-          { ...(cleanFilters as Parameters<typeof listProducts>[2]), per_page: apiPerPage },
+          { ...(apiFilters as Parameters<typeof listProducts>[2]), per_page: apiPerPage },
         ),
         listProductCategories(token, categoriesPage),
       ]);
@@ -279,7 +279,31 @@ export default function ProductsPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, getCleanFilters, categoriesPage, apiPerPage]);
+  }, [page, getModuleApiParams, categoriesPage, apiPerPage]);
+
+  const filterChips = useMemo(
+    () =>
+      buildActiveFilterChips(filters, {
+        onClear: (key) => {
+          if (key === "bike_compat") {
+            setBikeCompatibility({});
+            return;
+          }
+          if (key === "price_min" || key === "price_max") {
+            setPriceMin("");
+            setPriceMax("");
+            return;
+          }
+          setFilter(key as keyof typeof filters, undefined);
+        },
+        selectOptions: {
+          categories: allCategories.map((c) => ({ value: c.id, label: c.name })),
+          brands: brands.map((b) => ({ value: b.id, label: b.name })),
+          bikeBrands: bikeBrands.map((b) => ({ value: b.id, label: b.name })),
+        },
+      }),
+    [filters, allCategories, brands, bikeBrands, setFilter, setBikeCompatibility, setPriceMin, setPriceMax],
+  );
 
   useEffect(() => {
     loadDropdowns();
@@ -447,85 +471,34 @@ export default function ProductsPage() {
   // Render products tab content
   const productsTabContent = (
     <div className="space-y-4">
-      <FilterBar className="md:grid-cols-12">
-        <InputGroup label="Search" className="md:col-span-4">
-          <input
-            type="text"
-            placeholder="Search by name or SKU..."
-            value={filters.search || ""}
-            onChange={(e) => setSearch(e.target.value)}
-            className="form-input-base"
-          />
-        </InputGroup>
-        <InputGroup label="Category" className="md:col-span-4">
-          <SearchableSelect
-            value={filters.category_id || ""}
-            onChange={(value) =>
-              setCategory(value ? parseInt(value) : "")
-            }
-            placeholder="All Categories"
-            options={allCategories.map((c) => ({
-              value: c.id,
-              label: c.name,
-            }))}
-            className="form-input-base"
-          />
-        </InputGroup>
-        <InputGroup label="Brand" className="md:col-span-4">
-          <SearchableSelect
-            value={filters.brand_id || ""}
-            onChange={(value) =>
-              setBrand(value ? parseInt(value) : "")
-            }
-            placeholder="All Brands"
-            options={brands.map((b) => ({
-              value: b.id,
-              label: b.name,
-            }))}
-            className="form-input-base"
-          />
-        </InputGroup>
-      </FilterBar>
-
-      <div className="rounded-[1.5rem] border border-outline-variant/15 bg-surface-container-lowest p-4">
-        <TagInput
-          label="Tags"
-          value={filters.tags ?? []}
-          onChange={setTags}
-          placeholder="e.g., Black"
-          addButtonLabel="Add tag"
-          description="Add one or more tags to narrow results. Items must match every tag."
-        />
-      </div>
-
-      <AdvancedFilters
-        priceMin={filters.price_min}
-        setPriceMin={setPriceMin}
-        priceMax={filters.price_max}
-        setPriceMax={setPriceMax}
-        currency={filters.currency || "all"}
-        setCurrency={setCurrency}
-        showPriceFilters={true}
-        showCurrencyFilter={true}
+      <InventoryModuleFilters
+        module="products"
+        filters={filters}
+        bikeBrands={bikeBrands}
+        loading={loading}
+        setters={{
+          setSearch,
+          setCategory,
+          setBrand,
+          setBlueprint: () => {},
+          setSector: () => {},
+          setStatus: () => {},
+          setType: () => {},
+          setPriceMin,
+          setPriceMax,
+          setCurrency,
+          setLowStock,
+          setTags,
+          setBikeCompatibility,
+          setFilter,
+        }}
+        options={{
+          categories: allCategories.map((c) => ({ value: c.id, label: c.name })),
+          brands: brands.map((b) => ({ value: b.id, label: b.name })),
+        }}
       />
 
-      <div className="rounded-[1.5rem] border border-outline-variant/15 bg-surface-container-lowest p-4">
-        <div className="mb-3">
-          <p className="label-caps text-on-surface-variant">Compatible Bike</p>
-          <p className="mt-1 text-xs text-on-surface-variant/80">
-            Filter products by bike brand, model, and year. Universal products
-            remain visible.
-          </p>
-        </div>
-        <BikeCompatibilityFilter
-          brands={bikeBrands}
-          selectedBrandId={filters.bike_brand_id}
-          selectedModel={filters.bike_model}
-          selectedYear={filters.bike_year}
-          isLoading={loading}
-          onFilterChange={(compat) => setBikeCompatibility(compat)}
-        />
-      </div>
+      <ActiveFilterChips chips={filterChips} onClearAll={resetFilters} />
 
       {loading ? (
         <div className="flex justify-center py-12">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useMemo } from "react";
 import { EntityFormModal, type FieldConfig } from "@/components/entity-form-modal";
 import { usePermissions } from "@/components/permission-provider";
 import { useEntityFilters } from "@/hooks/useEntityFilters";
@@ -31,15 +31,15 @@ import {
   InventoryTableActionLink,
   InventoryTableSecondaryActions,
 } from "@/components/inventory/list-table";
+import { InventoryModuleFilters } from "@/components/inventory/InventoryModuleFilters";
+import { ActiveFilterChips } from "@/components/inventory/ActiveFilterChips";
+import { buildActiveFilterChips } from "@/lib/inventory-filter-utils";
 import {
   ActionButton,
   EmptyState,
-  FilterBar,
-  InputGroup,
   PageHero,
   PageShell,
   PaginationControls,
-  SearchableSelect,
 } from "@/components/ops-ui";
 import { useTableColumns, type TableColumnDef } from "@/hooks/useTableColumns";
 import { ColumnPicker } from "@/components/inventory/ColumnPicker";
@@ -58,7 +58,6 @@ const SERVICES_COLUMNS: readonly TableColumnDef<ServicesColumnId>[] = [
 ];
 import Link from "next/link";
 import { TabsWrapper } from "@/components/tabs-wrapper";
-import { AdvancedFilters } from "@/components/advanced-filters";
 import { getAuthToken } from "@/lib/auth-session";
 import {
   createMaintenanceServiceSector,
@@ -106,7 +105,21 @@ export default function MaintenanceServicesPage() {
   const [error, setError] = useState<string | null>(null);
 
   // Use custom filter hook
-  const { filters, page, setPage, getCleanFilters, setSearch, setSector, setPriceMin, setPriceMax, setCurrency, logFilters } = useEntityFilters();
+  const {
+    filters,
+    page,
+    setPage,
+    getModuleApiParams,
+    setSearch,
+    setSector,
+    setPriceMin,
+    setPriceMax,
+    setCurrency,
+    setLowStock,
+    setFilter,
+    resetFilters,
+    logFilters,
+  } = useEntityFilters();
 
   const [sectorModalOpen, setSectorModalOpen] = useState(false);
   const [editingSector, setEditingSector] = useState<MaintenanceServiceSectorRecord | null>(null);
@@ -137,8 +150,8 @@ export default function MaintenanceServicesPage() {
       console.log("[MaintenanceServices] Applying filters:", filters, "Page:", page);
       logFilters();
 
-      const cleanFilters = getCleanFilters();
-      const result = await listMaintenanceServices(token, page, { ...(cleanFilters as Parameters<typeof listMaintenanceServices>[2]), per_page: apiPerPage });
+      const apiFilters = getModuleApiParams("maintenance_services");
+      const result = await listMaintenanceServices(token, page, { ...(apiFilters as Parameters<typeof listMaintenanceServices>[2]), per_page: apiPerPage });
       setServices(result.items);
       setTotalPages(result.lastPage);
       setError(null);
@@ -147,7 +160,25 @@ export default function MaintenanceServicesPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, filters, logFilters, apiPerPage]);
+  }, [page, getModuleApiParams, logFilters, apiPerPage]);
+
+  const filterChips = useMemo(
+    () =>
+      buildActiveFilterChips(filters, {
+        onClear: (key) => {
+          if (key === "price_min" || key === "price_max") {
+            setPriceMin("");
+            setPriceMax("");
+            return;
+          }
+          setFilter(key as keyof typeof filters, undefined);
+        },
+        selectOptions: {
+          sectors: allSectors.map((s) => ({ value: s.id, label: s.name })),
+        },
+      }),
+    [filters, allSectors, setFilter, setPriceMin, setPriceMax],
+  );
 
   const loadDropdowns = useCallback(async () => {
     try {
@@ -348,37 +379,32 @@ export default function MaintenanceServicesPage() {
         </div>
       </div>
 
-      <FilterBar>
-        <InputGroup label="Search" className="md:col-span-8">
-          <input
-            type="text"
-            placeholder="Search by service name..."
-            value={filters.search || ""}
-            onChange={(e) => setSearch(e.target.value)}
-            className="form-input-base"
-          />
-        </InputGroup>
-        <InputGroup label="Sector" className="md:col-span-4">
-          <SearchableSelect
-            value={filters.sector_id || ""}
-            onChange={(v) => setSector(v ? parseInt(v) : "")}
-            placeholder="All Sectors"
-            options={allSectors.map((s) => ({ value: s.id, label: s.name }))}
-            className="form-input-base"
-          />
-        </InputGroup>
-      </FilterBar>
-
-      <AdvancedFilters
-        priceMin={filters.price_min}
-        setPriceMin={setPriceMin}
-        priceMax={filters.price_max}
-        setPriceMax={setPriceMax}
-        currency={filters.currency || "all"}
-        setCurrency={setCurrency}
-        showPriceFilters={true}
-        showCurrencyFilter={true}
+      <InventoryModuleFilters
+        module="maintenance_services"
+        filters={filters}
+        loading={loading}
+        setters={{
+          setSearch,
+          setCategory: () => {},
+          setBrand: () => {},
+          setBlueprint: () => {},
+          setSector,
+          setStatus: () => {},
+          setType: () => {},
+          setPriceMin,
+          setPriceMax,
+          setCurrency,
+          setLowStock,
+          setTags: () => {},
+          setBikeCompatibility: () => {},
+          setFilter,
+        }}
+        options={{
+          sectors: allSectors.map((s) => ({ value: s.id, label: s.name })),
+        }}
       />
+
+      <ActiveFilterChips chips={filterChips} onClearAll={resetFilters} />
 
       {loading ? (
         <div className="flex justify-center py-12">

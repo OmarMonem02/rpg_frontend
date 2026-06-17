@@ -1,4 +1,5 @@
 import { useState, useCallback } from "react";
+import type { InventoryModuleId } from "@/lib/inventory-filter-config";
 
 export type EntityFilters = {
   search?: string;
@@ -16,171 +17,230 @@ export type EntityFilters = {
   bike_model?: string;
   bike_year?: number;
   tags?: string[];
+  cost_price_min?: number;
+  cost_price_max?: number;
+  stock_min?: number;
+  stock_max?: number;
+  item_status?: string;
+  size?: string;
+  color?: string;
+  universal?: boolean | "";
+  max_discount_min?: number;
+  max_discount_max?: number;
+  profit_min?: number;
+  profit_max?: number;
+  profit_percent_min?: number;
+  profit_percent_max?: number;
+  mileage_min?: number;
+  mileage_max?: number;
+  created_from?: string;
+  created_to?: string;
+  have_commission?: boolean;
+  stock_alert_level?: string;
+  customer_id?: number;
+  customer_name?: string;
+  payment_method_id?: number;
+  is_maintenance?: boolean;
+  sale_type?: string;
+  date_from?: string;
+  date_to?: string;
+  total_min?: number;
+  total_max?: number;
+  item_type?: string;
+  delivery_status?: string;
 };
 
 export type FilterState = EntityFilters & {
   page: number;
 };
 
+function appendRange(
+  cleaned: Record<string, unknown>,
+  minKey: string,
+  maxKey: string,
+  rangeKey: string,
+  min?: number,
+  max?: number,
+) {
+  const minVal = min ?? 0;
+  const maxVal = max ?? 0;
+  if (min !== undefined || max !== undefined) {
+    if (minVal || maxVal) {
+      cleaned[rangeKey] = `${minVal}:${maxVal}`;
+    }
+  }
+  delete cleaned[minKey];
+  delete cleaned[maxKey];
+}
+
+function buildApiParams(
+  filters: EntityFilters,
+  module?: InventoryModuleId,
+): Record<string, unknown> {
+  const cleaned: Record<string, unknown> = {};
+
+  Object.entries(filters).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== "") {
+      cleaned[key] = value;
+    }
+  });
+
+  appendRange(cleaned, "price_min", "price_max", "price_range", filters.price_min, filters.price_max);
+  appendRange(
+    cleaned,
+    "cost_price_min",
+    "cost_price_max",
+    "cost_price_range",
+    filters.cost_price_min,
+    filters.cost_price_max,
+  );
+
+  if (Array.isArray(cleaned.tags)) {
+    const tags = cleaned.tags.filter(
+      (tag): tag is string => typeof tag === "string" && tag.trim() !== "",
+    );
+    if (tags.length > 0) {
+      cleaned.tags = tags;
+    } else {
+      delete cleaned.tags;
+    }
+  }
+
+  if (cleaned.currency === "all") delete cleaned.currency;
+  if (cleaned.universal === "") delete cleaned.universal;
+  if (cleaned.stock_alert_level === "all") delete cleaned.stock_alert_level;
+  if (!cleaned.have_commission) delete cleaned.have_commission;
+  if (!cleaned.low_stock) delete cleaned.low_stock;
+  if (!cleaned.is_maintenance) delete cleaned.is_maintenance;
+
+  if (module === "sales" || module === "delivery_orders") {
+    if (filters.sale_type) {
+      cleaned.type = filters.sale_type;
+      delete cleaned.sale_type;
+    }
+    if (module === "delivery_orders") {
+      cleaned.remote_only = true;
+    }
+  }
+
+  return cleaned;
+}
+
 export function useEntityFilters(initialFilters?: EntityFilters) {
   const [filters, setFilters] = useState<EntityFilters>(initialFilters || {});
   const [page, setPage] = useState(1);
 
-  // Search filter
+  const updateFilters = useCallback((patch: Partial<EntityFilters>) => {
+    setFilters((prev) => {
+      const next = { ...prev, ...patch };
+      Object.entries(patch).forEach(([key, value]) => {
+        if (value === undefined || value === null || value === "") {
+          delete next[key as keyof EntityFilters];
+        }
+      });
+      return next;
+    });
+    setPage(1);
+  }, []);
+
   const setSearch = useCallback((search: string) => {
-    setFilters((prev) => ({ ...prev, search: search || undefined }));
-    setPage(1); // Reset to first page when filtering
-  }, []);
+    updateFilters({ search: search || undefined });
+  }, [updateFilters]);
 
-  // Category filter
   const setCategory = useCallback((category_id: number | "") => {
-    setFilters((prev) => ({ ...prev, category_id: category_id || undefined }));
-    setPage(1);
-  }, []);
+    updateFilters({ category_id: category_id || undefined });
+  }, [updateFilters]);
 
-  // Brand filter
   const setBrand = useCallback((brand_id: number | "") => {
-    setFilters((prev) => ({ ...prev, brand_id: brand_id || undefined }));
-    setPage(1);
-  }, []);
+    updateFilters({ brand_id: brand_id || undefined });
+  }, [updateFilters]);
 
-  // Bike Blueprint filter
   const setBlueprint = useCallback((blueprint_id: number | "") => {
-    setFilters((prev) => ({
-      ...prev,
-      blueprint_id: blueprint_id || undefined,
-    }));
-    setPage(1);
-  }, []);
+    updateFilters({ blueprint_id: blueprint_id || undefined });
+  }, [updateFilters]);
 
-  // Spare-part compatibility (Bike Brand/Model/Year) filter
   const setBikeCompatibility = useCallback(
     (compat: { bike_brand_id?: number; bike_model?: string; bike_year?: number }) => {
-      setFilters((prev) => ({
-        ...prev,
+      updateFilters({
         bike_brand_id: compat.bike_brand_id,
         bike_model: compat.bike_model,
         bike_year: compat.bike_year,
-      }));
-      setPage(1);
+      });
     },
-    [],
+    [updateFilters],
   );
 
-  // Maintenance Service Sector filter
   const setSector = useCallback((sector_id: number | "") => {
-    setFilters((prev) => ({
-      ...prev,
-      sector_id: sector_id || undefined,
-    }));
-    setPage(1);
-  }, []);
+    updateFilters({ sector_id: sector_id || undefined });
+  }, [updateFilters]);
 
-  // Price range filters
   const setPriceRange = useCallback(
     (min?: number, max?: number) => {
-      setFilters((prev) => ({
-        ...prev,
+      updateFilters({
         price_min: min && min > 0 ? min : undefined,
         price_max: max && max > 0 ? max : undefined,
-      }));
-      setPage(1);
+      });
     },
-    [],
+    [updateFilters],
   );
 
   const setPriceMin = useCallback((price_min: number | "") => {
-    setFilters((prev) => ({
-      ...prev,
+    updateFilters({
       price_min: price_min && typeof price_min === "number" ? price_min : undefined,
-    }));
-    setPage(1);
-  }, []);
+    });
+  }, [updateFilters]);
 
   const setPriceMax = useCallback((price_max: number | "") => {
-    setFilters((prev) => ({
-      ...prev,
+    updateFilters({
       price_max: price_max && typeof price_max === "number" ? price_max : undefined,
-    }));
-    setPage(1);
-  }, []);
+    });
+  }, [updateFilters]);
 
-  // Currency filter
   const setCurrency = useCallback((currency: string) => {
-    setFilters((prev) => ({
-      ...prev,
-      currency:
-        currency && currency !== "all" ? currency : undefined,
-    }));
-    setPage(1);
-  }, []);
+    updateFilters({
+      currency: currency && currency !== "all" ? currency : undefined,
+    });
+  }, [updateFilters]);
 
-  // Status filter
   const setStatus = useCallback((status: string) => {
-    setFilters((prev) => ({ ...prev, status: status || undefined }));
-    setPage(1);
-  }, []);
+    updateFilters({ status: status || undefined });
+  }, [updateFilters]);
 
-  // Type filter
   const setType = useCallback((type: string) => {
-    setFilters((prev) => ({ ...prev, type: type || undefined }));
-    setPage(1);
-  }, []);
+    updateFilters({ type: type || undefined });
+  }, [updateFilters]);
 
   const setLowStock = useCallback((lowStock: boolean) => {
-    setFilters((prev) => ({ ...prev, low_stock: lowStock ? true : undefined }));
-    setPage(1);
-  }, []);
+    updateFilters({ low_stock: lowStock ? true : undefined });
+  }, [updateFilters]);
 
   const setTags = useCallback((tags: string[]) => {
-    setFilters((prev) => ({
-      ...prev,
-      tags: tags.length > 0 ? tags : undefined,
-    }));
-    setPage(1);
-  }, []);
+    updateFilters({ tags: tags.length > 0 ? tags : undefined });
+  }, [updateFilters]);
 
-  // Reset all filters
+  const setFilter = useCallback(
+    <K extends keyof EntityFilters>(key: K, value: EntityFilters[K]) => {
+      updateFilters({ [key]: value } as Partial<EntityFilters>);
+    },
+    [updateFilters],
+  );
+
   const resetFilters = useCallback(() => {
     setFilters({});
     setPage(1);
   }, []);
 
-  // Get clean filter object for API with price_range transformation
   const getCleanFilters = useCallback((): Record<string, unknown> => {
-    const cleaned: Record<string, unknown> = {};
-    Object.entries(filters).forEach(([key, value]) => {
-      if (value !== undefined && value !== null && value !== "") {
-        cleaned[key] = value;
-      }
-    });
-
-    // Transform price_min and price_max into price_range format if both exist
-    if (cleaned.price_min || cleaned.price_max) {
-      const min = cleaned.price_min || 0;
-      const max = cleaned.price_max || 0;
-      if (min || max) {
-        cleaned.price_range = `${min}:${max}`;
-      }
-      delete cleaned.price_min;
-      delete cleaned.price_max;
-    }
-
-    if (Array.isArray(cleaned.tags)) {
-      const tags = cleaned.tags.filter(
-        (tag): tag is string => typeof tag === "string" && tag.trim() !== "",
-      );
-      if (tags.length > 0) {
-        cleaned.tags = tags;
-      } else {
-        delete cleaned.tags;
-      }
-    }
-
-    return cleaned;
+    return buildApiParams(filters);
   }, [filters]);
 
-  // Log current filters (for debugging)
+  const getModuleApiParams = useCallback(
+    (module: InventoryModuleId): Record<string, unknown> => {
+      return buildApiParams(filters, module);
+    },
+    [filters],
+  );
+
   const logFilters = useCallback(() => {
     console.log("[Filters] Current state:", filters);
     console.log("[Filters] Clean filters for API:", getCleanFilters());
@@ -188,12 +248,10 @@ export function useEntityFilters(initialFilters?: EntityFilters) {
   }, [filters, getCleanFilters, page]);
 
   return {
-    // State
     filters,
     page,
     getCleanFilters,
-
-    // Setters
+    getModuleApiParams,
     setSearch,
     setCategory,
     setBrand,
@@ -208,10 +266,12 @@ export function useEntityFilters(initialFilters?: EntityFilters) {
     setType,
     setLowStock,
     setTags,
+    setFilter,
     setPage,
     resetFilters,
-
-    // Utilities
     logFilters,
   };
 }
+
+// Alias for plan compatibility
+export const useModuleFilters = useEntityFilters;

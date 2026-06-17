@@ -21,6 +21,7 @@ import {
   PageHero,
   PageShell,
   SectionHeading,
+  SearchableSelect,
   StatCard,
   StatGrid,
 } from "@/components/ops-ui";
@@ -87,6 +88,14 @@ export default function InventoryCountPage() {
     setListTab,
     listSearch,
     setListSearch,
+    listSkuSearch,
+    setListSkuSearch,
+    listVarianceFilter,
+    setListVarianceFilter,
+    listStockMin,
+    setListStockMin,
+    listStockMax,
+    setListStockMax,
     summary,
     workflowStep,
     visibleLines,
@@ -183,7 +192,20 @@ export default function InventoryCountPage() {
   }
 
   const activeEmpty = EMPTY_STATE_COPY[listTab];
-  const hasListSearch = listSearch.trim().length > 0;
+  const hasListFilters =
+    listSearch.trim().length > 0 ||
+    listSkuSearch.trim().length > 0 ||
+    listVarianceFilter !== "all" ||
+    listStockMin !== "" ||
+    listStockMax !== "";
+
+  const clearListFilters = () => {
+    setListSearch("");
+    setListSkuSearch("");
+    setListVarianceFilter("all");
+    setListStockMin("");
+    setListStockMax("");
+  };
 
   return (
     <PageShell className="pb-24 lg:pb-6">
@@ -607,7 +629,7 @@ export default function InventoryCountPage() {
 
             <div className="rounded-[1.5rem] border border-outline-variant/15 bg-surface-container-lowest p-4 sm:p-5">
               <FilterBar className="md:grid-cols-12">
-                <InputGroup label="Search counted items" className="md:col-span-12">
+                <InputGroup label="Search by name" className="md:col-span-4">
                   <div className="relative">
                     <MagnifyingGlassIcon
                       className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-on-surface-variant/70"
@@ -617,22 +639,83 @@ export default function InventoryCountPage() {
                       type="text"
                       value={listSearch}
                       onChange={(event) => setListSearch(event.target.value)}
-                      placeholder="Filter by name, SKU, or part number..."
-                      className="form-input-base indent-6 pl-10 pr-10"
-                      aria-label="Search counted items"
+                      placeholder="Filter by item name..."
+                      className="form-input-base indent-6 pl-10"
+                      aria-label="Search counted items by name"
                     />
-                    {hasListSearch ? (
-                      <button
-                        type="button"
-                        onClick={() => setListSearch("")}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-on-surface-variant hover:bg-surface-container hover:text-on-surface"
-                        aria-label="Clear search"
-                      >
-                        <XMarkIcon className="h-4 w-4" aria-hidden />
-                      </button>
-                    ) : null}
                   </div>
                 </InputGroup>
+                <InputGroup label="SKU / part number" className="md:col-span-4">
+                  <input
+                    type="text"
+                    value={listSkuSearch}
+                    onChange={(event) => setListSkuSearch(event.target.value)}
+                    placeholder="Filter by SKU or part number..."
+                    className="form-input-base"
+                    aria-label="Search counted items by SKU"
+                  />
+                </InputGroup>
+                <InputGroup label="Variance" className="md:col-span-4">
+                  <SearchableSelect
+                    value={listVarianceFilter}
+                    onChange={(value) =>
+                      setListVarianceFilter(
+                        value as typeof listVarianceFilter,
+                      )
+                    }
+                    options={[
+                      { value: "all", label: "All variances" },
+                      { value: "positive", label: "Surplus (+)" },
+                      { value: "negative", label: "Shortage (−)" },
+                      { value: "zero", label: "No variance (0)" },
+                    ]}
+                    className="form-input-base"
+                    aria-label="Filter by variance"
+                  />
+                </InputGroup>
+                <InputGroup label="System stock" className="md:col-span-6">
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      type="number"
+                      onWheel={(e) => e.currentTarget.blur()}
+                      value={listStockMin}
+                      onChange={(e) =>
+                        setListStockMin(
+                          e.target.value ? Number(e.target.value) : "",
+                        )
+                      }
+                      placeholder="Min"
+                      className="form-input-base py-2 text-sm mono-data [&::-webkit-inner-spin-button]:appearance-none"
+                      aria-label="Minimum system stock"
+                    />
+                    <input
+                      type="number"
+                      onWheel={(e) => e.currentTarget.blur()}
+                      value={listStockMax}
+                      onChange={(e) =>
+                        setListStockMax(
+                          e.target.value ? Number(e.target.value) : "",
+                        )
+                      }
+                      placeholder="Max"
+                      className="form-input-base py-2 text-sm mono-data [&::-webkit-inner-spin-button]:appearance-none"
+                      aria-label="Maximum system stock"
+                    />
+                  </div>
+                </InputGroup>
+                {hasListFilters ? (
+                  <div className="flex items-end md:col-span-6">
+                    <ActionButton
+                      type="button"
+                      variant="outline"
+                      onClick={clearListFilters}
+                      className="w-full sm:w-auto"
+                    >
+                      <XMarkIcon className="h-4 w-4" aria-hidden />
+                      Clear filters
+                    </ActionButton>
+                  </div>
+                ) : null}
               </FilterBar>
             </div>
 
@@ -678,20 +761,20 @@ export default function InventoryCountPage() {
           />
         ) : visibleLines.length === 0 ? (
           <EmptyState
-            title={hasListSearch ? "No items match this view" : activeEmpty.title}
+            title={hasListFilters ? "No items match this view" : activeEmpty.title}
             description={
-              hasListSearch
-                ? "Try another tab or adjust your search filter."
+              hasListFilters
+                ? "Try another tab or adjust your filters."
                 : activeEmpty.description
             }
             action={
-              hasListSearch ? (
+              hasListFilters ? (
                 <ActionButton
                   type="button"
                   variant="outline"
-                  onClick={() => setListSearch("")}
+                  onClick={clearListFilters}
                 >
-                  Clear search
+                  Clear filters
                 </ActionButton>
               ) : listTab !== "all" ? (
                 <ActionButton
@@ -709,7 +792,7 @@ export default function InventoryCountPage() {
             <p className="label-caps text-on-surface-variant">
               {visibleLines.length}{" "}
               {visibleLines.length === 1 ? "item" : "items"}
-              {hasListSearch ? " matching filter" : ""}
+              {hasListFilters ? " matching filters" : ""}
             </p>
 
             <div className="grid gap-3 md:hidden">

@@ -155,11 +155,46 @@ export function sortCountLinesBy(lines: CountLine[], key: CountSortKey): CountLi
   });
 }
 
+export type CountVarianceFilter = "all" | "positive" | "negative" | "zero";
+
 export function matchesCountSearch(line: CountLine, query: string): boolean {
   const normalized = query.trim().toLowerCase();
   if (!normalized) return true;
-  return [line.name, line.sku, line.partNumber ?? ""]
+  const skuHaystack = [line.sku, line.partNumber ?? ""]
+    .join(" ")
+    .toLowerCase();
+  if (skuHaystack.includes(normalized)) return true;
+  return line.name.toLowerCase().includes(normalized);
+}
+
+export function matchesCountSkuSearch(line: CountLine, query: string): boolean {
+  const normalized = query.trim().toLowerCase();
+  if (!normalized) return true;
+  return [line.sku, line.partNumber ?? ""]
     .join(" ")
     .toLowerCase()
     .includes(normalized);
+}
+
+export function matchesCountVariance(
+  line: CountLine,
+  filter: CountVarianceFilter,
+): boolean {
+  if (filter === "all") return true;
+  const variance = line.counted - line.systemQty;
+  if (filter === "positive") return variance > 0;
+  if (filter === "negative") return variance < 0;
+  return variance === 0;
+}
+
+export function matchesCountStockRange(
+  line: CountLine,
+  min?: number,
+  max?: number,
+): boolean {
+  if (min === undefined && max === undefined) return true;
+  const qty = line.systemQty;
+  if (min !== undefined && qty < min) return false;
+  if (max !== undefined && qty > max) return false;
+  return true;
 }

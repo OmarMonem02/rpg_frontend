@@ -15,16 +15,13 @@ import {
   type CreateBrandPayload,
 } from "@/lib/crud-api";
 import { EntityFormModal, type FieldConfig } from "@/components/entity-form-modal";
-import { AdvancedFilters } from "@/components/advanced-filters";
+import { InventoryModuleFilters } from "@/components/inventory/InventoryModuleFilters";
 import {
   ActionButton,
   EmptyState,
-  FilterBar,
-  InputGroup,
   PageHero,
   PageShell,
   PaginationControls,
-  SearchableSelect,
   StatusBadge,
   SurfaceCard,
 } from "@/components/ops-ui";
@@ -33,6 +30,7 @@ import {
   formatBrandType,
   type BrandType,
 } from "@/lib/brand-types";
+import { DEFAULT_BRAND_TYPE_OPTIONS } from "@/lib/inventory-filter-config";
 
 export default function BrandsPage() {
   const permissions = usePermissions();
@@ -48,9 +46,10 @@ export default function BrandsPage() {
   const {
     page,
     setPage,
-    getCleanFilters,
+    getModuleApiParams,
     setSearch,
     setType,
+    setFilter,
     filters,
   } = useEntityFilters();
 
@@ -64,11 +63,11 @@ export default function BrandsPage() {
       const token = getAuthToken();
       if (!token) throw new Error("Authentication required");
 
-      const cleanFilters = getCleanFilters();
+      const apiFilters = getModuleApiParams("brands");
       const result = await listBrands(
         token,
         page,
-        cleanFilters as { type?: string; search?: string; currency?: string },
+        apiFilters as { type?: string; search?: string; created_from?: string; created_to?: string },
       );
       setBrands(result.items);
       setTotalPages(result.lastPage);
@@ -78,7 +77,7 @@ export default function BrandsPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, getCleanFilters]);
+  }, [page, getModuleApiParams]);
 
   useEffect(() => {
     void loadBrands();
@@ -196,30 +195,29 @@ export default function BrandsPage() {
       ) : null}
 
       <SurfaceCard>
-        <FilterBar className="mb-6 md:grid-cols-12">
-          <InputGroup label="Search Brands" className="md:col-span-6">
-            <input
-              type="text"
-              placeholder="Search by brand name..."
-              value={filters.search || ""}
-              onChange={(e) => setSearch(e.target.value)}
-              className="form-input-base"
-            />
-          </InputGroup>
-          <InputGroup label="Filter by Type" className="md:col-span-6">
-            <SearchableSelect
-              value={filters.type || ""}
-              onChange={setType}
-              placeholder="All Types"
-              options={[
-                { value: "spare_parts", label: "Spare Parts" },
-                { value: "products", label: "Products" },
-                { value: "bikes", label: "Bikes" },
-              ]}
-              className="form-input-base"
-            />
-          </InputGroup>
-        </FilterBar>
+        <InventoryModuleFilters
+          module="brands"
+          filters={filters}
+          setters={{
+            setSearch,
+            setCategory: () => {},
+            setBrand: () => {},
+            setBlueprint: () => {},
+            setSector: () => {},
+            setStatus: () => {},
+            setType,
+            setPriceMin: () => {},
+            setPriceMax: () => {},
+            setCurrency: () => {},
+            setLowStock: () => {},
+            setTags: () => {},
+            setBikeCompatibility: () => {},
+            setFilter,
+          }}
+          options={{
+            brandTypes: DEFAULT_BRAND_TYPE_OPTIONS,
+          }}
+        />
         {loading ? (
           <div className="flex justify-center py-12">
             <div className="h-8 w-8 animate-spin rounded-full border-4 border-outline-variant/30 border-t-primary" />

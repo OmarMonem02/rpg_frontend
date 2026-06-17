@@ -9,7 +9,7 @@ import {
   type FormEvent,
   type KeyboardEvent,
 } from "react";
-import { BikeCompatibilityFilter } from "@/components/BikeCompatibilityFilter";
+import { InventoryModuleFilters } from "@/components/inventory/InventoryModuleFilters";
 import {
   InventoryImage,
   InventoryImagePlaceholder,
@@ -20,12 +20,12 @@ import {
   EmptyState,
   FilterBar,
   InputGroup,
-  PageHero,
   PageShell,
   PaginationControls,
   SearchableSelect,
   SectionHeading,
 } from "@/components/ops-ui";
+import { useEntityFilters } from "@/hooks/useEntityFilters";
 import { useExchangeRates } from "@/hooks/useExchangeRates";
 import { getAuthToken } from "@/lib/auth-session";
 import { formatCatalogPriceInEGP, type ExchangeRates } from "@/lib/currencies";
@@ -46,6 +46,8 @@ import {
 } from "@/lib/crud-api";
 import type { BikeBlueprintRecord } from "@/lib/api/bikes";
 import { filterBrandsByType } from "@/lib/brand-types";
+import type { InventoryModuleId } from "@/lib/inventory-filter-config";
+import { DEFAULT_ITEM_STATUS_OPTIONS } from "@/lib/inventory-filter-config";
 import {
   findExactSkuOrPartNumberMatch,
   formatMaxDiscount,
@@ -56,6 +58,19 @@ import {
   type LookupItem,
 } from "@/lib/item-lookup";
 type EntityFilter = "all" | "product" | "spare_part" | "maintenance_part";
+
+function browseModuleForEntity(entity: EntityFilter): InventoryModuleId {
+  switch (entity) {
+    case "product":
+      return "products";
+    case "spare_part":
+      return "spare_parts";
+    case "maintenance_part":
+      return "maintenance_parts";
+    default:
+      return "item_lookup";
+  }
+}
 
 const MAX_VISIBLE_BIKE_CHIPS = 4;
 
@@ -229,23 +244,28 @@ export default function ItemLookupPage() {
   const [quickResult, setQuickResult] = useState<LookupItem | null>(null);
 
   const [entityFilter, setEntityFilter] = useState<EntityFilter>("all");
-  const [nameSearchDraft, setNameSearchDraft] = useState("");
-  const [nameSearch, setNameSearch] = useState("");
-  const [productBrandId, setProductBrandId] = useState<number | "">("");
-  const [spareBrandId, setSpareBrandId] = useState<number | "">("");
-  const [productCategoryId, setProductCategoryId] = useState<number | "">("");
-  const [spareCategoryId, setSpareCategoryId] = useState<number | "">("");
-  const [maintenanceBrandId, setMaintenanceBrandId] = useState<number | "">("");
-  const [maintenanceCategoryId, setMaintenanceCategoryId] = useState<number | "">("");
-  const [bikeBrandId, setBikeBrandId] = useState<number | undefined>();
-  const [bikeModel, setBikeModel] = useState<string | undefined>();
-  const [bikeYear, setBikeYear] = useState<number | undefined>();
+  const {
+    filters,
+    page,
+    setPage,
+    getModuleApiParams,
+    setSearch,
+    setCategory,
+    setBrand,
+    setPriceMin,
+    setPriceMax,
+    setCurrency,
+    setBikeCompatibility,
+    setFilter,
+  } = useEntityFilters();
+
+  const browseModule = browseModuleForEntity(entityFilter);
 
   const [browseItems, setBrowseItems] = useState<LookupItem[]>([]);
   const [browseLoading, setBrowseLoading] = useState(false);
   const [browseError, setBrowseError] = useState<string | null>(null);
-  const [browsePage, setBrowsePage] = useState(1);
   const [browseTotalPages, setBrowseTotalPages] = useState(1);
+  const [showMoreBrowseFilters, setShowMoreBrowseFilters] = useState(false);
 
   const bikeBrandNameById = useMemo(
     () => new Map(bikeBrands.map((brand) => [brand.id, brand.name])),
@@ -302,21 +322,63 @@ export default function ItemLookupPage() {
   }, []);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => {
-      setNameSearch(nameSearchDraft);
-      setBrowsePage(1);
-    }, 300);
-    return () => window.clearTimeout(timer);
-  }, [nameSearchDraft]);
+    setCategory("");
+    setBrand("");
+    setPage(1);
+  }, [entityFilter, setCategory, setBrand, setPage]);
 
-  const buildSharedFilters = useCallback(() => {
-    return {
-      search: nameSearch || undefined,
-      bike_brand_id: bikeBrandId,
-      bike_model: bikeModel,
-      bike_year: bikeYear,
-    };
-  }, [nameSearch, bikeBrandId, bikeModel, bikeYear]);
+  const browseFilterOptions = useMemo(() => {
+    switch (browseModule) {
+      case "products":
+        return {
+          categories: productCategories.map((c) => ({
+            value: c.id,
+            label: c.name,
+          })),
+          brands: productBrands.map((b) => ({ value: b.id, label: b.name })),
+          itemStatuses: DEFAULT_ITEM_STATUS_OPTIONS,
+        };
+      case "spare_parts":
+        return {
+          categories: sparePartCategories.map((c) => ({
+            value: c.id,
+            label: c.name,
+          })),
+          brands: sparePartBrands.map((b) => ({ value: b.id, label: b.name })),
+          itemStatuses: DEFAULT_ITEM_STATUS_OPTIONS,
+        };
+      case "maintenance_parts":
+        return {
+          categories: maintenancePartCategories.map((c) => ({
+            value: c.id,
+            label: c.name,
+          })),
+          brands: maintenancePartBrands.map((b) => ({
+            value: b.id,
+            label: b.name,
+          })),
+          itemStatuses: DEFAULT_ITEM_STATUS_OPTIONS,
+        };
+      default:
+        return { itemStatuses: DEFAULT_ITEM_STATUS_OPTIONS };
+    }
+  }, [
+    browseModule,
+    productCategories,
+    productBrands,
+    sparePartCategories,
+    sparePartBrands,
+    maintenancePartCategories,
+    maintenancePartBrands,
+  ]);
+
+  const buildBrowseApiParams = useCallback(() => {
+    const params = { ...getModuleApiParams(browseModule) };
+    if (entityFilter === "all") {
+      delete params.category_id;
+    }
+    return params;
+  }, [browseModule, entityFilter, getModuleApiParams]);
 
   const runQuickLookup = useCallback(async () => {
     const code = skuValue.trim();
@@ -364,14 +426,10 @@ export default function ItemLookupPage() {
       const token = getAuthToken();
       if (!token) throw new Error("Authentication required");
 
-      const shared = buildSharedFilters();
+      const apiParams = buildBrowseApiParams();
 
       if (entityFilter === "product") {
-        const result = await listProducts(token, browsePage, {
-          ...shared,
-          brand_id: productBrandId || undefined,
-          category_id: productCategoryId || undefined,
-        });
+        const result = await listProducts(token, page, apiParams);
         setBrowseItems(
           result.items.map((record) => toLookupItem("product", record)),
         );
@@ -380,11 +438,7 @@ export default function ItemLookupPage() {
       }
 
       if (entityFilter === "spare_part") {
-        const result = await listSpareParts(token, browsePage, {
-          ...shared,
-          brand_id: spareBrandId || undefined,
-          category_id: spareCategoryId || undefined,
-        });
+        const result = await listSpareParts(token, page, apiParams);
         setBrowseItems(
           result.items.map((record) => toLookupItem("spare_part", record)),
         );
@@ -393,11 +447,7 @@ export default function ItemLookupPage() {
       }
 
       if (entityFilter === "maintenance_part") {
-        const result = await listMaintenanceParts(token, browsePage, {
-          ...shared,
-          brand_id: maintenanceBrandId || undefined,
-          category_id: maintenanceCategoryId || undefined,
-        });
+        const result = await listMaintenanceParts(token, page, apiParams);
         setBrowseItems(
           result.items.map((record) => toLookupItem("maintenance_part", record)),
         );
@@ -406,21 +456,9 @@ export default function ItemLookupPage() {
       }
 
       const [productsRes, spareRes, maintenanceRes] = await Promise.all([
-        listProducts(token, browsePage, {
-          ...shared,
-          brand_id: productBrandId || undefined,
-          category_id: productCategoryId || undefined,
-        }),
-        listSpareParts(token, browsePage, {
-          ...shared,
-          brand_id: spareBrandId || undefined,
-          category_id: spareCategoryId || undefined,
-        }),
-        listMaintenanceParts(token, browsePage, {
-          ...shared,
-          brand_id: maintenanceBrandId || undefined,
-          category_id: maintenanceCategoryId || undefined,
-        }),
+        listProducts(token, page, apiParams),
+        listSpareParts(token, page, apiParams),
+        listMaintenanceParts(token, page, apiParams),
       ]);
 
       const merged = [
@@ -450,17 +488,7 @@ export default function ItemLookupPage() {
     } finally {
       setBrowseLoading(false);
     }
-  }, [
-    browsePage,
-    buildSharedFilters,
-    entityFilter,
-    productBrandId,
-    productCategoryId,
-    spareBrandId,
-    spareCategoryId,
-    maintenanceBrandId,
-    maintenanceCategoryId,
-  ]);
+  }, [page, buildBrowseApiParams, entityFilter]);
 
   useEffect(() => {
     void loadBrowseResults();
@@ -477,13 +505,6 @@ export default function ItemLookupPage() {
       void runQuickLookup();
     }
   };
-
-  const showProductFilters =
-    entityFilter === "all" || entityFilter === "product";
-  const showSpareFilters =
-    entityFilter === "all" || entityFilter === "spare_part";
-  const showMaintenanceFilters =
-    entityFilter === "all" || entityFilter === "maintenance_part";
 
   return (
     <PageShell>
@@ -557,7 +578,6 @@ export default function ItemLookupPage() {
                 value={entityFilter}
                 onChange={(value) => {
                   setEntityFilter(value as EntityFilter);
-                  setBrowsePage(1);
                 }}
                 options={[
                   { value: "all", label: "All items" },
@@ -569,162 +589,51 @@ export default function ItemLookupPage() {
                 aria-label="Item type"
               />
             </InputGroup>
-
-            <InputGroup label="Search by name" className="md:col-span-9">
-              <input
-                type="text"
-                value={nameSearchDraft}
-                onChange={(event) => setNameSearchDraft(event.target.value)}
-                placeholder="Name, SKU, or part number…"
-                className="form-input-base"
-                aria-label="Search by name"
-              />
-            </InputGroup>
-          </FilterBar>
-
-          <FilterBar className="md:grid-cols-12">
-            {showProductFilters ? (
-              <>
-                <InputGroup label="Product brand" className="md:col-span-3">
-                  <SearchableSelect
-                    value={productBrandId}
-                    onChange={(value) => {
-                      setProductBrandId(value ? parseInt(value, 10) : "");
-                      setBrowsePage(1);
-                    }}
-                    placeholder="All product brands"
-                    options={productBrands.map((brand) => ({
-                      value: brand.id,
-                      label: brand.name,
-                    }))}
-                    className="form-input-base"
-                    disabled={metadataLoading}
-                    aria-label="Product brand"
-                  />
-                </InputGroup>
-                <InputGroup label="Product category" className="md:col-span-3">
-                  <SearchableSelect
-                    value={productCategoryId}
-                    onChange={(value) => {
-                      setProductCategoryId(value ? parseInt(value, 10) : "");
-                      setBrowsePage(1);
-                    }}
-                    placeholder="All product categories"
-                    options={productCategories.map((category) => ({
-                      value: category.id,
-                      label: category.name,
-                    }))}
-                    className="form-input-base"
-                    disabled={metadataLoading}
-                    aria-label="Product category"
-                  />
-                </InputGroup>
-              </>
-            ) : null}
-
-            {showSpareFilters ? (
-              <>
-                <InputGroup label="Spare part brand" className="md:col-span-3">
-                  <SearchableSelect
-                    value={spareBrandId}
-                    onChange={(value) => {
-                      setSpareBrandId(value ? parseInt(value, 10) : "");
-                      setBrowsePage(1);
-                    }}
-                    placeholder="All spare part brands"
-                    options={sparePartBrands.map((brand) => ({
-                      value: brand.id,
-                      label: brand.name,
-                    }))}
-                    className="form-input-base"
-                    disabled={metadataLoading}
-                    aria-label="Spare part brand"
-                  />
-                </InputGroup>
-                <InputGroup label="Spare part category" className="md:col-span-3">
-                  <SearchableSelect
-                    value={spareCategoryId}
-                    onChange={(value) => {
-                      setSpareCategoryId(value ? parseInt(value, 10) : "");
-                      setBrowsePage(1);
-                    }}
-                    placeholder="All spare part categories"
-                    options={sparePartCategories.map((category) => ({
-                      value: category.id,
-                      label: category.name,
-                    }))}
-                    className="form-input-base"
-                    disabled={metadataLoading}
-                    aria-label="Spare part category"
-                  />
-                </InputGroup>
-              </>
-            ) : null}
-
-            {showMaintenanceFilters ? (
-              <>
-                <InputGroup label="Maintenance part brand" className="md:col-span-3">
-                  <SearchableSelect
-                    value={maintenanceBrandId}
-                    onChange={(value) => {
-                      setMaintenanceBrandId(value ? parseInt(value, 10) : "");
-                      setBrowsePage(1);
-                    }}
-                    placeholder="All maintenance part brands"
-                    options={maintenancePartBrands.map((brand) => ({
-                      value: brand.id,
-                      label: brand.name,
-                    }))}
-                    className="form-input-base"
-                    disabled={metadataLoading}
-                    aria-label="Maintenance part brand"
-                  />
-                </InputGroup>
-                <InputGroup label="Maintenance part category" className="md:col-span-3">
-                  <SearchableSelect
-                    value={maintenanceCategoryId}
-                    onChange={(value) => {
-                      setMaintenanceCategoryId(value ? parseInt(value, 10) : "");
-                      setBrowsePage(1);
-                    }}
-                    placeholder="All maintenance part categories"
-                    options={maintenancePartCategories.map((category) => ({
-                      value: category.id,
-                      label: category.name,
-                    }))}
-                    className="form-input-base"
-                    disabled={metadataLoading}
-                    aria-label="Maintenance part category"
-                  />
-                </InputGroup>
-              </>
+            {entityFilter === "all" ? (
+              <InputGroup label="Search" className="md:col-span-9">
+                <input
+                  type="text"
+                  value={filters.search || ""}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="Name, SKU, or part number…"
+                  className="form-input-base"
+                  aria-label="Search catalog"
+                />
+              </InputGroup>
             ) : null}
           </FilterBar>
 
-          <div className="rounded-[1.25rem] border border-outline-variant/10 bg-surface-container-low/40 p-4">
-            <div className="mb-3">
-              <p className="label-caps text-on-surface-variant">
-                Compatible bike
-              </p>
-              <p className="mt-1 text-xs text-on-surface-variant/80">
-                Filter by bike brand, model, and year. Universal items remain
-                visible.
-              </p>
-            </div>
-            <BikeCompatibilityFilter
-              brands={bikeBrands}
-              selectedBrandId={bikeBrandId}
-              selectedModel={bikeModel}
-              selectedYear={bikeYear}
-              isLoading={browseLoading || metadataLoading}
-              onFilterChange={(compat) => {
-                setBikeBrandId(compat.bike_brand_id);
-                setBikeModel(compat.bike_model);
-                setBikeYear(compat.bike_year);
-                setBrowsePage(1);
-              }}
-            />
-          </div>
+          <InventoryModuleFilters
+            module={browseModule}
+            filters={filters}
+            bikeBrands={bikeBrands}
+            loading={browseLoading || metadataLoading}
+            showMoreFilters={showMoreBrowseFilters}
+            onToggleMore={() => setShowMoreBrowseFilters((v) => !v)}
+            sections={
+              entityFilter === "all"
+                ? ["advanced", "more"]
+                : ["primary", "advanced", "more"]
+            }
+            setters={{
+              setSearch,
+              setCategory,
+              setBrand,
+              setBlueprint: () => {},
+              setSector: () => {},
+              setStatus: () => {},
+              setType: () => {},
+              setPriceMin,
+              setPriceMax,
+              setCurrency,
+              setLowStock: (v) => setFilter("low_stock", v ? true : undefined),
+              setTags: (tags) =>
+                setFilter("tags", tags.length > 0 ? tags : undefined),
+              setBikeCompatibility,
+              setFilter,
+            }}
+            options={browseFilterOptions}
+          />
         </div>
 
         {browseError ? (
@@ -748,7 +657,7 @@ export default function ItemLookupPage() {
               {browseItems.length}{" "}
               {browseItems.length === 1 ? "item" : "items"}
               {browseTotalPages > 1
-                ? ` · page ${browsePage} of ${browseTotalPages}`
+                ? ` · page ${page} of ${browseTotalPages}`
                 : ""}
             </p>
 
@@ -840,17 +749,17 @@ export default function ItemLookupPage() {
             </div>
 
             <PaginationControls
-              page={browsePage}
+              page={page}
               totalPages={browseTotalPages}
               onPrevious={() =>
-                setBrowsePage((current) => Math.max(1, current - 1))
+                setPage((current) => Math.max(1, current - 1))
               }
               onNext={() =>
-                setBrowsePage((current) =>
+                setPage((current) =>
                   Math.min(browseTotalPages, current + 1),
                 )
               }
-              onPageChange={setBrowsePage}
+              onPageChange={setPage}
             />
           </>
         )}

@@ -342,7 +342,16 @@ export async function listBikes(
     brand_id?: number;
     status?: string;
     price_range?: string;
+    cost_price_range?: string;
     currency?: string;
+    mileage_min?: number;
+    mileage_max?: number;
+    max_discount_min?: number;
+    max_discount_max?: number;
+    profit_min?: number;
+    profit_max?: number;
+    profit_percent_min?: number;
+    profit_percent_max?: number;
     per_page?: number;
   },
 ): Promise<PaginatedResult<BikeRecord>> {
@@ -354,7 +363,16 @@ export async function listBikes(
     brand_id: filters?.brand_id,
     status: filters?.status,
     price_range: filters?.price_range,
+    cost_price_range: filters?.cost_price_range,
     currency: filters?.currency,
+    mileage_min: filters?.mileage_min,
+    mileage_max: filters?.mileage_max,
+    max_discount_min: filters?.max_discount_min,
+    max_discount_max: filters?.max_discount_max,
+    profit_min: filters?.profit_min,
+    profit_max: filters?.profit_max,
+    profit_percent_min: filters?.profit_percent_min,
+    profit_percent_max: filters?.profit_percent_max,
   });
 
   const payload = await authorizedFetch<unknown>(

@@ -24,6 +24,7 @@ import {
   StatusBadge,
   TabsWrapper,
 } from "@/components/ops-ui";
+import { useEntityFilters } from "@/hooks/useEntityFilters";
 import { getAuthToken } from "@/lib/auth-session";
 import {
   fetchAllPages,
@@ -38,9 +39,12 @@ import {
   classifyStockAlert,
   getStockBadgeShortLabel,
   getStockBadgeTone,
-  matchesStockAlertTab,
   type StockAlertBucket,
 } from "@/lib/inventory-stock";
+import {
+  DEFAULT_ITEM_STATUS_OPTIONS,
+  DEFAULT_STOCK_ALERT_OPTIONS,
+} from "@/lib/inventory-filter-config";
 
 type EntityKind = "spare-part" | "product" | "maintenance-part";
 
@@ -107,14 +111,6 @@ function toProductRow(product: ProductRecord): StockAlertRow {
     sale_currency: product.sale_currency,
     editHref: `/inventory/products/edit/${product.id}`,
   };
-}
-
-function matchesSearch(row: StockAlertRow, query: string): boolean {
-  if (!query) return true;
-  const haystack = [row.name, row.sku, row.partNumber ?? ""]
-    .join(" ")
-    .toLowerCase();
-  return haystack.includes(query);
 }
 
 function AlertTable({
@@ -268,9 +264,7 @@ function AlertTable({
 }
 
 function AlertPanels({
-  alertTab,
   entityFilter,
-  search,
   sparePartRows,
   productRows,
   maintenancePartRows,
@@ -278,9 +272,7 @@ function AlertPanels({
   showProducts,
   showMaintenanceParts,
 }: {
-  alertTab: AlertTab;
   entityFilter: EntityFilter;
-  search: string;
   sparePartRows: StockAlertRow[];
   productRows: StockAlertRow[];
   maintenancePartRows: StockAlertRow[];
@@ -288,18 +280,9 @@ function AlertPanels({
   showProducts: boolean;
   showMaintenanceParts: boolean;
 }) {
-  const query = search.trim().toLowerCase();
-
-  const filterRows = (rows: StockAlertRow[]) =>
-    rows.filter(
-      (row) =>
-        matchesStockAlertTab(row, alertTab) &&
-        matchesSearch(row, query),
-    );
-
-  const spareFiltered = filterRows(sparePartRows);
-  const productFiltered = filterRows(productRows);
-  const maintenanceFiltered = filterRows(maintenancePartRows);
+  const spareFiltered = sparePartRows;
+  const productFiltered = productRows;
+  const maintenanceFiltered = maintenancePartRows;
 
   const showSpareSection =
     showSpareParts && (entityFilter === "all" || entityFilter === "spare-part");
@@ -392,9 +375,29 @@ export default function InventoryAlarmsPage() {
   const [maintenancePartRows, setMaintenancePartRows] = useState<StockAlertRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [search, setSearch] = useState("");
   const [entityFilter, setEntityFilter] = useState<EntityFilter>("all");
   const [alertTab, setAlertTab] = useState<AlertTab>("all");
+  const {
+    filters,
+    setSearch,
+    setFilter,
+    getModuleApiParams,
+  } = useEntityFilters();
+
+  const buildListParams = useCallback(() => {
+    const base = getModuleApiParams("products");
+    const stockAlertLevel =
+      alertTab !== "all"
+        ? alertTab
+        : typeof base.stock_alert_level === "string"
+          ? base.stock_alert_level
+          : undefined;
+    return {
+      ...base,
+      low_stock: true,
+      stock_alert_level: stockAlertLevel,
+    };
+  }, [alertTab, getModuleApiParams]);
 
   const loadData = useCallback(async () => {
     try {
@@ -402,20 +405,22 @@ export default function InventoryAlarmsPage() {
       const token = getAuthToken();
       if (!token) throw new Error("Authentication required");
 
+      const listParams = buildListParams();
+
       const [spareParts, products, maintenanceParts] = await Promise.all([
         showSpareParts
           ? fetchAllPages((page) =>
-              listSpareParts(token, page, { low_stock: true }),
+              listSpareParts(token, page, listParams),
             )
           : Promise.resolve([]),
         showProducts
           ? fetchAllPages((page) =>
-              listProducts(token, page, { low_stock: true }),
+              listProducts(token, page, listParams),
             )
           : Promise.resolve([]),
         showMaintenanceParts
           ? fetchAllPages((page) =>
-              listMaintenanceParts(token, page, { low_stock: true }),
+              listMaintenanceParts(token, page, listParams),
             )
           : Promise.resolve([]),
       ]);
@@ -431,7 +436,7 @@ export default function InventoryAlarmsPage() {
     } finally {
       setLoading(false);
     }
-  }, [showSpareParts, showProducts, showMaintenanceParts]);
+  }, [buildListParams, showSpareParts, showProducts, showMaintenanceParts]);
 
   useEffect(() => {
     void loadData();
@@ -444,9 +449,7 @@ export default function InventoryAlarmsPage() {
   );
 
   const stats = useMemo(() => {
-    const query = search.trim().toLowerCase();
     const visible = allRows.filter((row) => {
-      if (!matchesSearch(row, query)) return false;
       if (entityFilter === "spare-part" && row.kind !== "spare-part") {
         return false;
       }
@@ -479,13 +482,11 @@ export default function InventoryAlarmsPage() {
       productCount,
       maintenanceCount,
     };
-  }, [allRows, search, entityFilter]);
+  }, [allRows, entityFilter]);
 
   const tabPanels = (
     <AlertPanels
-      alertTab={alertTab}
       entityFilter={entityFilter}
-      search={search}
       sparePartRows={sparePartRows}
       productRows={productRows}
       maintenancePartRows={maintenancePartRows}
@@ -569,16 +570,16 @@ export default function InventoryAlarmsPage() {
           ) : null}
 
           <FilterBar className="md:grid-cols-12">
-            <InputGroup label="Search" className="md:col-span-6">
+            <InputGroup label="Search" className="md:col-span-4">
               <input
                 type="search"
                 placeholder="Search by name, SKU, or part number…"
-                value={search}
+                value={filters.search || ""}
                 onChange={(e) => setSearch(e.target.value)}
                 className="form-input-base"
               />
             </InputGroup>
-            <InputGroup label="Catalog" className="md:col-span-6">
+            <InputGroup label="Catalog" className="md:col-span-4">
               <SearchableSelect
                 value={entityFilter}
                 onChange={(value) => setEntityFilter(value as EntityFilter)}
@@ -602,6 +603,60 @@ export default function InventoryAlarmsPage() {
                 className="form-input-base"
               />
             </InputGroup>
+            <InputGroup label="Condition" className="md:col-span-4">
+              <SearchableSelect
+                value={filters.item_status || ""}
+                onChange={(v) => setFilter("item_status", v || undefined)}
+                placeholder="All"
+                options={DEFAULT_ITEM_STATUS_OPTIONS}
+                className="form-input-base"
+              />
+            </InputGroup>
+            <InputGroup label="Stock on hand" className="md:col-span-4">
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  type="number"
+                  onWheel={(e) => e.currentTarget.blur()}
+                  value={filters.stock_min ?? ""}
+                  onChange={(e) =>
+                    setFilter(
+                      "stock_min",
+                      e.target.value ? Number(e.target.value) : undefined,
+                    )
+                  }
+                  placeholder="Min"
+                  className="form-input-base py-2 text-sm mono-data [&::-webkit-inner-spin-button]:appearance-none"
+                />
+                <input
+                  type="number"
+                  onWheel={(e) => e.currentTarget.blur()}
+                  value={filters.stock_max ?? ""}
+                  onChange={(e) =>
+                    setFilter(
+                      "stock_max",
+                      e.target.value ? Number(e.target.value) : undefined,
+                    )
+                  }
+                  placeholder="Max"
+                  className="form-input-base py-2 text-sm mono-data [&::-webkit-inner-spin-button]:appearance-none"
+                />
+              </div>
+            </InputGroup>
+            {alertTab === "all" ? (
+              <InputGroup label="Alert level" className="md:col-span-4">
+                <SearchableSelect
+                  value={filters.stock_alert_level || "all"}
+                  onChange={(v) =>
+                    setFilter(
+                      "stock_alert_level",
+                      v === "all" ? undefined : v,
+                    )
+                  }
+                  options={DEFAULT_STOCK_ALERT_OPTIONS}
+                  className="form-input-base"
+                />
+              </InputGroup>
+            ) : null}
           </FilterBar>
 
           {loading ? (
@@ -613,7 +668,12 @@ export default function InventoryAlarmsPage() {
             <TabsWrapper
               variant="card"
               activeTabId={alertTab}
-              onTabChange={(id) => setAlertTab(id as AlertTab)}
+              onTabChange={(id) => {
+                setAlertTab(id as AlertTab);
+                if (id !== "all") {
+                  setFilter("stock_alert_level", undefined);
+                }
+              }}
               tabs={[
                 {
                   id: "all",

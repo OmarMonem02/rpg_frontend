@@ -1,4 +1,10 @@
-import type { CountItemType, CountLine, CountListTab, CountSortKey } from "@/lib/stocktake";
+import type {
+  CountItemType,
+  CountLine,
+  CountListTab,
+  CountSortKey,
+  CountVarianceFilter,
+} from "@/lib/stocktake";
 
 const STORAGE_KEY = "rpg-inventory-count-session";
 const LEGACY_SESSION_KEY = "rpg-inventory-count-session";
@@ -19,6 +25,10 @@ export type CountSessionSnapshot = {
   lines: CountLine[];
   listTab: CountListTab;
   listSearch: string;
+  listSkuSearch?: string;
+  listVarianceFilter?: CountVarianceFilter;
+  listStockMin?: number;
+  listStockMax?: number;
   lastScan: CountSessionLastScan | null;
   lastTouchedKey: string | null;
   sortKey?: CountSortKey;
@@ -105,9 +115,22 @@ function normalizeLastScan(raw: unknown): CountSessionLastScan | null {
 }
 
 const VALID_SORT_KEYS: CountSortKey[] = ["name", "sku", "variance", "type", "default"];
+const VALID_VARIANCE_FILTERS: CountVarianceFilter[] = [
+  "all",
+  "positive",
+  "negative",
+  "zero",
+];
 
 function isCountSortKey(value: unknown): value is CountSortKey {
   return typeof value === "string" && VALID_SORT_KEYS.includes(value as CountSortKey);
+}
+
+function isCountVarianceFilter(value: unknown): value is CountVarianceFilter {
+  return (
+    typeof value === "string" &&
+    VALID_VARIANCE_FILTERS.includes(value as CountVarianceFilter)
+  );
 }
 
 function normalizeSnapshot(raw: unknown): CountSessionSnapshot | null {
@@ -135,6 +158,19 @@ function normalizeSnapshot(raw: unknown): CountSessionSnapshot | null {
     lines,
     listTab: isCountListTab(record.listTab) ? record.listTab : "all",
     listSearch: typeof record.listSearch === "string" ? record.listSearch : "",
+    listSkuSearch:
+      typeof record.listSkuSearch === "string" ? record.listSkuSearch : "",
+    listVarianceFilter: isCountVarianceFilter(record.listVarianceFilter)
+      ? record.listVarianceFilter
+      : "all",
+    listStockMin:
+      typeof record.listStockMin === "number" && Number.isFinite(record.listStockMin)
+        ? record.listStockMin
+        : undefined,
+    listStockMax:
+      typeof record.listStockMax === "number" && Number.isFinite(record.listStockMax)
+        ? record.listStockMax
+        : undefined,
     lastScan: normalizeLastScan(record.lastScan),
     lastTouchedKey:
       typeof record.lastTouchedKey === "string" ? record.lastTouchedKey : null,

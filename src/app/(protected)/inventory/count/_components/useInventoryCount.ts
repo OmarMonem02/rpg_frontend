@@ -19,6 +19,9 @@ import {
   filterCountLines,
   getWorkflowStep,
   matchesCountSearch,
+  matchesCountSkuSearch,
+  matchesCountStockRange,
+  matchesCountVariance,
   sortCountLinesBy,
   summarize,
   toExportRows,
@@ -26,6 +29,7 @@ import {
   type CountLine,
   type CountListTab,
   type CountSortKey,
+  type CountVarianceFilter,
 } from "@/lib/stocktake";
 import {
   clearCountSession,
@@ -89,6 +93,11 @@ export function useInventoryCount() {
   const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
   const [listTab, setListTab] = useState<CountListTab>("all");
   const [listSearch, setListSearch] = useState("");
+  const [listSkuSearch, setListSkuSearch] = useState("");
+  const [listVarianceFilter, setListVarianceFilter] =
+    useState<CountVarianceFilter>("all");
+  const [listStockMin, setListStockMin] = useState<number | "">("");
+  const [listStockMax, setListStockMax] = useState<number | "">("");
 
   // ── NEW: sort key ──
   const [sortKey, setSortKey] = useState<CountSortKey>("default");
@@ -125,11 +134,26 @@ export function useInventoryCount() {
   );
 
   const visibleLines = useMemo(() => {
-    const filtered = filterCountLines(lines, listTab).filter((line) =>
-      matchesCountSearch(line, listSearch),
+    const stockMin = listStockMin === "" ? undefined : listStockMin;
+    const stockMax = listStockMax === "" ? undefined : listStockMax;
+    const filtered = filterCountLines(lines, listTab).filter(
+      (line) =>
+        matchesCountSearch(line, listSearch) &&
+        matchesCountSkuSearch(line, listSkuSearch) &&
+        matchesCountVariance(line, listVarianceFilter) &&
+        matchesCountStockRange(line, stockMin, stockMax),
     );
     return sortCountLinesBy(filtered, sortKey);
-  }, [lines, listTab, listSearch, sortKey]);
+  }, [
+    lines,
+    listTab,
+    listSearch,
+    listSkuSearch,
+    listVarianceFilter,
+    listStockMin,
+    listStockMax,
+    sortKey,
+  ]);
 
   const listTabOptions = useMemo(
     (): Array<{ id: CountListTab; label: string }> => [
@@ -159,6 +183,10 @@ export function useInventoryCount() {
       setLines(snapshot.lines);
       setListTab(snapshot.listTab);
       setListSearch(snapshot.listSearch);
+      setListSkuSearch(snapshot.listSkuSearch ?? "");
+      setListVarianceFilter(snapshot.listVarianceFilter ?? "all");
+      setListStockMin(snapshot.listStockMin ?? "");
+      setListStockMax(snapshot.listStockMax ?? "");
       setLastScan(snapshot.lastScan);
       setLastTouchedKey(snapshot.lastTouchedKey);
       if (snapshot.sortKey) setSortKey(snapshot.sortKey);
@@ -178,12 +206,29 @@ export function useInventoryCount() {
       lines,
       listTab,
       listSearch,
+      listSkuSearch,
+      listVarianceFilter,
+      listStockMin: listStockMin === "" ? undefined : listStockMin,
+      listStockMax: listStockMax === "" ? undefined : listStockMax,
       lastScan,
       lastTouchedKey,
       sortKey,
       scanHistory,
     });
-  }, [hydrated, lines, listTab, listSearch, lastScan, lastTouchedKey, sortKey, scanHistory]);
+  }, [
+    hydrated,
+    lines,
+    listTab,
+    listSearch,
+    listSkuSearch,
+    listVarianceFilter,
+    listStockMin,
+    listStockMax,
+    lastScan,
+    lastTouchedKey,
+    sortKey,
+    scanHistory,
+  ]);
 
   // ── Global keyboard shortcut: "/" to focus scan input ──
   useEffect(() => {
@@ -752,6 +797,14 @@ export function useInventoryCount() {
     setListTab,
     listSearch,
     setListSearch,
+    listSkuSearch,
+    setListSkuSearch,
+    listVarianceFilter,
+    setListVarianceFilter,
+    listStockMin,
+    setListStockMin,
+    listStockMax,
+    setListStockMax,
     summary,
     workflowStep,
     visibleLines,

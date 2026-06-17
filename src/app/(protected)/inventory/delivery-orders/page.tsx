@@ -14,6 +14,10 @@ import {
   type SaleListFilters,
   type SaleRecord,
 } from "@/lib/crud-api";
+import { InventoryModuleFilters } from "@/components/inventory/InventoryModuleFilters";
+import { ActiveFilterChips } from "@/components/inventory/ActiveFilterChips";
+import { buildActiveFilterChips } from "@/lib/inventory-filter-utils";
+import type { ModuleFilterOptions } from "@/lib/inventory-filter-config";
 import {
   DELIVERY_STATUS_OPTIONS,
   formatDate,
@@ -50,10 +54,25 @@ import {
   MagnifyingGlassIcon,
   PlusIcon,
   TruckIcon,
-  XMarkIcon,
 } from "@heroicons/react/24/outline";
 
 type DeliverySort = "newest" | "oldest" | "highest" | "lowest";
+
+const DELIVERY_FILTER_OPTIONS: ModuleFilterOptions = {
+  deliveryStatuses: DELIVERY_STATUS_OPTIONS,
+};
+
+function saleFiltersFromParams(
+  params: Record<string, unknown>,
+  extras: Partial<SaleListFilters> = {},
+): SaleListFilters {
+  const { type, ...rest } = params;
+  return {
+    ...(rest as SaleListFilters),
+    sale_type: typeof type === "string" ? type : undefined,
+    ...extras,
+  };
+}
 
 const DELIVERY_FILTERS = [
   { value: "", label: "All delivery statuses" },
@@ -72,31 +91,36 @@ export default function DeliveryOrdersPage() {
     null,
   );
 
-  const { filters, page, setPage, setSearch } = useEntityFilters();
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
-  const [deliveryStatusFilter, setDeliveryStatusFilter] = useState("");
+  const {
+    filters,
+    page,
+    setPage,
+    getModuleApiParams,
+    setSearch,
+    setCategory,
+    setBrand,
+    setBlueprint,
+    setSector,
+    setStatus,
+    setType,
+    setPriceMin,
+    setPriceMax,
+    setCurrency,
+    setLowStock,
+    setTags,
+    setFilter,
+    resetFilters,
+  } = useEntityFilters();
   const [sortBy, setSortBy] = useState<DeliverySort>("newest");
   const [perPage, setPerPage] = useState(20);
 
   const listFilters = useMemo(
-    (): SaleListFilters => ({
-      search: filters.search || undefined,
-      delivery_status: deliveryStatusFilter || undefined,
-      date_from: dateFrom || undefined,
-      date_to: dateTo || undefined,
-      sort: sortBy,
-      per_page: perPage,
-      remote_only: true,
-    }),
-    [
-      filters.search,
-      deliveryStatusFilter,
-      dateFrom,
-      dateTo,
-      sortBy,
-      perPage,
-    ],
+    (): SaleListFilters =>
+      saleFiltersFromParams(getModuleApiParams("delivery_orders"), {
+        sort: sortBy,
+        per_page: perPage,
+      }),
+    [getModuleApiParams, sortBy, perPage],
   );
 
   const loadData = useCallback(async () => {
@@ -128,59 +152,16 @@ export default function DeliveryOrdersPage() {
     [orders],
   );
 
-  const activeFilters = useMemo(
+  const filterChips = useMemo(
     () =>
-      [
-        filters.search
-          ? {
-              key: "search",
-              label: `Search: ${filters.search}`,
-              onClear: () => setSearch(""),
-            }
-          : null,
-        deliveryStatusFilter
-          ? {
-              key: "delivery",
-              label: `Delivery: ${titleCase(deliveryStatusFilter)}`,
-              onClear: () => {
-                setDeliveryStatusFilter("");
-                setPage(1);
-              },
-            }
-          : null,
-        dateFrom
-          ? {
-              key: "from",
-              label: `From: ${formatDate(dateFrom)}`,
-              onClear: () => {
-                setDateFrom("");
-                setPage(1);
-              },
-            }
-          : null,
-        dateTo
-          ? {
-              key: "to",
-              label: `To: ${formatDate(dateTo)}`,
-              onClear: () => {
-                setDateTo("");
-                setPage(1);
-              },
-            }
-          : null,
-      ].filter(Boolean) as Array<{
-        key: string;
-        label: string;
-        onClear: () => void;
-      }>,
-    [
-      dateFrom,
-      dateTo,
-      deliveryStatusFilter,
-      filters.search,
-      setPage,
-      setSearch,
-    ],
+      buildActiveFilterChips(filters, {
+        selectOptions: DELIVERY_FILTER_OPTIONS,
+        onClear: (key) => {
+          if (key === "bike_compat") return;
+          setFilter(key, undefined);
+        },
+      }),
+    [filters, setFilter],
   );
 
   const handleExport = useCallback(
@@ -200,14 +181,10 @@ export default function DeliveryOrdersPage() {
     [listFilters],
   );
 
-  function resetFilters() {
-    setSearch("");
-    setDateFrom("");
-    setDateTo("");
-    setDeliveryStatusFilter("");
+  function resetViewFilters() {
+    resetFilters();
     setSortBy("newest");
     setPerPage(20);
-    setPage(1);
   }
 
   function applyDatePreset(preset: "today" | "week" | "month") {
@@ -215,9 +192,8 @@ export default function DeliveryOrdersPage() {
     const from = new Date(today);
     if (preset === "week") from.setDate(today.getDate() - 6);
     if (preset === "month") from.setDate(1);
-    setDateFrom(formatDateInput(from));
-    setDateTo(formatDateInput(today));
-    setPage(1);
+    setFilter("date_from", formatDateInput(from));
+    setFilter("date_to", formatDateInput(today));
   }
 
   return (
@@ -324,11 +300,10 @@ export default function DeliveryOrdersPage() {
 
         <InputGroup label="Delivery status" className="md:col-span-2">
           <SearchableSelect
-            value={deliveryStatusFilter}
-            onChange={(value) => {
-              setDeliveryStatusFilter(value);
-              setPage(1);
-            }}
+            value={filters.delivery_status || ""}
+            onChange={(value) =>
+              setFilter("delivery_status", value || undefined)
+            }
             options={DELIVERY_FILTERS}
             className="form-input-base"
           />
@@ -382,22 +357,10 @@ export default function DeliveryOrdersPage() {
         </div>
       </FilterBar>
 
-      {activeFilters.length > 0 ? (
+      {filterChips.length > 0 ? (
         <SurfaceCard className="flex flex-col gap-3 p-3 md:flex-row md:items-center md:justify-between">
-          <div className="flex flex-wrap gap-2">
-            {activeFilters.map((filter) => (
-              <button
-                key={filter.key}
-                type="button"
-                onClick={filter.onClear}
-                className="form-chip gap-2 rounded-full border border-primary/15 bg-primary/5 text-primary hover:bg-primary/10"
-              >
-                {filter.label}
-                <XMarkIcon className="h-3.5 w-3.5" />
-              </button>
-            ))}
-          </div>
-          <ActionButton type="button" size="sm" variant="ghost" onClick={resetFilters}>
+          <ActiveFilterChips chips={filterChips} />
+          <ActionButton type="button" size="sm" variant="ghost" onClick={resetViewFilters}>
             <ArrowPathIcon className="h-4 w-4" />
             Reset view
           </ActionButton>
@@ -440,30 +403,52 @@ export default function DeliveryOrdersPage() {
               </ActionButton>
             </div>
           </div>
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-2">
             <InputGroup label="From date">
               <input
                 type="date"
-                value={dateFrom}
-                onChange={(event) => {
-                  setDateFrom(event.target.value);
-                  setPage(1);
-                }}
+                value={filters.date_from || ""}
+                onChange={(event) =>
+                  setFilter("date_from", event.target.value || undefined)
+                }
                 className="form-input-base"
               />
             </InputGroup>
             <InputGroup label="To date">
               <input
                 type="date"
-                value={dateTo}
-                onChange={(event) => {
-                  setDateTo(event.target.value);
-                  setPage(1);
-                }}
+                value={filters.date_to || ""}
+                onChange={(event) =>
+                  setFilter("date_to", event.target.value || undefined)
+                }
                 className="form-input-base"
               />
             </InputGroup>
           </div>
+
+          <InventoryModuleFilters
+            module="delivery_orders"
+            filters={filters}
+            layout="panel"
+            sections={["more"]}
+            setters={{
+              setSearch,
+              setCategory,
+              setBrand,
+              setBlueprint,
+              setSector,
+              setStatus,
+              setType,
+              setPriceMin,
+              setPriceMax,
+              setCurrency,
+              setLowStock,
+              setTags,
+              setFilter,
+              setBikeCompatibility: () => {},
+            }}
+            options={DELIVERY_FILTER_OPTIONS}
+          />
         </SurfaceCard>
       ) : null}
 

@@ -150,6 +150,11 @@ export async function listMaintenanceServices(
     sector_id?: number;
     price_range?: string;
     currency?: string;
+    max_discount_min?: number;
+    max_discount_max?: number;
+    created_from?: string;
+    created_to?: string;
+    have_commission?: boolean;
     per_page?: number;
   },
 ): Promise<PaginatedResult<MaintenanceServiceRecord>> {
@@ -160,6 +165,11 @@ export async function listMaintenanceServices(
     sector_id: filters?.sector_id,
     price_range: filters?.price_range,
     currency: filters?.currency,
+    max_discount_min: filters?.max_discount_min,
+    max_discount_max: filters?.max_discount_max,
+    created_from: filters?.created_from,
+    created_to: filters?.created_to,
+    have_commission: filters?.have_commission,
   });
 
   const payload = await authorizedFetch<unknown>(

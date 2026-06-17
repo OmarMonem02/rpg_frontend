@@ -12,10 +12,16 @@ import {
   listSales,
   deleteSale,
   exportSales,
+  listPaymentMethods,
   toNumber,
+  type PaymentMethodRecord,
   type SaleListFilters,
   type SaleRecord,
 } from "@/lib/crud-api";
+import { InventoryModuleFilters } from "@/components/inventory/InventoryModuleFilters";
+import { ActiveFilterChips } from "@/components/inventory/ActiveFilterChips";
+import { buildActiveFilterChips } from "@/lib/inventory-filter-utils";
+import type { ModuleFilterOptions } from "@/lib/inventory-filter-config";
 import {
   ActionButton,
   EmptyState,
@@ -29,52 +35,61 @@ import {
   SurfaceCard,
   StatusBadge,
   DataTableCard,
-  StatCard,
-  StatGrid,
 } from "@/components/ops-ui";
 import {
   ArrowDownTrayIcon,
   ArrowPathIcon,
-  BanknotesIcon,
   CalendarDaysIcon,
   ChevronDownIcon,
   ClockIcon,
   CurrencyDollarIcon,
   EyeIcon,
   FunnelIcon,
-  MagnifyingGlassIcon,
   PlusIcon,
   ShoppingBagIcon,
   TrashIcon,
   TruckIcon,
-  XMarkIcon,
 } from "@heroicons/react/24/outline";
 import { ExportColumnPicker } from "@/components/export/ExportColumnPicker";
 
 type SaleSort = "newest" | "oldest" | "highest" | "lowest";
-type ItemTypeFilter = "" | "product" | "spare_part" | "maintenance_service" | "bike";
 
-const DELIVERY_STATUSES = [
-  { value: "", label: "All delivery" },
-  { value: "pending", label: "Pending" },
-  { value: "in-transit", label: "In transit" },
-  { value: "delivered", label: "Delivered" },
-];
+const SALES_FILTER_OPTIONS: ModuleFilterOptions = {
+  deliveryStatuses: [
+    { value: "pending", label: "Pending" },
+    { value: "in-transit", label: "In transit" },
+    { value: "delivered", label: "Delivered" },
+  ],
+  saleTypes: [
+    { value: "site", label: "In store" },
+    { value: "online", label: "Online" },
+    { value: "delivery", label: "Delivery" },
+  ],
+  itemTypes: [
+    { value: "product", label: "Products" },
+    { value: "spare_part", label: "Spare parts" },
+    { value: "maintenance_part", label: "Maintenance parts" },
+    { value: "maintenance_service", label: "Services" },
+    { value: "bike", label: "Bikes" },
+  ],
+  statuses: [
+    { value: "pending", label: "Pending" },
+    { value: "partial", label: "Partial" },
+    { value: "completed", label: "Completed" },
+  ],
+};
 
-const SALE_TYPES = [
-  { value: "", label: "All channels" },
-  { value: "site", label: "In store" },
-  { value: "online", label: "Online" },
-  { value: "delivery", label: "Delivery" },
-];
-
-const ITEM_TYPES = [
-  { value: "", label: "All item types" },
-  { value: "product", label: "Products" },
-  { value: "spare_part", label: "Spare parts" },
-  { value: "maintenance_service", label: "Services" },
-  { value: "bike", label: "Bikes" },
-] satisfies Array<{ value: ItemTypeFilter; label: string }>;
+function saleFiltersFromParams(
+  params: Record<string, unknown>,
+  extras: Partial<SaleListFilters> = {},
+): SaleListFilters {
+  const { type, ...rest } = params;
+  return {
+    ...(rest as SaleListFilters),
+    sale_type: typeof type === "string" ? type : undefined,
+    ...extras,
+  };
+}
 
 function formatDateInput(date: Date): string {
   return date.toISOString().slice(0, 10);
@@ -119,6 +134,7 @@ function SalesPageContent() {
   const [salesExportColumns, setSalesExportColumns] = useState(
     () => [] as ReturnType<typeof toExportColumnDefs>,
   );
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethodRecord[]>([]);
 
   const salesColumnState = useExportColumns("export-cols:sales", salesExportColumns);
 
@@ -136,19 +152,66 @@ function SalesPageContent() {
     void loadColumns();
   }, []);
 
-  const { filters, page, setPage, setSearch } = useEntityFilters();
+  useEffect(() => {
+    const loadPaymentMethods = async () => {
+      try {
+        const token = getAuthToken();
+        if (!token) return;
+        const result = await listPaymentMethods(token, { page: 1, per_page: 100 });
+        setPaymentMethods(result.items);
+      } catch {
+        // Keep empty until payment methods load.
+      }
+    };
+    void loadPaymentMethods();
+  }, []);
+
+  const {
+    filters,
+    page,
+    setPage,
+    getModuleApiParams,
+    setSearch,
+    setCategory,
+    setBrand,
+    setBlueprint,
+    setSector,
+    setStatus,
+    setType,
+    setPriceMin,
+    setPriceMax,
+    setCurrency,
+    setLowStock,
+    setTags,
+    setFilter,
+    resetFilters,
+  } = useEntityFilters();
   const sellerFilterId = Number(searchParams.get("seller_id") || 0) || undefined;
   const sellerFilterName = searchParams.get("seller_name") || "";
 
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
-  const [deliveryStatusFilter, setDeliveryStatusFilter] = useState<string>("");
-  const [saleTypeFilter, setSaleTypeFilter] = useState<string>("");
-  const [itemTypeFilter, setItemTypeFilter] = useState<ItemTypeFilter>("");
-  const [totalMin, setTotalMin] = useState("");
-  const [totalMax, setTotalMax] = useState("");
   const [sortBy, setSortBy] = useState<SaleSort>("newest");
   const [perPage, setPerPage] = useState(20);
+
+  const filterOptions = useMemo(
+    (): ModuleFilterOptions => ({
+      ...SALES_FILTER_OPTIONS,
+      paymentMethods: paymentMethods.map((method) => ({
+        value: method.id,
+        label: method.name,
+      })),
+    }),
+    [paymentMethods],
+  );
+
+  const listFilters = useMemo(
+    (): SaleListFilters =>
+      saleFiltersFromParams(getModuleApiParams("sales"), {
+        seller_id: sellerFilterId,
+        sort: sortBy,
+        per_page: perPage,
+      }),
+    [getModuleApiParams, sellerFilterId, sortBy, perPage],
+  );
 
   const loadData = useCallback(async () => {
     try {
@@ -156,19 +219,7 @@ function SalesPageContent() {
       const token = getAuthToken();
       if (!token) throw new Error("Authentication required");
 
-      const result = await listSales(token, page, {
-        search: filters.search || undefined,
-        seller_id: sellerFilterId,
-        delivery_status: deliveryStatusFilter || undefined,
-        sale_type: saleTypeFilter || undefined,
-        item_type: itemTypeFilter || undefined,
-        date_from: dateFrom || undefined,
-        date_to: dateTo || undefined,
-        total_min: totalMin ? Number(totalMin) : undefined,
-        total_max: totalMax ? Number(totalMax) : undefined,
-        sort: sortBy,
-        per_page: perPage,
-      });
+      const result = await listSales(token, page, listFilters);
 
       setSales(result.items);
       setTotalPages(result.lastPage);
@@ -180,20 +231,7 @@ function SalesPageContent() {
     } finally {
       setLoading(false);
     }
-  }, [
-    page,
-    filters.search,
-    sellerFilterId,
-    dateFrom,
-    dateTo,
-    deliveryStatusFilter,
-    saleTypeFilter,
-    itemTypeFilter,
-    totalMin,
-    totalMax,
-    sortBy,
-    perPage,
-  ]);
+  }, [listFilters, page]);
 
   useEffect(() => {
     loadData();
@@ -235,140 +273,34 @@ function SalesPageContent() {
     }
   };
 
-  const activeFilters = useMemo(
+  const filterChips = useMemo(
     () =>
-      [
-        filters.search
-          ? {
-            key: "search",
-            label: `Search: ${filters.search}`,
-            onClear: () => setSearch(""),
-          }
-          : null,
-        sellerFilterId
-          ? {
-            key: "seller",
-            label: `Seller: ${sellerFilterName || `#${sellerFilterId}`}`,
-            onClear: () => router.push("/inventory/sales"),
-          }
-          : null,
-        deliveryStatusFilter
-          ? {
-            key: "delivery",
-            label: `Delivery: ${titleCase(deliveryStatusFilter)}`,
-            onClear: () => {
-              setDeliveryStatusFilter("");
-              setPage(1);
-            },
-          }
-          : null,
-        saleTypeFilter
-          ? {
-            key: "type",
-            label: `Channel: ${titleCase(saleTypeFilter)}`,
-            onClear: () => {
-              setSaleTypeFilter("");
-              setPage(1);
-            },
-          }
-          : null,
-        itemTypeFilter
-          ? {
-            key: "item",
-            label: `Item: ${titleCase(itemTypeFilter)}`,
-            onClear: () => {
-              setItemTypeFilter("");
-              setPage(1);
-            },
-          }
-          : null,
-        dateFrom
-          ? {
-            key: "from",
-            label: `From: ${formatDate(dateFrom)}`,
-            onClear: () => {
-              setDateFrom("");
-              setPage(1);
-            },
-          }
-          : null,
-        dateTo
-          ? {
-            key: "to",
-            label: `To: ${formatDate(dateTo)}`,
-            onClear: () => {
-              setDateTo("");
-              setPage(1);
-            },
-          }
-          : null,
-        totalMin
-          ? {
-            key: "min",
-            label: `Min: ${formatMoney(Number(totalMin))}`,
-            onClear: () => {
-              setTotalMin("");
-              setPage(1);
-            },
-          }
-          : null,
-        totalMax
-          ? {
-            key: "max",
-            label: `Max: ${formatMoney(Number(totalMax))}`,
-            onClear: () => {
-              setTotalMax("");
-              setPage(1);
-            },
-          }
-          : null,
-      ].filter(Boolean) as Array<{
-        key: string;
-        label: string;
-        onClear: () => void;
-      }>,
-    [
-      dateFrom,
-      dateTo,
-      deliveryStatusFilter,
-      filters.search,
-      itemTypeFilter,
-      router,
-      saleTypeFilter,
-      sellerFilterId,
-      sellerFilterName,
-      setPage,
-      setSearch,
-      totalMax,
-      totalMin,
-    ],
+      buildActiveFilterChips(filters, {
+        selectOptions: filterOptions,
+        onClear: (key) => {
+          if (key === "bike_compat") return;
+          setFilter(key, undefined);
+        },
+        extraChips: sellerFilterId
+          ? [
+              {
+                key: "seller",
+                label: `Seller: ${sellerFilterName || `#${sellerFilterId}`}`,
+                onClear: () => router.push("/inventory/sales"),
+              },
+            ]
+          : [],
+      }),
+    [filters, filterOptions, router, sellerFilterId, sellerFilterName, setFilter],
   );
 
   const exportFilters = useMemo(
-    (): SaleListFilters => ({
-      search: filters.search || undefined,
-      seller_id: sellerFilterId,
-      delivery_status: deliveryStatusFilter || undefined,
-      sale_type: saleTypeFilter || undefined,
-      item_type: itemTypeFilter || undefined,
-      date_from: dateFrom || undefined,
-      date_to: dateTo || undefined,
-      total_min: totalMin ? Number(totalMin) : undefined,
-      total_max: totalMax ? Number(totalMax) : undefined,
-      sort: sortBy,
-    }),
-    [
-      filters.search,
-      sellerFilterId,
-      deliveryStatusFilter,
-      saleTypeFilter,
-      itemTypeFilter,
-      dateFrom,
-      dateTo,
-      totalMin,
-      totalMax,
-      sortBy,
-    ],
+    (): SaleListFilters =>
+      saleFiltersFromParams(getModuleApiParams("sales"), {
+        seller_id: sellerFilterId,
+        sort: sortBy,
+      }),
+    [getModuleApiParams, sellerFilterId, sortBy],
   );
 
   const handleExportSales = useCallback(
@@ -389,17 +321,9 @@ function SalesPageContent() {
   );
 
   function resetOperationsFilters() {
-    setSearch("");
-    setDateFrom("");
-    setDateTo("");
-    setDeliveryStatusFilter("");
-    setSaleTypeFilter("");
-    setItemTypeFilter("");
-    setTotalMin("");
-    setTotalMax("");
+    resetFilters();
     setSortBy("newest");
     setPerPage(20);
-    setPage(1);
     if (sellerFilterId) router.push("/inventory/sales");
   }
 
@@ -413,9 +337,8 @@ function SalesPageContent() {
       from.setDate(1);
     }
 
-    setDateFrom(formatDateInput(from));
-    setDateTo(formatDateInput(today));
-    setPage(1);
+    setFilter("date_from", formatDateInput(from));
+    setFilter("date_to", formatDateInput(today));
   }
 
   return (
@@ -581,21 +504,9 @@ function SalesPageContent() {
         </div>
       </FilterBar>
 
-      {activeFilters.length > 0 ? (
+      {filterChips.length > 0 ? (
         <SurfaceCard className="flex flex-col gap-3 p-3 md:flex-row md:items-center md:justify-between">
-          <div className="flex flex-wrap gap-2">
-            {activeFilters.map((filter) => (
-              <button
-                key={filter.key}
-                type="button"
-                onClick={filter.onClear}
-                className="form-chip gap-2 rounded-full border border-primary/15 bg-primary/5 text-primary hover:bg-primary/10"
-              >
-                {filter.label}
-                <XMarkIcon className="h-3.5 w-3.5" />
-              </button>
-            ))}
-          </div>
+          <ActiveFilterChips chips={filterChips} />
           <ActionButton
             type="button"
             size="sm"
@@ -633,105 +544,61 @@ function SalesPageContent() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-2">
             <InputGroup label="From date">
               <input
                 type="date"
-                value={dateFrom}
-                onChange={(event) => {
-                  setDateFrom(event.target.value);
-                  setPage(1);
-                }}
+                value={filters.date_from || ""}
+                onChange={(event) =>
+                  setFilter("date_from", event.target.value || undefined)
+                }
                 className="form-input-base"
               />
             </InputGroup>
             <InputGroup label="To date">
               <input
                 type="date"
-                value={dateTo}
-                onChange={(event) => {
-                  setDateTo(event.target.value);
-                  setPage(1);
-                }}
+                value={filters.date_to || ""}
+                onChange={(event) =>
+                  setFilter("date_to", event.target.value || undefined)
+                }
                 className="form-input-base"
               />
             </InputGroup>
-            <InputGroup label="Delivery status">
-              <SearchableSelect
-                value={deliveryStatusFilter}
-                onChange={(value) => {
-                  setDeliveryStatusFilter(value);
-                  setPage(1);
-                }}
-                options={DELIVERY_STATUSES}
-                className="form-input-base"
-              />
-            </InputGroup>
-            <InputGroup label="Sales channel">
-              <SearchableSelect
-                value={saleTypeFilter}
-                onChange={(value) => {
-                  setSaleTypeFilter(value);
-                  setPage(1);
-                }}
-                options={SALE_TYPES}
-                className="form-input-base"
-              />
-            </InputGroup>
-            <InputGroup label="Item type">
-              <SearchableSelect
-                value={itemTypeFilter}
-                onChange={(value) => {
-                  setItemTypeFilter(value as ItemTypeFilter);
-                  setPage(1);
-                }}
-                options={ITEM_TYPES}
-                className="form-input-base"
-              />
-            </InputGroup>
-            <InputGroup label="Min total">
-              <input
-                type="number"
-                min="0"
-                value={totalMin}
-                onChange={(event) => {
-                  setTotalMin(event.target.value);
-                  setPage(1);
-                }}
-                onWheel={(event) => {
-                  event.currentTarget.blur();
-                }}
-                placeholder="0.00"
-                className="form-input-base [&::-webkit-inner-spin-button]:appearance-none"
-              />
-            </InputGroup>
-            <InputGroup label="Max total">
-              <input
-                type="number"
-                min="0"
-                value={totalMax}
-                onChange={(event) => {
-                  setTotalMax(event.target.value);
-                  setPage(1);
-                }}
-                onWheel={(event) => {
-                  event.currentTarget.blur();
-                }}
-                placeholder="0.00"
-                className="form-input-base [&::-webkit-inner-spin-button]:appearance-none"
-              />
-            </InputGroup>
-            <div className="flex items-end">
-              <ActionButton
-                type="button"
-                variant="outline"
-                className="w-full"
-                onClick={resetOperationsFilters}
-              >
-                <XMarkIcon className="h-7.5 w-4" />
-                Clear filters
-              </ActionButton>
-            </div>
+          </div>
+
+          <InventoryModuleFilters
+            module="sales"
+            filters={filters}
+            layout="panel"
+            sections={["more"]}
+            setters={{
+              setSearch,
+              setCategory,
+              setBrand,
+              setBlueprint,
+              setSector,
+              setStatus,
+              setType,
+              setPriceMin,
+              setPriceMax,
+              setCurrency,
+              setLowStock,
+              setTags,
+              setFilter,
+              setBikeCompatibility: () => {},
+            }}
+            options={filterOptions}
+          />
+
+          <div className="mt-4 flex justify-end">
+            <ActionButton
+              type="button"
+              variant="outline"
+              onClick={resetOperationsFilters}
+            >
+              Clear filters
+            </ActionButton>
           </div>
         </SurfaceCard>
       ) : null}

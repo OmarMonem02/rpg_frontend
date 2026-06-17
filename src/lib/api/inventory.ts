@@ -11,6 +11,77 @@ import {
 } from "./core";
 
 export type ItemStatus = "new" | "used";
+
+export type CatalogListFilters = {
+  search?: string;
+  category_id?: number;
+  brand_id?: number;
+  price_range?: string;
+  cost_price_range?: string;
+  currency?: string;
+  low_stock?: boolean;
+  bike_brand_id?: number;
+  bike_model?: string;
+  bike_year?: number;
+  bike_year_from?: number;
+  bike_year_to?: number;
+  tags?: string[] | string;
+  stock_min?: number;
+  stock_max?: number;
+  item_status?: string;
+  size?: string;
+  color?: string;
+  universal?: boolean;
+  max_discount_min?: number;
+  max_discount_max?: number;
+  profit_min?: number;
+  profit_max?: number;
+  profit_percent_min?: number;
+  profit_percent_max?: number;
+  stock_alert_level?: string;
+  per_page?: number;
+};
+
+function catalogListQueryParams(
+  page: number,
+  filters?: CatalogListFilters,
+): Record<string, string | number | boolean | null | undefined> {
+  const tags = Array.isArray(filters?.tags)
+    ? filters.tags
+    : typeof filters?.tags === "string"
+      ? filters.tags.split(",")
+      : [];
+  return {
+    page,
+    per_page: filters?.per_page,
+    search: filters?.search,
+    category_id: filters?.category_id,
+    brand_id: filters?.brand_id,
+    price_range: filters?.price_range,
+    cost_price_range: filters?.cost_price_range,
+    currency: filters?.currency,
+    low_stock: filters?.low_stock,
+    bike_brand_id: filters?.bike_brand_id,
+    bike_model: filters?.bike_model,
+    bike_year: filters?.bike_year,
+    bike_year_from: filters?.bike_year_from,
+    bike_year_to: filters?.bike_year_to,
+    tags: tags.length ? tags.join(",") : undefined,
+    stock_min: filters?.stock_min,
+    stock_max: filters?.stock_max,
+    item_status: filters?.item_status,
+    size: filters?.size,
+    color: filters?.color,
+    universal: filters?.universal,
+    max_discount_min: filters?.max_discount_min,
+    max_discount_max: filters?.max_discount_max,
+    profit_min: filters?.profit_min,
+    profit_max: filters?.profit_max,
+    profit_percent_min: filters?.profit_percent_min,
+    profit_percent_max: filters?.profit_percent_max,
+    stock_alert_level: filters?.stock_alert_level,
+  };
+}
 import type { CatalogPricingFields } from "@/lib/catalog-pricing";
 import type { PricingCurrency } from "@/lib/currencies";
 import { toPricingCurrency } from "@/lib/currencies";
@@ -78,14 +149,16 @@ export async function listBrands(
   filters?: {
     type?: string;
     search?: string;
-    currency?: string;
+    created_from?: string;
+    created_to?: string;
   },
 ): Promise<PaginatedResult<BrandRecord>> {
   const query = buildQuery({
     page,
     type: filters?.type,
     search: filters?.search,
-    currency: filters?.currency !== "all" ? filters?.currency : undefined,
+    created_from: filters?.created_from,
+    created_to: filters?.created_to,
   });
 
   const payload = await authorizedFetch<unknown>(`/brands?${query}`, token);
@@ -548,38 +621,9 @@ export function normalizeSparePart(raw: unknown): SparePartRecord {
 export async function listSpareParts(
   token: string,
   page = 1,
-  filters?: {
-    search?: string;
-    category_id?: number;
-    brand_id?: number;
-    price_range?: string;
-    currency?: string;
-    low_stock?: boolean;
-    bike_brand_id?: number;
-    bike_model?: string;
-    bike_year?: number;
-    bike_year_from?: number;
-    bike_year_to?: number;
-    tags?: string[];
-    per_page?: number;
-  },
+  filters?: CatalogListFilters,
 ): Promise<PaginatedResult<SparePartRecord>> {
-  const query = buildQuery({
-    page,
-    per_page: filters?.per_page,
-    search: filters?.search,
-    category_id: filters?.category_id,
-    brand_id: filters?.brand_id,
-    price_range: filters?.price_range,
-    currency: filters?.currency,
-    low_stock: filters?.low_stock,
-    bike_brand_id: filters?.bike_brand_id,
-    bike_model: filters?.bike_model,
-    bike_year: filters?.bike_year,
-    bike_year_from: filters?.bike_year_from,
-    bike_year_to: filters?.bike_year_to,
-    tags: filters?.tags?.length ? filters.tags.join(",") : undefined,
-  });
+  const query = buildQuery(catalogListQueryParams(page, filters));
 
   const payload = await authorizedFetch<unknown>(
     `/spare_parts?${query}`,
@@ -766,38 +810,9 @@ export function normalizeMaintenancePart(raw: unknown): MaintenancePartRecord {
 export async function listMaintenanceParts(
   token: string,
   page = 1,
-  filters?: {
-    search?: string;
-    category_id?: number;
-    brand_id?: number;
-    price_range?: string;
-    currency?: string;
-    low_stock?: boolean;
-    bike_brand_id?: number;
-    bike_model?: string;
-    bike_year?: number;
-    bike_year_from?: number;
-    bike_year_to?: number;
-    tags?: string[];
-    per_page?: number;
-  },
+  filters?: CatalogListFilters,
 ): Promise<PaginatedResult<MaintenancePartRecord>> {
-  const query = buildQuery({
-    page,
-    per_page: filters?.per_page,
-    search: filters?.search,
-    category_id: filters?.category_id,
-    brand_id: filters?.brand_id,
-    price_range: filters?.price_range,
-    currency: filters?.currency,
-    low_stock: filters?.low_stock,
-    bike_brand_id: filters?.bike_brand_id,
-    bike_model: filters?.bike_model,
-    bike_year: filters?.bike_year,
-    bike_year_from: filters?.bike_year_from,
-    bike_year_to: filters?.bike_year_to,
-    tags: filters?.tags?.length ? filters.tags.join(",") : undefined,
-  });
+  const query = buildQuery(catalogListQueryParams(page, filters));
 
   const payload = await authorizedFetch<unknown>(
     `/maintenance_parts?${query}`,
@@ -958,34 +973,9 @@ export function normalizeProduct(raw: unknown): ProductRecord {
 export async function listProducts(
   token: string,
   page = 1,
-  filters?: {
-    search?: string;
-    category_id?: number;
-    brand_id?: number;
-    price_range?: string;
-    currency?: string;
-    low_stock?: boolean;
-    bike_brand_id?: number;
-    bike_model?: string;
-    bike_year?: number;
-    tags?: string[];
-    per_page?: number;
-  },
+  filters?: CatalogListFilters,
 ): Promise<PaginatedResult<ProductRecord>> {
-  const query = buildQuery({
-    page,
-    per_page: filters?.per_page,
-    search: filters?.search,
-    category_id: filters?.category_id,
-    brand_id: filters?.brand_id,
-    price_range: filters?.price_range,
-    currency: filters?.currency,
-    low_stock: filters?.low_stock,
-    bike_brand_id: filters?.bike_brand_id,
-    bike_model: filters?.bike_model,
-    bike_year: filters?.bike_year,
-    tags: filters?.tags?.length ? filters.tags.join(",") : undefined,
-  });
+  const query = buildQuery(catalogListQueryParams(page, filters));
 
   const payload = await authorizedFetch<unknown>(`/products?${query}`, token);
   const rows = pickArray(payload, ["data", "products"]);

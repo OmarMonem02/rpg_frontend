@@ -183,6 +183,7 @@ export type SaleListSort = "newest" | "oldest" | "highest" | "lowest";
 export type SaleListFilters = {
   search?: string;
   customer_id?: number;
+  customer_name?: string;
   seller_id?: number;
   payment_method_id?: number;
   status?: string;
@@ -376,6 +377,7 @@ export async function listSales(
     page,
     search: filters?.search,
     customer_id: filters?.customer_id,
+    customer_name: filters?.customer_name,
     seller_id: filters?.seller_id,
     payment_method_id: filters?.payment_method_id,
     status: filters?.status,
@@ -410,6 +412,7 @@ export function buildSalesExportQuery(
   const query = buildQuery({
     search: filters?.search,
     customer_id: filters?.customer_id,
+    customer_name: filters?.customer_name,
     seller_id: filters?.seller_id,
     payment_method_id: filters?.payment_method_id,
     status: filters?.status,

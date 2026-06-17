@@ -31,14 +31,16 @@ import {
 import { formatCatalogItemAttributes, ItemStatusBadge } from "@/lib/inventory-item-attributes";
 import {
   formatCatalogPriceInEGP,
-  SUPPORTED_PRICING_CURRENCIES,
   toPricingCurrency,
   type PricingCurrency,
 } from "@/lib/currencies";
 import { useExchangeRates } from "@/hooks/useExchangeRates";
-import { ActionButton, SearchableSelect, StatusBadge } from "@/components/ops-ui";
-import { BikeCompatibilityFilter } from "@/components/BikeCompatibilityFilter";
+import { useEntityFilters } from "@/hooks/useEntityFilters";
+import { ActionButton, StatusBadge } from "@/components/ops-ui";
+import { InventoryModuleFilters } from "@/components/inventory/InventoryModuleFilters";
 import { InventoryItemThumbnail } from "@/components/inventory/list-table";
+import { countActiveFilters } from "@/lib/inventory-filter-utils";
+import type { InventoryModuleId, ModuleFilterOptions } from "@/lib/inventory-filter-config";
 import { StockBadge } from "@/components/inventory/stock-badge";
 import {
   XMarkIcon,
@@ -61,20 +63,6 @@ type CatalogItem =
   | BikeRecord
   | MaintenanceServiceRecord;
 
-type FilterConfig = {
-  search: string;
-  brandId?: number;
-  categoryId?: number;
-  sectorId?: number;
-  priceMin: number;
-  priceMax: number;
-  currency: "" | PricingCurrency;
-  lowStock?: boolean;
-  bike_brand_id?: number;
-  bike_model?: string;
-  bike_year?: number;
-};
-
 interface CatalogPickerModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -92,27 +80,39 @@ export function CatalogPickerModal({
   selectedIds = [],
 }: CatalogPickerModalProps) {
   const { rates } = useExchangeRates();
+  const moduleId = catalogType as InventoryModuleId;
+  const {
+    filters,
+    page,
+    setPage,
+    getModuleApiParams,
+    setSearch,
+    setCategory,
+    setBrand,
+    setBlueprint,
+    setSector,
+    setStatus,
+    setType,
+    setPriceMin,
+    setPriceMax,
+    setCurrency,
+    setLowStock,
+    setTags,
+    setBikeCompatibility,
+    setFilter,
+    resetFilters,
+  } = useEntityFilters();
   const [items, setItems] = useState<CatalogItem[]>([]);
   const [selectedItemIds, setSelectedItemIds] = useState<Set<number>>(
     new Set(),
   );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [mounted, setMounted] = useState(false);
   const [filtersExpanded, setFiltersExpanded] = useState(false);
-  const [searchDraft, setSearchDraft] = useState("");
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
-
-  // Filter state
-  const [filters, setFilters] = useState<FilterConfig>({
-    search: "",
-    priceMin: 0,
-    priceMax: 100000,
-    currency: "",
-  });
 
   const [brands, setBrands] = useState<BrandRecord[]>([]);
   const [bikeBrands, setBikeBrands] = useState<BrandRecord[]>([]);
@@ -128,78 +128,61 @@ export function CatalogPickerModal({
   const [sectors, setSectors] = useState<MaintenanceServiceSectorRecord[]>([]);
   const [blueprints, setBlueprints] = useState<BikeBlueprintRecord[]>([]);
 
-  // Memoize filters to prevent unnecessary callback recreation
-  const memoizedFilters = useMemo(
-    () => filters,
-    [
-      filters.search,
-      filters.brandId,
-      filters.categoryId,
-      filters.sectorId,
-      filters.priceMin,
-      filters.priceMax,
-      filters.currency,
-      filters.lowStock,
-      filters.bike_brand_id,
-      filters.bike_model,
-      filters.bike_year,
-    ],
+  const activeFilterCount = useMemo(
+    () => countActiveFilters(filters),
+    [filters],
   );
 
-  const activeFilterCount = useMemo(() => {
-    let n = 0;
-    if (filters.search.trim()) n++;
-    if (filters.brandId != null) n++;
-    if (filters.categoryId != null) n++;
-    if (filters.sectorId != null) n++;
-    if (filters.currency) n++;
-    if (filters.lowStock) n++;
-    if (
-      filters.bike_brand_id != null ||
-      (filters.bike_model && filters.bike_model.trim()) ||
-      filters.bike_year != null
-    )
-      n++;
-    return n;
+  const filterOptions = useMemo((): ModuleFilterOptions => {
+    const options: ModuleFilterOptions = {
+      brands: brands.map((brand) => ({ value: brand.id, label: brand.name })),
+    };
+
+    if (catalogType === "products") {
+      options.categories = productCategories.map((category) => ({
+        value: category.id,
+        label: category.name,
+      }));
+    } else if (catalogType === "spare_parts") {
+      options.categories = sparePartCategories.map((category) => ({
+        value: category.id,
+        label: category.name,
+      }));
+    } else if (catalogType === "maintenance_parts") {
+      options.categories = maintenancePartCategories.map((category) => ({
+        value: category.id,
+        label: category.name,
+      }));
+    }
+
+    if (catalogType === "bikes") {
+      options.blueprints = blueprints.map((blueprint) => ({
+        value: blueprint.id,
+        label: `${blueprint.model} ${blueprint.year}`,
+      }));
+    }
+
+    if (catalogType === "maintenance_services") {
+      options.sectors = sectors.map((sector) => ({
+        value: sector.id,
+        label: sector.name,
+      }));
+    }
+
+    return options;
   }, [
-    filters.search,
-    filters.brandId,
-    filters.categoryId,
-    filters.sectorId,
-    filters.currency,
-    filters.lowStock,
-    filters.bike_brand_id,
-    filters.bike_model,
-    filters.bike_year,
+    catalogType,
+    brands,
+    productCategories,
+    sparePartCategories,
+    maintenancePartCategories,
+    blueprints,
+    sectors,
   ]);
 
   const clearAllFilters = useCallback(() => {
-    setSearchDraft("");
-    setFilters({
-      search: "",
-      priceMin: 0,
-      priceMax: 100000,
-      currency: "",
-      brandId: undefined,
-      categoryId: undefined,
-      sectorId: undefined,
-      lowStock: undefined,
-      bike_brand_id: undefined,
-      bike_model: undefined,
-      bike_year: undefined,
-    });
-    setPage(1);
-  }, []);
-
-  // Debounce the search draft into the applied filter to avoid a request per keystroke
-  useEffect(() => {
-    if (searchDraft === filters.search) return;
-    const timer = window.setTimeout(() => {
-      setFilters((prev) => ({ ...prev, search: searchDraft }));
-      setPage(1);
-    }, 300);
-    return () => window.clearTimeout(timer);
-  }, [searchDraft, filters.search]);
+    resetFilters();
+  }, [resetFilters]);
 
   // Load filter options (brands, categories, sectors)
   const loadFilterOptions = useCallback(async () => {
@@ -279,52 +262,39 @@ export function CatalogPickerModal({
       const token = getAuthToken();
       if (!token) throw new Error("Authentication required");
 
+      const apiFilters = getModuleApiParams(moduleId);
       let result;
 
       if (catalogType === "products") {
-        result = await listProducts(token, page, {
-          search: filters.search || undefined,
-          brand_id: filters.brandId,
-          category_id: filters.categoryId,
-          currency: filters.currency,
-          bike_brand_id: filters.bike_brand_id,
-          bike_model: filters.bike_model,
-          bike_year: filters.bike_year,
-        });
+        result = await listProducts(
+          token,
+          page,
+          apiFilters as Parameters<typeof listProducts>[2],
+        );
       } else if (catalogType === "spare_parts") {
-        result = await listSpareParts(token, page, {
-          search: filters.search || undefined,
-          brand_id: filters.brandId,
-          category_id: filters.categoryId,
-          currency: filters.currency,
-          low_stock: filters.lowStock,
-          bike_brand_id: filters.bike_brand_id,
-          bike_model: filters.bike_model,
-          bike_year: filters.bike_year,
-        });
+        result = await listSpareParts(
+          token,
+          page,
+          apiFilters as Parameters<typeof listSpareParts>[2],
+        );
       } else if (catalogType === "maintenance_parts") {
-        result = await listMaintenanceParts(token, page, {
-          search: filters.search || undefined,
-          brand_id: filters.brandId,
-          category_id: filters.categoryId,
-          currency: filters.currency,
-          low_stock: filters.lowStock,
-          bike_brand_id: filters.bike_brand_id,
-          bike_model: filters.bike_model,
-          bike_year: filters.bike_year,
-        });
+        result = await listMaintenanceParts(
+          token,
+          page,
+          apiFilters as Parameters<typeof listMaintenanceParts>[2],
+        );
       } else if (catalogType === "bikes") {
-        result = await listBikeForSale(token, page, {
-          search: filters.search || undefined,
-          brand_id: filters.brandId,
-          currency: filters.currency,
-        });
+        result = await listBikeForSale(
+          token,
+          page,
+          apiFilters as Parameters<typeof listBikeForSale>[2],
+        );
       } else if (catalogType === "maintenance_services") {
-        result = await listMaintenanceServices(token, page, {
-          search: filters.search || undefined,
-          sector_id: filters.sectorId,
-          currency: filters.currency,
-        });
+        result = await listMaintenanceServices(
+          token,
+          page,
+          apiFilters as Parameters<typeof listMaintenanceServices>[2],
+        );
       }
 
       if (result) {
@@ -349,7 +319,7 @@ export function CatalogPickerModal({
     } finally {
       setLoading(false);
     }
-  }, [catalogType, page, memoizedFilters]);
+  }, [catalogType, moduleId, page, getModuleApiParams]);
 
   useEffect(() => {
     if (isOpen) {
@@ -361,18 +331,17 @@ export function CatalogPickerModal({
     if (isOpen) {
       loadItems();
     }
-  }, [isOpen, catalogType, page, memoizedFilters, loadItems]);
+  }, [isOpen, catalogType, page, filters, loadItems]);
 
   useEffect(() => {
     if (isOpen) {
       setSelectedItemIds(new Set(selectedIds));
       setPage(1);
       setFiltersExpanded(false);
-      setSearchDraft(filters.search);
     } else {
       setSelectedItemIds(new Set());
     }
-  }, [isOpen, JSON.stringify(selectedIds)]);
+  }, [isOpen, JSON.stringify(selectedIds), setPage]);
 
   const handleToggleItem = (id: number) => {
     const newSelected = new Set(selectedItemIds);
@@ -636,268 +605,31 @@ export function CatalogPickerModal({
               className="max-h-[min(50vh,26rem)] overflow-y-auto overscroll-y-contain scroll-smooth border-t border-outline-variant/10 px-4 py-3 [scrollbar-gutter:stable] sm:max-h-[min(56vh,32rem)] sm:px-6 sm:py-4"
             >
               <div className="rounded-2xl border border-outline-variant/10 bg-surface-container-lowest/35 p-4 sm:p-5">
-                {(catalogType === "products" || catalogType === "spare_parts" || catalogType === "maintenance_parts") &&
-                  bikeBrands.length > 0 && (
-                  <div className="mb-4 rounded-xl border border-outline-variant/15 bg-surface-container-low/60 p-4 sm:rounded-2xl sm:p-4">
-                    <p className="label-caps mb-3 text-on-surface-variant">
-                      Compatible bike
-                    </p>
-                    <BikeCompatibilityFilter
-                      brands={bikeBrands}
-                      selectedBrandId={filters.bike_brand_id}
-                      selectedModel={filters.bike_model}
-                      selectedYear={filters.bike_year}
-                      isLoading={loading}
-                      onFilterChange={(compat) => {
-                        setFilters({
-                          ...filters,
-                          bike_brand_id: compat.bike_brand_id,
-                          bike_model: compat.bike_model,
-                          bike_year: compat.bike_year,
-                        });
-                        setPage(1);
-                      }}
-                    />
-                  </div>
-                )}
-
-                <div className="space-y-4">
-                  <div>
-                    <label
-                      htmlFor="catalog-picker-search"
-                      className="label-caps mb-1.5 block text-on-surface-variant"
-                    >
-                      Search
-                    </label>
-                    <div className="relative">
-                      <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-on-surface-variant/55">
-                        <MagnifyingGlassIcon className="h-4 w-4" aria-hidden />
-                      </span>
-                      <input
-                        id="catalog-picker-search"
-                        type="search"
-                        autoComplete="off"
-                        placeholder="Name, SKU, part number…"
-                        value={searchDraft}
-                        onChange={(e) => setSearchDraft(e.target.value)}
-                        className="form-input-base w-full pl-10"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                    {brands.length > 0 && (
-                      <div className="space-y-1.5">
-                        <label
-                          htmlFor="catalog-picker-brand"
-                          className="label-caps text-on-surface-variant"
-                        >
-                          Brand
-                        </label>
-                        <SearchableSelect
-                          id="catalog-picker-brand"
-                          value={filters.brandId || ""}
-                          onChange={(value) => {
-                            setFilters({
-                              ...filters,
-                              brandId: value ? Number(value) : undefined,
-                            });
-                            setPage(1);
-                          }}
-                          options={[
-                            { value: "", label: "All brands" },
-                            ...brands.map((brand) => ({
-                              value: brand.id,
-                              label: brand.name,
-                            })),
-                          ]}
-                          className="form-input-base w-full bg-surface-container-lowest/80 py-2.5 font-medium"
-                        />
-                      </div>
-                    )}
-
-                    {productCategories.length > 0 && (
-                      <div className="space-y-1.5">
-                        <label
-                          htmlFor="catalog-picker-product-category"
-                          className="label-caps text-on-surface-variant"
-                        >
-                          Category
-                        </label>
-                        <SearchableSelect
-                          id="catalog-picker-product-category"
-                          value={filters.categoryId || ""}
-                          onChange={(value) => {
-                            setFilters({
-                              ...filters,
-                              categoryId: value ? Number(value) : undefined,
-                            });
-                            setPage(1);
-                          }}
-                          options={[
-                            { value: "", label: "All categories" },
-                            ...productCategories.map((cat) => ({
-                              value: cat.id,
-                              label: cat.name,
-                            })),
-                          ]}
-                          className="form-input-base w-full bg-surface-container-lowest/80 py-2.5 font-medium"
-                        />
-                      </div>
-                    )}
-
-                    {sparePartCategories.length > 0 && catalogType === "spare_parts" && (
-                      <div className="space-y-1.5">
-                        <label
-                          htmlFor="catalog-picker-spare-category"
-                          className="label-caps text-on-surface-variant"
-                        >
-                          Category
-                        </label>
-                        <SearchableSelect
-                          id="catalog-picker-spare-category"
-                          value={filters.categoryId || ""}
-                          onChange={(value) => {
-                            setFilters({
-                              ...filters,
-                              categoryId: value ? Number(value) : undefined,
-                            });
-                            setPage(1);
-                          }}
-                          options={[
-                            { value: "", label: "All categories" },
-                            ...sparePartCategories.map((cat) => ({
-                              value: cat.id,
-                              label: cat.name,
-                            })),
-                          ]}
-                          className="form-input-base w-full bg-surface-container-lowest/80 py-2.5 font-medium"
-                        />
-                      </div>
-                    )}
-
-                    {maintenancePartCategories.length > 0 &&
-                      catalogType === "maintenance_parts" && (
-                      <div className="space-y-1.5">
-                        <label
-                          htmlFor="catalog-picker-maintenance-category"
-                          className="label-caps text-on-surface-variant"
-                        >
-                          Category
-                        </label>
-                        <SearchableSelect
-                          id="catalog-picker-maintenance-category"
-                          value={filters.categoryId || ""}
-                          onChange={(value) => {
-                            setFilters({
-                              ...filters,
-                              categoryId: value ? Number(value) : undefined,
-                            });
-                            setPage(1);
-                          }}
-                          options={[
-                            { value: "", label: "All categories" },
-                            ...maintenancePartCategories.map((cat) => ({
-                              value: cat.id,
-                              label: cat.name,
-                            })),
-                          ]}
-                          className="form-input-base w-full bg-surface-container-lowest/80 py-2.5 font-medium"
-                        />
-                      </div>
-                    )}
-
-                    {sectors.length > 0 && (
-                      <div className="space-y-1.5">
-                        <label
-                          htmlFor="catalog-picker-sector"
-                          className="label-caps text-on-surface-variant"
-                        >
-                          Sector
-                        </label>
-                        <SearchableSelect
-                          id="catalog-picker-sector"
-                          value={filters.sectorId || ""}
-                          onChange={(value) => {
-                            setFilters({
-                              ...filters,
-                              sectorId: value ? Number(value) : undefined,
-                            });
-                            setPage(1);
-                          }}
-                          options={[
-                            { value: "", label: "All sectors" },
-                            ...sectors.map((sector) => ({
-                              value: sector.id,
-                              label: sector.name,
-                            })),
-                          ]}
-                          className="form-input-base w-full bg-surface-container-lowest/80 py-2.5 font-medium"
-                        />
-                      </div>
-                    )}
-
-                    <div className="space-y-1.5">
-                      <label
-                        htmlFor="catalog-picker-currency"
-                        className="label-caps text-on-surface-variant"
-                      >
-                        Currency
-                      </label>
-                      <SearchableSelect
-                        id="catalog-picker-currency"
-                        value={filters.currency}
-                        onChange={(value) => {
-                          setFilters({
-                            ...filters,
-                            currency:
-                              value === ""
-                                ? ""
-                                : (value as PricingCurrency),
-                          });
-                          setPage(1);
-                        }}
-                        options={[
-                          { value: "", label: "Any currency" },
-                          ...SUPPORTED_PRICING_CURRENCIES.map((code) => ({
-                            value: code,
-                            label: code,
-                          })),
-                        ]}
-                        className="form-input-base w-full bg-surface-container-lowest/80 py-2.5 font-medium"
-                      />
-                    </div>
-                  </div>
-
-                  {catalogType === "maintenance_parts" || catalogType === "spare_parts" ? (
-                    <div className="flex flex-col gap-2 border-t border-outline-variant/10 pt-4 sm:flex-row sm:items-center sm:justify-between">
-                      <p className="label-caps text-on-surface-variant">Inventory</p>
-                      <button
-                        type="button"
-                        role="switch"
-                        aria-checked={filters.lowStock === true}
-                        onClick={() => {
-                          setFilters((prev) => ({
-                            ...prev,
-                            lowStock: prev.lowStock ? undefined : true,
-                          }));
-                          setPage(1);
-                        }}
-                        className={`inline-flex w-full items-center justify-center gap-2 rounded-xl border px-4 py-2.5 text-left text-sm font-semibold transition-all sm:w-auto ${filters.lowStock
-                          ? "border-warning/40 bg-warning/10 text-on-surface shadow-sm ring-1 ring-warning/25"
-                          : "border-outline-variant/20 bg-surface text-on-surface-variant hover:border-warning/35 hover:bg-warning/5 hover:text-on-surface"
-                          }`}
-                      >
-                        <span
-                          className={`flex h-2 w-2 shrink-0 rounded-full ${filters.lowStock ? "bg-warning" : "bg-outline-variant"
-                            }`}
-                          aria-hidden
-                        />
-                        Low stock only
-                      </button>
-                    </div>
-                  ) : null}
-                </div>
+                <InventoryModuleFilters
+                  module={moduleId}
+                  filters={filters}
+                  setters={{
+                    setSearch,
+                    setCategory,
+                    setBrand,
+                    setBlueprint,
+                    setSector,
+                    setStatus,
+                    setType,
+                    setPriceMin,
+                    setPriceMax,
+                    setCurrency,
+                    setLowStock,
+                    setTags,
+                    setBikeCompatibility,
+                    setFilter,
+                  }}
+                  options={filterOptions}
+                  bikeBrands={bikeBrands}
+                  loading={loading}
+                  layout="panel"
+                  sections={["primary", "advanced", "more"]}
+                />
               </div>
             </div>
           ) : null}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { usePermissions } from "@/components/permission-provider";
 import { getAuthToken } from "@/lib/auth-session";
@@ -57,16 +57,15 @@ import {
   InventoryTableActionLink,
   InventoryTableSecondaryActions,
 } from "@/components/inventory/list-table";
-import { AdvancedFilters } from "@/components/advanced-filters";
+import { InventoryModuleFilters } from "@/components/inventory/InventoryModuleFilters";
+import { ActiveFilterChips } from "@/components/inventory/ActiveFilterChips";
+import { buildActiveFilterChips } from "@/lib/inventory-filter-utils";
 import {
   ActionButton,
   EmptyState,
-  FilterBar,
-  InputGroup,
   PageHero,
   PageShell,
   PaginationControls,
-  SearchableSelect,
   StatusBadge,
   SurfaceCard,
 } from "@/components/ops-ui";
@@ -130,7 +129,23 @@ export default function BikesPage() {
   const [error, setError] = useState<string | null>(null);
 
   // Use custom filter hook
-  const { filters, page, setPage, getCleanFilters, setSearch, setStatus, setBlueprint, setBrand, setPriceMin, setPriceMax, setCurrency, logFilters } = useEntityFilters();
+  const {
+    filters,
+    page,
+    setPage,
+    getModuleApiParams,
+    setSearch,
+    setStatus,
+    setBlueprint,
+    setBrand,
+    setPriceMin,
+    setPriceMax,
+    setCurrency,
+    setLowStock,
+    setFilter,
+    resetFilters,
+    logFilters,
+  } = useEntityFilters();
 
   const { isVisible, toggle: toggleColumn, reset: resetColumns, visible: visibleColumns } = useTableColumns(
     "table-cols:bikes-catalog",
@@ -161,8 +176,8 @@ export default function BikesPage() {
       console.log("[Bikes] Applying filters:", filters, "Page:", page);
       logFilters();
 
-      const cleanFilters = getCleanFilters();
-      const result = await listBikes(token, page, { ...(cleanFilters as Parameters<typeof listBikes>[2]), per_page: apiPerPage });
+      const apiFilters = getModuleApiParams("bikes");
+      const result = await listBikes(token, page, { ...(apiFilters as Parameters<typeof listBikes>[2]), per_page: apiPerPage });
       setBikes(result.items);
       setTotalPages(result.lastPage);
       setError(null);
@@ -171,7 +186,30 @@ export default function BikesPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, filters, getCleanFilters, logFilters, apiPerPage]);
+  }, [page, getModuleApiParams, logFilters, apiPerPage]);
+
+  const filterChips = useMemo(
+    () =>
+      buildActiveFilterChips(filters, {
+        onClear: (key) => {
+          if (key === "price_min" || key === "price_max") {
+            setPriceMin("");
+            setPriceMax("");
+            return;
+          }
+          setFilter(key as keyof typeof filters, undefined);
+        },
+        selectOptions: {
+          brands: brands.map((b) => ({ value: b.id, label: b.name })),
+          blueprints: blueprints.map((b) => ({
+            value: b.id,
+            label: `${b.model} ${b.year}`,
+          })),
+          statuses: STATUSES,
+        },
+      }),
+    [filters, brands, blueprints, setFilter, setPriceMin, setPriceMax],
+  );
 
   const loadBlueprints = useCallback(async () => {
     try {
@@ -305,64 +343,37 @@ export default function BikesPage() {
       )}
 
       <SurfaceCard>
-        <FilterBar className="md:grid-cols-12">
-          <InputGroup label="Search" className="md:col-span-3">
-            <input
-              type="text"
-              placeholder="Search by model or VIN..."
-              value={filters.search || ""}
-              onChange={(e) => setSearch(e.target.value)}
-              className="form-input-base"
-            />
-          </InputGroup>
-          <InputGroup label="Blueprint" className="md:col-span-3">
-            <SearchableSelect
-              value={filters.blueprint_id || ""}
-              onChange={(value) => setBlueprint(value ? parseInt(value) : "")}
-              placeholder="All Blueprints"
-              options={blueprints.map((b) => ({
-                value: b.id,
-                label: `${b.model} ${b.year}`,
-              }))}
-              className="form-input-base"
-            />
-          </InputGroup>
-          <InputGroup label="Brand" className="md:col-span-3">
-            <SearchableSelect
-              value={filters.brand_id || ""}
-              onChange={(value) => setBrand(value ? parseInt(value) : "")}
-              placeholder="All Brands"
-              options={brands.map((b) => ({
-                value: b.id,
-                label: b.name,
-              }))}
-              className="form-input-base"
-            />
-          </InputGroup>
-          <InputGroup label="Status" className="md:col-span-3">
-            <SearchableSelect
-              value={filters.status || ""}
-              onChange={setStatus}
-              placeholder="All Statuses"
-              options={STATUSES.map((s) => ({
-                value: s.value,
-                label: s.label,
-              }))}
-              className="form-input-base"
-            />
-          </InputGroup>
-        </FilterBar>
-
-        <AdvancedFilters
-          priceMin={filters.price_min}
-          setPriceMin={setPriceMin}
-          priceMax={filters.price_max}
-          setPriceMax={setPriceMax}
-          currency={filters.currency || "all"}
-          setCurrency={setCurrency}
-          showPriceFilters={true}
-          showCurrencyFilter={true}
+        <InventoryModuleFilters
+          module="bikes"
+          filters={filters}
+          loading={loading}
+          setters={{
+            setSearch,
+            setCategory: () => {},
+            setBrand,
+            setBlueprint,
+            setSector: () => {},
+            setStatus,
+            setType: () => {},
+            setPriceMin,
+            setPriceMax,
+            setCurrency,
+            setLowStock,
+            setTags: () => {},
+            setBikeCompatibility: () => {},
+            setFilter,
+          }}
+          options={{
+            brands: brands.map((b) => ({ value: b.id, label: b.name })),
+            blueprints: blueprints.map((b) => ({
+              value: b.id,
+              label: `${b.model} ${b.year}`,
+            })),
+            statuses: STATUSES,
+          }}
         />
+
+        <ActiveFilterChips chips={filterChips} onClearAll={resetFilters} />
 
         {loading ? (
           <div className="flex justify-center py-12">
