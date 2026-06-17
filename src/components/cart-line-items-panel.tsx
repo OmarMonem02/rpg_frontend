@@ -285,7 +285,7 @@ export function CartLineItemsPanel({
 
                       {/* Item Type */}
                       <td className="px-5 py-4 text-center">
-                        <span className="form-chip rounded-lg bg-primary/8 text-primary border-primary/15 font-mono text-caption">
+                        <span className="form-chip rounded-lg bg-primary/8 text-primary border-primary/15 font-mono-data text-caption">
                           {item.sellable_type === "products" && "PRODUCT"}
                           {item.sellable_type === "spare_parts" && "SPARE PART"}
                           {item.sellable_type === "maintenance_parts" && "MAINT. PART"}

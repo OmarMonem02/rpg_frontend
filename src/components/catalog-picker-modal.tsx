@@ -39,6 +39,7 @@ import { useExchangeRates } from "@/hooks/useExchangeRates";
 import { ActionButton, SearchableSelect, StatusBadge } from "@/components/ops-ui";
 import { BikeCompatibilityFilter } from "@/components/BikeCompatibilityFilter";
 import { InventoryItemThumbnail } from "@/components/inventory/list-table";
+import { StockBadge } from "@/components/inventory/stock-badge";
 import {
   XMarkIcon,
   FunnelIcon,
@@ -510,28 +511,6 @@ export function CatalogPickerModal({
       reserved: "Reserved",
     };
     return labels[status.toLowerCase()] ?? status;
-  };
-
-  const getProductStockBadge = (product: ProductRecord) => {
-    if (product.stock_quantity <= 0) {
-      return (
-        <StatusBadge tone="danger">
-          <span className="mono-data">0</span> Out
-        </StatusBadge>
-      );
-    }
-    if (product.stock_quantity <= product.low_stock_alarm) {
-      return (
-        <StatusBadge tone="warning">
-          Low <span className="mono-data">{product.stock_quantity}</span>
-        </StatusBadge>
-      );
-    }
-    return (
-      <StatusBadge tone="success">
-        In <span className="mono-data">{product.stock_quantity}</span>
-      </StatusBadge>
-    );
   };
 
   const allVisibleSelected =
@@ -1093,7 +1072,10 @@ export function CatalogPickerModal({
                                   )?.name ?? item.products_category_id}
                                 </span>
                               ) : null}
-                              {getProductStockBadge(item)}
+                              <StockBadge
+                                stock_quantity={item.stock_quantity}
+                                low_stock_alarm={item.low_stock_alarm}
+                              />
                             </div>
                           )}
 
@@ -1137,12 +1119,10 @@ export function CatalogPickerModal({
                                     ?.name ?? item.brand_id}
                                 </span>
                               ) : null}
-                              <span className="inline-flex items-center text-xs font-medium text-on-surface-variant">
-                                <span className="label-caps mr-1 text-on-surface-variant/60">
-                                  Stock
-                                </span>
-                                {item.stock_quantity ?? 0}
-                              </span>
+                              <StockBadge
+                                stock_quantity={item.stock_quantity}
+                                low_stock_alarm={item.low_stock_alarm}
+                              />
                             </div>
                           )}
 
@@ -1186,12 +1166,10 @@ export function CatalogPickerModal({
                                     ?.name ?? item.brand_id}
                                 </span>
                               ) : null}
-                              <span className="inline-flex items-center text-xs font-medium text-on-surface-variant">
-                                <span className="label-caps mr-1 text-on-surface-variant/60">
-                                  Stock
-                                </span>
-                                {item.stock_quantity ?? 0}
-                              </span>
+                              <StockBadge
+                                stock_quantity={item.stock_quantity}
+                                low_stock_alarm={item.low_stock_alarm}
+                              />
                             </div>
                           )}
 

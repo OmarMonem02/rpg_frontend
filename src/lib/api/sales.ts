@@ -10,6 +10,11 @@ import {
   type PaginatedResult,
 } from "./core";
 import { normalizeCustomer, type CustomerRecord } from "./customers";
+import {
+  normalizeCustomerAddress,
+  formatCustomerAddressLabel,
+  type CustomerAddressRecord,
+} from "./customer-addresses";
 import { downloadFile } from "./import-export";
 import { normalizeSeller, type SellerRecord } from "./users";
 
@@ -116,6 +121,7 @@ export type SaleLineItemRecord = {
 export type SaleRecord = {
   id: number;
   customer_id: number;
+  customer_address_id?: number;
   seller_id: number;
   payment_method_id: number;
   payment_method_name?: string;
@@ -132,6 +138,7 @@ export type SaleRecord = {
   created_at?: string;
   updated_at?: string;
   customer?: CustomerRecord;
+  customer_address?: CustomerAddressRecord;
   seller?: SellerRecord;
 };
 
@@ -149,6 +156,7 @@ export type CreateSaleLineItemPayload = {
 
 export type CreateSalePayload = {
   customer_id: number;
+  customer_address_id?: number;
   seller_id: number;
   payment_method_id: number;
   type: "site" | "online" | "delivery";
@@ -314,6 +322,7 @@ export function normalizeSale(raw: unknown): SaleRecord {
   return {
     id: toNumber(record.id),
     customer_id: toNumber(record.customer_id),
+    customer_address_id: toNumber(record.customer_address_id) || undefined,
     seller_id: toNumber(record.seller_id),
     payment_method_id: toNumber(record.payment_method_id),
     payment_method_name:
@@ -337,8 +346,24 @@ export function normalizeSale(raw: unknown): SaleRecord {
     created_at: toText(record.created_at) || undefined,
     updated_at: toText(record.updated_at) || undefined,
     customer: record.customer ? normalizeCustomer(record.customer) : undefined,
+    customer_address: record.customer_address
+      ? normalizeCustomerAddress(record.customer_address)
+      : record.customerAddress
+        ? normalizeCustomerAddress(record.customerAddress)
+        : undefined,
     seller: record.seller ? normalizeSeller(record.seller) : undefined,
   };
+}
+
+export function resolveSaleAddress(sale: SaleRecord): string | undefined {
+  if (sale.customer_address) {
+    return (
+      sale.customer_address.formatted ??
+      formatCustomerAddressLabel(sale.customer_address)
+    );
+  }
+
+  return sale.customer?.address;
 }
 
 export async function listSales(

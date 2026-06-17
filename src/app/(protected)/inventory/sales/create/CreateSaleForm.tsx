@@ -22,8 +22,12 @@ import {
   listProducts,
   listSpareParts,
   createCustomer,
+  listCustomerAddresses,
+  createCustomerAddress,
+  formatCustomerAddressLabel,
   type CreateCustomerPayload,
   type CustomerRecord,
+  type CustomerAddressRecord,
   type SellerRecord,
   type PaymentMethodRecord,
   type ProductRecord,
@@ -80,6 +84,7 @@ import {
   TagIcon,
   CheckIcon,
   GlobeAltIcon,
+  MapPinIcon,
 } from "@heroicons/react/24/outline";
 import type { DiscountInputType } from "@/lib/discount-input";
 import { formatDiscountAmount } from "@/components/form-discount-input";
@@ -325,44 +330,118 @@ export function CreateSaleForm() {
   // Quick Customer state
   const [customerModalOpen, setCustomerModalOpen] = useState(false);
 
-  const customerFields: FieldConfig[] = [
-    {
-      name: "name",
-      label: "Full Name",
-      type: "text",
-      required: true,
-      span: 2,
-      placeholder: "e.g. John Doe",
-    },
-    {
-      name: "phone",
-      label: "Phone Number",
-      type: "text",
-      required: true,
-      placeholder: "e.g. +20 123 456 7890",
-    },
-    {
-      name: "address",
-      label: "Physical Address",
-      type: "textarea",
-      span: 2,
-      placeholder: "Street, area, city (optional)",
-    },
-    {
-      name: "how_did_you_know_us",
-      label: "How did they find us?",
-      type: "text",
-      span: 2,
-      placeholder: "e.g. Instagram, walk-in, referral…",
-    },
-    {
-      name: "notes",
-      label: "Internal notes",
-      type: "textarea",
-      span: 2,
-      placeholder: "Optional notes for your team only",
-    },
-  ];
+  // Customer addresses (Online / Delivery)
+  const [customerAddresses, setCustomerAddresses] = useState<
+    CustomerAddressRecord[]
+  >([]);
+  const [selectedAddressId, setSelectedAddressId] = useState<number | null>(
+    null,
+  );
+  const [addressModalOpen, setAddressModalOpen] = useState(false);
+  const [addressesLoading, setAddressesLoading] = useState(false);
+
+  const isRemoteSale = saleType === "online" || saleType === "delivery";
+
+  const customerFields: FieldConfig[] = useMemo(() => {
+    const base: FieldConfig[] = [
+      {
+        name: "name",
+        label: "Full Name",
+        type: "text",
+        required: true,
+        span: 2,
+        placeholder: "e.g. John Doe",
+      },
+      {
+        name: "phone",
+        label: "Phone Number",
+        type: "text",
+        required: true,
+        placeholder: "e.g. +20 123 456 7890",
+      },
+    ];
+
+    if (isRemoteSale) {
+      base.push(
+        {
+          name: "full_address",
+          label: "Street / Area",
+          type: "textarea",
+          required: true,
+          span: 2,
+          placeholder: "Building, street, area",
+        },
+        {
+          name: "city",
+          label: "City",
+          type: "text",
+          required: true,
+          placeholder: "e.g. Cairo",
+        },
+        {
+          name: "label",
+          label: "Address label",
+          type: "text",
+          placeholder: "e.g. Home, Office (optional)",
+        },
+      );
+    } else {
+      base.push({
+        name: "address",
+        label: "Physical Address",
+        type: "textarea",
+        span: 2,
+        placeholder: "Street, area, city (optional)",
+      });
+    }
+
+    base.push(
+      {
+        name: "how_did_you_know_us",
+        label: "How did they find us?",
+        type: "text",
+        span: 2,
+        placeholder: "e.g. Instagram, walk-in, referral…",
+      },
+      {
+        name: "notes",
+        label: "Internal notes",
+        type: "textarea",
+        span: 2,
+        placeholder: "Optional notes for your team only",
+      },
+    );
+
+    return base;
+  }, [isRemoteSale]);
+
+  const addressFields: FieldConfig[] = useMemo(
+    () => [
+      {
+        name: "label",
+        label: "Address label",
+        type: "text",
+        span: 2,
+        placeholder: "e.g. Home, Office (optional)",
+      },
+      {
+        name: "full_address",
+        label: "Street / Area",
+        type: "textarea",
+        required: true,
+        span: 2,
+        placeholder: "Building, street, area",
+      },
+      {
+        name: "city",
+        label: "City",
+        type: "text",
+        required: true,
+        placeholder: "e.g. Cairo",
+      },
+    ],
+    [],
+  );
 
   // Catalog picker state
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -414,6 +493,65 @@ export function CreateSaleForm() {
     );
     setSaleStatus((current) => (current === "completed" ? "pending" : current));
   }, [saleType]);
+
+  useEffect(() => {
+    if (saleType === "site") {
+      setSelectedAddressId(null);
+    }
+  }, [saleType]);
+
+  useEffect(() => {
+    if (!customerId) {
+      setCustomerAddresses([]);
+      setSelectedAddressId(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadAddresses = async () => {
+      try {
+        setAddressesLoading(true);
+        const token = getAuthToken();
+        if (!token) return;
+
+        const addresses = await listCustomerAddresses(token, customerId);
+        if (cancelled) return;
+
+        setCustomerAddresses(addresses);
+        const preferred =
+          addresses.find((address) => address.is_default) ?? addresses[0] ?? null;
+        setSelectedAddressId(preferred?.id ?? null);
+      } catch (err) {
+        if (!cancelled) {
+          setError(
+            err instanceof Error
+              ? err.message
+              : "Failed to load customer addresses",
+          );
+        }
+      } finally {
+        if (!cancelled) setAddressesLoading(false);
+      }
+    };
+
+    void loadAddresses();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [customerId]);
+
+  useEffect(() => {
+    if (!isRemoteSale || selectedAddressId || customerAddresses.length === 0) {
+      return;
+    }
+
+    const preferred =
+      customerAddresses.find((address) => address.is_default) ??
+      customerAddresses[0];
+    if (preferred) setSelectedAddressId(preferred.id);
+  }, [isRemoteSale, customerAddresses, selectedAddressId]);
 
   const handleOpenCatalog = (catalogType: CatalogType) => {
     setActiveCatalog(catalogType);
@@ -774,6 +912,9 @@ export function CreateSaleForm() {
         );
       }
       if (shippingFee < 0) throw new Error("Shipping fee cannot be negative");
+      if (isRemoteSale && !selectedAddressId) {
+        throw new Error("Please select or add a physical address");
+      }
       const draftAmount = normalizeDiscountAmount(resolvedDiscountDraft);
       let saleDiscount = approvedDiscount;
 
@@ -839,6 +980,9 @@ export function CreateSaleForm() {
       // Create sale payload
       const payload: CreateSalePayload = {
         customer_id: customerId,
+        ...(isRemoteSale && selectedAddressId
+          ? { customer_address_id: selectedAddressId }
+          : {}),
         seller_id: sellerId,
         payment_method_id: paymentMethodId,
         type: saleType,
@@ -929,8 +1073,31 @@ export function CreateSaleForm() {
 
       const newCustomer = await createCustomer(token, payload);
 
-      // Update customer list and select the new one
-      setCustomers((prev) => [...prev, newCustomer]);
+      if (isRemoteSale) {
+        const fullAddress = String(data.full_address ?? "").trim();
+        const city = String(data.city ?? "").trim();
+        if (!fullAddress) throw new Error("Street / area is required");
+        if (!city) throw new Error("City is required");
+
+        const newAddress = await createCustomerAddress(token, newCustomer.id, {
+          label: data.label ? String(data.label).trim() : undefined,
+          full_address: fullAddress,
+          city,
+        });
+
+        const customerWithAddress: CustomerRecord = {
+          ...newCustomer,
+          address:
+            newAddress.formatted ?? formatCustomerAddressLabel(newAddress),
+        };
+
+        setCustomers((prev) => [...prev, customerWithAddress]);
+        setCustomerAddresses([newAddress]);
+        setSelectedAddressId(newAddress.id);
+      } else {
+        setCustomers((prev) => [...prev, newCustomer]);
+      }
+
       setCustomerId(newCustomer.id);
       setCustomerModalOpen(false);
 
@@ -942,12 +1109,45 @@ export function CreateSaleForm() {
     }
   };
 
+  const handleCreateAddress = async (data: Record<string, unknown>) => {
+    try {
+      const token = getAuthToken();
+      if (!token) throw new Error("Authentication required");
+      if (!customerId) throw new Error("Please select a customer first");
+
+      const fullAddress = String(data.full_address ?? "").trim();
+      const city = String(data.city ?? "").trim();
+      if (!fullAddress) throw new Error("Street / area is required");
+      if (!city) throw new Error("City is required");
+
+      const newAddress = await createCustomerAddress(token, customerId, {
+        label: data.label ? String(data.label).trim() : undefined,
+        full_address: fullAddress,
+        city,
+      });
+
+      setCustomerAddresses((prev) => [...prev, newAddress]);
+      setSelectedAddressId(newAddress.id);
+      setAddressModalOpen(false);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to add physical address",
+      );
+      throw err;
+    }
+  };
+
   const selectedCustomer = useMemo(
     () => customers.find((c) => c.id === customerId) ?? null,
     [customers, customerId],
   );
 
-  const isRemoteSale = saleType === "online" || saleType === "delivery";
+  const selectedAddress = useMemo(
+    () =>
+      customerAddresses.find((address) => address.id === selectedAddressId) ??
+      null,
+    [customerAddresses, selectedAddressId],
+  );
   const cartItemCount = cartItems.reduce(
     (n, item) => n + (Number(item.quantity) || 0),
     0,
@@ -1246,9 +1446,69 @@ export function CreateSaleForm() {
                       ) : null}
                     </div>
                   </div>
-                  {selectedCustomer.address ? (
+                  {!isRemoteSale && selectedCustomer.address ? (
                     <p className="text-xs text-on-surface-variant sm:max-w-[45%] sm:text-right truncate">
                       {selectedCustomer.address}
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
+
+              {isRemoteSale && selectedCustomer ? (
+                <div className="col-span-full space-y-3">
+                  {customerAddresses.length === 0 && !addressesLoading ? (
+                    <div className="rounded-2xl border border-dashed border-outline-variant/30 bg-surface-container-low/60 px-4 py-4">
+                      <p className="text-sm text-on-surface-variant">
+                        This customer has no physical address on file.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setAddressModalOpen(true)}
+                        className="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-on-primary transition-colors hover:bg-primary/90"
+                      >
+                        <PlusIcon className="h-4 w-4" aria-hidden />
+                        Add physical address
+                      </button>
+                    </div>
+                  ) : (
+                    <FormSelect
+                      searchable={customerAddresses.length > 6}
+                      id="sale-customer-address"
+                      label="Physical address"
+                      icon={MapPinIcon}
+                      required
+                      value={selectedAddressId || ""}
+                      onChange={(value) =>
+                        setSelectedAddressId(Number(value) || null)
+                      }
+                      disabled={addressesLoading || customerAddresses.length === 0}
+                      hint={
+                        addressesLoading
+                          ? "Loading saved addresses…"
+                          : "Choose where to ship or deliver this order."
+                      }
+                      placeholder="Select a physical address…"
+                      placeholderSelectable={false}
+                      options={customerAddresses.map((address) => ({
+                        value: address.id,
+                        label: formatCustomerAddressLabel(address),
+                      }))}
+                      headerAction={
+                        <button
+                          type="button"
+                          onClick={() => setAddressModalOpen(true)}
+                          className="flex items-center gap-1 rounded-md px-2 py-1 label-caps text-primary transition-colors hover:bg-primary/10 hover:text-primary/80"
+                        >
+                          <PlusIcon className="h-3 w-3" aria-hidden />
+                          Add
+                        </button>
+                      }
+                    />
+                  )}
+
+                  {selectedAddress ? (
+                    <p className="text-xs text-on-surface-variant">
+                      {formatCustomerAddressLabel(selectedAddress)}
                     </p>
                   ) : null}
                 </div>
@@ -1434,7 +1694,7 @@ export function CreateSaleForm() {
                 <span className="text-sm font-bold uppercase tracking-widest text-primary/80">
                   Total
                 </span>
-                <span className="text-base font-black text-primary font-mono tracking-tight">
+                <span className="text-base font-black text-primary font-mono-data-data tracking-tight">
                   {saleTotal.toLocaleString("en-US", { minimumFractionDigits: 2 })}
                 </span>
                 <span className="text-sm font-bold text-primary/70 uppercase">EGP</span>
@@ -1457,7 +1717,8 @@ export function CreateSaleForm() {
                 !customerId ||
                 !sellerId ||
                 !paymentMethodId ||
-                cartItems.length === 0
+                cartItems.length === 0 ||
+                (isRemoteSale && !selectedAddressId)
               }
               className="min-w-[160px] text-base gap-2 px-8 py-3.5 shadow-md hover:shadow-lg disabled:opacity-50 disabled:shadow-none"
             >
@@ -1512,6 +1773,17 @@ export function CreateSaleForm() {
         onSubmit={handleCreateCustomer}
         submitLabel="Register & Select"
         heroLabel="New Customer"
+      />
+
+      <EntityDrawer
+        isOpen={addressModalOpen}
+        onClose={() => setAddressModalOpen(false)}
+        title="Add physical address"
+        description="Save a delivery address for this customer."
+        fields={addressFields}
+        onSubmit={handleCreateAddress}
+        submitLabel="Save address"
+        heroLabel="New Address"
       />
 
     </PageShell>

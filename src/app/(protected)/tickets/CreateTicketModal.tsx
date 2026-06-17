@@ -334,7 +334,7 @@ export function CreateTicketModal({
                               <p className="font-black text-on-surface">
                                 {b.bike_blueprint?.brand?.name || "Unknown"} {b.bike_blueprint?.model || "Unknown"}
                               </p>
-                              <p className="text-xs text-on-surface-variant font-mono mt-1">VIN: {b.vin || "N/A"} | Year: {b.bike_blueprint?.year || "N/A"}</p>
+                              <p className="text-xs text-on-surface-variant mono-data mt-1">VIN: {b.vin || "N/A"} | Year: {b.bike_blueprint?.year || "N/A"}</p>
                               </div>
                             </div>
                             <div className={`h-6 w-6 rounded-full border-2 flex items-center justify-center transition-all ${selectedBike?.id === b.id ? "bg-primary border-primary" : "border-outline-variant"}`}>

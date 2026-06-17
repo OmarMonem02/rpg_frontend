@@ -194,7 +194,7 @@ export default function InventoryCountPage() {
           <p className="max-w-2xl text-sm leading-6 text-on-surface-variant">
             Scan a barcode/SKU or pick items by name, enter the physical count for
             each, and review discrepancies against system stock. Press{" "}
-            <kbd className="rounded-md border border-outline-variant/20 bg-surface-container px-1.5 py-0.5 font-mono text-xs">
+            <kbd className="rounded-md border border-outline-variant/20 bg-surface-container px-1.5 py-0.5 font-mono-data text-xs">
               /
             </kbd>{" "}
             anytime to focus the scanner. Your count is saved locally and survives

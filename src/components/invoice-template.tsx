@@ -1,6 +1,6 @@
 "use client";
 
-import { SaleRecord, saleLineItemTypeLabel } from "@/lib/crud-api";
+import { SaleRecord, saleLineItemTypeLabel, resolveSaleAddress } from "@/lib/crud-api";
 
 export type InvoiceTemplateProps = {
   sale: SaleRecord;
@@ -90,6 +90,7 @@ export function InvoiceTemplate({
     documentTitle ?? (isMaintenance ? "Maintenance Invoice" : "Invoice");
   const resolvedReferenceLabel =
     referenceLabel ?? (isMaintenance ? "Ticket #" : "Invoice #");
+  const saleAddress = resolveSaleAddress(sale);
 
   const itemsSubtotal =
     sale.line_items?.reduce(
@@ -188,10 +189,10 @@ export function InvoiceTemplate({
                   <dt>Phone</dt>
                   <dd>{sale.customer?.phone || "N/A"}</dd>
                 </div>
-                {sale.customer?.address ? (
+                {saleAddress ? (
                   <div className="party-row">
                     <dt>Address</dt>
-                    <dd>{sale.customer.address}</dd>
+                    <dd>{saleAddress}</dd>
                   </div>
                 ) : null}
               </dl>

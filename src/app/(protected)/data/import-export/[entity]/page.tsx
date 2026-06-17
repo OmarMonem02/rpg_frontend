@@ -221,7 +221,7 @@ export default function EntityImportExportPage() {
             <tbody className="divide-y divide-outline-variant/10 text-on-surface">
               {referenceColumns.map((col) => (
                 <tr key={col.key} className="hover:bg-surface-container-lowest transition-colors">
-                  <td className="px-4 py-3 border-r border-outline-variant/15 font-mono text-xs">
+                  <td className="px-4 py-3 border-r border-outline-variant/15 font-mono-data text-xs">
                     {col.key}
                     {col.required ? <span className="ml-1 text-error font-bold">*</span> : null}
                   </td>

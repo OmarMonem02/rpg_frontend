@@ -1,6 +1,6 @@
 "use client";
 
-import { SaleRecord } from "@/lib/crud-api";
+import { SaleRecord, resolveSaleAddress } from "@/lib/crud-api";
 
 interface ReceiptTemplateProps {
   sale: SaleRecord;
@@ -51,7 +51,10 @@ export function ReceiptTemplate({
 
         {/* Customer Info */}
         <div className="text-caption space-y-1 border-b border-outline-variant/20 pb-2">
-          <p>Customer: #{sale.customer_id}</p>
+          <p>Customer: {sale.customer?.name ?? `#${sale.customer_id}`}</p>
+          {resolveSaleAddress(sale) ? (
+            <p>Address: {resolveSaleAddress(sale)}</p>
+          ) : null}
           <p>Seller: #{sale.seller_id}</p>
           <p className="uppercase">Status: {sale.status}</p>
         </div>

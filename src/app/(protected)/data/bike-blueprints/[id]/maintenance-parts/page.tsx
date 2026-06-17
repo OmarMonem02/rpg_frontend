@@ -674,7 +674,7 @@ export default function BikeBlueprintMaintenancePartsPage() {
               {assignedRows.map((row) => (
                 <tr key={row.id} className="border-b border-outline-variant/10 hover:bg-surface-container-low">
                   <td className="px-4 py-3 text-on-surface">{row.maintenance_part?.name ?? `Maintenance Part #${row.maintenance_part_id}`}</td>
-                  <td className="px-4 py-3 font-mono text-xs text-on-surface-variant">{row.maintenance_part?.sku ?? "-"}</td>
+                  <td className="px-4 py-3 font-mono-data text-xs text-on-surface-variant">{row.maintenance_part?.sku ?? "-"}</td>
                   <td className="px-4 py-3 text-xs text-on-surface-variant">{row.maintenance_part?.category?.name ?? "-"}</td>
                   <td className="px-4 py-3 text-xs text-on-surface-variant">{row.maintenance_part?.brand?.name ?? "-"}</td>
                   <td className="px-4 py-3 text-center text-on-surface">{row.maintenance_part?.stock_quantity ?? 0}</td>

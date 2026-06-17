@@ -1028,7 +1028,7 @@ export default function TicketDetailsPage() {
               <p className="text-on-surface-variant">
                 {ticket.customer_bike?.bike_blueprint?.brand?.name} {ticket.customer_bike?.bike_blueprint?.model} {ticket.customer_bike?.bike_blueprint?.year}
               </p>
-              <p className="text-xs text-on-surface-variant/70 mt-1 font-mono">VIN: {ticket.customer_bike?.vin || "N/A"}</p>
+              <p className="text-xs text-on-surface-variant/70 mt-1 font-mono-data">VIN: {ticket.customer_bike?.vin || "N/A"}</p>
             </div>
             <div className="rounded-2xl border border-outline-variant/15 bg-surface p-4 text-sm min-w-[150px] shadow-sm flex flex-col justify-between">
               <div>
@@ -1148,7 +1148,7 @@ export default function TicketDetailsPage() {
             <p className="mb-3 text-sm text-on-surface-variant">Preparing tracking link…</p>
           ) : null}
           {trackingUrl ? (
-            <p className="mb-3 break-all rounded-lg bg-surface-container-low px-3 py-2 font-mono text-xs text-on-surface-variant">
+            <p className="mb-3 break-all rounded-lg bg-surface-container-low px-3 py-2 font-mono-data text-xs text-on-surface-variant">
               {trackingUrl}
             </p>
           ) : ticket.customer?.phone && !trackingLinkEnsuring ? (
