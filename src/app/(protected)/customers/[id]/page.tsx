@@ -42,14 +42,12 @@ function ticketStatusTone(
   return "default";
 }
 
-function saleStatusTone(
-  status: string,
-): "success" | "warning" | "danger" | "default" {
-  const s = status.toLowerCase();
-  if (s === "completed") return "success";
-  if (s === "pending" || s === "partial") return "warning";
-  if (s === "cancelled" || s === "returned") return "danger";
-  return "default";
+function channelLabel(saleType?: string): string {
+  const type = saleType?.toLowerCase() ?? "";
+  if (type === "online") return "Online";
+  if (type === "delivery") return "Delivery";
+  if (type === "site") return "In store";
+  return saleType || "—";
 }
 
 export default function CustomerWorkspacePage() {
@@ -395,7 +393,7 @@ function CustomerWorkspaceContent() {
                       <thead className="border-b border-outline-variant/20 bg-surface-container-low text-on-surface-variant">
                         <tr>
                           <th className="label-caps px-6 py-4">Sale</th>
-                          <th className="label-caps px-6 py-4">Status</th>
+                          <th className="label-caps px-6 py-4">Channel</th>
                           <th className="label-caps px-6 py-4 text-right">Total</th>
                           <th className="label-caps px-6 py-4">Date</th>
                           <th className="label-caps px-6 py-4 text-right"> </th>
@@ -407,10 +405,8 @@ function CustomerWorkspaceContent() {
                             <td className="px-6 py-4 font-semibold text-on-surface">
                               #{sale.id}
                             </td>
-                            <td className="px-6 py-4">
-                              <StatusBadge tone={saleStatusTone(sale.status)}>
-                                {sale.status}
-                              </StatusBadge>
+                            <td className="px-6 py-4 text-on-surface-variant">
+                              {channelLabel(sale.sale_type)}
                             </td>
                             <td className="px-6 py-4 text-right tabular-nums font-medium">
                               EGP {formatMoney(sale.total)}

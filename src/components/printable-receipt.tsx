@@ -56,7 +56,7 @@ export function ReceiptTemplate({
             <p>Address: {resolveSaleAddress(sale)}</p>
           ) : null}
           <p>Seller: #{sale.seller_id}</p>
-          <p className="uppercase">Status: {sale.status}</p>
+          <p>Payment: {sale.payment_method_name || "—"}</p>
         </div>
 
         {/* Items */}

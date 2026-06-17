@@ -39,29 +39,6 @@ function humanizeDeliveryStatus(status: string) {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-function humanizeStatus(status: string) {
-  return status.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-}
-
-function getStatusTone(status: string) {
-  switch (status.toLowerCase()) {
-    case "completed":
-    case "delivered":
-      return "bcomp";
-    case "pending":
-    case "in-transit":
-    case "in_transit":
-      return "bpend";
-    case "returned":
-    case "cancelled":
-      return "breturn";
-    case "partial":
-      return "bpartial";
-    default:
-      return "bpend";
-  }
-}
-
 function getTypeBadgeClass(type: string) {
   switch (type) {
     case "products":
@@ -132,8 +109,9 @@ export function InvoiceTemplate({
     sale.seller?.name ||
     (sale.seller_id > 0 ? `Seller #${sale.seller_id}` : "—");
 
-  const paymentStatus =
-    sale.status.toLowerCase() === "completed" ? "Paid" : humanizeStatus(sale.status);
+  const paymentMethodLabel =
+    sale.payment_method_name ||
+    (sale.payment_method_id > 0 ? `Method #${sale.payment_method_id}` : "—");
 
   return (
     <div className="receipt-wrapper invoice-template pdf-capture-safe">
@@ -208,16 +186,6 @@ export function InvoiceTemplate({
                         (sale.payment_method_id > 0
                           ? `Method #${sale.payment_method_id}`
                           : "N/A")}
-                    </span>
-                  </dd>
-                </div>
-                <div className="party-row">
-                  <dt>Status</dt>
-                  <dd>
-                    <span
-                      className={`receipt-badge ${getStatusTone(sale.status)}`}
-                    >
-                      {humanizeStatus(sale.status)}
                     </span>
                   </dd>
                 </div>
@@ -420,7 +388,7 @@ export function InvoiceTemplate({
                   <div className="trow grand">
                     <span className="lbl">
                       Total due
-                      <span className="totals-status">{paymentStatus}</span>
+                      <span className="totals-status">{paymentMethodLabel}</span>
                     </span>
                     <span className="amt mono-data">{formatEgp(netTotal)}</span>
                   </div>

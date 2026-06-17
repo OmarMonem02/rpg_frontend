@@ -69,7 +69,6 @@ function buildSalesHref(sellerId: number, period: string): string {
     seller_id: String(sellerId),
     date_from: dateFrom,
     date_to: dateTo,
-    status: "completed",
   });
 
   return `/inventory/sales?${params.toString()}`;

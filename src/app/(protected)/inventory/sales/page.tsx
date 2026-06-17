@@ -54,13 +54,6 @@ import { ExportColumnPicker } from "@/components/export/ExportColumnPicker";
 type SaleSort = "newest" | "oldest" | "highest" | "lowest";
 type ItemTypeFilter = "" | "product" | "spare_part" | "maintenance_service" | "bike";
 
-const SALE_STATUSES = [
-  { value: "", label: "All statuses" },
-  { value: "pending", label: "Pending" },
-  { value: "partial", label: "Partial" },
-  { value: "completed", label: "Completed" },
-];
-
 const DELIVERY_STATUSES = [
   { value: "", label: "All delivery" },
   { value: "pending", label: "Pending" },
@@ -149,7 +142,6 @@ function SalesPageContent() {
 
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("");
   const [deliveryStatusFilter, setDeliveryStatusFilter] = useState<string>("");
   const [saleTypeFilter, setSaleTypeFilter] = useState<string>("");
   const [itemTypeFilter, setItemTypeFilter] = useState<ItemTypeFilter>("");
@@ -167,7 +159,6 @@ function SalesPageContent() {
       const result = await listSales(token, page, {
         search: filters.search || undefined,
         seller_id: sellerFilterId,
-        status: statusFilter || undefined,
         delivery_status: deliveryStatusFilter || undefined,
         sale_type: saleTypeFilter || undefined,
         item_type: itemTypeFilter || undefined,
@@ -195,7 +186,6 @@ function SalesPageContent() {
     sellerFilterId,
     dateFrom,
     dateTo,
-    statusFilter,
     deliveryStatusFilter,
     saleTypeFilter,
     itemTypeFilter,
@@ -232,23 +222,6 @@ function SalesPageContent() {
     }
   };
 
-  const getStatusTone = (status: string) => {
-    switch (status.toLowerCase()) {
-      case "completed":
-      case "delivered":
-        return "success";
-      case "pending":
-      case "in-transit":
-      case "partial":
-        return "warning";
-      case "cancelled":
-      case "returned":
-        return "danger";
-      default:
-        return "default";
-    }
-  };
-
   const getDeliveryTone = (status: string) => {
     switch (status.toLowerCase()) {
       case "delivered":
@@ -261,22 +234,6 @@ function SalesPageContent() {
         return "default";
     }
   };
-
-  const pageSummary = useMemo(() => {
-    const revenue = sales.reduce((sum, sale) => sum + (toNumber(sale.total) || 0), 0);
-    const pendingCount = sales.filter((sale) =>
-      ["pending", "partial"].includes(sale.status.toLowerCase()),
-    ).length;
-    const deliveryQueue = sales.filter((sale) =>
-      sale.sale_type === "delivery" && sale.delivery_status !== "delivered",
-    ).length;
-    const itemCount = sales.reduce(
-      (sum, sale) => sum + (sale.line_items?.length || 0),
-      0,
-    );
-
-    return { revenue, pendingCount, deliveryQueue, itemCount };
-  }, [sales]);
 
   const activeFilters = useMemo(
     () =>
@@ -293,16 +250,6 @@ function SalesPageContent() {
             key: "seller",
             label: `Seller: ${sellerFilterName || `#${sellerFilterId}`}`,
             onClear: () => router.push("/inventory/sales"),
-          }
-          : null,
-        statusFilter
-          ? {
-            key: "status",
-            label: `Status: ${titleCase(statusFilter)}`,
-            onClear: () => {
-              setStatusFilter("");
-              setPage(1);
-            },
           }
           : null,
         deliveryStatusFilter
@@ -392,7 +339,6 @@ function SalesPageContent() {
       sellerFilterName,
       setPage,
       setSearch,
-      statusFilter,
       totalMax,
       totalMin,
     ],
@@ -402,7 +348,6 @@ function SalesPageContent() {
     (): SaleListFilters => ({
       search: filters.search || undefined,
       seller_id: sellerFilterId,
-      status: statusFilter || undefined,
       delivery_status: deliveryStatusFilter || undefined,
       sale_type: saleTypeFilter || undefined,
       item_type: itemTypeFilter || undefined,
@@ -415,7 +360,6 @@ function SalesPageContent() {
     [
       filters.search,
       sellerFilterId,
-      statusFilter,
       deliveryStatusFilter,
       saleTypeFilter,
       itemTypeFilter,
@@ -448,7 +392,6 @@ function SalesPageContent() {
     setSearch("");
     setDateFrom("");
     setDateTo("");
-    setStatusFilter("");
     setDeliveryStatusFilter("");
     setSaleTypeFilter("");
     setItemTypeFilter("");
@@ -588,18 +531,6 @@ function SalesPageContent() {
               className="form-input-base pl-10"
             />
           </div>
-        </InputGroup>
-
-        <InputGroup label="Status" className="md:col-span-2">
-          <SearchableSelect
-            value={statusFilter}
-            onChange={(value) => {
-              setStatusFilter(value);
-              setPage(1);
-            }}
-            options={SALE_STATUSES}
-            className="form-input-base"
-          />
         </InputGroup>
 
         <InputGroup label="Sort" className="md:col-span-2">
@@ -871,9 +802,6 @@ function SalesPageContent() {
                         </p>
                       </div>
                     </div>
-                    <StatusBadge tone={getStatusTone(sale.status)}>
-                      {titleCase(sale.status)}
-                    </StatusBadge>
                   </div>
 
                   <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
@@ -949,7 +877,6 @@ function SalesPageContent() {
                       <th className="label-caps px-5 py-4 text-left">Invoice</th>
                       <th className="label-caps px-5 py-4 text-left">Customer</th>
                       <th className="label-caps px-5 py-4 text-left">Seller / Payment</th>
-                      <th className="label-caps px-5 py-4 text-center">Status</th>
                       <th className="label-caps px-5 py-4 text-center">Delivery</th>
                       <th className="label-caps px-5 py-4 text-center">Items</th>
                       <th className="label-caps px-5 py-4 text-right">Total</th>
@@ -991,11 +918,6 @@ function SalesPageContent() {
                               {sale.payment_method_name || "Payment method not set"}
                             </span>
                           </div>
-                        </td>
-                        <td className="px-5 py-4 text-center">
-                          <StatusBadge tone={getStatusTone(sale.status)}>
-                            {titleCase(sale.status)}
-                          </StatusBadge>
                         </td>
                         <td className="px-5 py-4 text-center">
                           <StatusBadge tone={getDeliveryTone(sale.delivery_status)}>

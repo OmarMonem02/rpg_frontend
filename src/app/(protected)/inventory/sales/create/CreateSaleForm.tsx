@@ -78,7 +78,6 @@ import {
   UserCircleIcon,
   CreditCardIcon,
   ShoppingCartIcon,
-  ShieldCheckIcon,
   TruckIcon,
   CurrencyDollarIcon,
   TagIcon,
@@ -311,9 +310,6 @@ export function CreateSaleForm() {
   const [saleType, setSaleType] = useState<"site" | "online" | "delivery">(
     "site",
   );
-  const [saleStatus, setSaleStatus] = useState<
-    "pending" | "partial" | "completed"
-  >("completed");
   const [deliveryStatus, setDeliveryStatus] = useState("pending");
   const [shippingFee, setShippingFee] = useState(0);
   const [isMaintenance, setIsMaintenance] = useState(false);
@@ -483,7 +479,6 @@ export function CreateSaleForm() {
   useEffect(() => {
     if (saleType === "site") {
       setDeliveryStatus("delivered");
-      setSaleStatus("completed");
       setShippingFee(0);
       return;
     }
@@ -491,7 +486,6 @@ export function CreateSaleForm() {
     setDeliveryStatus((current) =>
       current === "delivered" ? "pending" : current,
     );
-    setSaleStatus((current) => (current === "completed" ? "pending" : current));
   }, [saleType]);
 
   useEffect(() => {
@@ -986,7 +980,6 @@ export function CreateSaleForm() {
         seller_id: sellerId,
         payment_method_id: paymentMethodId,
         type: saleType,
-        status: saleStatus,
         delivery_status: deliveryStatus as
           | "pending"
           | "in-transit"
@@ -1031,6 +1024,8 @@ export function CreateSaleForm() {
             lineItem.product_id = item.sellable_id;
           } else if (item.sellable_type === "spare_parts") {
             lineItem.spare_part_id = item.sellable_id;
+          } else if (item.sellable_type === "maintenance_parts") {
+            lineItem.maintenance_part_id = item.sellable_id;
           } else if (item.sellable_type === "bikes") {
             lineItem.bike_for_sale_id = item.sellable_id;
           } else if (item.sellable_type === "maintenance_services") {
@@ -1587,28 +1582,6 @@ export function CreateSaleForm() {
                   </label>
                 </div>
               </div>
-
-              <FormSelect
-                searchable={false}
-                id="sale-status"
-                label="Sale status"
-                icon={ShieldCheckIcon}
-                value={saleStatus}
-                disabled={!isRemoteSale}
-                hint={
-                  !isRemoteSale
-                    ? "In-store sales are marked completed automatically."
-                    : undefined
-                }
-                onChange={(v) =>
-                  setSaleStatus(v as "pending" | "partial" | "completed")
-                }
-                options={[
-                  { value: "pending", label: "Pending" },
-                  { value: "partial", label: "Partial" },
-                  { value: "completed", label: "Completed" },
-                ]}
-              />
 
               <FormSelect
                 searchable={false}

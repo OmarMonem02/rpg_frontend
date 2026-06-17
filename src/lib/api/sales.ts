@@ -160,12 +160,6 @@ export type CreateSalePayload = {
   seller_id: number;
   payment_method_id: number;
   type: "site" | "online" | "delivery";
-  status?:
-    | "completed"
-    | "partial"
-    | "pending"
-    | "returned"
-    | "cancelled";
   delivery_status?: "pending" | "in-transit" | "delivered";
   shipping_fee?: number;
   discount?: number;
@@ -177,10 +171,8 @@ export type CreateSalePayload = {
 };
 
 export type UpdateSalePayload = Partial<
-  Omit<CreateSalePayload, "items" | "status">
-> & {
-  status?: string;
-};
+  Omit<CreateSalePayload, "items">
+>;
 
 export type SaleListSort = "newest" | "oldest" | "highest" | "lowest";
 
@@ -201,6 +193,7 @@ export type SaleListFilters = {
   user_id?: number;
   sort?: SaleListSort;
   per_page?: number;
+  remote_only?: boolean;
 };
 
 export type UpdateSaleLineItemPayload = Partial<CreateSaleLineItemPayload>;
@@ -389,6 +382,7 @@ export async function listSales(
     user_id: filters?.user_id,
     sort: filters?.sort,
     per_page: filters?.per_page,
+    remote_only: filters?.remote_only,
   });
 
   const payload = await authorizedFetch<unknown>(`/sales?${query}`, token);
@@ -421,6 +415,7 @@ export function buildSalesExportQuery(
     item_type: filters?.item_type,
     user_id: filters?.user_id,
     sort: filters?.sort,
+    remote_only: filters?.remote_only,
     format,
   });
 

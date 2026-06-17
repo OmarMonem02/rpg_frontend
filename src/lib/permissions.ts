@@ -334,6 +334,14 @@ const ROUTE_PERMISSION_RULES: Array<{
     permission: { page: "sales", action: "create" },
   },
   {
+    pattern: /^\/inventory\/delivery-orders\/[^/]+(?:\/|$)/,
+    permission: { page: "sales", action: "read" },
+  },
+  {
+    pattern: /^\/inventory\/delivery-orders(?:\/|$)/,
+    permission: { page: "sales", action: "read" },
+  },
+  {
     pattern: /^\/inventory\/sales\/[^/]+\/(?:manage|return|exchange)(?:\/|$)/,
     permission: { page: "sales", action: "update" },
   },

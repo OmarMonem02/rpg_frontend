@@ -259,10 +259,10 @@ export default function SaleDetailsPage() {
       {/* ── Status Stats ── */}
       <StatGrid>
         <StatCard
-          label="Status"
-          value={sale.status.toUpperCase()}
-          tone={getStatusTone(sale.status)}
-          hint={`Delivery: ${sale.delivery_status}`}
+          label="Delivery"
+          value={titleCase(sale.delivery_status)}
+          tone={getStatusTone(sale.delivery_status)}
+          hint={sale.payment_method_name || "Payment method not set"}
         />
         <StatCard
           label="Customer"

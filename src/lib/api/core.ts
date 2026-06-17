@@ -305,7 +305,10 @@ export function buildQuery(
   const q = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
     if (value === undefined || value === null || value === '') continue;
-    if (typeof value === 'boolean') { if (value) q.append(key, 'true'); continue; }
+    if (typeof value === 'boolean') {
+      if (value) q.append(key, '1');
+      continue;
+    }
     if (typeof value === 'number' && value === 0 && !allowZero.includes(key)) continue;
     q.append(key, String(value));
   }
