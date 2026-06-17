@@ -1,8 +1,9 @@
-export type BrandType = "spare_parts" | "products" | "bikes";
+export type BrandType = "spare_parts" | "products" | "maintenance_parts" | "bikes";
 
 export const BRAND_TYPE_OPTIONS: { value: BrandType; label: string }[] = [
   { value: "spare_parts", label: "Spare Parts" },
   { value: "products", label: "Products" },
+  { value: "maintenance_parts", label: "Maintenance Parts" },
   { value: "bikes", label: "Bikes" },
 ];
 

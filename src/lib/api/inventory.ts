@@ -9,6 +9,8 @@ import {
   buildQuery,
   type PaginatedResult,
 } from "./core";
+
+export type ItemStatus = "new" | "used";
 import type { CatalogPricingFields } from "@/lib/catalog-pricing";
 import type { PricingCurrency } from "@/lib/currencies";
 import { toPricingCurrency } from "@/lib/currencies";
@@ -42,7 +44,7 @@ function normalizeBrandTypes(raw: unknown): BrandType[] {
     return raw
       .map((value) => toText(value))
       .filter((value): value is BrandType =>
-        value === "spare_parts" || value === "products" || value === "bikes",
+        value === "spare_parts" || value === "products" || value === "maintenance_parts" || value === "bikes",
       );
   }
 
@@ -138,6 +140,15 @@ export type CreateCategoryPayload = {
   name: string;
 };
 
+function normalizeCatalogItemAttributes(record: Record<string, unknown>) {
+  const status = toText(record.item_status) || "new";
+  return {
+    size: toText(record.size) || undefined,
+    color: toText(record.color) || undefined,
+    item_status: (status === "used" ? "used" : "new") as ItemStatus,
+  };
+}
+
 export function normalizeSparePartCategory(raw: unknown): SparePartCategoryRecord {
   const record = asRecord(raw);
   return {
@@ -201,6 +212,88 @@ export async function deleteSparePartCategory(
   id: number,
 ): Promise<void> {
   await authorizedFetch<void>(`/spare_part_categories/${id}`, token, {
+    method: "DELETE",
+  });
+}
+
+// --- MAINTENANCE PART CATEGORIES ---
+export type MaintenancePartCategoryRecord = {
+  id: number;
+  name: string;
+  created_at?: string;
+};
+
+export function normalizeMaintenancePartCategory(
+  raw: unknown,
+): MaintenancePartCategoryRecord {
+  const record = asRecord(raw);
+  return {
+    id: toNumber(record.id),
+    name: toText(record.name),
+    created_at: toText(record.created_at) || undefined,
+  };
+}
+
+export async function listMaintenancePartCategories(
+  token: string,
+  page = 1,
+): Promise<PaginatedResult<MaintenancePartCategoryRecord>> {
+  const query = buildQuery({ page });
+  const payload = await authorizedFetch<unknown>(
+    `/maintenance_part_categories?${query}`,
+    token,
+  );
+  const rows = pickArray(payload, ["data", "maintenance_part_categories"]);
+  const meta = parsePagination(payload);
+  return {
+    items: rows
+      .map(normalizeMaintenancePartCategory)
+      .filter((item) => item.id > 0),
+    currentPage: meta.current_page ?? 1,
+    lastPage: meta.last_page ?? 1,
+  };
+}
+
+export async function createMaintenancePartCategory(
+  token: string,
+  payload: CreateCategoryPayload,
+): Promise<MaintenancePartCategoryRecord> {
+  const data = await authorizedFetch<unknown>(
+    "/maintenance_part_categories",
+    token,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    },
+  );
+  const record = asRecord(data);
+  return normalizeMaintenancePartCategory(record.data ?? record);
+}
+
+export async function updateMaintenancePartCategory(
+  token: string,
+  id: number,
+  payload: CreateCategoryPayload,
+): Promise<MaintenancePartCategoryRecord> {
+  const data = await authorizedFetch<unknown>(
+    `/maintenance_part_categories/${id}`,
+    token,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    },
+  );
+  const record = asRecord(data);
+  return normalizeMaintenancePartCategory(record.data ?? record);
+}
+
+export async function deleteMaintenancePartCategory(
+  token: string,
+  id: number,
+): Promise<void> {
+  await authorizedFetch<void>(`/maintenance_part_categories/${id}`, token, {
     method: "DELETE",
   });
 }
@@ -287,7 +380,10 @@ export type SparePartRecord = {
   image?: string;
   image_public_id?: string;
   images?: InventoryImageRecord[];
-  part_number?: string;
+    part_number?: string;
+  size?: string;
+  color?: string;
+  item_status: ItemStatus;
   stock_quantity: number;
   low_stock_alarm: number;
   spare_parts_category_id: number;
@@ -315,6 +411,9 @@ export type CreateSparePartPayload = {
   image_public_id?: string;
   images?: InventoryImageRecord[];
   part_number?: string;
+  size?: string;
+  color?: string;
+  item_status?: ItemStatus;
   stock_quantity?: number;
   low_stock_alarm?: number;
   spare_parts_category_id: number;
@@ -341,6 +440,9 @@ export type UpdateSparePartPayload = {
   image_public_id?: string;
   images?: InventoryImageRecord[];
   part_number?: string;
+  size?: string;
+  color?: string;
+  item_status?: ItemStatus;
   stock_quantity?: number;
   low_stock_alarm?: number;
   spare_parts_category_id: number;
@@ -421,6 +523,7 @@ export function normalizeSparePart(raw: unknown): SparePartRecord {
     image_public_id: toText(record.image_public_id) || undefined,
     images: normalizeInventoryImages(record.images),
     part_number: toText(record.part_number) || undefined,
+    ...normalizeCatalogItemAttributes(record),
     stock_quantity: toNumber(record.stock_quantity),
     low_stock_alarm: toNumber(record.low_stock_alarm),
     spare_parts_category_id: toNumber(record.spare_parts_category_id),
@@ -532,6 +635,220 @@ export async function getSparePart(
   return normalizeSparePart(record.data ?? record.spare_part ?? record);
 }
 
+// --- MAINTENANCE PARTS ---
+export type MaintenancePartRecord = {
+  id: number;
+  name: string;
+  sku: string;
+  image?: string;
+  image_public_id?: string;
+  images?: InventoryImageRecord[];
+    part_number?: string;
+  size?: string;
+  color?: string;
+  item_status: ItemStatus;
+  stock_quantity: number;
+  low_stock_alarm: number;
+  maintenance_parts_category_id: number;
+  brand_id: number;
+  cost_currency: PricingCurrency;
+  sale_currency: PricingCurrency;
+  cost_price: number;
+  sale_price: number;
+  sale_price_mode: CatalogPricingFields["sale_price_mode"];
+  sale_margin_type?: CatalogPricingFields["sale_margin_type"];
+  sale_margin_value?: number;
+  max_discount_type: "fixed" | "percentage";
+  max_discount_value: number;
+  universal: boolean;
+  notes?: string;
+  tags?: string[];
+  bike_blueprint_ids?: number[];
+  created_at?: string;
+};
+
+export type CreateMaintenancePartPayload = {
+  name: string;
+  sku: string;
+  image?: string;
+  image_public_id?: string;
+  images?: InventoryImageRecord[];
+  part_number?: string;
+  size?: string;
+  color?: string;
+  item_status?: ItemStatus;
+  stock_quantity?: number;
+  low_stock_alarm?: number;
+  maintenance_parts_category_id: number;
+  brand_id: number;
+  cost_currency: PricingCurrency;
+  sale_currency: PricingCurrency;
+  cost_price: number;
+  sale_price: number;
+  sale_price_mode?: CatalogPricingFields["sale_price_mode"];
+  sale_margin_type?: CatalogPricingFields["sale_margin_type"];
+  sale_margin_value?: number;
+  max_discount_type: "fixed" | "percentage";
+  max_discount_value: number;
+  universal?: boolean;
+  notes?: string;
+  tags?: string[];
+  bike_blueprint_ids?: number[];
+};
+
+export type UpdateMaintenancePartPayload = {
+  name: string;
+  sku: string;
+  image?: string;
+  image_public_id?: string;
+  images?: InventoryImageRecord[];
+  part_number?: string;
+  size?: string;
+  color?: string;
+  item_status?: ItemStatus;
+  stock_quantity?: number;
+  low_stock_alarm?: number;
+  maintenance_parts_category_id: number;
+  brand_id: number;
+  cost_currency: PricingCurrency;
+  sale_currency: PricingCurrency;
+  cost_price: number;
+  sale_price: number;
+  sale_price_mode?: CatalogPricingFields["sale_price_mode"];
+  sale_margin_type?: CatalogPricingFields["sale_margin_type"];
+  sale_margin_value?: number;
+  max_discount_type: "fixed" | "percentage";
+  max_discount_value: number;
+  universal?: boolean;
+  notes?: string;
+  tags?: string[];
+  /** When set, replaces pivot links (use [] when universal). Omit to leave links unchanged. */
+  bike_blueprint_ids?: number[];
+};
+
+export function normalizeMaintenancePart(raw: unknown): MaintenancePartRecord {
+  const record = asRecord(raw);
+  const pricing = normalizeCatalogPricingFields(record);
+  return {
+    id: toNumber(record.id),
+    name: toText(record.name),
+    sku: toText(record.sku),
+    image: toText(record.image) || undefined,
+    image_public_id: toText(record.image_public_id) || undefined,
+    images: normalizeInventoryImages(record.images),
+    part_number: toText(record.part_number) || undefined,
+    ...normalizeCatalogItemAttributes(record),
+    stock_quantity: toNumber(record.stock_quantity),
+    low_stock_alarm: toNumber(record.low_stock_alarm),
+    maintenance_parts_category_id: toNumber(record.maintenance_parts_category_id),
+    brand_id: toNumber(record.brand_id),
+    ...pricing,
+    cost_price: toNumber(record.cost_price),
+    sale_price: toNumber(record.sale_price),
+    max_discount_type: toText(record.max_discount_type) as "fixed" | "percentage",
+    max_discount_value: toNumber(record.max_discount_value),
+    universal: record.universal === true || record.universal === "true",
+    notes: toText(record.notes) || undefined,
+    tags: coalesceTags(record),
+    bike_blueprint_ids: coalesceBikeBlueprintIds(record),
+    created_at: toText(record.created_at) || undefined,
+  };
+}
+
+export async function listMaintenanceParts(
+  token: string,
+  page = 1,
+  filters?: {
+    search?: string;
+    category_id?: number;
+    brand_id?: number;
+    price_range?: string;
+    currency?: string;
+    low_stock?: boolean;
+    bike_brand_id?: number;
+    bike_model?: string;
+    bike_year?: number;
+    bike_year_from?: number;
+    bike_year_to?: number;
+    tags?: string[];
+    per_page?: number;
+  },
+): Promise<PaginatedResult<MaintenancePartRecord>> {
+  const query = buildQuery({
+    page,
+    per_page: filters?.per_page,
+    search: filters?.search,
+    category_id: filters?.category_id,
+    brand_id: filters?.brand_id,
+    price_range: filters?.price_range,
+    currency: filters?.currency,
+    low_stock: filters?.low_stock,
+    bike_brand_id: filters?.bike_brand_id,
+    bike_model: filters?.bike_model,
+    bike_year: filters?.bike_year,
+    bike_year_from: filters?.bike_year_from,
+    bike_year_to: filters?.bike_year_to,
+    tags: filters?.tags?.length ? filters.tags.join(",") : undefined,
+  });
+
+  const payload = await authorizedFetch<unknown>(
+    `/maintenance_parts?${query}`,
+    token,
+  );
+  const rows = pickArray(payload, ["data", "maintenance_parts"]);
+  const meta = parsePagination(payload);
+  return {
+    items: rows.map(normalizeMaintenancePart).filter((item) => item.id > 0),
+    currentPage: meta.current_page ?? 1,
+    lastPage: meta.last_page ?? 1,
+  };
+}
+
+export async function createMaintenancePart(
+  token: string,
+  payload: CreateMaintenancePartPayload,
+): Promise<MaintenancePartRecord> {
+  const data = await authorizedFetch<unknown>("/maintenance_parts", token, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const record = asRecord(data);
+  return normalizeMaintenancePart(record.data ?? record);
+}
+
+export async function updateMaintenancePart(
+  token: string,
+  id: number,
+  payload: UpdateMaintenancePartPayload,
+): Promise<MaintenancePartRecord> {
+  const data = await authorizedFetch<unknown>(`/maintenance_parts/${id}`, token, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const record = asRecord(data);
+  return normalizeMaintenancePart(record.data ?? record);
+}
+
+export async function deleteMaintenancePart(
+  token: string,
+  id: number,
+): Promise<void> {
+  await authorizedFetch<void>(`/maintenance_parts/${id}`, token, {
+    method: "DELETE",
+  });
+}
+
+export async function getMaintenancePart(
+  token: string,
+  id: number,
+): Promise<MaintenancePartRecord> {
+  const data = await authorizedFetch<unknown>(`/maintenance_parts/${id}`, token);
+  const record = asRecord(data);
+  return normalizeMaintenancePart(record.data ?? record.maintenance_part ?? record);
+}
+
 // --- PRODUCTS ---
 export type ProductRecord = {
   id: number;
@@ -540,7 +857,10 @@ export type ProductRecord = {
   image?: string;
   image_public_id?: string;
   images?: InventoryImageRecord[];
-  part_number?: string;
+    part_number?: string;
+  size?: string;
+  color?: string;
+  item_status: ItemStatus;
   stock_quantity: number;
   low_stock_alarm: number;
   products_category_id: number;
@@ -568,6 +888,9 @@ export type CreateProductPayload = {
   image_public_id?: string;
   images?: InventoryImageRecord[];
   part_number?: string;
+  size?: string;
+  color?: string;
+  item_status?: ItemStatus;
   stock_quantity?: number;
   low_stock_alarm?: number;
   products_category_id: number;
@@ -603,6 +926,7 @@ export function normalizeProduct(raw: unknown): ProductRecord {
     image_public_id: toText(record.image_public_id) || undefined,
     images: normalizeInventoryImages(record.images),
     part_number: toText(record.part_number),
+    ...normalizeCatalogItemAttributes(record),
     stock_quantity: toNumber(record.stock_quantity),
     low_stock_alarm: toNumber(record.low_stock_alarm),
     products_category_id: toNumber(record.products_category_id),
@@ -743,9 +1067,59 @@ export function buildSparePartQuickEditPayload(
     image: record.image,
     image_public_id: record.image_public_id,
     part_number: record.part_number,
+    size: record.size,
+    color: record.color,
+    item_status: record.item_status,
     stock_quantity: changes.stock_quantity ?? record.stock_quantity,
     low_stock_alarm: changes.low_stock_alarm ?? record.low_stock_alarm,
     spare_parts_category_id: record.spare_parts_category_id,
+    brand_id: record.brand_id,
+    cost_price: changes.cost_price ?? record.cost_price,
+    sale_price: changes.sale_price ?? record.sale_price,
+    sale_price_mode: changes.sale_price_mode ?? record.sale_price_mode,
+    sale_margin_type: changes.sale_margin_type ?? record.sale_margin_type,
+    sale_margin_value: changes.sale_margin_value ?? record.sale_margin_value,
+    max_discount_type: record.max_discount_type,
+    max_discount_value: record.max_discount_value,
+    universal: record.universal,
+    notes: record.notes,
+    tags: record.tags,
+    bike_blueprint_ids: record.bike_blueprint_ids,
+  };
+}
+
+export type MaintenancePartQuickEditFields = Partial<
+  Pick<
+    MaintenancePartRecord,
+    | "name"
+    | "stock_quantity"
+    | "low_stock_alarm"
+    | "cost_price"
+    | "sale_price"
+    | "sale_price_mode"
+    | "sale_margin_type"
+    | "sale_margin_value"
+  >
+>;
+
+export function buildMaintenancePartQuickEditPayload(
+  record: MaintenancePartRecord,
+  changes: MaintenancePartQuickEditFields,
+): UpdateMaintenancePartPayload {
+  return {
+    cost_currency: record.cost_currency,
+    sale_currency: record.sale_currency,
+    name: changes.name ?? record.name,
+    sku: record.sku,
+    image: record.image,
+    image_public_id: record.image_public_id,
+    part_number: record.part_number,
+    size: record.size,
+    color: record.color,
+    item_status: record.item_status,
+    stock_quantity: changes.stock_quantity ?? record.stock_quantity,
+    low_stock_alarm: changes.low_stock_alarm ?? record.low_stock_alarm,
+    maintenance_parts_category_id: record.maintenance_parts_category_id,
     brand_id: record.brand_id,
     cost_price: changes.cost_price ?? record.cost_price,
     sale_price: changes.sale_price ?? record.sale_price,
@@ -926,6 +1300,31 @@ export async function bulkPreviewSpareParts(
     body: JSON.stringify(cleanBulkPayload(payload)),
   });
   return normalizeBulkPreviewResult(data);
+}
+
+
+export async function bulkPreviewMaintenanceParts(
+  token: string,
+  payload: BulkInventoryEditPayload,
+): Promise<BulkInventoryPreviewResult> {
+  const data = await authorizedFetch<unknown>("/maintenance_parts/bulk/preview", token, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(cleanBulkPayload(payload)),
+  });
+  return normalizeBulkPreviewResult(data);
+}
+
+export async function bulkApplyMaintenanceParts(
+  token: string,
+  payload: BulkInventoryEditPayload,
+): Promise<BulkInventoryApplyResult> {
+  const data = await authorizedFetch<unknown>("/maintenance_parts/bulk/apply", token, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(cleanBulkPayload(payload)),
+  });
+  return normalizeBulkApplyResult(data);
 }
 
 export async function bulkApplySpareParts(

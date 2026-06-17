@@ -428,6 +428,11 @@ export const defaultWorkspaceNavSections: SidebarNavSection[] = [
         icon: <SparePartsIcon className="h-5 w-5" />,
       },
       {
+        href: "/inventory/maintenance-parts",
+        label: "Maintenance Parts",
+        icon: <SparePartsIcon className="h-5 w-5" />,
+      },
+      {
         href: "/inventory/products",
         label: "Products",
         icon: <ProductsIcon className="h-5 w-5" />,

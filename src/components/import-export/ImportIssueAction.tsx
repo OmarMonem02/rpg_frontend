@@ -22,6 +22,7 @@ import { ArrowPathIcon } from "@heroicons/react/24/outline";
 const BRAND_TYPE_LABELS: Record<BrandType, string> = {
   products: "products",
   spare_parts: "spare parts",
+  maintenance_parts: "maintenance parts",
   bikes: "bikes",
 };
 

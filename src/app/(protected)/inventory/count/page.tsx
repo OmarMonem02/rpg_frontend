@@ -150,7 +150,9 @@ export default function InventoryCountPage() {
     handleExport(stocktakeColumnState.columnsParam());
   }, [handleExport, stocktakeColumnState]);
 
-  const [bulkTab, setBulkTab] = useState<"products" | "spare_parts">("products");
+  const [bulkTab, setBulkTab] = useState<
+    "products" | "spare_parts" | "maintenance_parts"
+  >("products");
 
   useEffect(() => {
     if (countMode === "bulk") {
@@ -435,6 +437,14 @@ export default function InventoryCountPage() {
                   <PlusIcon className="h-4 w-4" aria-hidden />
                   Browse spare parts
                 </ActionButton>
+                <ActionButton
+                  type="button"
+                  variant="outline"
+                  onClick={() => setPickerType("maintenance_parts")}
+                >
+                  <PlusIcon className="h-4 w-4" aria-hidden />
+                  Browse maintenance parts
+                </ActionButton>
               </div>
 
               {scanError ? (
@@ -491,6 +501,17 @@ export default function InventoryCountPage() {
             >
               Spare Parts ({bulkCatalog.spareParts.length})
             </button>
+            <button
+              type="button"
+              onClick={() => setBulkTab("maintenance_parts")}
+              className={`px-4 py-2 text-sm font-semibold transition-colors border-b-2 ${
+                bulkTab === "maintenance_parts"
+                  ? "border-primary text-primary"
+                  : "border-transparent text-on-surface-variant hover:text-on-surface"
+              }`}
+            >
+              Maintenance Parts ({bulkCatalog.maintenanceParts.length})
+            </button>
           </div>
           {isBulkLoading ? (
             <div className="flex justify-center py-10">
@@ -498,8 +519,20 @@ export default function InventoryCountPage() {
             </div>
           ) : (
             <BulkRecapTable
-              type={bulkTab === "products" ? "product" : "spare_part"}
-              records={bulkTab === "products" ? bulkCatalog.products : bulkCatalog.spareParts}
+              type={
+                bulkTab === "products"
+                  ? "product"
+                  : bulkTab === "maintenance_parts"
+                    ? "maintenance_part"
+                    : "spare_part"
+              }
+              records={
+                bulkTab === "products"
+                  ? bulkCatalog.products
+                  : bulkTab === "maintenance_parts"
+                    ? bulkCatalog.maintenanceParts
+                    : bulkCatalog.spareParts
+              }
               lines={lines}
               onToggleInclusion={toggleLineInclusion}
               onUpdateCounted={updateLineFromBulk}
@@ -737,7 +770,9 @@ export default function InventoryCountPage() {
           onClose={() => setPickerType(null)}
           catalogType={pickerType}
           onAddItems={(items) =>
-            handlePickerAdd(items as Array<ProductRecord | SparePartRecord>)
+            handlePickerAdd(
+              items as Parameters<typeof handlePickerAdd>[0],
+            )
           }
         />
       ) : null}

@@ -11,7 +11,7 @@ import {
 } from "./core";
 import type { CatalogPricingFields } from "@/lib/catalog-pricing";
 import { toPricingCurrency, type PricingCurrency } from "@/lib/currencies";
-import type { CreateSparePartPayload } from "./inventory";
+import type { CreateMaintenancePartPayload, CreateSparePartPayload } from "./inventory";
 import {
   normalizeInventoryImages,
   type InventoryImageRecord,
@@ -614,6 +614,176 @@ export async function removeBlueprintFromSparePart(
 ): Promise<void> {
   await authorizedFetch<void>(
     `/spare_parts/${sparePartId}/bike_blueprints/${blueprintId}`,
+    token,
+    { method: "DELETE" },
+  );
+}
+export type BlueprintMaintenancePartRowRecord = {
+  id: number;
+  bike_blueprint_id: number;
+  maintenance_part_id: number;
+  created_at?: string;
+  maintenance_part?: {
+    id: number;
+    name: string;
+    sku: string;
+    stock_quantity: number;
+    sale_price: number;
+    sale_currency?: string;
+    category?: {
+      id: number;
+      name: string;
+    };
+    brand?: {
+      id: number;
+      name: string;
+    };
+  };
+};
+
+export function normalizeBlueprintMaintenancePartRow(
+  raw: unknown,
+): BlueprintMaintenancePartRowRecord {
+  const record = asRecord(raw);
+  const sparePart = asRecord(record.maintenance_part);
+  const category = asRecord(sparePart.category);
+  const brand = asRecord(sparePart.brand);
+
+  return {
+    id: toNumber(record.id),
+    bike_blueprint_id: toNumber(record.bike_blueprint_id),
+    maintenance_part_id: toNumber(record.maintenance_part_id),
+    created_at: toText(record.created_at) || undefined,
+    maintenance_part:
+      sparePart && Object.keys(sparePart).length > 0
+        ? {
+            id: toNumber(sparePart.id),
+            name: toText(sparePart.name),
+            sku: toText(sparePart.sku),
+            stock_quantity: toNumber(sparePart.stock_quantity),
+            sale_price: toNumber(sparePart.sale_price),
+            sale_currency: toText(sparePart.sale_currency) || undefined,
+            category:
+              category && Object.keys(category).length > 0
+                ? {
+                    id: toNumber(category.id),
+                    name: toText(category.name),
+                  }
+                : undefined,
+            brand:
+              brand && Object.keys(brand).length > 0
+                ? {
+                    id: toNumber(brand.id),
+                    name: toText(brand.name),
+                  }
+                : undefined,
+          }
+        : undefined,
+  };
+}
+
+export async function listBikeBlueprintMaintenanceParts(
+  token: string,
+  blueprintId: number,
+  page = 1,
+  filters?: {
+    per_page?: number;
+    category_id?: number;
+    brand_id?: number;
+    search?: string;
+  },
+): Promise<PaginatedResult<BlueprintMaintenancePartRowRecord>> {
+  const query = buildQuery({
+    page,
+    per_page: filters?.per_page,
+    category_id: filters?.category_id,
+    brand_id: filters?.brand_id,
+    search: filters?.search,
+  });
+
+  const payload = await authorizedFetch<unknown>(
+    `/bike_blueprints/${blueprintId}/maintenance_parts?${query}`,
+    token,
+  );
+  const rows = pickArray(payload, ["data", "maintenance_parts"]);
+  const meta = parsePagination(payload);
+  return {
+    items: rows
+      .map(normalizeBlueprintMaintenancePartRow)
+      .filter((item) => item.id > 0),
+    currentPage: meta.current_page ?? 1,
+    lastPage: meta.last_page ?? 1,
+  };
+}
+
+export async function assignMaintenancePartToBikeBlueprint(
+  token: string,
+  blueprintId: number,
+  payload:
+    | { maintenance_part_id: number }
+    | { maintenance_part_ids: number[] }
+    | { maintenance_part_data: CreateMaintenancePartPayload },
+): Promise<unknown> {
+  return authorizedFetch<unknown>(
+    `/bike_blueprints/${blueprintId}/maintenance_parts`,
+    token,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    },
+  );
+}
+
+export async function removeMaintenancePartFromBikeBlueprint(
+  token: string,
+  blueprintId: number,
+  sparePartId: number,
+): Promise<void> {
+  await authorizedFetch<void>(
+    `/bike_blueprints/${blueprintId}/maintenance_parts/${sparePartId}`,
+    token,
+    { method: "DELETE" },
+  );
+}
+
+export async function getMaintenancePartBlueprints(
+  token: string,
+  sparePartId: number,
+): Promise<number[]> {
+  const payload = await authorizedFetch<unknown>(
+    `/maintenance_parts/${sparePartId}/bike_blueprints`,
+    token,
+  );
+  const rows = pickArray(payload, ["data", "bike_blueprints"]);
+  return rows
+    .map((item: unknown) => toNumber(asRecord(item).id))
+    .filter((id) => id > 0);
+}
+
+export async function assignBlueprintsToMaintenancePart(
+  token: string,
+  sparePartId: number,
+  blueprintIds: number[],
+): Promise<void> {
+  await authorizedFetch<void>(
+    `/maintenance_parts/${sparePartId}/bike_blueprints`,
+    token,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ bike_blueprint_ids: blueprintIds }),
+    },
+  );
+}
+
+export async function removeBlueprintFromMaintenancePart(
+  token: string,
+  sparePartId: number,
+  blueprintId: number,
+): Promise<void> {
+  await authorizedFetch<void>(
+    `/maintenance_parts/${sparePartId}/bike_blueprints/${blueprintId}`,
     token,
     { method: "DELETE" },
   );

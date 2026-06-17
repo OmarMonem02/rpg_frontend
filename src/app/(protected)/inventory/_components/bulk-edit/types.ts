@@ -9,14 +9,19 @@ import type {
   ProductRecord,
   SparePartCategoryRecord,
   SparePartRecord,
+  MaintenancePartCategoryRecord,
+  MaintenancePartRecord,
 } from "@/lib/crud-api";
 import type { PaginatedResult } from "@/lib/api/core";
 
 export type { BulkInventoryFilters };
 
-export type BulkEditEntity = "products" | "spare_parts";
+export type BulkEditEntity = "products" | "spare_parts" | "maintenance_parts";
 
-export type BulkInventoryListItem = ProductRecord | SparePartRecord;
+export type BulkInventoryListItem =
+  | ProductRecord
+  | SparePartRecord
+  | MaintenancePartRecord;
 
 export type BulkEditEntityConfig = {
   entity: BulkEditEntity;
@@ -24,7 +29,7 @@ export type BulkEditEntityConfig = {
   title: string;
   subtitle: string;
   listHref: string;
-  brandType: "products" | "spare_parts";
+  brandType: "products" | "spare_parts" | "maintenance_parts";
   listItems: (
     token: string,
     page: number,
@@ -33,7 +38,11 @@ export type BulkEditEntityConfig = {
   listCategories: (
     token: string,
     page: number,
-  ) => Promise<PaginatedResult<ProductCategoryRecord | SparePartCategoryRecord>>;
+  ) => Promise<
+    PaginatedResult<
+      ProductCategoryRecord | SparePartCategoryRecord | MaintenancePartCategoryRecord
+    >
+  >;
   listBrands: (token: string, page: number) => Promise<PaginatedResult<BrandRecord>>;
   preview: (
     token: string,

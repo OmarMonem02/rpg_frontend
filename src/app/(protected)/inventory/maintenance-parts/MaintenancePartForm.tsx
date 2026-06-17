@@ -3,77 +3,103 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { usePermissions } from "@/components/permission-provider";
-import { getAuthToken } from "@/lib/auth-session";
 import {
-  listProductCategories,
+  type MaintenancePartRecord,
+  type CreateMaintenancePartPayload,
+  type UpdateMaintenancePartPayload,
+  type MaintenancePartCategoryRecord,
+  type BrandRecord,
+  type BikeBlueprintRecord,
+  listMaintenancePartCategories,
   listBrands,
   listBikeBlueprints,
   createBrand,
-  createProductCategory,
-  createProduct,
-  updateProduct,
-  type ProductRecord,
-  type CreateProductPayload,
-  type UpdateProductPayload,
-  type ProductCategoryRecord,
-  type BrandRecord,
-  type BikeBlueprintRecord,
+  createMaintenancePartCategory,
+  createMaintenancePart,
+  updateMaintenancePart,
+  assignMaintenancePartToBikeBlueprint,
+  removeMaintenancePartFromBikeBlueprint,
   fetchAllPages,
 } from "@/lib/crud-api";
+import { getAuthToken } from "@/lib/auth-session";
+import {
+  buildBlueprintYearRangeFields,
+  createBlueprintsFromFormData,
+} from "@/lib/blueprint-year-range-fields";
 import { buildCatalogPricingPayload } from "@/lib/catalog-pricing";
 import {
   ensurePrimaryInventoryImages,
   type InventoryImageRecord,
 } from "@/lib/inventory-images";
-import {
-  buildBlueprintYearRangeFields,
-  createBlueprintsFromFormData,
-} from "@/lib/blueprint-year-range-fields";
 import { EntityForm, type FieldConfig } from "@/components/entity-form";
-import { PageShell } from "@/components/ops-ui";
 import { filterBrandsByType } from "@/lib/brand-types";
 import { ITEM_STATUS_OPTIONS } from "@/lib/inventory-item-attributes";
 
-interface ProductFormProps {
-  initialData?: ProductRecord | null;
+interface MaintenancePartFormProps {
   mode: "create" | "edit";
+  initialData?: MaintenancePartRecord;
 }
 
-export function ProductForm({ initialData, mode }: ProductFormProps) {
+export function MaintenancePartForm({ mode, initialData }: MaintenancePartFormProps) {
   const router = useRouter();
   const permissions = usePermissions();
-  const [categories, setCategories] = useState<ProductCategoryRecord[]>([]);
-  const [brandRows, setBrandRows] = useState<BrandRecord[]>([]);
-  const [blueprints, setBlueprints] = useState<BikeBlueprintRecord[]>([]);
-  const [currentBlueprintIds, setCurrentBlueprintIds] = useState<number[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const canCreateBrands = permissions.canCreate("brands");
   const canCreateBlueprints = permissions.canCreate("bike-blueprints");
-  const canCreateProductCategories = permissions.canCreate("product-categories");
+  const canCreateMaintenancePartCategories = permissions.canCreate("maintenance-part-categories");
+  const [currentBlueprintIds, setCurrentBlueprintIds] = useState<number[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [categoryRows, setCategoryRows] = useState<MaintenancePartCategoryRecord[]>([]);
+  const [brandRows, setBrandRows] = useState<BrandRecord[]>([]);
+  const [blueprints, setBlueprints] = useState<BikeBlueprintRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
+
     const loadDependencies = async () => {
+      setLoading(true);
       try {
         const token = getAuthToken();
         if (!token) return;
-        const [catRes, brandsRes, blueprintRows] = await Promise.all([
-          fetchAllPages((p) => listProductCategories(token, p)),
-          fetchAllPages((p) => listBrands(token, p)),
-          fetchAllPages((p) => listBikeBlueprints(token, p)),
+
+        const [categories, brands, blueprintRows] = await Promise.all([
+          fetchAllPages((page) => listMaintenancePartCategories(token, page)),
+          fetchAllPages((page) => listBrands(token, page)),
+          fetchAllPages((page) => listBikeBlueprints(token, page)),
         ]);
-        setCategories(catRes);
-        setBrandRows(brandsRes);
-        setBlueprints(blueprintRows);
+
+        if (!cancelled) {
+          setCategoryRows(categories);
+          setBrandRows(brands);
+          setBlueprints(blueprintRows);
+        }
       } catch (err) {
-        console.error("Failed to load dependencies:", err);
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Failed to load form data");
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     };
-    loadDependencies();
+
+    void loadDependencies();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
+
+  const maintenancePartBrands = useMemo(
+    () => filterBrandsByType(brandRows, "maintenance_parts"),
+    [brandRows],
+  );
+  const bikeBrands = useMemo(
+    () => filterBrandsByType(brandRows, "bikes"),
+    [brandRows],
+  );
 
   useEffect(() => {
     if (mode === "edit" && initialData) {
@@ -81,18 +107,13 @@ export function ProductForm({ initialData, mode }: ProductFormProps) {
     }
   }, [mode, initialData]);
 
-  const brands = useMemo(
-    () => filterBrandsByType(brandRows, "products"),
-    [brandRows],
-  );
-  const bikeBrands = useMemo(
-    () => filterBrandsByType(brandRows, "bikes"),
-    [brandRows],
-  );
   const bikeBrandNameById = useMemo(
     () => new Map(bikeBrands.map((brand) => [brand.id, brand.name])),
     [bikeBrands],
   );
+
+  const formKey =
+    mode === "edit" && initialData ? `edit-${initialData.id}` : "create";
 
   const buildBikeBrandQuickCreate = useCallback((): FieldConfig["quickCreate"] => ({
     title: "Add Bike Brand",
@@ -160,10 +181,37 @@ export function ProductForm({ initialData, mode }: ProductFormProps) {
     return Number.isFinite(parsed) ? parsed : undefined;
   };
 
+  const syncMaintenancePartBlueprints = async (
+    maintenancePart: MaintenancePartRecord,
+    currentIds: number[],
+    selectedIds: number[],
+  ) => {
+    const token = getAuthToken();
+    if (!token) throw new Error("Authentication required");
+
+    const toAdd = selectedIds.filter((id) => !currentIds.includes(id));
+    const toRemove = currentIds.filter((id) => !selectedIds.includes(id));
+
+    await Promise.all(
+      toRemove.map((blueprintId) =>
+        removeMaintenancePartFromBikeBlueprint(token, blueprintId, maintenancePart.id),
+      ),
+    );
+
+    await Promise.all(
+      toAdd.map((blueprintId) =>
+        assignMaintenancePartToBikeBlueprint(token, blueprintId, {
+          maintenance_part_id: maintenancePart.id,
+        }),
+      ),
+    );
+  };
+
   const handleSubmit = async (formData: Record<string, unknown>) => {
     try {
-      setIsSubmitting(true);
       setError(null);
+      setIsSubmitting(true);
+
       const token = getAuthToken();
       if (!token) throw new Error("Authentication required");
 
@@ -183,17 +231,20 @@ export function ProductForm({ initialData, mode }: ProductFormProps) {
         : [];
       if (!isUniversal && selectedBlueprintsRaw.length === 0) {
         throw new Error(
-          "Please select at least one Compatible Bike Blueprint (or enable Universal Product).",
+          "Please select at least one Compatible Bike Blueprint (or enable Universal Part).",
         );
       }
 
-      const selectedBlueprints = isUniversal ? [] : selectedBlueprintsRaw;
+      const toNumber = (v: unknown): number | undefined => {
+        const n = Number(v);
+        return Number.isFinite(n) ? n : undefined;
+      };
 
       const images = Array.isArray(formData.images)
         ? ensurePrimaryInventoryImages(formData.images as InventoryImageRecord[])
         : [];
 
-      const basePayload: UpdateProductPayload = {
+      const basePayload: UpdateMaintenancePartPayload = {
         name: String(formData.name),
         sku: String(formData.sku),
         images,
@@ -201,55 +252,59 @@ export function ProductForm({ initialData, mode }: ProductFormProps) {
         size: formData.size ? String(formData.size) : undefined,
         color: formData.color ? String(formData.color) : undefined,
         item_status: (formData.item_status ? String(formData.item_status) : "new") as "new" | "used",
-        stock_quantity: formData.stock_quantity ? Number(formData.stock_quantity) : 0,
-        low_stock_alarm: formData.low_stock_alarm ? Number(formData.low_stock_alarm) : 0,
-        products_category_id: Number(formData.products_category_id),
+        stock_quantity: toNumber(formData.stock_quantity),
+        low_stock_alarm: toNumber(formData.low_stock_alarm),
+        maintenance_parts_category_id: Number(formData.maintenance_parts_category_id),
         brand_id: Number(formData.brand_id),
         ...buildCatalogPricingPayload(formData),
         max_discount_type: String(formData.max_discount_type) as "fixed" | "percentage",
         max_discount_value: Number(formData.max_discount_value),
-        universal: isUniversal,
+        universal: Boolean(formData.universal),
         notes: formData.notes ? String(formData.notes) : undefined,
         tags: Array.isArray(formData.tags)
           ? (formData.tags as string[]).filter((tag) => String(tag).trim())
           : undefined,
       };
 
+      let maintenancePart: MaintenancePartRecord;
+      const selectedBlueprints = isUniversal ? [] : selectedBlueprintsRaw;
       if (mode === "edit" && initialData) {
-        await updateProduct(token, initialData.id, {
+        maintenancePart = await updateMaintenancePart(token, initialData.id, {
           ...basePayload,
           bike_blueprint_ids: selectedBlueprints,
         });
       } else {
-        const createPayload: CreateProductPayload = {
+        const createPayload = {
           ...basePayload,
           bike_blueprint_ids:
             selectedBlueprints.length > 0 ? selectedBlueprints : undefined,
-        };
-        await createProduct(token, createPayload);
+        } as CreateMaintenancePartPayload;
+        maintenancePart = await createMaintenancePart(token, createPayload);
       }
 
-      router.push("/inventory/products");
+      if (mode !== "edit") {
+        await syncMaintenancePartBlueprints(maintenancePart, [], selectedBlueprints);
+      }
+
+      router.push("/inventory/maintenance-parts");
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save product");
+      setError(err instanceof Error ? err.message : "Failed to save maintenance part");
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const formKey = mode === "edit" && initialData ? `edit-${initialData.id}` : "create";
-
   const fields: FieldConfig[] = useMemo(() => [
     {
       name: "name",
-      label: "Product Name",
+      label: "Part Name",
       type: "text",
       required: true,
       section: "Basic Info",
-      sectionDescription: "Start with the core identity your sales and inventory teams will recognize.",
-      description: "Use the product name that should appear in your catalog and stock screens.",
-      placeholder: "Enter product name",
+      sectionDescription: "Start with the part identity your team uses every day.",
+      description: "Use the customer-facing or warehouse-recognized part name.",
+      placeholder: "Enter part name",
       value: initialData?.name,
       helperTone: "featured",
     },
@@ -259,8 +314,8 @@ export function ProductForm({ initialData, mode }: ProductFormProps) {
       type: "text",
       required: true,
       section: "Basic Info",
-      description: "Keep the SKU short, unique, and easy to search.",
-      placeholder: "e.g., PROD-001",
+      description: "Keep the SKU unique and easy to scan in inventory.",
+      placeholder: "e.g., SKU-001",
       value: initialData?.sku,
     },
     {
@@ -277,7 +332,7 @@ export function ProductForm({ initialData, mode }: ProductFormProps) {
       label: "Size",
       type: "text",
       section: "Basic Info",
-      description: "Optional size label for this product.",
+      description: "Optional size label for this part.",
       placeholder: "e.g., M, XL",
       value: initialData?.size,
     },
@@ -286,7 +341,7 @@ export function ProductForm({ initialData, mode }: ProductFormProps) {
       label: "Color",
       type: "text",
       section: "Basic Info",
-      description: "Optional color label for this product.",
+      description: "Optional color label for this part.",
       placeholder: "e.g., Matte Black",
       value: initialData?.color,
     },
@@ -296,7 +351,7 @@ export function ProductForm({ initialData, mode }: ProductFormProps) {
       type: "select",
       required: true,
       section: "Basic Info",
-      description: "Whether the product is new or used inventory.",
+      description: "Whether the part is new or used inventory.",
       options: ITEM_STATUS_OPTIONS.map((option) => ({
         value: option.value,
         label: option.label,
@@ -305,7 +360,7 @@ export function ProductForm({ initialData, mode }: ProductFormProps) {
     },
     {
       name: "images",
-      label: "Product Photos",
+      label: "Maintenance Part Photos",
       type: "images",
       section: "Basic Info",
       description: "Upload up to 4 photos. Star your favorite — it appears in the catalog list.",
@@ -322,41 +377,41 @@ export function ProductForm({ initialData, mode }: ProductFormProps) {
                 },
               ]
             : [],
-      uploadFolder: "rpg-system/products",
+      uploadFolder: "rpg-system/maintenance-parts",
       maxImages: 4,
       span: 2,
     },
     {
-      name: "products_category_id",
+      name: "maintenance_parts_category_id",
       label: "Category",
       type: "select",
       required: true,
       section: "Classification",
-      sectionDescription: "Group the product for clearer catalog browsing and reporting.",
-      description: "Choose the main product category.",
-      options: () => categories.map((c) => ({ value: c.id, label: c.name })),
-      value: initialData?.products_category_id,
+      sectionDescription: "Place the part under the right shelf and supplier grouping.",
+      description: "Choose the main maintenance-parts category.",
+      options: () => categoryRows.map((c) => ({ value: c.id, label: c.name })),
+      value: initialData?.maintenance_parts_category_id,
       quickCreate: {
         title: "Add Category",
-        description: "Create a product category without leaving this form.",
+        description: "Create a maintenance-parts category without leaving this form.",
         submitLabel: "Create & Select",
-        enabled: canCreateProductCategories,
+        enabled: canCreateMaintenancePartCategories,
         fields: [
           {
             name: "name",
             label: "Category Name",
             type: "text",
             required: true,
-            placeholder: "e.g., Helmets, Gloves",
+            placeholder: "e.g., Brakes, Filters",
           },
         ],
         onCreate: async (data) => {
           const token = getAuthToken();
           if (!token) throw new Error("Authentication required");
-          const created = await createProductCategory(token, {
+          const created = await createMaintenancePartCategory(token, {
             name: String(data.name),
           });
-          setCategories((prev) => [...prev, created]);
+          setCategoryRows((prev) => [...prev, created]);
           return { id: created.id };
         },
       },
@@ -367,12 +422,12 @@ export function ProductForm({ initialData, mode }: ProductFormProps) {
       type: "select",
       required: true,
       section: "Classification",
-      description: "Pick the brand your team uses for purchasing and display.",
-      options: () => brands.map((b) => ({ value: b.id, label: b.name })),
+      description: "Pick the source brand used in purchasing and reporting.",
+      options: () => maintenancePartBrands.map((b) => ({ value: b.id, label: b.name })),
       value: initialData?.brand_id,
       quickCreate: {
         title: "Add Brand",
-        description: "Create a product brand without leaving this form.",
+        description: "Create a maintenance-parts brand without leaving this form.",
         submitLabel: "Create & Select",
         enabled: canCreateBrands,
         fields: [
@@ -381,7 +436,7 @@ export function ProductForm({ initialData, mode }: ProductFormProps) {
             label: "Brand Name",
             type: "text",
             required: true,
-            placeholder: "e.g., Honda, Yamaha",
+            placeholder: "e.g., OEM Supplier",
           },
         ],
         onCreate: async (data) => {
@@ -389,7 +444,7 @@ export function ProductForm({ initialData, mode }: ProductFormProps) {
           if (!token) throw new Error("Authentication required");
           const created = await createBrand(token, {
             name: String(data.name),
-            types: ["products"],
+            types: ["maintenance_parts"],
           });
           setBrandRows((prev) => [...prev, created]);
           return { id: created.id };
@@ -422,8 +477,8 @@ export function ProductForm({ initialData, mode }: ProductFormProps) {
       type: "select",
       required: true,
       section: "Discount",
-      sectionDescription: "Control how much pricing flexibility the team has at sale time.",
-      description: "Choose whether the cap is percentage-based or a fixed value.",
+      sectionDescription: "Control discount policy and where this part can be used.",
+      description: "Choose whether the discount cap is percentage-based or fixed.",
       options: [
         { value: "percentage", label: "Percentage (%)" },
         { value: "fixed", label: "Fixed Amount" },
@@ -435,7 +490,7 @@ export function ProductForm({ initialData, mode }: ProductFormProps) {
       label: "Max Discount Value",
       type: "number",
       section: "Discount",
-      description: "Set the highest discount allowed for this product.",
+      description: "Set the highest discount your team can apply.",
       placeholder: "0",
       value: initialData?.max_discount_value ?? 0,
       min: 0,
@@ -446,34 +501,34 @@ export function ProductForm({ initialData, mode }: ProductFormProps) {
       label: "Stock Quantity",
       type: "number",
       section: "Inventory",
-      sectionDescription: "Set the operating quantities that control stock health.",
-      description: "Enter the opening stock count for this product.",
+      sectionDescription: "Set the operational numbers that drive stock visibility.",
+      description: "Add the opening stock count for this part.",
       placeholder: "0",
-      required: true,
       value: initialData?.stock_quantity ?? 0,
       min: 0,
       helperTone: "featured",
     },
+
     {
       name: "low_stock_alarm",
       label: "Low Stock Alarm",
       type: "number",
       section: "Inventory",
-      description: "Set the threshold where the product becomes low stock.",
+      description: "Set when the team should treat this part as low stock.",
       placeholder: "5",
       required: true,
       value: initialData?.low_stock_alarm ?? 0,
       min: 0,
     },
-    
+
     
     {
       name: "universal",
-      label: "Universal Product",
+      label: "Universal Part",
       type: "toggle",
       section: "Compatibility",
       description:
-        "When off, select at least one compatible bike blueprint below. When on, the product applies broadly without blueprint links.",
+        "When off, select at least one compatible bike blueprint below. When on, the part applies broadly without blueprint links.",
       value: mode === "create" ? true : (initialData?.universal ?? false),
       helperTone: "featured",
     },
@@ -627,17 +682,17 @@ export function ProductForm({ initialData, mode }: ProductFormProps) {
       label: "Notes",
       type: "textarea",
       section: "Notes",
-      sectionDescription: "Capture details that help sales or operations later.",
-      description: "Add specifications, selling points, or internal notes.",
-      placeholder: "e.g., Material, specifications, compatibility...",
+      sectionDescription: "Add any extra context the team may need later.",
+      description: "Capture fitment notes, supplier remarks, or quality details.",
+      placeholder: "e.g., OEM quality, compatible with...",
       value: initialData?.notes,
       rows: 3,
     },
   ], [
     mode,
     initialData,
-    categories,
-    brands,
+    categoryRows,
+    maintenancePartBrands,
     bikeBrands,
     blueprints,
     bikeBrandNameById,
@@ -647,16 +702,14 @@ export function ProductForm({ initialData, mode }: ProductFormProps) {
     buildBikeBrandQuickCreate,
     canCreateBrands,
     canCreateBlueprints,
-    canCreateProductCategories,
+    canCreateMaintenancePartCategories,
   ]);
 
   if (loading) {
     return (
-      <PageShell>
-        <div className="flex justify-center py-24">
-          <div className="h-10 w-10 animate-spin rounded-full border-4 border-outline-variant/30 border-t-primary" />
-        </div>
-      </PageShell>
+      <div className="flex justify-center py-24">
+        <div className="h-10 w-10 animate-spin rounded-full border-4 border-outline-variant/30 border-t-primary" />
+      </div>
     );
   }
 
@@ -664,20 +717,24 @@ export function ProductForm({ initialData, mode }: ProductFormProps) {
     <div className="w-full py-4 md:py-6">
       <EntityForm
         formKey={formKey}
-        title={
-          mode === "edit"
-            ? `Edit ${initialData?.name ?? "Product"}`
-            : "Create Product"
-        }
-        description={mode === "edit" ? "Update product profile, stock settings, pricing, and compatibility in one view." : "Create a product entry with inventory, pricing, and bike compatibility in one view."}
-        fields={fields}
-        onSubmit={handleSubmit}
-        onCancel={() => router.push("/inventory/products")}
-        isLoading={isSubmitting}
-        error={error ?? undefined}
-        submitLabel={mode === "edit" ? "Save Changes" : "Create Product"}
-        heroLabel="Inventory"
         variant="page"
+        title={
+          mode === "create"
+            ? "Create Maintenance Part"
+            : `Edit ${initialData?.name ?? "Maintenance Part"}`
+        }
+        description={
+          mode === "create"
+            ? "Build a maintenance part entry with inventory, pricing, and compatibility details in one view."
+            : "Refine stock, pricing, and compatibility details for this maintenance part."
+        }
+        fields={fields}
+        isLoading={isSubmitting}
+        error={error || undefined}
+        onCancel={() => router.push("/inventory/maintenance-parts")}
+        onSubmit={handleSubmit}
+        submitLabel={mode === "create" ? "Create Maintenance Part" : "Save Changes"}
+        heroLabel="Maintenance Parts"
       />
     </div>
   );

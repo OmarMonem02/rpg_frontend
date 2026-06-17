@@ -5,6 +5,7 @@ import type {
   ProductRecord,
   SaleLineItemRecord,
   SparePartRecord,
+  MaintenancePartRecord,
 } from "@/lib/crud-api";
 import type { PricingCurrency } from "@/lib/currencies";
 import { egpMultiplierForPricingCurrency, toPricingCurrency } from "@/lib/currencies";
@@ -12,12 +13,14 @@ import { egpMultiplierForPricingCurrency, toPricingCurrency } from "@/lib/curren
 export type CatalogType =
   | "products"
   | "spare_parts"
+  | "maintenance_parts"
   | "bikes"
   | "maintenance_services";
 
 export type CatalogItem =
   | ProductRecord
   | SparePartRecord
+  | MaintenancePartRecord
   | BikeRecord
   | MaintenanceServiceRecord;
 
@@ -73,6 +76,20 @@ export function buildPayload(item: CatalogItem) {
       currency: toPricingCurrency(item.sale_currency),
       payload: {
         product_id: item.id,
+        selling_price: item.sale_price,
+        discount: 0,
+        qty: 1,
+      },
+    };
+  }
+
+  if ("stock_quantity" in item && "maintenance_parts_category_id" in item) {
+    return {
+      label: item.name,
+      kind: "maintenance_parts" as const,
+      currency: toPricingCurrency(item.sale_currency),
+      payload: {
+        maintenance_part_id: item.id,
         selling_price: item.sale_price,
         discount: 0,
         qty: 1,

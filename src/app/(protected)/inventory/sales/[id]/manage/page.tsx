@@ -430,6 +430,7 @@ export default function ManageSaleItemsPage() {
                       options={[
                         { value: "products", label: "Products Gallery" },
                         { value: "spare_parts", label: "Spare Parts Bin" },
+                        { value: "maintenance_parts", label: "Maintenance Parts" },
                         { value: "bikes", label: "Bikes Store" },
                         {
                           value: "maintenance_services",

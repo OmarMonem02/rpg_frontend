@@ -14,6 +14,7 @@ import {
   type SalePriceQuickEditStrategy,
 } from "@/lib/catalog-pricing";
 import { formatCatalogPriceInEGP, toPricingCurrency } from "@/lib/currencies";
+import { ItemStatusBadge } from "@/lib/inventory-item-attributes";
 import {
   listProducts,
   listProductCategories,
@@ -85,6 +86,7 @@ import { PageSizeSelect } from "@/components/inventory/PageSizeSelect";
 type ProductsColumnId =
   | "image" | "sku" | "name" | "stock" | "alarm"
   | "cost_price" | "sale_price" | "category" | "brand"
+  | "size" | "color" | "status"
   | "tags" | "universal" | "actions";
 
 const PRODUCTS_COLUMNS: readonly TableColumnDef<ProductsColumnId>[] = [
@@ -97,6 +99,9 @@ const PRODUCTS_COLUMNS: readonly TableColumnDef<ProductsColumnId>[] = [
   { id: "sale_price", label: "Sale Price" },
   { id: "category", label: "Category" },
   { id: "brand", label: "Brand" },
+  { id: "size", label: "Size" },
+  { id: "color", label: "Color" },
+  { id: "status", label: "Status" },
   { id: "tags", label: "Tags" },
   { id: "universal", label: "Universal" },
   { id: "actions", label: "Actions", required: true },
@@ -569,6 +574,9 @@ export default function ProductsPage() {
                   {isVisible("sale_price") && <InventoryListTableTh>Sale Price</InventoryListTableTh>}
                   {isVisible("category") && <InventoryListTableTh>Category</InventoryListTableTh>}
                   {isVisible("brand") && <InventoryListTableTh>Brand</InventoryListTableTh>}
+                  {isVisible("size") && <InventoryListTableTh>Size</InventoryListTableTh>}
+                  {isVisible("color") && <InventoryListTableTh>Color</InventoryListTableTh>}
+                  {isVisible("status") && <InventoryListTableTh>Status</InventoryListTableTh>}
                   {isVisible("tags") && <InventoryListTableTh>Tags</InventoryListTableTh>}
                   {isVisible("universal") && <InventoryListTableTh>Universal</InventoryListTableTh>}
                   <InventoryListTableTh align="center">Actions</InventoryListTableTh>
@@ -728,6 +736,17 @@ export default function ProductsPage() {
                         <span className="form-chip bg-primary/8 text-primary border-primary/15">
                           {brands.find((b) => b.id === product.brand_id)?.name}
                         </span>
+                      </InventoryListTableTd>
+                    )}
+                    {isVisible("size") && (
+                      <InventoryListTableTd>{product.size || "—"}</InventoryListTableTd>
+                    )}
+                    {isVisible("color") && (
+                      <InventoryListTableTd>{product.color || "—"}</InventoryListTableTd>
+                    )}
+                    {isVisible("status") && (
+                      <InventoryListTableTd>
+                        <ItemStatusBadge status={product.item_status} />
                       </InventoryListTableTd>
                     )}
                     {isVisible("tags") && (

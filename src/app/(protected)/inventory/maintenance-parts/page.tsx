@@ -16,19 +16,19 @@ import {
 import { formatCatalogPriceInEGP, toPricingCurrency } from "@/lib/currencies";
 import { ItemStatusBadge } from "@/lib/inventory-item-attributes";
 import {
-  listSpareParts,
-  listSparePartCategories,
+  listMaintenanceParts,
+  listMaintenancePartCategories,
   listBrands,
-  deleteSparePart,
-  updateSparePart,
-  buildSparePartQuickEditPayload,
-  createSparePartCategory,
-  updateSparePartCategory,
-  deleteSparePartCategory,
-  type SparePartRecord,
-  type SparePartCategoryRecord,
+  deleteMaintenancePart,
+  updateMaintenancePart,
+  buildMaintenancePartQuickEditPayload,
+  createMaintenancePartCategory,
+  updateMaintenancePartCategory,
+  deleteMaintenancePartCategory,
+  type MaintenancePartRecord,
+  type MaintenancePartCategoryRecord,
   type BrandRecord,
-  type SparePartQuickEditFields,
+  type MaintenancePartQuickEditFields,
   fetchAllPages,
 } from "@/lib/crud-api";
 import { filterBrandsByType } from "@/lib/brand-types";
@@ -84,13 +84,13 @@ import { ColumnPicker } from "@/components/inventory/ColumnPicker";
 import { useTablePageSize } from "@/hooks/useTablePageSize";
 import { PageSizeSelect } from "@/components/inventory/PageSizeSelect";
 
-type SparePartsColumnId =
+type MaintenancePartsColumnId =
   | "image" | "sku" | "name" | "stock" | "alarm"
   | "cost_price" | "price" | "category" | "brand"
   | "size" | "color" | "status"
   | "tags" | "universal" | "actions";
 
-const SPARE_PARTS_COLUMNS: readonly TableColumnDef<SparePartsColumnId>[] = [
+const MAINTENANCE_PARTS_COLUMNS: readonly TableColumnDef<MaintenancePartsColumnId>[] = [
   { id: "image", label: "Image" },
   { id: "sku", label: "SKU / Part No." },
   { id: "name", label: "Name" },
@@ -108,7 +108,7 @@ const SPARE_PARTS_COLUMNS: readonly TableColumnDef<SparePartsColumnId>[] = [
   { id: "actions", label: "Actions", required: true },
 ];
 
-const SPARE_PART_QUICK_EDIT_KEYS = [
+const MAINTENANCE_PART_QUICK_EDIT_KEYS = [
   "name",
   "stock_quantity",
   "low_stock_alarm",
@@ -118,10 +118,10 @@ const SPARE_PART_QUICK_EDIT_KEYS = [
   "sale_margin_value",
 ] as const;
 
-function parseSparePartQuickEditChanges(
+function parseMaintenancePartQuickEditChanges(
   changes: QuickEditDraft,
-): SparePartQuickEditFields {
-  const payload: SparePartQuickEditFields = {};
+): MaintenancePartQuickEditFields {
+  const payload: MaintenancePartQuickEditFields = {};
   if ("name" in changes) payload.name = changes.name.trim();
   if ("stock_quantity" in changes) {
     payload.stock_quantity = Number(changes.stock_quantity);
@@ -156,14 +156,14 @@ function TagsCell({ tags }: { tags?: string[] }) {
   );
 }
 
-export default function SparePartsPage() {
+export default function MaintenancePartsPage() {
   const router = useRouter();
   const permissions = usePermissions();
   const { rates } = useExchangeRates();
-  const canUpdateSpareParts = permissions.canUpdate("spare-parts");
-  const [spareParts, setSpareParts] = useState<SparePartRecord[]>([]);
-  const [categories, setCategories] = useState<SparePartCategoryRecord[]>([]);
-  const [allCategories, setAllCategories] = useState<SparePartCategoryRecord[]>(
+  const canUpdateMaintenanceParts = permissions.canUpdate("maintenance-parts");
+  const [maintenanceParts, setMaintenanceParts] = useState<MaintenancePartRecord[]>([]);
+  const [categories, setCategories] = useState<MaintenancePartCategoryRecord[]>([]);
+  const [allCategories, setAllCategories] = useState<MaintenancePartCategoryRecord[]>(
     [],
   );
   const [brands, setBrands] = useState<BrandRecord[]>([]);
@@ -193,21 +193,21 @@ export default function SparePartsPage() {
   // Category Modal State
   const [categoryModalOpen, setCategoryModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] =
-    useState<SparePartCategoryRecord | null>(null);
+    useState<MaintenancePartCategoryRecord | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   const { isVisible, toggle: toggleColumn, reset: resetColumns, visible: visibleColumns } = useTableColumns(
-    "table-cols:spare-parts-catalog",
-    SPARE_PARTS_COLUMNS,
+    "table-cols:maintenance-parts-catalog",
+    MAINTENANCE_PARTS_COLUMNS,
   );
 
   const { pageSize, setPageSize, apiPerPage, isShowAll } = useTablePageSize(
-    "table-page-size:spare-parts-catalog",
+    "table-page-size:maintenance-parts-catalog",
   );
 
   const quickEdit = useQuickEditRow();
-  const validateSparePartQuickEdit = combineValidators(
+  const validateMaintenancePartQuickEdit = combineValidators(
     validateNonEmptyName,
     (draft) =>
       validateNonNegativeIntegers(draft, [
@@ -227,11 +227,11 @@ export default function SparePartsPage() {
       const token = getAuthToken();
       if (!token) return;
       const [catsRes, brandsRes] = await Promise.all([
-        fetchAllPages((p) => listSparePartCategories(token, p)),
+        fetchAllPages((p) => listMaintenancePartCategories(token, p)),
         fetchAllPages((p) => listBrands(token, p)),
       ]);
       setAllCategories(catsRes);
-      setBrands(filterBrandsByType(brandsRes, "spare_parts"));
+      setBrands(filterBrandsByType(brandsRes, "maintenance_parts"));
       setBikeBrands(filterBrandsByType(brandsRes, "bikes"));
     } catch (err) {
       console.error("Failed to load dropdowns:", err);
@@ -247,22 +247,22 @@ export default function SparePartsPage() {
       const cleanFilters = getCleanFilters();
 
       const [partsRes, catsRes] = await Promise.all([
-        listSpareParts(
+        listMaintenanceParts(
           token,
           page,
-          { ...(cleanFilters as Parameters<typeof listSpareParts>[2]), per_page: apiPerPage },
+          { ...(cleanFilters as Parameters<typeof listMaintenanceParts>[2]), per_page: apiPerPage },
         ),
-        listSparePartCategories(token, categoriesPage),
+        listMaintenancePartCategories(token, categoriesPage),
       ]);
 
-      setSpareParts(partsRes.items);
+      setMaintenanceParts(partsRes.items);
       setTotalPages(partsRes.lastPage);
       setCategories(catsRes.items);
       setCategoriesTotalPages(catsRes.lastPage);
       setError(null);
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Failed to load spare parts",
+        err instanceof Error ? err.message : "Failed to load maintenance parts",
       );
     } finally {
       setLoading(false);
@@ -279,15 +279,15 @@ export default function SparePartsPage() {
 
   useLiveDataRefresh(loadData);
 
-  const handleSaveSparePartQuickEdit = async (part: SparePartRecord) => {
+  const handleSaveMaintenancePartQuickEdit = async (part: MaintenancePartRecord) => {
     const token = getAuthToken();
     if (!token) throw new Error("Authentication required");
 
     await quickEdit.saveEdit(
-      [...SPARE_PART_QUICK_EDIT_KEYS],
-      validateSparePartQuickEdit,
+      [...MAINTENANCE_PART_QUICK_EDIT_KEYS],
+      validateMaintenancePartQuickEdit,
       async (changes) => {
-        let payload = parseSparePartQuickEditChanges(changes);
+        let payload = parseMaintenancePartQuickEditChanges(changes);
 
         const marginPricingTouched =
           "sale_price" in changes ||
@@ -327,33 +327,33 @@ export default function SparePartsPage() {
           payload = { ...payload, ...pricingResult.fields };
         }
 
-        const updated = await updateSparePart(
+        const updated = await updateMaintenancePart(
           token,
           part.id,
-          buildSparePartQuickEditPayload(part, payload),
+          buildMaintenancePartQuickEditPayload(part, payload),
         );
-        setSpareParts((prev) =>
+        setMaintenanceParts((prev) =>
           prev.map((row) => (row.id === part.id ? updated : row)),
         );
       },
     );
   };
 
-  const handleDeleteSparePart = async (id: number) => {
-    if (!confirm("Are you sure you want to delete this spare part?")) return;
+  const handleDeleteMaintenancePart = async (id: number) => {
+    if (!confirm("Are you sure you want to delete this maintenance part?")) return;
     try {
       const token = getAuthToken();
       if (!token) return;
-      await deleteSparePart(token, id);
+      await deleteMaintenancePart(token, id);
       await loadData();
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Failed to delete spare part",
+        err instanceof Error ? err.message : "Failed to delete maintenance part",
       );
     }
   };
 
-  const handleOpenCategoryModal = (category?: SparePartCategoryRecord) => {
+  const handleOpenCategoryModal = (category?: MaintenancePartCategoryRecord) => {
     setEditingCategory(category || null);
     setSubmitError(null);
     setCategoryModalOpen(true);
@@ -373,12 +373,12 @@ export default function SparePartsPage() {
       const payload = { name: String(formData.name) };
 
       if (editingCategory) {
-        await updateSparePartCategory(token, editingCategory.id, payload);
+        await updateMaintenancePartCategory(token, editingCategory.id, payload);
       } else {
-        await createSparePartCategory(token, payload);
+        await createMaintenancePartCategory(token, payload);
       }
 
-      const catsRes = await listSparePartCategories(token, categoriesPage);
+      const catsRes = await listMaintenancePartCategories(token, categoriesPage);
       setCategories(catsRes.items);
       setCategoriesTotalPages(catsRes.lastPage);
       loadDropdowns();
@@ -397,8 +397,8 @@ export default function SparePartsPage() {
     try {
       const token = getAuthToken();
       if (!token) return;
-      await deleteSparePartCategory(token, id);
-      const catsRes = await listSparePartCategories(token, categoriesPage);
+      await deleteMaintenancePartCategory(token, id);
+      const catsRes = await listMaintenancePartCategories(token, categoriesPage);
       setCategories(catsRes.items);
       setCategoriesTotalPages(catsRes.lastPage);
       loadDropdowns();
@@ -422,8 +422,8 @@ export default function SparePartsPage() {
     },
   ];
 
-  // Render spare parts tab content
-  const sparePartsTabContent = (
+  // Render maintenance parts tab content
+  const maintenancePartsTabContent = (
     <div className="space-y-4">
       <FilterBar className="md:grid-cols-12">
         <InputGroup label="Search" className="md:col-span-4">
@@ -491,7 +491,7 @@ export default function SparePartsPage() {
         <div className="mb-3">
           <p className="label-caps text-on-surface-variant">Compatible Bike</p>
           <p className="mt-1 text-xs text-on-surface-variant/80">
-            Filter spare parts by bike brand, model, and year. Universal parts
+            Filter maintenance parts by bike brand, model, and year. Universal parts
             remain visible.
           </p>
         </div>
@@ -509,28 +509,28 @@ export default function SparePartsPage() {
         <div className="flex justify-center py-12">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-outline-variant/30 border-t-primary"></div>
         </div>
-      ) : spareParts.length === 0 ? (
+      ) : maintenanceParts.length === 0 ? (
         <EmptyState
-          title="No spare parts found"
-          description="Try adjusting your filters or create a new spare part to begin building the catalog."
+          title="No maintenance parts found"
+          description="Try adjusting your filters or create a new maintenance part to begin building the catalog."
           action={
             <ActionButton
               tone="primary"
-              onClick={() => router.push("/inventory/spare-parts/create")}
+              onClick={() => router.push("/inventory/maintenance-parts/create")}
             >
-              Create Spare Part
+              Create Maintenance Part
             </ActionButton>
           }
         />
       ) : (
         <InventoryListTable>
-          <InventoryListTableToolbar label="Spare parts catalog" count={spareParts.length}>
+          <InventoryListTableToolbar label="Maintenance parts catalog" count={maintenanceParts.length}>
             <PageSizeSelect
               value={pageSize}
               onChange={(size) => { setPageSize(size); setPage(1); }}
             />
             <ColumnPicker
-              columns={SPARE_PARTS_COLUMNS}
+              columns={MAINTENANCE_PARTS_COLUMNS}
               visible={visibleColumns}
               onToggle={toggleColumn}
               onReset={resetColumns}
@@ -564,7 +564,7 @@ export default function SparePartsPage() {
                 </tr>
               </InventoryListTableHead>
               <InventoryListTableBody>
-              {spareParts.map((part) => {
+              {maintenanceParts.map((part) => {
                 const editing = quickEdit.isEditing(part.id);
                 return (
                   <InventoryListTableRow key={part.id} editing={editing}>
@@ -588,7 +588,7 @@ export default function SparePartsPage() {
                             onChange={(value) =>
                               quickEdit.updateField("name", value)
                             }
-                            aria-label="Spare part name"
+                            aria-label="Maintenance part name"
                           />
                         ) : (
                           part.name
@@ -704,7 +704,7 @@ export default function SparePartsPage() {
                         <span className="form-chip">
                           {
                             allCategories.find(
-                              (c) => c.id === part.spare_parts_category_id,
+                              (c) => c.id === part.maintenance_parts_category_id,
                             )?.name
                           }
                         </span>
@@ -718,14 +718,10 @@ export default function SparePartsPage() {
                       </InventoryListTableTd>
                     )}
                     {isVisible("size") && (
-                      <InventoryListTableTd>
-                        {part.size || "—"}
-                      </InventoryListTableTd>
+                      <InventoryListTableTd>{part.size || "—"}</InventoryListTableTd>
                     )}
                     {isVisible("color") && (
-                      <InventoryListTableTd>
-                        {part.color || "—"}
-                      </InventoryListTableTd>
+                      <InventoryListTableTd>{part.color || "—"}</InventoryListTableTd>
                     )}
                     {isVisible("status") && (
                       <InventoryListTableTd>
@@ -749,9 +745,9 @@ export default function SparePartsPage() {
                         isEditing={editing}
                         saving={quickEdit.saving}
                         canSave={quickEdit.hasChanges([
-                          ...SPARE_PART_QUICK_EDIT_KEYS,
+                          ...MAINTENANCE_PART_QUICK_EDIT_KEYS,
                         ])}
-                        showQuickEdit={canUpdateSpareParts}
+                        showQuickEdit={canUpdateMaintenanceParts}
                         onStartEdit={() =>
                           quickEdit.startEdit(part.id, {
                             name: part.name,
@@ -765,24 +761,24 @@ export default function SparePartsPage() {
                             sale_margin_value: part.sale_margin_value ?? 0,
                           })
                         }
-                        onSave={() => handleSaveSparePartQuickEdit(part)}
+                        onSave={() => handleSaveMaintenancePartQuickEdit(part)}
                         onCancel={quickEdit.cancelEdit}
                       >
                         <InventoryTableSecondaryActions>
                           <InventoryTableActionLink
                             onClick={() =>
                               router.push(
-                                `/inventory/spare-parts/edit/${part.id}`,
+                                `/inventory/maintenance-parts/edit/${part.id}`,
                               )
                             }
-                            hidden={!canUpdateSpareParts}
+                            hidden={!canUpdateMaintenanceParts}
                           >
                             Edit
                           </InventoryTableActionLink>
                           <InventoryTableActionDivider />
                           <InventoryTableActionLink
                             tone="danger"
-                            onClick={() => handleDeleteSparePart(part.id)}
+                            onClick={() => handleDeleteMaintenancePart(part.id)}
                           >
                             Delete
                           </InventoryTableActionLink>
@@ -820,7 +816,7 @@ export default function SparePartsPage() {
         <div>
           <h2 className="text-lg font-semibold text-on-surface">Categories</h2>
           <p className="mt-1 text-sm text-on-surface-variant">
-            Organize spare parts into cleaner catalog groups.
+            Organize maintenance parts into cleaner catalog groups.
           </p>
         </div>
         <ActionButton tone="primary" onClick={() => handleOpenCategoryModal()}>
@@ -831,7 +827,7 @@ export default function SparePartsPage() {
       {categories.length === 0 ? (
         <EmptyState
           title="No categories found"
-          description="Create the first category to give your spare-parts inventory a stronger structure."
+          description="Create the first category to give your maintenance-parts inventory a stronger structure."
           action={
             <ActionButton
               tone="primary"
@@ -902,22 +898,22 @@ export default function SparePartsPage() {
     <PageShell>
       <PageHero
         eyebrow="Inventory Control"
-        title="Spare Parts Management"
+        title="Maintenance Parts Management"
         actions={
           <>
-            {canUpdateSpareParts ? (
+            {canUpdateMaintenanceParts ? (
               <ActionButton
                 variant="outline"
-                href="/inventory/spare-parts/bulk-edit"
+                href="/inventory/maintenance-parts/bulk-edit"
               >
                 Bulk edit
               </ActionButton>
             ) : null}
             <ActionButton
               tone="primary"
-              onClick={() => router.push("/inventory/spare-parts/create")}
+              onClick={() => router.push("/inventory/maintenance-parts/create")}
             >
-              Add Spare Part
+              Add Maintenance Part
             </ActionButton>
           </>
         }
@@ -933,8 +929,8 @@ export default function SparePartsPage() {
         tabs={[
           {
             id: "parts",
-            label: "All Spare Parts",
-            content: sparePartsTabContent,
+            label: "All Maintenance Parts",
+            content: maintenancePartsTabContent,
           },
           {
             id: "categories",
@@ -950,7 +946,7 @@ export default function SparePartsPage() {
         description={
           editingCategory
             ? "Adjust the category details for better organization."
-            : "Create a new spare parts category so your inventory stays organized from the start."
+            : "Create a new maintenance parts category so your inventory stays organized from the start."
         }
         fields={categoryModalFields}
         isOpen={categoryModalOpen}

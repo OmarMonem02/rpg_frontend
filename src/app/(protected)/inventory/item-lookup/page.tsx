@@ -33,10 +33,13 @@ import {
   listProductCategories,
   listProducts,
   listSparePartCategories,
+  listMaintenancePartCategories,
   listSpareParts,
+  listMaintenanceParts,
   type BrandRecord,
   type ProductCategoryRecord,
   type SparePartCategoryRecord,
+  type MaintenancePartCategoryRecord,
 } from "@/lib/crud-api";
 import type { BikeBlueprintRecord } from "@/lib/api/bikes";
 import { filterBrandsByType } from "@/lib/brand-types";
@@ -49,7 +52,7 @@ import {
   toLookupItem,
   type LookupItem,
 } from "@/lib/item-lookup";
-type EntityFilter = "all" | "product" | "spare_part";
+type EntityFilter = "all" | "product" | "spare_part" | "maintenance_part";
 
 const MAX_VISIBLE_BIKE_CHIPS = 4;
 
@@ -204,11 +207,15 @@ export default function ItemLookupPage() {
   const [bikeBrands, setBikeBrands] = useState<BrandRecord[]>([]);
   const [productBrands, setProductBrands] = useState<BrandRecord[]>([]);
   const [sparePartBrands, setSparePartBrands] = useState<BrandRecord[]>([]);
+  const [maintenancePartBrands, setMaintenancePartBrands] = useState<BrandRecord[]>([]);
   const [productCategories, setProductCategories] = useState<
     ProductCategoryRecord[]
   >([]);
   const [sparePartCategories, setSparePartCategories] = useState<
     SparePartCategoryRecord[]
+  >([]);
+  const [maintenancePartCategories, setMaintenancePartCategories] = useState<
+    MaintenancePartCategoryRecord[]
   >([]);
   const [metadataLoading, setMetadataLoading] = useState(true);
 
@@ -224,6 +231,8 @@ export default function ItemLookupPage() {
   const [spareBrandId, setSpareBrandId] = useState<number | "">("");
   const [productCategoryId, setProductCategoryId] = useState<number | "">("");
   const [spareCategoryId, setSpareCategoryId] = useState<number | "">("");
+  const [maintenanceBrandId, setMaintenanceBrandId] = useState<number | "">("");
+  const [maintenanceCategoryId, setMaintenanceCategoryId] = useState<number | "">("");
   const [bikeBrandId, setBikeBrandId] = useState<number | undefined>();
   const [bikeModel, setBikeModel] = useState<string | undefined>();
   const [bikeYear, setBikeYear] = useState<number | undefined>();
@@ -260,19 +269,23 @@ export default function ItemLookupPage() {
           brandsRes,
           productCatsRes,
           spareCatsRes,
+          maintenanceCatsRes,
           blueprintRows,
         ] = await Promise.all([
           fetchAllPages((p) => listBrands(token, p)),
           fetchAllPages((p) => listProductCategories(token, p)),
           fetchAllPages((p) => listSparePartCategories(token, p)),
+          fetchAllPages((p) => listMaintenancePartCategories(token, p)),
           fetchAllPages((p) => listBikeBlueprints(token, p)),
         ]);
 
         setProductBrands(filterBrandsByType(brandsRes, "products"));
         setSparePartBrands(filterBrandsByType(brandsRes, "spare_parts"));
+        setMaintenancePartBrands(filterBrandsByType(brandsRes, "maintenance_parts"));
         setBikeBrands(filterBrandsByType(brandsRes, "bikes"));
         setProductCategories(productCatsRes);
         setSparePartCategories(spareCatsRes);
+        setMaintenancePartCategories(maintenanceCatsRes);
         setBlueprints(blueprintRows);
       } catch (err) {
         console.error("Failed to load item lookup metadata:", err);
@@ -313,19 +326,21 @@ export default function ItemLookupPage() {
       const token = getAuthToken();
       if (!token) throw new Error("Authentication required");
 
-      const [productsRes, spareRes] = await Promise.all([
+      const [productsRes, spareRes, maintenanceRes] = await Promise.all([
         listProducts(token, 1, { search: code }),
         listSpareParts(token, 1, { search: code }),
+        listMaintenanceParts(token, 1, { search: code }),
       ]);
 
       const match = findExactSkuOrPartNumberMatch(
         code,
         productsRes.items,
         spareRes.items,
+        maintenanceRes.items,
       );
 
       if (!match) {
-        throw new Error(`No product or spare part found for "${code}"`);
+        throw new Error(`No catalog item found for "${code}"`);
       }
 
       setQuickResult(match);
@@ -373,7 +388,20 @@ export default function ItemLookupPage() {
         return;
       }
 
-      const [productsRes, spareRes] = await Promise.all([
+      if (entityFilter === "maintenance_part") {
+        const result = await listMaintenanceParts(token, browsePage, {
+          ...shared,
+          brand_id: maintenanceBrandId || undefined,
+          category_id: maintenanceCategoryId || undefined,
+        });
+        setBrowseItems(
+          result.items.map((record) => toLookupItem("maintenance_part", record)),
+        );
+        setBrowseTotalPages(result.lastPage);
+        return;
+      }
+
+      const [productsRes, spareRes, maintenanceRes] = await Promise.all([
         listProducts(token, browsePage, {
           ...shared,
           brand_id: productBrandId || undefined,
@@ -384,6 +412,11 @@ export default function ItemLookupPage() {
           brand_id: spareBrandId || undefined,
           category_id: spareCategoryId || undefined,
         }),
+        listMaintenanceParts(token, browsePage, {
+          ...shared,
+          brand_id: maintenanceBrandId || undefined,
+          category_id: maintenanceCategoryId || undefined,
+        }),
       ]);
 
       const merged = [
@@ -392,6 +425,9 @@ export default function ItemLookupPage() {
         ),
         ...spareRes.items.map((record) =>
           toLookupItem("spare_part", record),
+        ),
+        ...maintenanceRes.items.map((record) =>
+          toLookupItem("maintenance_part", record),
         ),
       ].sort((a, b) =>
         lookupItemSortKey(a).localeCompare(lookupItemSortKey(b)),
@@ -418,6 +454,8 @@ export default function ItemLookupPage() {
     productCategoryId,
     spareBrandId,
     spareCategoryId,
+    maintenanceBrandId,
+    maintenanceCategoryId,
   ]);
 
   useEffect(() => {
@@ -447,6 +485,8 @@ export default function ItemLookupPage() {
     entityFilter === "all" || entityFilter === "product";
   const showSpareFilters =
     entityFilter === "all" || entityFilter === "spare_part";
+  const showMaintenanceFilters =
+    entityFilter === "all" || entityFilter === "maintenance_part";
 
   return (
     <PageShell>
@@ -510,7 +550,7 @@ export default function ItemLookupPage() {
       <section className="mt-10 space-y-4">
         <SectionHeading
           title="Browse Catalog"
-          description="Use filters and name search to explore products and spare parts."
+          description="Use filters and name search to explore products, spare parts, and maintenance parts."
         />
 
         <div className="space-y-4 rounded-[1.5rem] border border-outline-variant/15 bg-surface-container-lowest p-4 sm:p-5">
@@ -526,6 +566,7 @@ export default function ItemLookupPage() {
                   { value: "all", label: "All items" },
                   { value: "product", label: "Products only" },
                   { value: "spare_part", label: "Spare parts only" },
+                  { value: "maintenance_part", label: "Maintenance parts only" },
                 ]}
                 className="form-input-base"
                 aria-label="Item type"
@@ -618,6 +659,45 @@ export default function ItemLookupPage() {
                     className="form-input-base"
                     disabled={metadataLoading}
                     aria-label="Spare part category"
+                  />
+                </InputGroup>
+              </>
+            ) : null}
+
+            {showMaintenanceFilters ? (
+              <>
+                <InputGroup label="Maintenance part brand" className="md:col-span-3">
+                  <SearchableSelect
+                    value={maintenanceBrandId}
+                    onChange={(value) => {
+                      setMaintenanceBrandId(value ? parseInt(value, 10) : "");
+                      setBrowsePage(1);
+                    }}
+                    placeholder="All maintenance part brands"
+                    options={maintenancePartBrands.map((brand) => ({
+                      value: brand.id,
+                      label: brand.name,
+                    }))}
+                    className="form-input-base"
+                    disabled={metadataLoading}
+                    aria-label="Maintenance part brand"
+                  />
+                </InputGroup>
+                <InputGroup label="Maintenance part category" className="md:col-span-3">
+                  <SearchableSelect
+                    value={maintenanceCategoryId}
+                    onChange={(value) => {
+                      setMaintenanceCategoryId(value ? parseInt(value, 10) : "");
+                      setBrowsePage(1);
+                    }}
+                    placeholder="All maintenance part categories"
+                    options={maintenancePartCategories.map((category) => ({
+                      value: category.id,
+                      label: category.name,
+                    }))}
+                    className="form-input-base"
+                    disabled={metadataLoading}
+                    aria-label="Maintenance part category"
                   />
                 </InputGroup>
               </>

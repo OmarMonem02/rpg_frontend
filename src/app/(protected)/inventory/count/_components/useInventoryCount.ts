@@ -6,10 +6,13 @@ import {
   exportStocktakeDiscrepancies,
   listProducts,
   listSpareParts,
+  listMaintenanceParts,
   bulkApplyProducts,
   bulkApplySpareParts,
+  bulkApplyMaintenanceParts,
   type ProductRecord,
   type SparePartRecord,
+  type MaintenancePartRecord,
 } from "@/lib/crud-api";
 import { findExactSkuOrPartNumberMatch } from "@/lib/item-lookup";
 import {
@@ -31,7 +34,9 @@ import {
   type CountSessionLastScan,
 } from "@/lib/stocktake-session";
 
-export type PickerType = "products" | "spare_parts";
+export type PickerType = "products" | "spare_parts" | "maintenance_parts";
+
+type CatalogRecord = ProductRecord | SparePartRecord | MaintenancePartRecord;
 
 const RESTORE_NOTICE_KEY = "rpg-inventory-count-restore-notice";
 const MAX_SCAN_HISTORY = 10;
@@ -42,7 +47,7 @@ function lineKey(type: CountItemType, id: number): string {
 
 function recordToLine(
   type: CountItemType,
-  record: ProductRecord | SparePartRecord,
+  record: CatalogRecord,
   counted: number = 1
 ): CountLine {
   return {
@@ -105,7 +110,11 @@ export function useInventoryCount() {
 
   // ── NEW: Bulk mode states ──
   const [countMode, setCountMode] = useState<"scan" | "bulk">("scan");
-  const [bulkCatalog, setBulkCatalog] = useState<{ products: ProductRecord[]; spareParts: SparePartRecord[] }>({ products: [], spareParts: [] });
+  const [bulkCatalog, setBulkCatalog] = useState<{
+    products: ProductRecord[];
+    spareParts: SparePartRecord[];
+    maintenanceParts: MaintenancePartRecord[];
+  }>({ products: [], spareParts: [], maintenanceParts: [] });
   const [isBulkLoading, setIsBulkLoading] = useState(false);
   const [bulkCatalogLoaded, setBulkCatalogLoaded] = useState(false);
 
@@ -237,7 +246,7 @@ export function useInventoryCount() {
   }, []);
 
   const addOrIncrement = useCallback(
-    (type: CountItemType, record: ProductRecord | SparePartRecord, step = 1) => {
+    (type: CountItemType, record: CatalogRecord, step = 1) => {
       const key = lineKey(type, record.id);
       let nextCounted = step;
 
@@ -288,18 +297,20 @@ export function useInventoryCount() {
       const token = getAuthToken();
       if (!token) throw new Error("Authentication required");
 
-      const [productsRes, spareRes] = await Promise.all([
+      const [productsRes, spareRes, maintenanceRes] = await Promise.all([
         listProducts(token, 1, { search: code }),
         listSpareParts(token, 1, { search: code }),
+        listMaintenanceParts(token, 1, { search: code }),
       ]);
 
       const match = findExactSkuOrPartNumberMatch(
         code,
         productsRes.items,
         spareRes.items,
+        maintenanceRes.items,
       );
       if (!match) {
-        throw new Error(`No product or spare part found for "${code}"`);
+        throw new Error(`No catalog item found for "${code}"`);
       }
 
       addOrIncrement(match.kind, match.record);
@@ -315,11 +326,15 @@ export function useInventoryCount() {
   }, [addOrIncrement, scanBusy, scanValue, scheduleScanRefocus]);
 
   const handlePickerAdd = useCallback(
-    (items: Array<ProductRecord | SparePartRecord>) => {
+    (items: CatalogRecord[]) => {
       if (!pickerType) return;
       const type: CountItemType =
-        pickerType === "products" ? "product" : "spare_part";
-      items.forEach((item) => addOrIncrement(type, item));
+        pickerType === "products"
+          ? "product"
+          : pickerType === "maintenance_parts"
+            ? "maintenance_part"
+            : "spare_part";
+      items.forEach((item) => addOrIncrement(type, item as CatalogRecord));
       setPickerType(null);
       refocusScanInput();
     },
@@ -425,9 +440,11 @@ export function useInventoryCount() {
       // Separate product and spare part IDs
       const productIds = lines.filter((l) => l.type === "product").map((l) => l.id);
       const sparePartIds = lines.filter((l) => l.type === "spare_part").map((l) => l.id);
+      const maintenancePartIds = lines
+        .filter((l) => l.type === "maintenance_part")
+        .map((l) => l.id);
 
-      // Fetch current stock for all items
-      const [productsRes, spareRes] = await Promise.all([
+      const [productsRes, spareRes, maintenanceRes] = await Promise.all([
         productIds.length > 0
           ? listProducts(token, 1, {})
               .then(async (first) => {
@@ -455,15 +472,36 @@ export function useInventoryCount() {
                 return allParts;
               })
           : Promise.resolve([]),
+        maintenancePartIds.length > 0
+          ? listMaintenanceParts(token, 1, {})
+              .then(async (first) => {
+                const allParts: MaintenancePartRecord[] = [...first.items];
+                let page = 2;
+                while (page <= first.lastPage && page <= 10) {
+                  const next = await listMaintenanceParts(token, page, {});
+                  allParts.push(...next.items);
+                  page++;
+                }
+                return allParts;
+              })
+          : Promise.resolve([]),
       ]);
 
       const productMap = new Map(productsRes.map((p) => [p.id, p.stock_quantity]));
       const spareMap = new Map(spareRes.map((p) => [p.id, p.stock_quantity]));
+      const maintenanceMap = new Map(
+        maintenanceRes.map((p) => [p.id, p.stock_quantity]),
+      );
 
       let updatedCount = 0;
       setLines((prev) =>
         prev.map((line) => {
-          const map = line.type === "product" ? productMap : spareMap;
+          const map =
+            line.type === "product"
+              ? productMap
+              : line.type === "maintenance_part"
+                ? maintenanceMap
+                : spareMap;
           const freshQty = map.get(line.id);
           if (freshQty !== undefined && freshQty !== line.systemQty) {
             updatedCount++;
@@ -528,6 +566,11 @@ export function useInventoryCount() {
               ids: [line.id],
               changes: { stock_quantity: { mode: "set", value: line.counted } }
             });
+          } else if (line.type === "maintenance_part") {
+            await bulkApplyMaintenanceParts(token, {
+              ids: [line.id],
+              changes: { stock_quantity: { mode: "set", value: line.counted } }
+            });
           } else {
             await bulkApplySpareParts(token, {
               ids: [line.id],
@@ -567,15 +610,17 @@ export function useInventoryCount() {
         const token = getAuthToken();
         if (!token) throw new Error("Authentication required");
 
-        const [productsRes, spareRes] = await Promise.all([
+        const [productsRes, spareRes, maintenanceRes] = await Promise.all([
           listProducts(token, 1, { search: code }),
           listSpareParts(token, 1, { search: code }),
+          listMaintenanceParts(token, 1, { search: code }),
         ]);
 
         const match = findExactSkuOrPartNumberMatch(
           code,
           productsRes.items,
           spareRes.items,
+          maintenanceRes.items,
         );
         if (!match) {
           throw new Error(`Item "${scan.name}" no longer found in the catalog`);
@@ -626,12 +671,25 @@ export function useInventoryCount() {
         return all;
       };
 
-      const [products, spareParts] = await Promise.all([
+      const fetchAllMaintenanceParts = async () => {
+        const first = await listMaintenanceParts(token, 1, {});
+        const all: MaintenancePartRecord[] = [...first.items];
+        let page = 2;
+        while (page <= first.lastPage) {
+          const next = await listMaintenanceParts(token, page, {});
+          all.push(...next.items);
+          page++;
+        }
+        return all;
+      };
+
+      const [products, spareParts, maintenanceParts] = await Promise.all([
         fetchAllProducts(),
         fetchAllSpareParts(),
+        fetchAllMaintenanceParts(),
       ]);
 
-      setBulkCatalog({ products, spareParts });
+      setBulkCatalog({ products, spareParts, maintenanceParts });
       setBulkCatalogLoaded(true);
     } catch (err) {
       setRefreshError(err instanceof Error ? err.message : "Failed to load catalog");
@@ -640,7 +698,7 @@ export function useInventoryCount() {
     }
   }, [bulkCatalogLoaded, isBulkLoading]);
 
-  const toggleLineInclusion = useCallback((type: CountItemType, record: ProductRecord | SparePartRecord, include: boolean) => {
+  const toggleLineInclusion = useCallback((type: CountItemType, record: CatalogRecord, include: boolean) => {
     const key = lineKey(type, record.id);
     if (include) {
       setLines((prev) => {
@@ -653,7 +711,7 @@ export function useInventoryCount() {
     }
   }, [removeLine, touchLine]);
 
-  const updateLineFromBulk = useCallback((type: CountItemType, record: ProductRecord | SparePartRecord, value: number) => {
+  const updateLineFromBulk = useCallback((type: CountItemType, record: CatalogRecord, value: number) => {
     const key = lineKey(type, record.id);
     const next = Number.isFinite(value) ? Math.max(0, Math.trunc(value)) : 0;
     

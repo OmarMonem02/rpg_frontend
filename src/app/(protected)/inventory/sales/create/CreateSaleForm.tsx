@@ -28,6 +28,7 @@ import {
   type PaymentMethodRecord,
   type ProductRecord,
   type SparePartRecord,
+  type MaintenancePartRecord,
   type BikeRecord,
   type MaintenanceServiceRecord,
   type CreateSalePayload,
@@ -281,6 +282,7 @@ const SALE_TYPE_OPTIONS = [
 type CatalogType =
   | "products"
   | "spare_parts"
+  | "maintenance_parts"
   | "bikes"
   | "maintenance_services";
 
@@ -428,6 +430,7 @@ export function CreateSaleForm() {
       items: (
         | ProductRecord
         | SparePartRecord
+        | MaintenancePartRecord
         | BikeRecord
         | MaintenanceServiceRecord
       )[],
@@ -437,14 +440,16 @@ export function CreateSaleForm() {
         let sellableType:
           | "products"
           | "spare_parts"
+          | "maintenance_parts"
           | "bikes"
           | "maintenance_services";
         let price = 0;
 
         if ("sale_price" in item && "sku" in item) {
-          // Could be product or spare_part
           if ("stock_quantity" in item && "products_category_id" in item) {
             sellableType = "products";
+          } else if ("maintenance_parts_category_id" in item) {
+            sellableType = "maintenance_parts";
           } else {
             sellableType = "spare_parts";
           }
@@ -480,10 +485,12 @@ export function CreateSaleForm() {
   );
 
   const addOrIncrementCatalogItem = useCallback(
-    (item: ProductRecord | SparePartRecord) => {
-      const sellableType: "products" | "spare_parts" =
+    (item: ProductRecord | SparePartRecord | MaintenancePartRecord) => {
+      const sellableType: "products" | "spare_parts" | "maintenance_parts" =
         "stock_quantity" in item && "products_category_id" in item
           ? "products"
+          : "maintenance_parts_category_id" in item
+            ? "maintenance_parts"
           : "spare_parts";
 
       setCartItems((prev) => {
@@ -1032,6 +1039,19 @@ export function CreateSaleForm() {
                 </div>
                 <div className="flex flex-col items-start">
                   <span className="font-semibold text-m">Spare Parts</span>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleOpenCatalog("maintenance_parts")}
+                className="group relative flex items-center gap-4 w-full p-2 rounded-xl border-2 border-transparent bg-primary/5 hover:bg-primary/10 hover:border-primary/20 text-on-surface transition-all overflow-hidden"
+              >
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary group-hover:scale-110 transition-transform">
+                  <CogIcon className="w-7 h-7" />
+                </div>
+                <div className="flex flex-col items-start">
+                  <span className="font-semibold text-m">Maintenance Parts</span>
                 </div>
               </button>
 

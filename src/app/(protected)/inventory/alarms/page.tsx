@@ -26,8 +26,10 @@ import {
   fetchAllPages,
   listProducts,
   listSpareParts,
+  listMaintenanceParts,
   type ProductRecord,
   type SparePartRecord,
+  type MaintenancePartRecord,
 } from "@/lib/crud-api";
 import {
   classifyStockAlert,
@@ -37,7 +39,7 @@ import {
   type StockAlertBucket,
 } from "@/lib/inventory-stock";
 
-type EntityKind = "spare-part" | "product";
+type EntityKind = "spare-part" | "product" | "maintenance-part";
 
 type StockAlertRow = {
   kind: EntityKind;
@@ -69,6 +71,22 @@ function toSparePartRow(part: SparePartRecord): StockAlertRow {
     sale_price: part.sale_price,
     sale_currency: part.sale_currency,
     editHref: `/inventory/spare-parts/edit/${part.id}`,
+  };
+}
+
+function toMaintenancePartRow(part: MaintenancePartRecord): StockAlertRow {
+  return {
+    kind: "maintenance-part",
+    id: part.id,
+    name: part.name,
+    sku: part.sku,
+    partNumber: part.part_number,
+    image: part.image,
+    stock_quantity: part.stock_quantity,
+    low_stock_alarm: part.low_stock_alarm,
+    sale_price: part.sale_price,
+    sale_currency: part.sale_currency,
+    editHref: `/inventory/maintenance-parts/edit/${part.id}`,
   };
 }
 
@@ -246,16 +264,20 @@ function AlertPanels({
   search,
   sparePartRows,
   productRows,
+  maintenancePartRows,
   showSpareParts,
   showProducts,
+  showMaintenanceParts,
 }: {
   alertTab: AlertTab;
   entityFilter: EntityFilter;
   search: string;
   sparePartRows: StockAlertRow[];
   productRows: StockAlertRow[];
+  maintenancePartRows: StockAlertRow[];
   showSpareParts: boolean;
   showProducts: boolean;
+  showMaintenanceParts: boolean;
 }) {
   const query = search.trim().toLowerCase();
 
@@ -268,24 +290,29 @@ function AlertPanels({
 
   const spareFiltered = filterRows(sparePartRows);
   const productFiltered = filterRows(productRows);
+  const maintenanceFiltered = filterRows(maintenancePartRows);
 
   const showSpareSection =
     showSpareParts && (entityFilter === "all" || entityFilter === "spare-part");
   const showProductSection =
     showProducts && (entityFilter === "all" || entityFilter === "product");
+  const showMaintenanceSection =
+    showMaintenanceParts &&
+    (entityFilter === "all" || entityFilter === "maintenance-part");
 
-  if (!showSpareSection && !showProductSection) {
+  if (!showSpareSection && !showProductSection && !showMaintenanceSection) {
     return (
       <EmptyState
         title="No inventory access"
-        description="You need read access to spare parts or products to view stock alarms."
+        description="You need read access to spare parts, maintenance parts, or products to view stock alarms."
       />
     );
   }
 
   const nothingVisible =
     (showSpareSection ? spareFiltered.length === 0 : true) &&
-    (showProductSection ? productFiltered.length === 0 : true);
+    (showProductSection ? productFiltered.length === 0 : true) &&
+    (showMaintenanceSection ? maintenanceFiltered.length === 0 : true);
 
   if (nothingVisible) {
     return (
@@ -320,6 +347,17 @@ function AlertPanels({
           createLabel="Add product"
         />
       ) : null}
+      {showMaintenanceSection ? (
+        <AlertTable
+          title="Maintenance parts"
+          description="Maintenance parts at or below their configured low-stock threshold."
+          rows={maintenanceFiltered}
+          emptyTitle="No maintenance part alerts"
+          emptyDescription="Maintenance parts in this view are fully stocked relative to their alarm settings."
+          createHref="/inventory/maintenance-parts/create"
+          createLabel="Add maintenance part"
+        />
+      ) : null}
     </div>
   );
 }
@@ -331,6 +369,7 @@ export default function InventoryAlarmsPage() {
   const permissions = usePermissions();
   const showSpareParts = permissions.canReadPage("spare-parts");
   const showProducts = permissions.canReadPage("products");
+  const showMaintenanceParts = permissions.canReadPage("maintenance-parts");
   const initialTab =
     searchParams.get("tab") === "pricing" ? "pricing" : "stock";
   const [mainTab, setMainTab] = useState<MainAlarmTab>(initialTab);
@@ -341,6 +380,7 @@ export default function InventoryAlarmsPage() {
 
   const [sparePartRows, setSparePartRows] = useState<StockAlertRow[]>([]);
   const [productRows, setProductRows] = useState<StockAlertRow[]>([]);
+  const [maintenancePartRows, setMaintenancePartRows] = useState<StockAlertRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -353,7 +393,7 @@ export default function InventoryAlarmsPage() {
       const token = getAuthToken();
       if (!token) throw new Error("Authentication required");
 
-      const [spareParts, products] = await Promise.all([
+      const [spareParts, products, maintenanceParts] = await Promise.all([
         showSpareParts
           ? fetchAllPages((page) =>
               listSpareParts(token, page, { low_stock: true }),
@@ -364,10 +404,16 @@ export default function InventoryAlarmsPage() {
               listProducts(token, page, { low_stock: true }),
             )
           : Promise.resolve([]),
+        showMaintenanceParts
+          ? fetchAllPages((page) =>
+              listMaintenanceParts(token, page, { low_stock: true }),
+            )
+          : Promise.resolve([]),
       ]);
 
       setSparePartRows(spareParts.map(toSparePartRow));
       setProductRows(products.map(toProductRow));
+      setMaintenancePartRows(maintenanceParts.map(toMaintenancePartRow));
       setError(null);
     } catch (err) {
       setError(
@@ -376,7 +422,7 @@ export default function InventoryAlarmsPage() {
     } finally {
       setLoading(false);
     }
-  }, [showSpareParts, showProducts]);
+  }, [showSpareParts, showProducts, showMaintenanceParts]);
 
   useEffect(() => {
     void loadData();
@@ -385,8 +431,8 @@ export default function InventoryAlarmsPage() {
   useLiveDataRefresh(loadData);
 
   const allRows = useMemo(
-    () => [...sparePartRows, ...productRows],
-    [sparePartRows, productRows],
+    () => [...sparePartRows, ...productRows, ...maintenancePartRows],
+    [sparePartRows, productRows, maintenancePartRows],
   );
 
   const stats = useMemo(() => {
@@ -397,6 +443,9 @@ export default function InventoryAlarmsPage() {
         return false;
       }
       if (entityFilter === "product" && row.kind !== "product") {
+        return false;
+      }
+      if (entityFilter === "maintenance-part" && row.kind !== "maintenance-part") {
         return false;
       }
       return true;
@@ -410,6 +459,9 @@ export default function InventoryAlarmsPage() {
     ).length;
     const spareCount = visible.filter((row) => row.kind === "spare-part").length;
     const productCount = visible.filter((row) => row.kind === "product").length;
+    const maintenanceCount = visible.filter(
+      (row) => row.kind === "maintenance-part",
+    ).length;
 
     return {
       outCount,
@@ -417,6 +469,7 @@ export default function InventoryAlarmsPage() {
       total: outCount + lowCount,
       spareCount,
       productCount,
+      maintenanceCount,
     };
   }, [allRows, search, entityFilter]);
 
@@ -427,8 +480,10 @@ export default function InventoryAlarmsPage() {
       search={search}
       sparePartRows={sparePartRows}
       productRows={productRows}
+      maintenancePartRows={maintenancePartRows}
       showSpareParts={showSpareParts}
       showProducts={showProducts}
+      showMaintenanceParts={showMaintenanceParts}
     />
   );
 
@@ -466,8 +521,8 @@ export default function InventoryAlarmsPage() {
               />
               <StatCard
                 label="By catalog"
-                value={`${stats.spareCount} / ${stats.productCount}`}
-                hint="Spare parts / products"
+                value={`${stats.spareCount} / ${stats.productCount} / ${stats.maintenanceCount}`}
+                hint="Spare parts / products / maintenance parts"
                 tone="primary"
               />
             </StatGrid>
@@ -526,6 +581,14 @@ export default function InventoryAlarmsPage() {
                     : []),
                   ...(showProducts
                     ? [{ value: "product", label: "Products only" }]
+                    : []),
+                  ...(showMaintenanceParts
+                    ? [
+                        {
+                          value: "maintenance-part",
+                          label: "Maintenance parts only",
+                        },
+                      ]
                     : []),
                 ]}
                 className="form-input-base"

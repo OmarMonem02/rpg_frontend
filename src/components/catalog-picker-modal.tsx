@@ -6,24 +6,29 @@ import { getAuthToken } from "@/lib/auth-session";
 import {
   listProducts,
   listSpareParts,
+  listMaintenanceParts,
   listBikeForSale,
   listMaintenanceServices,
   listBrands,
   listProductCategories,
   listSparePartCategories,
+  listMaintenancePartCategories,
   listMaintenanceServiceSectors,
   listBikeBlueprints,
   type ProductRecord,
   type SparePartRecord,
+  type MaintenancePartRecord,
   type BikeRecord,
   type BikeBlueprintRecord,
   type MaintenanceServiceRecord,
   type BrandRecord,
   type ProductCategoryRecord,
   type SparePartCategoryRecord,
+  type MaintenancePartCategoryRecord,
   type MaintenanceServiceSectorRecord,
   fetchAllPages,
 } from "@/lib/crud-api";
+import { formatCatalogItemAttributes, ItemStatusBadge } from "@/lib/inventory-item-attributes";
 import {
   formatCatalogPriceInEGP,
   SUPPORTED_PRICING_CURRENCIES,
@@ -45,12 +50,14 @@ import {
 type CatalogType =
   | "products"
   | "spare_parts"
+  | "maintenance_parts"
   | "bikes"
   | "maintenance_services";
 
 type CatalogItem =
   | ProductRecord
   | SparePartRecord
+  | MaintenancePartRecord
   | BikeRecord
   | MaintenanceServiceRecord;
 
@@ -133,6 +140,9 @@ export function CatalogPickerModal({
   >([]);
   const [sparePartCategories, setSparePartCategories] = useState<
     SparePartCategoryRecord[]
+  >([]);
+  const [maintenancePartCategories, setMaintenancePartCategories] = useState<
+    MaintenancePartCategoryRecord[]
   >([]);
   const [sectors, setSectors] = useState<MaintenanceServiceSectorRecord[]>([]);
   const [blueprints, setBlueprints] = useState<BikeBlueprintRecord[]>([]);
@@ -235,6 +245,18 @@ export function CatalogPickerModal({
         setBrands(spBrandsRes);
         setBikeBrands(bikeBrandsRes);
         setSparePartCategories(categoriesRes.items);
+        setMaintenancePartCategories([]);
+        setBlueprints([]);
+      } else if (catalogType === "maintenance_parts") {
+        const [mpBrandsRes, bikeBrandsRes, categoriesRes] = await Promise.all([
+          fetchAllPages((p) => listBrands(token, p, { type: "maintenance_parts" })),
+          fetchAllPages((p) => listBrands(token, p, { type: "bikes" })),
+          listMaintenancePartCategories(token, 1),
+        ]);
+        setBrands(mpBrandsRes);
+        setBikeBrands(bikeBrandsRes);
+        setMaintenancePartCategories(categoriesRes.items);
+        setSparePartCategories([]);
         setBlueprints([]);
       } else if (catalogType === "bikes") {
         const [brandsRes, blueprintsRes] = await Promise.all([
@@ -290,6 +312,17 @@ export function CatalogPickerModal({
         });
       } else if (catalogType === "spare_parts") {
         result = await listSpareParts(token, page, {
+          search: filters.search || undefined,
+          brand_id: filters.brandId,
+          category_id: filters.categoryId,
+          currency: filters.currency,
+          low_stock: filters.lowStock,
+          bike_brand_id: filters.bike_brand_id,
+          bike_model: filters.bike_model,
+          bike_year: filters.bike_year,
+        });
+      } else if (catalogType === "maintenance_parts") {
+        result = await listMaintenanceParts(token, page, {
           search: filters.search || undefined,
           brand_id: filters.brandId,
           category_id: filters.categoryId,
@@ -575,6 +608,7 @@ export function CatalogPickerModal({
               </span>
               {catalogType === "products" && "Browse Products"}
               {catalogType === "spare_parts" && "Browse Spare Parts"}
+              {catalogType === "maintenance_parts" && "Browse Maintenance Parts"}
               {catalogType === "bikes" && "Browse Bikes"}
               {catalogType === "maintenance_services" && "Browse Services"}
               {selectedItemIds.size > 0 && (
@@ -654,7 +688,7 @@ export function CatalogPickerModal({
               className="max-h-[min(50vh,26rem)] overflow-y-auto overscroll-y-contain scroll-smooth border-t border-outline-variant/10 px-4 py-3 [scrollbar-gutter:stable] sm:max-h-[min(56vh,32rem)] sm:px-6 sm:py-4"
             >
               <div className="rounded-2xl border border-outline-variant/10 bg-surface-container-lowest/35 p-4 sm:p-5">
-                {(catalogType === "products" || catalogType === "spare_parts") &&
+                {(catalogType === "products" || catalogType === "spare_parts" || catalogType === "maintenance_parts") &&
                   bikeBrands.length > 0 && (
                   <div className="mb-4 rounded-xl border border-outline-variant/15 bg-surface-container-low/60 p-4 sm:rounded-2xl sm:p-4">
                     <p className="label-caps mb-3 text-on-surface-variant">
@@ -764,7 +798,7 @@ export function CatalogPickerModal({
                       </div>
                     )}
 
-                    {sparePartCategories.length > 0 && (
+                    {sparePartCategories.length > 0 && catalogType === "spare_parts" && (
                       <div className="space-y-1.5">
                         <label
                           htmlFor="catalog-picker-spare-category"
@@ -785,6 +819,37 @@ export function CatalogPickerModal({
                           options={[
                             { value: "", label: "All categories" },
                             ...sparePartCategories.map((cat) => ({
+                              value: cat.id,
+                              label: cat.name,
+                            })),
+                          ]}
+                          className="form-input-base w-full bg-surface-container-lowest/80 py-2.5 font-medium"
+                        />
+                      </div>
+                    )}
+
+                    {maintenancePartCategories.length > 0 &&
+                      catalogType === "maintenance_parts" && (
+                      <div className="space-y-1.5">
+                        <label
+                          htmlFor="catalog-picker-maintenance-category"
+                          className="label-caps text-on-surface-variant"
+                        >
+                          Category
+                        </label>
+                        <SearchableSelect
+                          id="catalog-picker-maintenance-category"
+                          value={filters.categoryId || ""}
+                          onChange={(value) => {
+                            setFilters({
+                              ...filters,
+                              categoryId: value ? Number(value) : undefined,
+                            });
+                            setPage(1);
+                          }}
+                          options={[
+                            { value: "", label: "All categories" },
+                            ...maintenancePartCategories.map((cat) => ({
                               value: cat.id,
                               label: cat.name,
                             })),
@@ -856,7 +921,7 @@ export function CatalogPickerModal({
                     </div>
                   </div>
 
-                  {catalogType === "spare_parts" ? (
+                  {catalogType === "maintenance_parts" || catalogType === "spare_parts" ? (
                     <div className="flex flex-col gap-2 border-t border-outline-variant/10 pt-4 sm:flex-row sm:items-center sm:justify-between">
                       <p className="label-caps text-on-surface-variant">Inventory</p>
                       <button
@@ -1073,6 +1138,63 @@ export function CatalogPickerModal({
                                   </span>{" "}
                                   {item.part_number}
                                 </span>
+                              ) : null}
+                              {formatCatalogItemAttributes(item) ? (
+                                <span className="inline-flex items-center text-xs font-medium text-on-surface-variant">
+                                  {formatCatalogItemAttributes(item)}
+                                </span>
+                              ) : null}
+                              {"item_status" in item ? (
+                                <ItemStatusBadge status={item.item_status} />
+                              ) : null}
+                              <span className="mono-data inline-flex items-center text-xs font-medium text-on-surface-variant">
+                                <span className="label-caps mr-1 text-on-surface-variant/60">
+                                  Universal
+                                </span>{" "}
+                                {item.universal ? "Yes" : "No"}
+                              </span>
+                              {item.brand_id ? (
+                                <span className="inline-flex items-center text-xs font-medium text-on-surface-variant">
+                                  <span className="label-caps mr-1 text-on-surface-variant/60">
+                                    Brand
+                                  </span>{" "}
+                                  {brands.find((b) => b.id === item.brand_id)
+                                    ?.name ?? item.brand_id}
+                                </span>
+                              ) : null}
+                              <span className="inline-flex items-center text-xs font-medium text-on-surface-variant">
+                                <span className="label-caps mr-1 text-on-surface-variant/60">
+                                  Stock
+                                </span>
+                                {item.stock_quantity ?? 0}
+                              </span>
+                            </div>
+                          )}
+
+                        {catalogType === "maintenance_parts" &&
+                          "maintenance_parts_category_id" in item && (
+                            <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1">
+                              <span className="mono-data inline-flex items-center text-xs font-medium text-on-surface-variant">
+                                <span className="label-caps mr-1 text-on-surface-variant/60">
+                                  SKU
+                                </span>{" "}
+                                {item.sku}
+                              </span>
+                              {item.part_number ? (
+                                <span className="mono-data inline-flex items-center text-xs font-medium text-on-surface-variant">
+                                  <span className="label-caps mr-1 text-on-surface-variant/60">
+                                    Part#
+                                  </span>{" "}
+                                  {item.part_number}
+                                </span>
+                              ) : null}
+                              {formatCatalogItemAttributes(item) ? (
+                                <span className="inline-flex items-center text-xs font-medium text-on-surface-variant">
+                                  {formatCatalogItemAttributes(item)}
+                                </span>
+                              ) : null}
+                              {"item_status" in item ? (
+                                <ItemStatusBadge status={item.item_status} />
                               ) : null}
                               <span className="mono-data inline-flex items-center text-xs font-medium text-on-surface-variant">
                                 <span className="label-caps mr-1 text-on-surface-variant/60">

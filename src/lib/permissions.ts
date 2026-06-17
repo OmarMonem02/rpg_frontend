@@ -7,12 +7,14 @@ export type PagePath =
   | "products"
   | "bikes"
   | "spare-parts"
+  | "maintenance-parts"
   | "maintenance-services"
   | "users"
   | "import-export"
   | "payment-methods"
   | "product-categories"
   | "spare-part-categories"
+  | "maintenance-part-categories"
   | "bike-blueprints"
   | "sellers"
   | "reporting";
@@ -70,12 +72,14 @@ export const ALL_PAGE_PATHS: PagePath[] = [
   "products",
   "bikes",
   "spare-parts",
+  "maintenance-parts",
   "maintenance-services",
   "users",
   "import-export",
   "payment-methods",
   "product-categories",
   "spare-part-categories",
+  "maintenance-part-categories",
   "bike-blueprints",
   "sellers",
   "reporting",
@@ -149,6 +153,13 @@ const FALLBACK_PAGE_DEFINITIONS: PermissionPageDefinition[] = [
     actions: ["create", "read", "display", "update", "delete"],
   },
   {
+    key: "maintenance-parts",
+    label: "Maintenance Parts",
+    group: "inventory",
+    description: "Manage maintenance parts, compatibility links, and stock.",
+    actions: ["create", "read", "display", "update", "delete"],
+  },
+  {
     key: "maintenance-services",
     label: "Maintenance Services",
     group: "maintenance",
@@ -188,6 +199,13 @@ const FALLBACK_PAGE_DEFINITIONS: PermissionPageDefinition[] = [
     label: "Spare Part Categories",
     group: "master-data",
     description: "Maintain spare part classification data.",
+    actions: ["create", "read", "display", "update", "delete"],
+  },
+  {
+    key: "maintenance-part-categories",
+    label: "Maintenance Part Categories",
+    group: "master-data",
+    description: "Maintain maintenance part classification data.",
     actions: ["create", "read", "display", "update", "delete"],
   },
   {
@@ -238,12 +256,14 @@ const DEFAULT_ROUTE_BY_PAGE: Record<PagePath, string> = {
   products: "/inventory/products",
   bikes: "/inventory/bikes",
   "spare-parts": "/inventory/spare-parts",
+  "maintenance-parts": "/inventory/maintenance-parts",
   "maintenance-services": "/inventory/maintenance-services",
   users: "/users",
   "import-export": "/data/import-export",
   "payment-methods": "/data/payment-methods",
   "product-categories": "/data/product-categories",
   "spare-part-categories": "/data/spare-part-categories",
+  "maintenance-part-categories": "/data/maintenance-part-categories",
   "bike-blueprints": "/data/bike-blueprints",
   sellers: "/sellers",
   reporting: "/reporting",
@@ -280,6 +300,14 @@ const ROUTE_PERMISSION_RULES: Array<{
   {
     pattern: /^\/data\/spare-part-categories(?:\/|$)/,
     permission: { page: "spare-part-categories", action: "read" },
+  },
+  {
+    pattern: /^\/data\/maintenance-part-categories(?:\/|$)/,
+    permission: { page: "maintenance-part-categories", action: "read" },
+  },
+  {
+    pattern: /^\/data\/bike-blueprints\/[^/]+\/maintenance-parts(?:\/|$)/,
+    permission: { page: "bike-blueprints", action: "update" },
   },
   {
     pattern: /^\/data\/bike-blueprints\/create(?:\/|$)/,
@@ -340,6 +368,26 @@ const ROUTE_PERMISSION_RULES: Array<{
   {
     pattern: /^\/inventory\/count(?:\/|$)/,
     permission: { page: "inventory", action: "read" },
+  },
+  {
+    pattern: /^\/inventory\/maintenance-parts\/create(?:\/|$)/,
+    permission: { page: "maintenance-parts", action: "create" },
+  },
+  {
+    pattern: /^\/inventory\/maintenance-parts\/edit(?:\/|$)/,
+    permission: { page: "maintenance-parts", action: "update" },
+  },
+  {
+    pattern: /^\/inventory\/maintenance-parts\/manage-links(?:\/|$)/,
+    permission: { page: "maintenance-parts", action: "update" },
+  },
+  {
+    pattern: /^\/inventory\/maintenance-parts\/bulk-edit(?:\/|$)/,
+    permission: { page: "maintenance-parts", action: "update" },
+  },
+  {
+    pattern: /^\/inventory\/maintenance-parts(?:\/|$)/,
+    permission: { page: "maintenance-parts", action: "read" },
   },
   {
     pattern: /^\/inventory\/spare-parts\/create(?:\/|$)/,

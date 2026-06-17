@@ -101,7 +101,7 @@ export async function deletePaymentMethod(
 export type SaleLineItemRecord = {
   id: number;
   sale_id: number;
-  sellable_type: "products" | "spare_parts" | "bikes" | "maintenance_services";
+  sellable_type: "products" | "spare_parts" | "maintenance_parts" | "bikes" | "maintenance_services";
   sellable_id: number;
   selling_price: number;
   discount_amount: number;
@@ -138,6 +138,7 @@ export type SaleRecord = {
 export type CreateSaleLineItemPayload = {
   product_id?: number;
   spare_part_id?: number;
+  maintenance_part_id?: number;
   bike_for_sale_id?: number;
   maintenance_service_id?: number;
   selling_price: number;
@@ -188,7 +189,7 @@ export type SaleListFilters = {
   date_to?: string;
   total_min?: number;
   total_max?: number;
-  item_type?: "product" | "spare_part" | "maintenance_service" | "bike";
+  item_type?: "product" | "spare_part" | "maintenance_part" | "maintenance_service" | "bike";
   user_id?: number;
   sort?: SaleListSort;
   per_page?: number;
@@ -204,6 +205,8 @@ const API_ITEM_TYPE_TO_SELLABLE: Record<
   products: "products",
   spare_part: "spare_parts",
   spare_parts: "spare_parts",
+  maintenance_part: "maintenance_parts",
+  maintenance_parts: "maintenance_parts",
   bike: "bikes",
   bikes: "bikes",
   maintenance_service: "maintenance_services",
@@ -216,6 +219,7 @@ export function saleLineItemTypeLabel(
   const labels: Record<SaleLineItemRecord["sellable_type"], string> = {
     products: "Product",
     spare_parts: "Spare Part",
+    maintenance_parts: "Maintenance Part",
     bikes: "Bike",
     maintenance_services: "Service",
   };
@@ -239,6 +243,7 @@ function resolveLineItemSellableType(
 
   if (toNumber(record.product_id) > 0) return "products";
   if (toNumber(record.spare_part_id) > 0) return "spare_parts";
+  if (toNumber(record.maintenance_part_id) > 0) return "maintenance_parts";
   if (toNumber(record.bike_for_sale_id) > 0) return "bikes";
   if (toNumber(record.maintenance_service_id) > 0) return "maintenance_services";
 
@@ -257,6 +262,8 @@ function resolveLineItemSellableId(
       return toNumber(record.product_id);
     case "spare_parts":
       return toNumber(record.spare_part_id);
+    case "maintenance_parts":
+      return toNumber(record.maintenance_part_id);
     case "bikes":
       return toNumber(record.bike_for_sale_id);
     case "maintenance_services":
@@ -268,7 +275,7 @@ function resolveLineItemSellableId(
 
 /** Strips known type prefixes the backend prepends to item_label (e.g. "product ", "spare part "). */
 export function stripItemTypePrefix(label: string): string {
-  const prefixes = ["maintenance service ", "spare part ", "product ", "bike "];
+  const prefixes = ["maintenance service ", "maintenance part ", "spare part ", "product ", "bike "];
   for (const prefix of prefixes) {
     if (label.toLowerCase().startsWith(prefix)) {
       return label.slice(prefix.length);

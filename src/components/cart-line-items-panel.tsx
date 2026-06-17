@@ -7,9 +7,11 @@ import { egpMultiplierForPricingCurrency, formatEgp } from "@/lib/currencies";
 import {
   ProductRecord,
   SparePartRecord,
+  MaintenancePartRecord,
   BikeRecord,
   MaintenanceServiceRecord,
 } from "@/lib/crud-api";
+import { formatCatalogItemAttributes } from "@/lib/inventory-item-attributes";
 import { EmptyState } from "@/components/ops-ui";
 import {
   computeCartTotalsBreakdown,
@@ -19,7 +21,12 @@ import { TrashIcon, PencilSquareIcon, CheckIcon, XMarkIcon } from "@heroicons/re
 export type SaleLineItem = {
   id?: string; // temp ID for unsaved items
   sellable_id: number;
-  sellable_type: "products" | "spare_parts" | "bikes" | "maintenance_services";
+  sellable_type:
+    | "products"
+    | "spare_parts"
+    | "maintenance_parts"
+    | "bikes"
+    | "maintenance_services";
   item_name: string;
   selling_price: number;
   discount_amount: number;
@@ -27,7 +34,12 @@ export type SaleLineItem = {
   discount_approval_request_pending?: boolean;
   quantity: number;
   currency: PricingCurrency;
-  catalogItem: ProductRecord | SparePartRecord | BikeRecord | MaintenanceServiceRecord;
+  catalogItem:
+    | ProductRecord
+    | SparePartRecord
+    | MaintenancePartRecord
+    | BikeRecord
+    | MaintenanceServiceRecord;
 };
 
 interface CartLineItemsPanelProps {
@@ -83,7 +95,8 @@ export function CartLineItemsPanel({
     // Products + spare parts come from inventory and have stock_quantity
     if (
       item.sellable_type === "products" ||
-      item.sellable_type === "spare_parts"
+      item.sellable_type === "spare_parts" ||
+      item.sellable_type === "maintenance_parts"
     ) {
       const stock = (item.catalogItem as { stock_quantity?: number }).stock_quantity;
       if (typeof stock === "number" && Number.isFinite(stock) && stock >= 0) return Math.trunc(stock);
@@ -252,7 +265,10 @@ export function CartLineItemsPanel({
                   const rowId = item.id || item.sellable_id;
                   const isEditing = editingRowId === rowId;
                   const maxQty = getMaxQty(item);
-                  const isStockLimited = item.sellable_type === "products" || item.sellable_type === "spare_parts";
+                  const isStockLimited =
+                    item.sellable_type === "products" ||
+                    item.sellable_type === "spare_parts" ||
+                    item.sellable_type === "maintenance_parts";
                   const isOutOfStock = isStockLimited && typeof maxQty === "number" && maxQty === 0;
                   return (
                     <tr
@@ -272,6 +288,7 @@ export function CartLineItemsPanel({
                         <span className="form-chip rounded-lg bg-primary/8 text-primary border-primary/15 font-mono text-caption">
                           {item.sellable_type === "products" && "PRODUCT"}
                           {item.sellable_type === "spare_parts" && "SPARE PART"}
+                          {item.sellable_type === "maintenance_parts" && "MAINT. PART"}
                           {item.sellable_type === "bikes" && "BIKE"}
                           {item.sellable_type === "maintenance_services" && "SERVICE"}
                         </span>

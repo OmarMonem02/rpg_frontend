@@ -227,12 +227,12 @@ export default function TicketDetailsPage() {
   // Item Management State
   const [activeTaskId, setActiveTaskId] = useState<number | null>(null);
   const [pickerCatalogType, setPickerCatalogType] = useState<
-    "spare_parts" | "maintenance_services" | "products" | null
+    "spare_parts" | "maintenance_parts" | "maintenance_services" | "products" | null
   >(null);
 
   const openCatalogPicker = (
     taskId: number,
-    catalogType: "spare_parts" | "maintenance_services" | "products",
+    catalogType: "spare_parts" | "maintenance_parts" | "maintenance_services" | "products",
   ) => {
     setActiveTaskId(taskId);
     setPickerCatalogType(catalogType);
@@ -672,10 +672,11 @@ export default function TicketDetailsPage() {
     "service_price" in item ? item.service_price : item.sale_price;
 
   const buildTaskItemPayload = (
-    catalogType: "spare_parts" | "maintenance_services" | "products",
+    catalogType: "spare_parts" | "maintenance_parts" | "maintenance_services" | "products",
     item: SparePartRecord | MaintenanceServiceRecord | ProductRecord,
   ) => ({
     spare_part_id: catalogType === "spare_parts" ? item.id : undefined,
+    maintenance_part_id: catalogType === "maintenance_parts" ? item.id : undefined,
     maintenance_service_id: catalogType === "maintenance_services" ? item.id : undefined,
     product_id: catalogType === "products" ? item.id : undefined,
     price_snapshot: convertToEGP(
@@ -689,7 +690,7 @@ export default function TicketDetailsPage() {
 
   const handleAddItemsToTask = async (
     taskId: number,
-    catalogType: "spare_parts" | "maintenance_services" | "products",
+    catalogType: "spare_parts" | "maintenance_parts" | "maintenance_services" | "products",
     items: Array<SparePartRecord | MaintenanceServiceRecord | ProductRecord>,
   ) => {
     if (ticket?.status !== "in_progress") {
@@ -826,10 +827,17 @@ export default function TicketDetailsPage() {
         sale_id: ticketData.id,
         sellable_type: (item.spare_part_id
           ? "spare_parts"
+          : item.maintenance_part_id
+            ? "maintenance_parts"
           : item.product_id
             ? "products"
-            : "maintenance_services") as "spare_parts" | "products" | "maintenance_services",
-        sellable_id: item.spare_part_id ?? item.product_id ?? item.maintenance_service_id ?? 0,
+            : "maintenance_services") as "spare_parts" | "maintenance_parts" | "products" | "maintenance_services",
+        sellable_id:
+          item.spare_part_id ??
+          item.maintenance_part_id ??
+          item.product_id ??
+          item.maintenance_service_id ??
+          0,
         selling_price: convertTicketLineAmount(item, item.price_snapshot, rates),
         discount_amount: convertTicketLineAmount(item, item.discount, rates),
         quantity: item.qty,
@@ -1254,7 +1262,17 @@ export default function TicketDetailsPage() {
                             onClick={() => openCatalogPicker(task.id, "spare_parts")}
                             disabled={!canEditItems}
                           >
-                            + Part
+                            + Spare Part
+                          </ActionButton>
+                          <div className="w-px h-4 bg-outline-variant/20 mx-1" />
+                          <ActionButton 
+                            variant="ghost" 
+                            size="sm" 
+                            className="border-0 rounded-lg"
+                            onClick={() => openCatalogPicker(task.id, "maintenance_parts")}
+                            disabled={!canEditItems}
+                          >
+                            + Maint. Part
                           </ActionButton>
                           <div className="w-px h-4 bg-outline-variant/20 mx-1" />
                           <ActionButton 

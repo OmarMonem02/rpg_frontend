@@ -25,7 +25,7 @@ import {
   type CountWorkflowStep,
 } from "@/lib/stocktake";
 import type { CountSessionLastScan } from "@/lib/stocktake-session";
-import type { ProductRecord, SparePartRecord } from "@/lib/crud-api";
+import type { ProductRecord, SparePartRecord, MaintenancePartRecord } from "@/lib/crud-api";
 
 const WORKFLOW_STEPS: Array<{ id: CountWorkflowStep; label: string; hint: string }> = [
   { id: "scan", label: "Scan", hint: "Add items to the count" },
@@ -679,10 +679,18 @@ export function BulkRecapTable({
   onUpdateCounted,
 }: {
   type: CountItemType;
-  records: Array<ProductRecord | SparePartRecord>;
+  records: Array<ProductRecord | SparePartRecord | MaintenancePartRecord>;
   lines: CountLine[];
-  onToggleInclusion: (type: CountItemType, record: ProductRecord | SparePartRecord, include: boolean) => void;
-  onUpdateCounted: (type: CountItemType, record: ProductRecord | SparePartRecord, value: number) => void;
+  onToggleInclusion: (
+    type: CountItemType,
+    record: ProductRecord | SparePartRecord | MaintenancePartRecord,
+    include: boolean,
+  ) => void;
+  onUpdateCounted: (
+    type: CountItemType,
+    record: ProductRecord | SparePartRecord | MaintenancePartRecord,
+    value: number,
+  ) => void;
 }) {
   return (
     <DataTableCard className="overflow-hidden border-outline-variant/10">

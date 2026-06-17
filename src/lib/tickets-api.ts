@@ -88,6 +88,7 @@ export type TicketItem = {
   task_id: number;
   ticket_id: number;
   spare_part_id?: number;
+  maintenance_part_id?: number;
   maintenance_service_id?: number;
   product_id?: number;
   price_snapshot: number;
@@ -96,6 +97,7 @@ export type TicketItem = {
   subtotal: number;
   item_name?: string;
   spare_part?: { id: number; name: string } & TicketCatalogDiscount;
+  maintenance_part?: { id: number; name: string } & TicketCatalogDiscount;
   maintenance_service?: { id: number; name: string } & TicketCatalogDiscount;
   product?: { id: number; name: string } & TicketCatalogDiscount;
 };
@@ -122,6 +124,7 @@ function normalizeTicketCatalog(
 function normalizeTicketItem(raw: unknown): TicketItem {
   const record = asRecord(raw);
   const sparePart = normalizeTicketCatalog(record.spare_part ?? record.sparePart);
+  const maintenancePart = normalizeTicketCatalog(record.maintenance_part ?? record.maintenancePart);
   const maintenanceService = normalizeTicketCatalog(
     record.maintenance_service ?? record.maintenanceService,
   );
@@ -132,6 +135,7 @@ function normalizeTicketItem(raw: unknown): TicketItem {
     task_id: toNumber(record.task_id),
     ticket_id: toNumber(record.ticket_id),
     spare_part_id: toNumber(record.spare_part_id) || undefined,
+    maintenance_part_id: toNumber(record.maintenance_part_id) || undefined,
     maintenance_service_id: toNumber(record.maintenance_service_id) || undefined,
     product_id: toNumber(record.product_id) || undefined,
     price_snapshot: toNumber(record.price_snapshot),
@@ -140,6 +144,7 @@ function normalizeTicketItem(raw: unknown): TicketItem {
     subtotal: toNumber(record.subtotal),
     item_name: toText(record.item_name) || undefined,
     spare_part: sparePart,
+    maintenance_part: maintenancePart,
     maintenance_service: maintenanceService,
     product,
   };
@@ -203,15 +208,18 @@ function normalizeTicket(raw: unknown): Ticket {
 export function ticketItemName(item: TicketItem): string {
   if (item.item_name) return item.item_name;
   if (item.spare_part?.name) return item.spare_part.name;
+  if (item.maintenance_part?.name) return item.maintenance_part.name;
   if (item.product?.name) return item.product.name;
   if (item.maintenance_service?.name) return item.maintenance_service.name;
   if (item.spare_part_id) return "Spare Part";
+  if (item.maintenance_part_id) return "Maintenance Part";
   if (item.product_id) return "Product";
   return "Service";
 }
 
 export function ticketItemTypeLabel(item: TicketItem): string {
   if (item.spare_part_id) return "Spare Part";
+  if (item.maintenance_part_id) return "Maintenance Part";
   if (item.product_id) return "Product";
   return "Service";
 }
@@ -379,6 +387,7 @@ export const ticketsApi = {
     taskId: number,
     data: {
       spare_part_id?: number;
+      maintenance_part_id?: number;
       maintenance_service_id?: number;
       product_id?: number;
       price_snapshot: number;

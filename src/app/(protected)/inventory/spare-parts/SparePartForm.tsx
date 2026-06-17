@@ -33,6 +33,7 @@ import {
 } from "@/lib/inventory-images";
 import { EntityForm, type FieldConfig } from "@/components/entity-form";
 import { filterBrandsByType } from "@/lib/brand-types";
+import { ITEM_STATUS_OPTIONS } from "@/lib/inventory-item-attributes";
 
 interface SparePartFormProps {
   mode: "create" | "edit";
@@ -248,6 +249,9 @@ export function SparePartForm({ mode, initialData }: SparePartFormProps) {
         sku: String(formData.sku),
         images,
         part_number: formData.part_number ? String(formData.part_number) : undefined,
+        size: formData.size ? String(formData.size) : undefined,
+        color: formData.color ? String(formData.color) : undefined,
+        item_status: (formData.item_status ? String(formData.item_status) : "new") as "new" | "used",
         stock_quantity: toNumber(formData.stock_quantity),
         low_stock_alarm: toNumber(formData.low_stock_alarm),
         spare_parts_category_id: Number(formData.spare_parts_category_id),
@@ -322,6 +326,37 @@ export function SparePartForm({ mode, initialData }: SparePartFormProps) {
       description: "Add the maker reference if your team uses manufacturer numbers.",
       placeholder: "e.g., MPN-12345",
       value: initialData?.part_number,
+    },
+    {
+      name: "size",
+      label: "Size",
+      type: "text",
+      section: "Basic Info",
+      description: "Optional size label for this part.",
+      placeholder: "e.g., M, XL",
+      value: initialData?.size,
+    },
+    {
+      name: "color",
+      label: "Color",
+      type: "text",
+      section: "Basic Info",
+      description: "Optional color label for this part.",
+      placeholder: "e.g., Matte Black",
+      value: initialData?.color,
+    },
+    {
+      name: "item_status",
+      label: "Item Status",
+      type: "select",
+      required: true,
+      section: "Basic Info",
+      description: "Whether the part is new or used inventory.",
+      options: ITEM_STATUS_OPTIONS.map((option) => ({
+        value: option.value,
+        label: option.label,
+      })),
+      value: initialData?.item_status ?? "new",
     },
     {
       name: "images",
