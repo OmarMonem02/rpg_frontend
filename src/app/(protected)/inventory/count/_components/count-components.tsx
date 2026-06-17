@@ -15,6 +15,10 @@ import {
   SearchableSelect,
   StatusBadge,
 } from "@/components/ops-ui";
+import {
+  InventoryImage,
+  InventoryImagePlaceholder,
+} from "@/components/inventory/InventoryImage";
 import { getLookupItemKindLabel } from "@/lib/item-lookup";
 import {
   computeVariance,
@@ -59,24 +63,19 @@ export function CountItemThumbnail({
   size?: "md" | "lg";
 }) {
   const sizeClass = size === "lg" ? "h-14 w-14 text-sm" : "h-10 w-10 text-xs";
+  const placeholderClass = `${sizeClass} flex flex-none items-center justify-center rounded-xl border border-outline-variant/15 bg-surface-container font-semibold text-on-surface-variant`;
 
-  if (image) {
-    return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
-        src={image}
-        alt=""
-        className={`${sizeClass} flex-none rounded-xl border border-outline-variant/15 object-cover`}
-      />
-    );
+  if (!image) {
+    return <InventoryImagePlaceholder name={name} className={placeholderClass} />;
   }
 
   return (
-    <div
-      className={`${sizeClass} flex flex-none items-center justify-center rounded-xl border border-outline-variant/15 bg-surface-container font-semibold text-on-surface-variant`}
-    >
-      {name.slice(0, 1).toUpperCase()}
-    </div>
+    <InventoryImage
+      src={image}
+      alt=""
+      className={`${sizeClass} flex-none rounded-xl border border-outline-variant/15 object-cover`}
+      fallback={<InventoryImagePlaceholder name={name} className={placeholderClass} />}
+    />
   );
 }
 

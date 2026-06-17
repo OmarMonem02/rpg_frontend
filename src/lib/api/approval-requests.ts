@@ -370,6 +370,7 @@ export async function listApprovalRequests(
     items: data,
     currentPage: pagination.current_page ?? 1,
     lastPage: pagination.last_page ?? 1,
+    total: pagination.total,
   };
 }
 

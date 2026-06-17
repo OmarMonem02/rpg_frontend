@@ -4,6 +4,10 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { PricingLossPanel } from "@/app/(protected)/inventory/alarms/pricing-loss-panel";
+import {
+  InventoryImage,
+  InventoryImagePlaceholder,
+} from "@/components/inventory/InventoryImage";
 import { usePermissions } from "@/components/permission-provider";
 import {
   ActionButton,
@@ -187,16 +191,22 @@ function AlertTable({
                     <td className="px-4 py-4 md:px-6">
                       <div className="flex items-center gap-3">
                         {row.image ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
+                          <InventoryImage
                             src={row.image}
                             alt=""
                             className="h-10 w-10 flex-none rounded-xl object-cover"
+                            fallback={
+                              <InventoryImagePlaceholder
+                                name={row.name}
+                                className="flex h-10 w-10 flex-none items-center justify-center rounded-xl border border-outline-variant/15 bg-surface-container text-xs font-medium text-on-surface-variant"
+                              />
+                            }
                           />
                         ) : (
-                          <div className="flex h-10 w-10 flex-none items-center justify-center rounded-xl border border-outline-variant/15 bg-surface-container text-xs font-medium text-on-surface-variant">
-                            {row.name.slice(0, 1).toUpperCase()}
-                          </div>
+                          <InventoryImagePlaceholder
+                            name={row.name}
+                            className="flex h-10 w-10 flex-none items-center justify-center rounded-xl border border-outline-variant/15 bg-surface-container text-xs font-medium text-on-surface-variant"
+                          />
                         )}
                         <div>
                           <p className="font-medium text-on-surface">

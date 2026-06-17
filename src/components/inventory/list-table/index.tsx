@@ -6,6 +6,10 @@ import { DataTableCard } from "@/components/ops-ui";
 import { ImageGalleryModal } from "@/components/inventory/ImageGalleryModal";
 import { ImageHoverPreview } from "@/components/inventory/ImageHoverPreview";
 import {
+  InventoryImage,
+  InventoryImagePlaceholder,
+} from "@/components/inventory/InventoryImage";
+import {
   getGalleryImages,
   getPrimaryImageUrl,
   type InventoryImageRecord,
@@ -181,57 +185,58 @@ export function InventoryItemThumbnail({
   size?: "md" | "lg";
 }) {
   const sizeClass = size === "lg" ? "h-12 w-12 text-sm" : "h-10 w-10 text-xs";
+  const placeholderClass = `${sizeClass} flex flex-none items-center justify-center rounded-xl border border-outline-variant/15 bg-surface-container font-semibold text-on-surface-variant`;
   const [galleryOpen, setGalleryOpen] = useState(false);
 
   const displayImage = getPrimaryImageUrl(images, image);
   const galleryImages = getGalleryImages(images, image);
   const extraCount = galleryImages.length > 1 ? galleryImages.length - 1 : 0;
 
-  if (displayImage) {
+  if (!displayImage) {
     return (
-      <>
-        <div className="relative inline-flex">
-          <ImageHoverPreview src={displayImage} alt={name}>
-            <button
-              type="button"
-              className={`${sizeClass} block flex-none overflow-hidden rounded-xl border border-outline-variant/15 shadow-sm`}
-              onClick={() => setGalleryOpen(true)}
-              aria-label={`View photos for ${name}`}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={displayImage}
-                alt=""
-                className="h-full w-full object-cover"
-              />
-            </button>
-          </ImageHoverPreview>
-
-          {extraCount > 0 ? (
-            <span className="pointer-events-none absolute -bottom-1 -right-1 rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-bold text-on-primary shadow-sm">
-              +{extraCount}
-            </span>
-          ) : null}
-        </div>
-
-        <ImageGalleryModal
-          images={galleryImages}
-          initialIndex={0}
-          isOpen={galleryOpen}
-          onClose={() => setGalleryOpen(false)}
-          alt={name}
-        />
-      </>
+      <InventoryImagePlaceholder name={name} className={placeholderClass} />
     );
   }
 
   return (
-    <div
-      className={`${sizeClass} flex flex-none items-center justify-center rounded-xl border border-outline-variant/15 bg-surface-container font-semibold text-on-surface-variant`}
-      aria-hidden
-    >
-      {name.slice(0, 1).toUpperCase() || "?"}
-    </div>
+    <>
+      <div className="relative inline-flex">
+        <ImageHoverPreview src={displayImage} alt={name}>
+          <button
+            type="button"
+            className={`${sizeClass} block flex-none overflow-hidden rounded-xl border border-outline-variant/15 shadow-sm`}
+            onClick={() => setGalleryOpen(true)}
+            aria-label={`View photos for ${name}`}
+          >
+            <InventoryImage
+              src={displayImage}
+              alt=""
+              className="h-full w-full object-cover"
+              fallback={
+                <InventoryImagePlaceholder
+                  name={name}
+                  className={`${sizeClass} flex h-full w-full items-center justify-center bg-surface-container font-semibold text-on-surface-variant`}
+                />
+              }
+            />
+          </button>
+        </ImageHoverPreview>
+
+        {extraCount > 0 ? (
+          <span className="pointer-events-none absolute -bottom-1 -right-1 rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-bold text-on-primary shadow-sm">
+            +{extraCount}
+          </span>
+        ) : null}
+      </div>
+
+      <ImageGalleryModal
+        images={galleryImages}
+        initialIndex={0}
+        isOpen={galleryOpen}
+        onClose={() => setGalleryOpen(false)}
+        alt={name}
+      />
+    </>
   );
 }
 

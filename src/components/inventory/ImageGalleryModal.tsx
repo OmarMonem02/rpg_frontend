@@ -25,6 +25,7 @@ export function ImageGalleryModal({
 }: ImageGalleryModalProps) {
   const titleId = useId();
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
+  const [failedUrls, setFailedUrls] = useState<Set<string>>(() => new Set());
   const portalTarget = useSyncExternalStore(
     () => () => {},
     getDocumentBody,
@@ -38,6 +39,7 @@ export function ImageGalleryModal({
         ? 0
         : Math.min(Math.max(initialIndex, 0), images.length - 1);
     setCurrentIndex(bounded);
+    setFailedUrls(new Set());
   }, [isOpen, initialIndex, images.length]);
 
   useEffect(() => {
@@ -78,6 +80,8 @@ export function ImageGalleryModal({
   }
 
   const safeIndex = Math.min(Math.max(currentIndex, 0), images.length - 1);
+  const currentImage = images[safeIndex];
+  const currentImageFailed = failedUrls.has(currentImage);
 
   return createPortal(
     <div
@@ -108,12 +112,31 @@ export function ImageGalleryModal({
         </button>
 
         <div className="overflow-hidden rounded-2xl border border-outline-variant/20 bg-surface shadow-2xl">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={images[safeIndex]}
-            alt={alt}
-            className="mx-auto max-h-[min(80vh,720px)] w-full object-contain bg-surface-container-low"
-          />
+          {currentImageFailed ? (
+            <div className="flex min-h-[min(40vh,360px)] flex-col items-center justify-center gap-2 bg-surface-container-low px-6 py-12 text-center">
+              <p className="text-sm font-medium text-on-surface">
+                Image unavailable
+              </p>
+              <p className="max-w-sm text-xs text-on-surface-variant">
+                This photo could not be loaded. The source may block external
+                embedding.
+              </p>
+            </div>
+          ) : (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={currentImage}
+              alt={alt}
+              className="mx-auto max-h-[min(80vh,720px)] w-full object-contain bg-surface-container-low"
+              onError={() => {
+                setFailedUrls((prev) => {
+                  const next = new Set(prev);
+                  next.add(currentImage);
+                  return next;
+                });
+              }}
+            />
+          )}
         </div>
 
         {images.length > 1 ? (

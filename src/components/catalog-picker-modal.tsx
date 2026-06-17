@@ -38,13 +38,13 @@ import {
 import { useExchangeRates } from "@/hooks/useExchangeRates";
 import { ActionButton, SearchableSelect, StatusBadge } from "@/components/ops-ui";
 import { BikeCompatibilityFilter } from "@/components/BikeCompatibilityFilter";
+import { InventoryItemThumbnail } from "@/components/inventory/list-table";
 import { useLiveDataRefresh } from "@/hooks/useLiveDataRefresh";
 import {
   XMarkIcon,
   FunnelIcon,
   ChevronDownIcon,
   MagnifyingGlassIcon,
-  PhotoIcon,
 } from "@heroicons/react/24/outline";
 
 type CatalogType =
@@ -82,25 +82,6 @@ interface CatalogPickerModalProps {
   onAddItems: (items: CatalogItem[]) => void;
   selectedIds?: number[];
   blueprintId?: number;
-}
-
-function ItemThumbnail({ src, name }: { src?: string; name: string }) {
-  const [failed, setFailed] = useState(false);
-  const showImage = Boolean(src) && !failed;
-  return (
-    <div className="flex h-10 w-10 flex-none items-center justify-center overflow-hidden rounded-xl border border-outline-variant/15 bg-surface-container text-on-surface-variant">
-      {showImage ? (
-        <img
-          src={src}
-          alt=""
-          className="h-full w-full object-cover"
-          onError={() => setFailed(true)}
-        />
-      ) : (
-        <PhotoIcon className="h-5 w-5 opacity-70" aria-hidden title={name} />
-      )}
-    </div>
-  );
 }
 
 export function CatalogPickerModal({
@@ -511,11 +492,6 @@ export function CatalogPickerModal({
     }
     if ("name" in item) return item.name;
     return `Item #${(item as { id: number }).id}`;
-  };
-
-  const getItemImage = (item: CatalogItem): string | undefined => {
-    if ("image" in item && item.image) return item.image;
-    return undefined;
   };
 
   const getBikeStatusTone = (
@@ -1081,10 +1057,16 @@ export function CatalogPickerModal({
                           </svg>
                         )}
                       </div>
-                      <ItemThumbnail
-                        src={getItemImage(item)}
-                        name={getItemName(item)}
-                      />
+                      <div
+                        className="shrink-0"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <InventoryItemThumbnail
+                          image={"image" in item ? item.image : undefined}
+                          images={"images" in item ? item.images : undefined}
+                          name={getItemName(item)}
+                        />
+                      </div>
                       {/* Content */}
                       <div className="flex-1 min-w-0 pr-4">
                         <h4 className="font-semibold text-sm text-on-surface truncate">

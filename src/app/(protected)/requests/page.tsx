@@ -320,6 +320,18 @@ export default function RequestsPage() {
     "approve" | "reject" | null
   >(null);
 
+  const loadPendingCount = useCallback(async () => {
+    const token = getAuthToken();
+    if (!token) return;
+
+    try {
+      const count = await getPendingApprovalRequestCount(token);
+      setPendingCount(count);
+    } catch {
+      // Keep the last known count when the badge endpoint fails.
+    }
+  }, []);
+
   const loadRequests = useCallback(async () => {
     try {
       setLoading(true);
@@ -327,18 +339,17 @@ export default function RequestsPage() {
       const token = getAuthToken();
       if (!token) throw new Error("Authentication required");
 
-      const [result, count] = await Promise.all([
-        listApprovalRequests(token, {
-          status: statusFilter || undefined,
-          page: currentPage,
-          per_page: 20,
-        }),
-        getPendingApprovalRequestCount(token).catch(() => null),
-      ]);
+      const result = await listApprovalRequests(token, {
+        status: statusFilter || undefined,
+        page: currentPage,
+        per_page: 20,
+      });
 
       setRequests(result.items);
       setLastPage(result.lastPage);
-      if (count != null) setPendingCount(count);
+      if (statusFilter === "pending" && result.total != null) {
+        setPendingCount(result.total);
+      }
 
       if (result.items.length === 0) {
         setSelectedId(null);
@@ -364,6 +375,18 @@ export default function RequestsPage() {
       setLoading(false);
     }
   }, [currentPage, statusFilter]);
+
+  const refreshRequests = useCallback(async () => {
+    await loadRequests();
+    if (statusFilter !== "pending") {
+      await loadPendingCount();
+    }
+  }, [loadPendingCount, loadRequests, statusFilter]);
+
+  useEffect(() => {
+    if (statusFilter === "pending") return;
+    void loadPendingCount();
+  }, [loadPendingCount, statusFilter]);
 
   const loadSelectedRequest = useCallback(async (id: number) => {
     try {
@@ -432,6 +455,9 @@ export default function RequestsPage() {
 
       setConfirmAction(null);
       await loadRequests();
+      if (statusFilter !== "pending") {
+        await loadPendingCount();
+      }
       await loadSelectedRequest(selectedRequest.id);
     } catch (err) {
       setActionError(
@@ -461,6 +487,9 @@ export default function RequestsPage() {
 
       setConfirmAction(null);
       await loadRequests();
+      if (statusFilter !== "pending") {
+        await loadPendingCount();
+      }
       await loadSelectedRequest(selectedRequest.id);
     } catch (err) {
       setActionError(
@@ -506,7 +535,7 @@ export default function RequestsPage() {
           <ActionButton
             type="button"
             variant="outline"
-            onClick={() => void loadRequests()}
+            onClick={() => void refreshRequests()}
             disabled={loading}
           >
             <ArrowPathIcon

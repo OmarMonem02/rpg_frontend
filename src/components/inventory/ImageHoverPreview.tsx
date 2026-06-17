@@ -83,6 +83,7 @@ export function ImageHoverPreview({
   const anchorRef = useRef<HTMLDivElement | null>(null);
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [visible, setVisible] = useState(false);
+  const [previewFailed, setPreviewFailed] = useState(false);
   const [position, setPosition] = useState<PreviewPosition>({ top: 0, left: 0 });
   const portalTarget = useSyncExternalStore(
     () => () => {},
@@ -129,6 +130,10 @@ export function ImageHoverPreview({
     }, 80);
   }, [clearHideTimer]);
 
+  useEffect(() => {
+    setPreviewFailed(false);
+  }, [src]);
+
   useLayoutEffect(() => {
     if (!visible) return;
     updatePosition();
@@ -153,7 +158,7 @@ export function ImageHoverPreview({
   useEffect(() => clearHideTimer, [clearHideTimer]);
 
   const preview =
-    visible && portalTarget ? (
+    visible && portalTarget && !previewFailed ? (
       <div
         className="pointer-events-none fixed z-[110] overflow-hidden rounded-2xl border border-outline-variant/20 bg-surface shadow-2xl"
         style={{
@@ -164,7 +169,12 @@ export function ImageHoverPreview({
         }}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={src} alt={alt} className="h-full w-full object-cover" />
+        <img
+          src={src}
+          alt={alt}
+          className="h-full w-full object-cover"
+          onError={() => setPreviewFailed(true)}
+        />
       </div>
     ) : null;
 

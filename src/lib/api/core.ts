@@ -104,12 +104,14 @@ export async function parseApiValidationError(
 export type PaginationMeta = {
   current_page?: number;
   last_page?: number;
+  total?: number;
 };
 
 export type PaginatedResult<T> = {
   items: T[];
   currentPage: number;
   lastPage: number;
+  total?: number;
 };
 
 export type UnknownRecord = Record<string, unknown>;
@@ -277,9 +279,18 @@ export function parsePagination(payload: unknown): PaginationMeta {
   const data = asRecord(payload);
   const meta = asRecord(data.meta);
   const innerData = asRecord(data.data);
+  const total =
+    meta.total !== undefined
+      ? toNumber(meta.total)
+      : data.total !== undefined
+        ? toNumber(data.total)
+        : innerData.total !== undefined
+          ? toNumber(innerData.total)
+          : undefined;
   return {
     current_page: toNumber(meta.current_page) || toNumber(data.current_page) || toNumber(innerData.current_page) || 1,
     last_page: toNumber(meta.last_page) || toNumber(data.last_page) || toNumber(innerData.last_page) || 1,
+    total,
   };
 }
 

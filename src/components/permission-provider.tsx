@@ -84,6 +84,9 @@ export function PermissionProvider({
         if (/^\/history(?:\/|$)/.test(normalized)) {
           return authUser?.role === "admin";
         }
+        if (/^\/data\/system-backup(?:\/|$)/.test(normalized)) {
+          return authUser?.role === "admin";
+        }
         if (/^\/requests(?:\/|$)/.test(normalized)) {
           return authUser?.role === "admin";
         }

@@ -104,7 +104,7 @@ export function AppSidebar({
       active = false;
       window.clearInterval(interval);
     };
-  }, [isAdminUser, pathname]);
+  }, [isAdminUser]);
 
   const filteredNavSections = navSections
     .map((section) => ({

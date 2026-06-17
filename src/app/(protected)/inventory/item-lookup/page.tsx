@@ -10,6 +10,10 @@ import {
   type KeyboardEvent,
 } from "react";
 import { BikeCompatibilityFilter } from "@/components/BikeCompatibilityFilter";
+import {
+  InventoryImage,
+  InventoryImagePlaceholder,
+} from "@/components/inventory/InventoryImage";
 import { StockBadge } from "@/components/inventory/stock-badge";
 import {
   ActionButton,
@@ -65,17 +69,18 @@ function ItemLookupImage({
   name: string;
   size?: "sm" | "md" | "lg";
 }) {
-  if (!src) return null;
-
   const sizeClass =
     size === "lg" ? "h-24 w-24" : size === "md" ? "h-14 w-14" : "h-10 w-10";
+  const placeholderClass = `${sizeClass} flex flex-none items-center justify-center rounded-xl border border-outline-variant/15 bg-surface-container text-sm font-semibold text-on-surface-variant`;
+
+  if (!src) return null;
 
   return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
+    <InventoryImage
       src={src}
       alt={name}
       className={`${sizeClass} flex-none rounded-xl border border-outline-variant/15 object-cover`}
+      fallback={<InventoryImagePlaceholder name={name} className={placeholderClass} />}
     />
   );
 }
