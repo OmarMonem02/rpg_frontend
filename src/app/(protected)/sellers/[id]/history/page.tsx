@@ -140,7 +140,7 @@ export default function SellerHistoryPage() {
               calendar month (Africa/Cairo).
             </p>
             <p className="text-on-surface-variant/80">
-              Earned commission uses the seller&apos;s current rate for all periods shown.
+              Earned commission uses the seller&apos;s current per-category rates for all periods shown.
             </p>
           </div>
         }
@@ -212,14 +212,29 @@ export default function SellerHistoryPage() {
                 label="Earned commission"
                 value={formatMoney(currentMonth?.commissionAmount ?? 0)}
                 tone="primary"
-                hint="Current rate applied"
-              />
-              <StatCard
-                label="Commission rate"
-                value={formatCommissionRate(history.seller.commissionRate)}
-                tone="primary"
+                hint="Current rates applied"
               />
             </StatGrid>
+
+            <SurfaceCard className="p-4 md:p-5">
+              <p className="label-caps">Commission rates</p>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                <RateRow label="Products" value={history.seller.products_commission_rate} />
+                <RateRow label="Spare parts" value={history.seller.spare_parts_commission_rate} />
+                <RateRow
+                  label="Maintenance parts"
+                  value={history.seller.maintenance_parts_commission_rate}
+                />
+                <RateRow
+                  label="Bikes for sale"
+                  value={history.seller.bikes_for_sale_commission_rate}
+                />
+                <RateRow
+                  label="Maintenance services"
+                  value={history.seller.maintenance_services_commission_rate}
+                />
+              </div>
+            </SurfaceCard>
           </section>
 
           <FilterBar>
@@ -344,6 +359,17 @@ function MetricRow({
         }`}
       >
         {value}
+      </p>
+    </div>
+  );
+}
+
+function RateRow({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-xl border border-outline-variant/10 bg-surface-container-lowest px-3 py-2">
+      <p className="label-caps">{label}</p>
+      <p className="mono-data mt-1 text-sm font-semibold text-primary">
+        {formatCommissionRate(value)}
       </p>
     </div>
   );

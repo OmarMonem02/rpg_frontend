@@ -62,6 +62,7 @@ export function ServiceForm({ initialData, mode }: ServiceFormProps) {
         max_discount_type: String(formData.max_discount_type) as "fixed" | "percentage",
         max_discount_value: Number(formData.max_discount_value),
         maintenance_service_sector_id: Number(formData.maintenance_service_sector_id),
+        have_commission: formData.have_commission !== false,
       };
 
       if (mode === "edit" && initialData) {
@@ -186,6 +187,16 @@ export function ServiceForm({ initialData, mode }: ServiceFormProps) {
       value: initialData?.max_discount_value ?? 0,
       min: 0,
       step: "0.01",
+    },
+    {
+      name: "have_commission",
+      label: "Have Commission",
+      type: "toggle",
+      section: "Commission",
+      sectionDescription: "Control whether this service contributes to seller commission on completed sales.",
+      description: "When enabled, eligible sale lines use the seller's maintenance services commission rate.",
+      value: mode === "create" ? true : (initialData?.have_commission ?? true),
+      helperTone: "featured",
     },
   ],
     [mode, initialData, sectors, canCreateServices],

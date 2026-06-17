@@ -107,6 +107,7 @@ export type MaintenanceServiceRecord = {
   max_discount_type: "fixed" | "percentage";
   max_discount_value: number;
   maintenance_service_sector_id: number;
+  have_commission: boolean;
   created_at?: string;
 };
 
@@ -117,6 +118,7 @@ export type CreateMaintenanceServicePayload = {
   max_discount_type: "fixed" | "percentage";
   max_discount_value: number;
   maintenance_service_sector_id: number;
+  have_commission?: boolean;
 };
 
 export type UpdateMaintenanceServicePayload = CreateMaintenanceServicePayload;
@@ -135,6 +137,7 @@ export function normalizeMaintenanceService(raw: unknown): MaintenanceServiceRec
     maintenance_service_sector_id: toNumber(
       record.maintenance_service_sector_id,
     ),
+    have_commission: record.have_commission !== false && record.have_commission !== "false",
     created_at: toText(record.created_at) || undefined,
   };
 }

@@ -30,6 +30,11 @@ export function ReceiptTemplate({
   const shippingFee = (sale.shipping_fee || 0).toFixed(2);
   const saleDiscount = (sale.sale_discount || 0).toFixed(2);
   const totalAmount = (sale.total || 0).toFixed(2);
+  const showCommission =
+    sale.status === "completed" && (sale.commission_amount ?? 0) > 0;
+  const sellerLabel =
+    sale.seller?.name ||
+    (sale.seller_id > 0 ? `Seller #${sale.seller_id}` : "—");
 
   return (
     <div className="receipt-template pdf-capture-safe print-body w-80 bg-surface-container-lowest text-on-surface print:w-full print:max-w-none">
@@ -55,7 +60,7 @@ export function ReceiptTemplate({
           {resolveSaleAddress(sale) ? (
             <p>Address: {resolveSaleAddress(sale)}</p>
           ) : null}
-          <p>Seller: #{sale.seller_id}</p>
+          <p>Seller: {sellerLabel}</p>
           <p>Payment: {sale.payment_method_name || "—"}</p>
         </div>
 
@@ -76,6 +81,12 @@ export function ReceiptTemplate({
                   <div className="text-caption flex justify-between text-negative ml-2">
                     <span>Discount</span>
                     <span>-${item.discount_amount.toFixed(2)}</span>
+                  </div>
+                )}
+                {(item.commission_amount ?? 0) > 0 && (
+                  <div className="text-caption flex justify-between text-primary ml-2">
+                    <span>Commission</span>
+                    <span className="mono-data">${item.commission_amount!.toFixed(2)}</span>
                   </div>
                 )}
               </div>
@@ -107,6 +118,18 @@ export function ReceiptTemplate({
             <span>TOTAL:</span>
             <span className="mono-data font-bold">${totalAmount}</span>
           </div>
+          {showCommission ? (
+            <>
+              <div className="flex justify-between pt-1">
+                <span>Commission base:</span>
+                <span className="mono-data">${(sale.commission_base ?? 0).toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between font-semibold text-primary">
+                <span>Commission amount:</span>
+                <span className="mono-data">${(sale.commission_amount ?? 0).toFixed(2)}</span>
+              </div>
+            </>
+          ) : null}
         </div>
 
         {/* Payment Method */}

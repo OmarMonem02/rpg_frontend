@@ -115,6 +115,8 @@ export type SaleLineItemRecord = {
   remaining_qty: number;
   item_label?: string;
   item_name?: string;
+  commission_base?: number;
+  commission_amount?: number;
   created_at?: string;
 };
 
@@ -134,6 +136,8 @@ export type SaleRecord = {
   sale_discount: number;
   total: number;
   amount_paid?: number;
+  commission_base?: number;
+  commission_amount?: number;
   line_items?: SaleLineItemRecord[];
   created_at?: string;
   updated_at?: string;
@@ -303,6 +307,8 @@ export function normalizeSaleLineItem(raw: unknown): SaleLineItemRecord {
     remaining_qty: toNumber(record.remaining_qty ?? Math.max(0, qty - returned)),
     item_label: rawLabel,
     item_name: rawLabel ? stripItemTypePrefix(rawLabel) : undefined,
+    commission_base: toNumber(record.commission_base || 0),
+    commission_amount: toNumber(record.commission_amount || 0),
     created_at: toText(record.created_at) || undefined,
   };
 }
@@ -335,6 +341,8 @@ export function normalizeSale(raw: unknown): SaleRecord {
     shipping_fee: toNumber(record.shipping_fee || 0),
     sale_discount: toNumber(record.sale_discount || record.discount || 0),
     total: toNumber(record.total || 0),
+    commission_base: toNumber(record.commission_base || 0),
+    commission_amount: toNumber(record.commission_amount || 0),
     line_items: lineItemsRaw.map(normalizeSaleLineItem),
     created_at: toText(record.created_at) || undefined,
     updated_at: toText(record.updated_at) || undefined,

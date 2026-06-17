@@ -9,7 +9,9 @@ import {
   createSeller,
   deleteSeller,
   listSellers,
+  sellerMaxCommissionRate,
   updateSeller,
+  type SellerCommissionRates,
   type SellerListFilters,
   type SellerRecord,
   type SellerSummary,
@@ -30,14 +32,30 @@ import {
 
 type SellerFormState = {
   name: string;
-  commission_rate: string;
   phone: string;
+  products_commission_rate: string;
+  spare_parts_commission_rate: string;
+  maintenance_parts_commission_rate: string;
+  bikes_for_sale_commission_rate: string;
+  maintenance_services_commission_rate: string;
 };
+
+const COMMISSION_RATE_FIELDS: Array<{ key: keyof SellerCommissionRates; label: string }> = [
+  { key: "products_commission_rate", label: "Products Commission Rate" },
+  { key: "spare_parts_commission_rate", label: "Spare Parts Commission Rate" },
+  { key: "maintenance_parts_commission_rate", label: "Maintenance Parts Commission Rate" },
+  { key: "bikes_for_sale_commission_rate", label: "Bikes for Sale Commission Rate" },
+  { key: "maintenance_services_commission_rate", label: "Maintenance Services Commission Rate" },
+];
 
 const initialForm: SellerFormState = {
   name: "",
-  commission_rate: "",
   phone: "",
+  products_commission_rate: "",
+  spare_parts_commission_rate: "",
+  maintenance_parts_commission_rate: "",
+  bikes_for_sale_commission_rate: "",
+  maintenance_services_commission_rate: "",
 };
 
 function getSellerInitials(name: string): string {
@@ -67,14 +85,17 @@ function formatMoney(value: number): string {
 
 function getAverageCommission(records: SellerRecord[]): number {
   if (records.length === 0) return 0;
-  return records.reduce((sum, record) => sum + record.commission_rate, 0) / records.length;
+  return (
+    records.reduce((sum, record) => sum + sellerMaxCommissionRate(record), 0) /
+    records.length
+  );
 }
 
 function getPageSummary(records: SellerRecord[]): SellerSummary {
   return {
     totalSellers: records.length,
-    commissionedSellers: records.filter((record) => record.commission_rate > 0).length,
-    highCommissionSellers: records.filter((record) => record.commission_rate >= 10).length,
+    commissionedSellers: records.filter((record) => sellerMaxCommissionRate(record) > 0).length,
+    highCommissionSellers: records.filter((record) => sellerMaxCommissionRate(record) >= 10).length,
     contactReadySellers: records.filter(hasSellerPhone).length,
     completedSalesCount: records.reduce((sum, record) => sum + record.completed_sales_count, 0),
     commissionBase: records.reduce((sum, record) => sum + record.commission_base, 0),
@@ -125,7 +146,7 @@ export default function SellersPage() {
   const currentEditingRecord = editingId ? records.find((record) => record.id === editingId) : null;
   const formHeading = editingId ? "Edit Seller" : "Create Seller";
   const formDescription = editingId
-    ? "Update seller profile details, phone contact, and commission rate."
+    ? "Update seller profile details, phone contact, and per-category commission rates."
     : "Create a seller profile that can be linked to sales and commission reporting.";
   const canShowSellerForm = isFormOpen && (canCreateSellers || Boolean(editingId));
 
@@ -192,8 +213,12 @@ export default function SellersPage() {
     setMessage("");
     const payload = {
       name: form.name.trim(),
-      commission_rate: Number(form.commission_rate),
       phone: form.phone.trim(),
+      products_commission_rate: Number(form.products_commission_rate),
+      spare_parts_commission_rate: Number(form.spare_parts_commission_rate),
+      maintenance_parts_commission_rate: Number(form.maintenance_parts_commission_rate),
+      bikes_for_sale_commission_rate: Number(form.bikes_for_sale_commission_rate),
+      maintenance_services_commission_rate: Number(form.maintenance_services_commission_rate),
     };
 
     try {
@@ -254,8 +279,12 @@ export default function SellersPage() {
     setIsFormOpen(true);
     setForm({
       name: record.name,
-      commission_rate: String(record.commission_rate),
       phone: record.phone ?? "",
+      products_commission_rate: String(record.products_commission_rate),
+      spare_parts_commission_rate: String(record.spare_parts_commission_rate),
+      maintenance_parts_commission_rate: String(record.maintenance_parts_commission_rate),
+      bikes_for_sale_commission_rate: String(record.bikes_for_sale_commission_rate),
+      maintenance_services_commission_rate: String(record.maintenance_services_commission_rate),
     });
     setMessage("");
     setError("");
@@ -389,7 +418,7 @@ export default function SellersPage() {
           </div>
 
           <form className="grid gap-5 p-4 md:p-5" onSubmit={onSubmit}>
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid gap-4 md:grid-cols-2">
               <label className="space-y-2">
                 <span className="label-caps">Name</span>
                 <input
@@ -400,28 +429,6 @@ export default function SellersPage() {
                   required
                   className="form-input-base"
                   placeholder="Seller name"
-                />
-              </label>
-
-              <label className="space-y-2">
-                <span className="label-caps">Commission Rate</span>
-                <input
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={form.commission_rate}
-                  onChange={(event) =>
-                    setForm((prev) => ({
-                      ...prev,
-                      commission_rate: event.target.value,
-                    }))
-                  }
-                  onWheel={(event) => {
-                    event.currentTarget.blur();
-                  }}
-                  required
-                  className="form-input-base [&::-webkit-inner-spin-button]:appearance-none"
-                  placeholder="5"
                 />
               </label>
 
@@ -437,6 +444,30 @@ export default function SellersPage() {
                   placeholder="+20##########"
                 />
               </label>
+
+              {COMMISSION_RATE_FIELDS.map(({ key, label }) => (
+                <label key={key} className="space-y-2">
+                  <span className="label-caps">{label}</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={form[key]}
+                    onChange={(event) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        [key]: event.target.value,
+                      }))
+                    }
+                    onWheel={(event) => {
+                      event.currentTarget.blur();
+                    }}
+                    required
+                    className="form-input-base [&::-webkit-inner-spin-button]:appearance-none"
+                    placeholder="0"
+                  />
+                </label>
+              ))}
 
               <div className="flex flex-wrap gap-2 md:col-span-2">
                 <ActionButton
@@ -579,9 +610,9 @@ export default function SellersPage() {
                       </p>
                     </div>
                     <div>
-                      <p className="label-caps">Commission</p>
+                      <p className="label-caps">Max Rate</p>
                       <p className="mono-data mt-1 text-sm font-semibold text-primary">
-                        {formatCommissionRate(record.commission_rate)}
+                        {formatCommissionRate(sellerMaxCommissionRate(record))}
                       </p>
                     </div>
                     <div>
@@ -616,7 +647,7 @@ export default function SellersPage() {
                 <thead>
                   <tr className="border-b border-outline-variant/15 bg-surface-container-low">
                     <th className="label-caps px-4 py-3">Seller</th>
-                    <th className="label-caps px-4 py-3">Rate</th>
+                    <th className="label-caps px-4 py-3">Max Rate</th>
                     <th className="label-caps px-4 py-3">
                       <span>Completed Sales</span>
                       <span className="mt-0.5 block text-[10px] font-medium normal-case tracking-normal text-on-surface-variant/80">
@@ -658,7 +689,7 @@ export default function SellersPage() {
                       <td className="px-4 py-4">
                         <div className="flex flex-col items-start gap-1.5">
                           <span className="mono-data text-sm font-semibold text-primary">
-                            {formatCommissionRate(record.commission_rate)}
+                            {formatCommissionRate(sellerMaxCommissionRate(record))}
                           </span>
                         </div>
                       </td>

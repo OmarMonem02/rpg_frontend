@@ -28,11 +28,24 @@ export type UserRecord = {
   created_at?: string;
 };
 
+export type SellerCommissionRates = {
+  products_commission_rate: number;
+  spare_parts_commission_rate: number;
+  maintenance_parts_commission_rate: number;
+  bikes_for_sale_commission_rate: number;
+  maintenance_services_commission_rate: number;
+};
+
 export type SellerRecord = {
   id: number;
   name: string;
   phone: string;
-  commission_rate: number;
+  products_commission_rate: number;
+  spare_parts_commission_rate: number;
+  maintenance_parts_commission_rate: number;
+  bikes_for_sale_commission_rate: number;
+  maintenance_services_commission_rate: number;
+  max_commission_rate?: number;
   completed_sales_count: number;
   commission_base: number;
   commission_amount: number;
@@ -85,9 +98,8 @@ export type UpdateUserPermissionsPayload = {
 
 export type UpsertSellerPayload = {
   name: string;
-  commission_rate: number;
   phone: string;
-};
+} & SellerCommissionRates;
 
 export type SellerMonthlyPeriod = {
   period: string;
@@ -109,8 +121,7 @@ export type SellerMonthlyHistory = {
     id: number;
     name: string;
     phone: string;
-    commissionRate: number;
-  };
+  } & SellerCommissionRates;
   year: number;
   currentPeriod: string;
   months: SellerMonthlyPeriod[];
@@ -134,13 +145,38 @@ export function normalizeUser(raw: unknown): UserRecord {
   };
 }
 
+export function normalizeSellerCommissionRates(raw: unknown): SellerCommissionRates {
+  const record = asRecord(raw);
+
+  return {
+    products_commission_rate: toNumber(record.products_commission_rate),
+    spare_parts_commission_rate: toNumber(record.spare_parts_commission_rate),
+    maintenance_parts_commission_rate: toNumber(record.maintenance_parts_commission_rate),
+    bikes_for_sale_commission_rate: toNumber(record.bikes_for_sale_commission_rate),
+    maintenance_services_commission_rate: toNumber(record.maintenance_services_commission_rate),
+  };
+}
+
+export function sellerMaxCommissionRate(rates: SellerCommissionRates): number {
+  return Math.max(
+    rates.products_commission_rate,
+    rates.spare_parts_commission_rate,
+    rates.maintenance_parts_commission_rate,
+    rates.bikes_for_sale_commission_rate,
+    rates.maintenance_services_commission_rate,
+  );
+}
+
 export function normalizeSeller(raw: unknown): SellerRecord {
   const record = asRecord(raw);
+  const rates = normalizeSellerCommissionRates(record);
+
   return {
     id: toNumber(record.id),
     name: toText(record.name),
     phone: toText(record.phone),
-    commission_rate: toNumber(record.commission_rate),
+    ...rates,
+    max_commission_rate: toNumber(record.max_commission_rate) || sellerMaxCommissionRate(rates),
     completed_sales_count: toNumber(record.completed_sales_count),
     commission_base: toNumber(record.commission_base),
     commission_amount: toNumber(record.commission_amount),
@@ -340,7 +376,7 @@ export async function getSellerMonthlyHistory(
       id: toNumber(seller.id),
       name: toText(seller.name),
       phone: toText(seller.phone),
-      commissionRate: toNumber(seller.commission_rate),
+      ...normalizeSellerCommissionRates(seller),
     },
     year: toNumber(record.year),
     currentPeriod: toText(record.current_period),

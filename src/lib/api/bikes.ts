@@ -269,6 +269,7 @@ export type BikeRecord = {
   vin: string;
   mileage: number;
   notes?: string;
+  have_commission: boolean;
   created_at?: string;
 };
 
@@ -290,6 +291,7 @@ export type CreateBikePayload = {
   vin: string;
   mileage?: number;
   notes?: string;
+  have_commission?: boolean;
 };
 
 export type UpdateBikePayload = CreateBikePayload;
@@ -326,6 +328,7 @@ export function normalizeBike(raw: unknown): BikeRecord {
     vin: toText(record.vin),
     mileage: toNumber(record.mileage),
     notes: toText(record.notes) || undefined,
+    have_commission: record.have_commission !== false && record.have_commission !== "false",
     created_at: toText(record.created_at) || undefined,
   };
 }

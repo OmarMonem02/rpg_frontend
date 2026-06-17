@@ -209,6 +209,7 @@ export function ProductForm({ initialData, mode }: ProductFormProps) {
         max_discount_type: String(formData.max_discount_type) as "fixed" | "percentage",
         max_discount_value: Number(formData.max_discount_value),
         universal: isUniversal,
+        have_commission: formData.have_commission !== false,
         notes: formData.notes ? String(formData.notes) : undefined,
         tags: Array.isArray(formData.tags)
           ? (formData.tags as string[]).filter((tag) => String(tag).trim())
@@ -314,13 +315,13 @@ export function ProductForm({ initialData, mode }: ProductFormProps) {
           ? initialData.images
           : initialData?.image
             ? [
-                {
-                  url: initialData.image,
-                  public_id: initialData.image_public_id,
-                  is_primary: true,
-                  sort_order: 0,
-                },
-              ]
+              {
+                url: initialData.image,
+                public_id: initialData.image_public_id,
+                is_primary: true,
+                sort_order: 0,
+              },
+            ]
             : [],
       uploadFolder: "rpg-system/products",
       maxImages: 4,
@@ -465,8 +466,6 @@ export function ProductForm({ initialData, mode }: ProductFormProps) {
       value: initialData?.low_stock_alarm ?? 0,
       min: 0,
     },
-    
-    
     {
       name: "universal",
       label: "Universal Product",
@@ -621,6 +620,16 @@ export function ProductForm({ initialData, mode }: ProductFormProps) {
           return ids.length === 1 ? { id: ids[0] } : { ids };
         },
       },
+    },
+    {
+      name: "have_commission",
+      label: "Have Commission",
+      type: "toggle",
+      section: "Commission",
+      sectionDescription: "Control whether this item contributes to seller commission on completed sales.",
+      description: "When enabled, eligible sale lines use the seller's product commission rate.",
+      value: mode === "create" ? true : (initialData?.have_commission ?? true),
+      helperTone: "featured",
     },
     {
       name: "notes",

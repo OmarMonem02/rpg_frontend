@@ -80,6 +80,7 @@ export function BikeForm({ mode, initialData }: BikeFormProps) {
         vin: String(formData.vin),
         mileage: formData.mileage ? Number(formData.mileage) : 0,
         notes: formData.notes ? String(formData.notes) : undefined,
+        have_commission: formData.have_commission !== false,
       };
 
       if (mode === "edit" && initialData) {
@@ -206,6 +207,14 @@ export function BikeForm({ mode, initialData }: BikeFormProps) {
       placeholder: "0",
       min: 0,
       value: initialData?.mileage ?? 0,
+    },
+    {
+      name: "have_commission",
+      label: "Have Commission",
+      type: "toggle",
+      section: "Pricing",
+      description: "When enabled, eligible sale lines use the seller's bikes for sale commission rate.",
+      value: mode === "create" ? true : (initialData?.have_commission ?? true),
     },
     {
       name: "notes",

@@ -32,6 +32,7 @@ import {
   HashtagIcon,
 } from "@heroicons/react/24/outline";
 import { money, labelOf } from "./sale-item-utils";
+import { titleCase } from "@/lib/delivery-orders/utils";
 
 function getStatusTone(
   status: string,

@@ -398,6 +398,7 @@ export type SparePartRecord = {
   max_discount_type: "fixed" | "percentage";
   max_discount_value: number;
   universal: boolean;
+  have_commission: boolean;
   notes?: string;
   tags?: string[];
   bike_blueprint_ids?: number[];
@@ -428,6 +429,7 @@ export type CreateSparePartPayload = {
   max_discount_type: "fixed" | "percentage";
   max_discount_value: number;
   universal?: boolean;
+  have_commission?: boolean;
   notes?: string;
   tags?: string[];
   bike_blueprint_ids?: number[];
@@ -457,6 +459,7 @@ export type UpdateSparePartPayload = {
   max_discount_type: "fixed" | "percentage";
   max_discount_value: number;
   universal?: boolean;
+  have_commission?: boolean;
   notes?: string;
   tags?: string[];
   /** When set, replaces pivot links (use [] when universal). Omit to leave links unchanged. */
@@ -534,6 +537,7 @@ export function normalizeSparePart(raw: unknown): SparePartRecord {
     max_discount_type: toText(record.max_discount_type) as "fixed" | "percentage",
     max_discount_value: toNumber(record.max_discount_value),
     universal: record.universal === true || record.universal === "true",
+    have_commission: record.have_commission !== false && record.have_commission !== "false",
     notes: toText(record.notes) || undefined,
     tags: coalesceTags(record),
     bike_blueprint_ids: coalesceBikeBlueprintIds(record),
@@ -661,6 +665,7 @@ export type MaintenancePartRecord = {
   max_discount_type: "fixed" | "percentage";
   max_discount_value: number;
   universal: boolean;
+  have_commission: boolean;
   notes?: string;
   tags?: string[];
   bike_blueprint_ids?: number[];
@@ -691,6 +696,7 @@ export type CreateMaintenancePartPayload = {
   max_discount_type: "fixed" | "percentage";
   max_discount_value: number;
   universal?: boolean;
+  have_commission?: boolean;
   notes?: string;
   tags?: string[];
   bike_blueprint_ids?: number[];
@@ -720,6 +726,7 @@ export type UpdateMaintenancePartPayload = {
   max_discount_type: "fixed" | "percentage";
   max_discount_value: number;
   universal?: boolean;
+  have_commission?: boolean;
   notes?: string;
   tags?: string[];
   /** When set, replaces pivot links (use [] when universal). Omit to leave links unchanged. */
@@ -748,6 +755,7 @@ export function normalizeMaintenancePart(raw: unknown): MaintenancePartRecord {
     max_discount_type: toText(record.max_discount_type) as "fixed" | "percentage",
     max_discount_value: toNumber(record.max_discount_value),
     universal: record.universal === true || record.universal === "true",
+    have_commission: record.have_commission !== false && record.have_commission !== "false",
     notes: toText(record.notes) || undefined,
     tags: coalesceTags(record),
     bike_blueprint_ids: coalesceBikeBlueprintIds(record),
@@ -875,6 +883,7 @@ export type ProductRecord = {
   max_discount_type: "fixed" | "percentage";
   max_discount_value: number;
   universal: boolean;
+  have_commission: boolean;
   notes?: string;
   tags?: string[];
   bike_blueprint_ids?: number[];
@@ -905,6 +914,7 @@ export type CreateProductPayload = {
   max_discount_type: "fixed" | "percentage";
   max_discount_value: number;
   universal?: boolean;
+  have_commission?: boolean;
   notes?: string;
   tags?: string[];
   bike_blueprint_ids?: number[];
@@ -937,6 +947,7 @@ export function normalizeProduct(raw: unknown): ProductRecord {
     max_discount_type: toText(record.max_discount_type) as "fixed" | "percentage",
     max_discount_value: toNumber(record.max_discount_value),
     universal: record.universal === true || record.universal === "true",
+    have_commission: record.have_commission !== false && record.have_commission !== "false",
     notes: toText(record.notes) || undefined,
     tags: coalesceTags(record),
     bike_blueprint_ids: coalesceBikeBlueprintIds(record),

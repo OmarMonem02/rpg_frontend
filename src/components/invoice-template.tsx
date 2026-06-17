@@ -81,6 +81,8 @@ export function InvoiceTemplate({
   const remainingBalance = Math.max(0, netTotal - amountPaid);
   const hasOutstandingBalance =
     sale.amount_paid != null && remainingBalance > 0.005;
+  const showCommission =
+    sale.status === "completed" && (sale.commission_amount ?? 0) > 0;
 
   const activeLineItems =
     sale.line_items?.filter((item) => item.remaining_qty > 0) ?? [];
@@ -361,7 +363,6 @@ export function InvoiceTemplate({
                     </span>
                   </div>
                 ) : null}
-
                 <div className="totals-divider" aria-hidden="true" />
 
                 {hasOutstandingBalance ? (
