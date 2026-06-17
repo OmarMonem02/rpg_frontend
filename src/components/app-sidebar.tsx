@@ -270,7 +270,7 @@ export function AppSidebar({
                       <span className="ml-3 flex min-w-0 flex-1 items-center justify-between gap-2">
                         <span className="truncate">{item.label}</span>
                         {item.href === "/requests" && pendingRequestCount > 0 ? (
-                          <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-warning px-1.5 py-0.5 text-[10px] font-bold text-on-warning">
+                          <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-warning-container px-1.5 py-0.5 text-[10px] font-bold text-on-warning-container">
                             {pendingRequestCount}
                           </span>
                         ) : null}

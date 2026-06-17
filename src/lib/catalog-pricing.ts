@@ -305,6 +305,52 @@ export function pricingRecordFromItem(
   };
 }
 
+export type CatalogProfit = {
+  amountEgp: number;
+  percentOnCost: number;
+};
+
+export function computeCatalogProfit(
+  pricing: Pick<
+    CatalogPricingFields,
+    "cost_price" | "cost_currency" | "sale_price" | "sale_currency"
+  >,
+  rates: ExchangeRates,
+): CatalogProfit | null {
+  const costEgp = computeCostInEgp(pricing.cost_price, pricing.cost_currency, rates);
+  if (costEgp <= 0) return null;
+
+  const saleEgp = computeSaleInEgp(pricing.sale_price, pricing.sale_currency, rates);
+  const amountEgp = Math.round((saleEgp - costEgp) * 100) / 100;
+  const percentOnCost = Math.round((amountEgp / costEgp) * 1000) / 10;
+
+  return { amountEgp, percentOnCost };
+}
+
+export function formatCatalogProfitAmount(
+  pricing: Pick<
+    CatalogPricingFields,
+    "cost_price" | "cost_currency" | "sale_price" | "sale_currency"
+  >,
+  rates: ExchangeRates,
+): string {
+  const profit = computeCatalogProfit(pricing, rates);
+  if (!profit) return "—";
+  return formatEgp(profit.amountEgp);
+}
+
+export function formatCatalogProfitPercent(
+  pricing: Pick<
+    CatalogPricingFields,
+    "cost_price" | "cost_currency" | "sale_price" | "sale_currency"
+  >,
+  rates: ExchangeRates,
+): string {
+  const profit = computeCatalogProfit(pricing, rates);
+  if (!profit) return "—";
+  return `${profit.percentOnCost}%`;
+}
+
 export function buildCatalogPricingPayload(
   formData: Record<string, unknown>,
 ): CatalogPricingFields {

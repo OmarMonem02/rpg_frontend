@@ -27,7 +27,6 @@ import {
   SectionHeading,
 } from "@/components/ops-ui";
 import { useExchangeRates } from "@/hooks/useExchangeRates";
-import { useLiveDataRefresh } from "@/hooks/useLiveDataRefresh";
 import { getAuthToken } from "@/lib/auth-session";
 import { formatCatalogPriceInEGP, type ExchangeRates } from "@/lib/currencies";
 import {
@@ -466,13 +465,6 @@ export default function ItemLookupPage() {
   useEffect(() => {
     void loadBrowseResults();
   }, [loadBrowseResults]);
-
-  useLiveDataRefresh(() => {
-    void loadBrowseResults();
-    if (skuValue.trim()) {
-      void runQuickLookup();
-    }
-  });
 
   const handleQuickSubmit = (event: FormEvent) => {
     event.preventDefault();

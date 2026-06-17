@@ -32,10 +32,10 @@
   --color-success: #1b7a3f;
   --color-success-container: #d4f4df;
   --color-on-success-container: #0a3d1f;
-
-  --color-warning: #9a6700;
-  --color-warning-container: #fff0c2;
-  --color-on-warning-container: #4a3200;
+  
+  --color-warning: #8e4242;
+  --color-warning-container: #ff8484;
+  --color-on-warning-container: #471f1f;
 
   --color-info: #0053dc;
   --color-info-container: #d9e2ff;
@@ -1500,9 +1500,9 @@
     --color-success: #1b7a3f !important;
     --color-success-container: #d4f4df !important;
     --color-on-success-container: #0a3d1f !important;
-    --color-warning: #9a6700 !important;
-    --color-warning-container: #fff0c2 !important;
-    --color-on-warning-container: #4a3200 !important;
+    --color-warning: #8e4242 !important;
+    --color-warning-container: #ff8484 !important;
+    --color-on-warning-container: #471f1f !important;
     --color-positive: #1b7a3f !important;
     --color-negative: #ba1a1a !important;
     --color-neutral-metric: #5c6467 !important;

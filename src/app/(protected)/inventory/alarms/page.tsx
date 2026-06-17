@@ -24,7 +24,6 @@ import {
   StatusBadge,
   TabsWrapper,
 } from "@/components/ops-ui";
-import { useLiveDataRefresh } from "@/hooks/useLiveDataRefresh";
 import { getAuthToken } from "@/lib/auth-session";
 import {
   fetchAllPages,
@@ -438,7 +437,6 @@ export default function InventoryAlarmsPage() {
     void loadData();
   }, [loadData]);
 
-  useLiveDataRefresh(loadData);
 
   const allRows = useMemo(
     () => [...sparePartRows, ...productRows, ...maintenancePartRows],

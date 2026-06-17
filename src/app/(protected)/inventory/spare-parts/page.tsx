@@ -6,14 +6,17 @@ import { usePermissions } from "@/components/permission-provider";
 import { getAuthToken } from "@/lib/auth-session";
 import { useEntityFilters } from "@/hooks/useEntityFilters";
 import { useExchangeRates } from "@/hooks/useExchangeRates";
-import { useLiveDataRefresh } from "@/hooks/useLiveDataRefresh";
 import {
+  formatCatalogProfitAmount,
+  formatCatalogProfitPercent,
+  isPricingLoss,
   pricingRecordFromItem,
   resolveMarginQuickEditPricing,
   type SaleMarginType,
   type SalePriceQuickEditStrategy,
 } from "@/lib/catalog-pricing";
 import { formatCatalogPriceInEGP, toPricingCurrency } from "@/lib/currencies";
+import { formatMaxDiscount } from "@/lib/item-lookup";
 import { ItemStatusBadge } from "@/lib/inventory-item-attributes";
 import {
   listSpareParts,
@@ -34,8 +37,8 @@ import {
 import { filterBrandsByType } from "@/lib/brand-types";
 import {
   QuickEditActions,
+  QuickEditCostPriceCell,
   QuickEditInput,
-  QuickEditPriceInput,
   QuickEditSalePriceCell,
   combineValidators,
   useQuickEditRow,
@@ -86,7 +89,8 @@ import { PageSizeSelect } from "@/components/inventory/PageSizeSelect";
 
 type SparePartsColumnId =
   | "image" | "sku" | "name" | "stock" | "alarm"
-  | "cost_price" | "price" | "category" | "brand"
+  | "cost_price" | "price" | "profit_amount" | "profit_percent" | "max_discount"
+  | "category" | "brand"
   | "size" | "color" | "status"
   | "tags" | "universal" | "actions";
 
@@ -98,6 +102,9 @@ const SPARE_PARTS_COLUMNS: readonly TableColumnDef<SparePartsColumnId>[] = [
   { id: "alarm", label: "Alarm on" },
   { id: "cost_price", label: "Cost Price" },
   { id: "price", label: "Price" },
+  { id: "profit_amount", label: "Profit" },
+  { id: "profit_percent", label: "Profit %" },
+  { id: "max_discount", label: "Max Discount" },
   { id: "category", label: "Category" },
   { id: "brand", label: "Brand" },
   { id: "size", label: "Size" },
@@ -276,8 +283,6 @@ export default function SparePartsPage() {
   useEffect(() => {
     loadData();
   }, [loadData]);
-
-  useLiveDataRefresh(loadData);
 
   const handleSaveSparePartQuickEdit = async (part: SparePartRecord) => {
     const token = getAuthToken();
@@ -537,7 +542,7 @@ export default function SparePartsPage() {
             />
           </InventoryListTableToolbar>
           <InventoryListTableScroll>
-            <InventoryListTableElement minWidth="1280px">
+            <InventoryListTableElement minWidth="1520px">
               <InventoryListTableHead>
                 <tr>
                   {isVisible("image") && <InventoryListTableTh className="w-14">Image</InventoryListTableTh>}
@@ -553,6 +558,9 @@ export default function SparePartsPage() {
                   {isVisible("alarm") && <InventoryListTableTh align="center">Alarm on</InventoryListTableTh>}
                   {isVisible("cost_price") && <InventoryListTableTh>Cost Price</InventoryListTableTh>}
                   {isVisible("price") && <InventoryListTableTh>Price</InventoryListTableTh>}
+                  {isVisible("profit_amount") && <InventoryListTableTh>Profit</InventoryListTableTh>}
+                  {isVisible("profit_percent") && <InventoryListTableTh>Profit %</InventoryListTableTh>}
+                  {isVisible("max_discount") && <InventoryListTableTh>Max Discount</InventoryListTableTh>}
                   {isVisible("category") && <InventoryListTableTh>Category</InventoryListTableTh>}
                   {isVisible("brand") && <InventoryListTableTh>Brand</InventoryListTableTh>}
                   {isVisible("size") && <InventoryListTableTh>Size</InventoryListTableTh>}
@@ -566,6 +574,18 @@ export default function SparePartsPage() {
               <InventoryListTableBody>
               {spareParts.map((part) => {
                 const editing = quickEdit.isEditing(part.id);
+                const profitPricing = pricingRecordFromItem(
+                  editing
+                    ? {
+                        ...part,
+                        cost_price:
+                          Number(quickEdit.draft.cost_price) || part.cost_price,
+                        sale_price:
+                          Number(quickEdit.draft.sale_price) || part.sale_price,
+                      }
+                    : part,
+                );
+                const showLoss = isPricingLoss(profitPricing, rates);
                 return (
                   <InventoryListTableRow key={part.id} editing={editing}>
                     {isVisible("image") && (
@@ -641,14 +661,13 @@ export default function SparePartsPage() {
                     {isVisible("cost_price") && (
                       <InventoryListTableTd variant="primary">
                         {editing ? (
-                          <QuickEditPriceInput
+                          <QuickEditCostPriceCell
                             value={quickEdit.draft.cost_price ?? ""}
                             onChange={(value) =>
                               quickEdit.updateField("cost_price", value)
                             }
-                            currency={toPricingCurrency(
-                              part.cost_currency,
-                            )}
+                            costCurrency={toPricingCurrency(part.cost_currency)}
+                            rates={rates}
                             type="number"
                             min={0}
                             step="any"
@@ -697,6 +716,27 @@ export default function SparePartsPage() {
                             quickEdit.updateField("sale_margin_value", value)
                           }
                         />
+                      </InventoryListTableTd>
+                    )}
+                    {isVisible("profit_amount") && (
+                      <InventoryListTableTd
+                        variant="mono"
+                        className={showLoss ? "text-warning" : undefined}
+                      >
+                        {formatCatalogProfitAmount(profitPricing, rates)}
+                      </InventoryListTableTd>
+                    )}
+                    {isVisible("profit_percent") && (
+                      <InventoryListTableTd
+                        variant="mono"
+                        className={showLoss ? "text-warning" : undefined}
+                      >
+                        {formatCatalogProfitPercent(profitPricing, rates)}
+                      </InventoryListTableTd>
+                    )}
+                    {isVisible("max_discount") && (
+                      <InventoryListTableTd variant="muted">
+                        {formatMaxDiscount(part, rates)}
                       </InventoryListTableTd>
                     )}
                     {isVisible("category") && (

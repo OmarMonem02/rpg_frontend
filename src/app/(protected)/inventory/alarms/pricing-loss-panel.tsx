@@ -16,7 +16,6 @@ import {
   StatGrid,
   StatusBadge,
 } from "@/components/ops-ui";
-import { useLiveDataRefresh } from "@/hooks/useLiveDataRefresh";
 import { getAuthToken } from "@/lib/auth-session";
 import {
   applyPricingAlarms,
@@ -86,8 +85,6 @@ export function PricingLossPanel() {
   useEffect(() => {
     void loadData();
   }, [loadData]);
-
-  useLiveDataRefresh(loadData);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();

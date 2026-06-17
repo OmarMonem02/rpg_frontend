@@ -8,12 +8,16 @@ import { useEntityFilters } from "@/hooks/useEntityFilters";
 import { useExchangeRates } from "@/hooks/useExchangeRates";
 import { useGlobalDataRefresh } from "@/hooks/useGlobalDataRefresh";
 import {
+  formatCatalogProfitAmount,
+  formatCatalogProfitPercent,
+  isPricingLoss,
   pricingRecordFromItem,
   resolveMarginQuickEditPricing,
   type SaleMarginType,
   type SalePriceQuickEditStrategy,
 } from "@/lib/catalog-pricing";
 import { formatCatalogPriceInEGP, toPricingCurrency } from "@/lib/currencies";
+import { formatMaxDiscount } from "@/lib/item-lookup";
 import {
   listBikes,
   listBikeBlueprints,
@@ -28,8 +32,8 @@ import {
 } from "@/lib/crud-api";
 import {
   QuickEditActions,
+  QuickEditCostPriceCell,
   QuickEditInput,
-  QuickEditPriceInput,
   QuickEditSalePriceCell,
   combineValidators,
   useQuickEditRow,
@@ -72,17 +76,20 @@ import { useTablePageSize } from "@/hooks/useTablePageSize";
 import { PageSizeSelect } from "@/components/inventory/PageSizeSelect";
 
 type BikesColumnId =
-  | "blueprint" | "vin" | "sale_price" | "cost_price"
+  | "blueprint" | "vin" | "sale_price" | "profit_amount" | "profit_percent"
+  | "cost_price"
   | "mileage" | "status" | "discount" | "actions";
 
 const BIKES_COLUMNS: readonly TableColumnDef<BikesColumnId>[] = [
   { id: "blueprint", label: "Blueprint" },
   { id: "vin", label: "VIN" },
   { id: "sale_price", label: "Sale Price" },
+  { id: "profit_amount", label: "Profit" },
+  { id: "profit_percent", label: "Profit %" },
   { id: "cost_price", label: "Cost Price" },
   { id: "mileage", label: "Mileage (km)" },
   { id: "status", label: "Status" },
-  { id: "discount", label: "Discount" },
+  { id: "discount", label: "Max Discount" },
   { id: "actions", label: "Actions", required: true },
 ];
 
@@ -386,22 +393,36 @@ export default function BikesPage() {
               />
             </InventoryListTableToolbar>
             <InventoryListTableScroll>
-              <InventoryListTableElement minWidth="960px">
+              <InventoryListTableElement minWidth="1200px">
                 <InventoryListTableHead>
                   <tr>
                     {isVisible("blueprint") && <InventoryListTableTh>Blueprint</InventoryListTableTh>}
                     {isVisible("vin") && <InventoryListTableTh>VIN</InventoryListTableTh>}
                     {isVisible("sale_price") && <InventoryListTableTh align="right">Sale Price</InventoryListTableTh>}
+                    {isVisible("profit_amount") && <InventoryListTableTh align="right">Profit</InventoryListTableTh>}
+                    {isVisible("profit_percent") && <InventoryListTableTh align="right">Profit %</InventoryListTableTh>}
                     {isVisible("cost_price") && <InventoryListTableTh align="right">Cost Price</InventoryListTableTh>}
                     {isVisible("mileage") && <InventoryListTableTh align="center">Mileage (km)</InventoryListTableTh>}
                     {isVisible("status") && <InventoryListTableTh>Status</InventoryListTableTh>}
-                    {isVisible("discount") && <InventoryListTableTh>Discount</InventoryListTableTh>}
+                    {isVisible("discount") && <InventoryListTableTh>Max Discount</InventoryListTableTh>}
                     <InventoryListTableTh align="center">Actions</InventoryListTableTh>
                   </tr>
                 </InventoryListTableHead>
                 <InventoryListTableBody>
                 {bikes.map((bike) => {
                   const editing = quickEdit.isEditing(bike.id);
+                  const profitPricing = pricingRecordFromItem(
+                    editing
+                      ? {
+                          ...bike,
+                          cost_price:
+                            Number(quickEdit.draft.cost_price) || bike.cost_price,
+                          sale_price:
+                            Number(quickEdit.draft.sale_price) || bike.sale_price,
+                        }
+                      : bike,
+                  );
+                  const showLoss = isPricingLoss(profitPricing, rates);
                   return (
                     <InventoryListTableRow key={bike.id} editing={editing}>
                       {isVisible("blueprint") && (
@@ -456,17 +477,34 @@ export default function BikesPage() {
                           />
                         </InventoryListTableTd>
                       )}
+                      {isVisible("profit_amount") && (
+                        <InventoryListTableTd
+                          align="right"
+                          variant="mono"
+                          className={showLoss ? "text-warning" : undefined}
+                        >
+                          {formatCatalogProfitAmount(profitPricing, rates)}
+                        </InventoryListTableTd>
+                      )}
+                      {isVisible("profit_percent") && (
+                        <InventoryListTableTd
+                          align="right"
+                          variant="mono"
+                          className={showLoss ? "text-warning" : undefined}
+                        >
+                          {formatCatalogProfitPercent(profitPricing, rates)}
+                        </InventoryListTableTd>
+                      )}
                       {isVisible("cost_price") && (
                         <InventoryListTableTd align="right" variant="mono">
                           {editing ? (
-                            <QuickEditPriceInput
+                            <QuickEditCostPriceCell
                               value={quickEdit.draft.cost_price ?? ""}
                               onChange={(value) =>
                                 quickEdit.updateField("cost_price", value)
                               }
-                              currency={toPricingCurrency(
-                                bike.cost_currency,
-                              )}
+                              costCurrency={toPricingCurrency(bike.cost_currency)}
+                              rates={rates}
                               type="number"
                               min={0}
                               step="any"
@@ -508,13 +546,17 @@ export default function BikesPage() {
                       )}
                       {isVisible("discount") && (
                         <InventoryListTableTd variant="muted">
-                          {bike.max_discount_type === "percentage"
-                            ? `${bike.max_discount_value}%`
-                            : formatCatalogPriceInEGP(
-                                bike.max_discount_value,
-                                toPricingCurrency(bike.sale_currency),
-                                rates,
-                              )}
+                          {formatMaxDiscount(
+                            {
+                              max_discount_type:
+                                bike.max_discount_type === "fixed"
+                                  ? "fixed"
+                                  : "percentage",
+                              max_discount_value: bike.max_discount_value,
+                              sale_currency: toPricingCurrency(bike.sale_currency),
+                            },
+                            rates,
+                          )}
                         </InventoryListTableTd>
                       )}
                       <InventoryListTableTd align="right" className="whitespace-nowrap">

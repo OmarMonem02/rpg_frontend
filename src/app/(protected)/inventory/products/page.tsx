@@ -6,14 +6,17 @@ import { usePermissions } from "@/components/permission-provider";
 import { getAuthToken } from "@/lib/auth-session";
 import { useEntityFilters } from "@/hooks/useEntityFilters";
 import { useExchangeRates } from "@/hooks/useExchangeRates";
-import { useLiveDataRefresh } from "@/hooks/useLiveDataRefresh";
 import {
+  formatCatalogProfitAmount,
+  formatCatalogProfitPercent,
+  isPricingLoss,
   pricingRecordFromItem,
   resolveMarginQuickEditPricing,
   type SaleMarginType,
   type SalePriceQuickEditStrategy,
 } from "@/lib/catalog-pricing";
 import { formatCatalogPriceInEGP, toPricingCurrency } from "@/lib/currencies";
+import { formatMaxDiscount } from "@/lib/item-lookup";
 import { ItemStatusBadge } from "@/lib/inventory-item-attributes";
 import {
   listProducts,
@@ -33,8 +36,8 @@ import {
 import { filterBrandsByType } from "@/lib/brand-types";
 import {
   QuickEditActions,
+  QuickEditCostPriceCell,
   QuickEditInput,
-  QuickEditPriceInput,
   QuickEditSalePriceCell,
   combineValidators,
   useQuickEditRow,
@@ -85,7 +88,8 @@ import { PageSizeSelect } from "@/components/inventory/PageSizeSelect";
 
 type ProductsColumnId =
   | "image" | "sku" | "name" | "stock" | "alarm"
-  | "cost_price" | "sale_price" | "category" | "brand"
+  | "cost_price" | "sale_price" | "profit_amount" | "profit_percent" | "max_discount"
+  | "category" | "brand"
   | "size" | "color" | "status"
   | "tags" | "universal" | "actions";
 
@@ -97,6 +101,9 @@ const PRODUCTS_COLUMNS: readonly TableColumnDef<ProductsColumnId>[] = [
   { id: "alarm", label: "Alarm on" },
   { id: "cost_price", label: "Cost Price" },
   { id: "sale_price", label: "Sale Price" },
+  { id: "profit_amount", label: "Profit" },
+  { id: "profit_percent", label: "Profit %" },
+  { id: "max_discount", label: "Max Discount" },
   { id: "category", label: "Category" },
   { id: "brand", label: "Brand" },
   { id: "size", label: "Size" },
@@ -281,8 +288,6 @@ export default function ProductsPage() {
   useEffect(() => {
     loadData();
   }, [loadData]);
-
-  useLiveDataRefresh(loadData);
 
   const handleSaveProductQuickEdit = async (product: ProductRecord) => {
     const token = getAuthToken();
@@ -556,7 +561,7 @@ export default function ProductsPage() {
             />
           </InventoryListTableToolbar>
           <InventoryListTableScroll>
-            <InventoryListTableElement minWidth="1280px">
+            <InventoryListTableElement minWidth="1520px">
               <InventoryListTableHead>
                 <tr>
                   {isVisible("image") && <InventoryListTableTh className="w-14">Image</InventoryListTableTh>}
@@ -572,6 +577,9 @@ export default function ProductsPage() {
                   {isVisible("alarm") && <InventoryListTableTh align="center">Alarm on</InventoryListTableTh>}
                   {isVisible("cost_price") && <InventoryListTableTh>Cost Price</InventoryListTableTh>}
                   {isVisible("sale_price") && <InventoryListTableTh>Sale Price</InventoryListTableTh>}
+                  {isVisible("profit_amount") && <InventoryListTableTh>Profit</InventoryListTableTh>}
+                  {isVisible("profit_percent") && <InventoryListTableTh>Profit %</InventoryListTableTh>}
+                  {isVisible("max_discount") && <InventoryListTableTh>Max Discount</InventoryListTableTh>}
                   {isVisible("category") && <InventoryListTableTh>Category</InventoryListTableTh>}
                   {isVisible("brand") && <InventoryListTableTh>Brand</InventoryListTableTh>}
                   {isVisible("size") && <InventoryListTableTh>Size</InventoryListTableTh>}
@@ -585,6 +593,18 @@ export default function ProductsPage() {
               <InventoryListTableBody>
               {products.map((product) => {
                 const editing = quickEdit.isEditing(product.id);
+                const profitPricing = pricingRecordFromItem(
+                  editing
+                    ? {
+                        ...product,
+                        cost_price:
+                          Number(quickEdit.draft.cost_price) || product.cost_price,
+                        sale_price:
+                          Number(quickEdit.draft.sale_price) || product.sale_price,
+                      }
+                    : product,
+                );
+                const showLoss = isPricingLoss(profitPricing, rates);
                 return (
                   <InventoryListTableRow key={product.id} editing={editing}>
                     {isVisible("image") && (
@@ -662,14 +682,13 @@ export default function ProductsPage() {
                     {isVisible("cost_price") && (
                       <InventoryListTableTd variant="primary">
                         {editing ? (
-                          <QuickEditPriceInput
+                          <QuickEditCostPriceCell
                             value={quickEdit.draft.cost_price ?? ""}
                             onChange={(value) =>
                               quickEdit.updateField("cost_price", value)
                             }
-                            currency={toPricingCurrency(
-                              product.cost_currency,
-                            )}
+                            costCurrency={toPricingCurrency(product.cost_currency)}
+                            rates={rates}
                             type="number"
                             min={0}
                             step="any"
@@ -718,6 +737,27 @@ export default function ProductsPage() {
                             quickEdit.updateField("sale_margin_value", value)
                           }
                         />
+                      </InventoryListTableTd>
+                    )}
+                    {isVisible("profit_amount") && (
+                      <InventoryListTableTd
+                        variant="mono"
+                        className={showLoss ? "text-warning" : undefined}
+                      >
+                        {formatCatalogProfitAmount(profitPricing, rates)}
+                      </InventoryListTableTd>
+                    )}
+                    {isVisible("profit_percent") && (
+                      <InventoryListTableTd
+                        variant="mono"
+                        className={showLoss ? "text-warning" : undefined}
+                      >
+                        {formatCatalogProfitPercent(profitPricing, rates)}
+                      </InventoryListTableTd>
+                    )}
+                    {isVisible("max_discount") && (
+                      <InventoryListTableTd variant="muted">
+                        {formatMaxDiscount(product, rates)}
                       </InventoryListTableTd>
                     )}
                     {isVisible("category") && (

@@ -52,7 +52,7 @@ const SERVICES_COLUMNS: readonly TableColumnDef<ServicesColumnId>[] = [
   { id: "name", label: "Name" },
   { id: "sector", label: "Sector" },
   { id: "price", label: "Price" },
-  { id: "discount", label: "Discount" },
+  { id: "discount", label: "Max Discount" },
   { id: "created", label: "Created" },
   { id: "actions", label: "Actions", required: true },
 ];
@@ -410,7 +410,7 @@ export default function MaintenanceServicesPage() {
                   {isVisible("name") && <InventoryListTableTh>Name</InventoryListTableTh>}
                   {isVisible("sector") && <InventoryListTableTh>Sector</InventoryListTableTh>}
                   {isVisible("price") && <InventoryListTableTh>Price</InventoryListTableTh>}
-                  {isVisible("discount") && <InventoryListTableTh>Discount</InventoryListTableTh>}
+                  {isVisible("discount") && <InventoryListTableTh>Max Discount</InventoryListTableTh>}
                   {isVisible("created") && <InventoryListTableTh>Created</InventoryListTableTh>}
                   <InventoryListTableTh align="center">Actions</InventoryListTableTh>
                 </tr>

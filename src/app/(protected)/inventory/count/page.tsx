@@ -257,6 +257,8 @@ export default function InventoryCountPage() {
             onToggle={stocktakeColumnState.toggle}
             onMove={stocktakeColumnState.move}
             onReset={stocktakeColumnState.reset}
+            collapsible
+            defaultCollapsed
           />
         </div>
       ) : null}

@@ -39,7 +39,6 @@ import { useExchangeRates } from "@/hooks/useExchangeRates";
 import { ActionButton, SearchableSelect, StatusBadge } from "@/components/ops-ui";
 import { BikeCompatibilityFilter } from "@/components/BikeCompatibilityFilter";
 import { InventoryItemThumbnail } from "@/components/inventory/list-table";
-import { useLiveDataRefresh } from "@/hooks/useLiveDataRefresh";
 import {
   XMarkIcon,
   FunnelIcon,
@@ -362,12 +361,6 @@ export function CatalogPickerModal({
       loadItems();
     }
   }, [isOpen, catalogType, page, memoizedFilters, loadItems]);
-
-  useLiveDataRefresh(() => {
-    if (isOpen) {
-      return loadItems();
-    }
-  });
 
   useEffect(() => {
     if (isOpen) {

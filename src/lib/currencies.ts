@@ -51,6 +51,16 @@ export function convertToEGP(
   return Math.round(amount * m * 100) / 100;
 }
 
+/** Converts an EGP amount back to the given pricing currency (2 decimal places). */
+export function convertFromEGP(
+  amount: number,
+  currency: PricingCurrency,
+  rates: ExchangeRates,
+): number {
+  const m = egpMultiplierForPricingCurrency(currency, rates);
+  return Math.round((amount / m) * 100) / 100;
+}
+
 export function formatEgp(amount: number): string {
   return new Intl.NumberFormat("en-EG", {
     style: "currency",
