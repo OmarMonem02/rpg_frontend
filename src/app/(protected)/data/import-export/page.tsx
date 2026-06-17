@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { fetchImportExportEntities } from "@/lib/api/import-export";
 import { getAuthToken } from "@/lib/auth-session";
 import type { ImportExportEntity } from "@/types/import-export";
-import { EntityCard } from "@/components/import-export/EntityCard";
+import { EntityCardGrid } from "@/components/import-export/EntityCardGrid";
+import { useImportExportEntityOrder } from "@/hooks/useImportExportEntityOrder";
 import {
   PageHero,
   PageShell,
@@ -39,6 +40,8 @@ export default function ImportExportHubPage() {
     void loadEntities();
   }, []);
 
+  const { orderedEntities, orderedSlugs, move, reset } = useImportExportEntityOrder(entities);
+
   return (
     <PageShell>
       <div className="mb-2 text-sm text-on-surface-variant flex items-center gap-2">
@@ -71,11 +74,12 @@ export default function ImportExportHubPage() {
           </div>
         </SurfaceCard>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {entities.map((entity) => (
-            <EntityCard key={entity.slug} entity={entity} />
-          ))}
-        </div>
+        <EntityCardGrid
+          entities={orderedEntities}
+          orderedSlugs={orderedSlugs}
+          onMove={move}
+          onReset={reset}
+        />
       )}
     </PageShell>
   );

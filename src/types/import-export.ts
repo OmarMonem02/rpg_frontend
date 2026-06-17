@@ -30,7 +30,8 @@ export type ImportIssueActionType =
   | 'create_spare_part_category'
   | 'create_maintenance_part_category'
   | 'create_maintenance_service_sector'
-  | 'create_bike_blueprint';
+  | 'create_bike_blueprint'
+  | 'create_bike_blueprint_range';
 
 export type ImportIssueAction = {
   type: ImportIssueActionType;
@@ -39,6 +40,8 @@ export type ImportIssueAction = {
   brand_id?: number;
   model?: string;
   year?: number;
+  year_from?: number;
+  year_to?: number;
 };
 
 export type ImportIssue = {

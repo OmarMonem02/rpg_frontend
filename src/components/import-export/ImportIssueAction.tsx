@@ -2,7 +2,7 @@
 
 import { ActionButton, InlineMessage } from "@/components/ops-ui";
 import { usePermissions } from "@/components/permission-provider";
-import { createBikeBlueprint } from "@/lib/api/bikes";
+import { bulkCreateBikeBlueprintsByYearRange, createBikeBlueprint } from "@/lib/api/bikes";
 import {
   createBrand,
   createProductCategory,
@@ -38,6 +38,7 @@ function permissionPageForAction(action: ImportIssueAction): PagePath | null {
     case "create_maintenance_service_sector":
       return "maintenance-services";
     case "create_bike_blueprint":
+    case "create_bike_blueprint_range":
       return "bike-blueprints";
     default:
       return null;
@@ -60,6 +61,10 @@ function actionLabel(action: ImportIssueAction): string {
       return "Create sector";
     case "create_bike_blueprint":
       return "Create blueprint";
+    case "create_bike_blueprint_range":
+      return action.year_from != null && action.year_to != null
+        ? `Create blueprints (${action.year_from}-${action.year_to})`
+        : "Create blueprints";
     default:
       return "Create";
   }
@@ -138,6 +143,18 @@ export function ImportIssueActionButton({ action, onResolved }: ImportIssueActio
             brand_id: action.brand_id,
             model: action.model,
             year: action.year,
+          });
+          break;
+        }
+        case "create_bike_blueprint_range": {
+          if (!action.brand_id || !action.model || action.year_from == null || action.year_to == null) {
+            throw new Error("Missing blueprint range details.");
+          }
+          await bulkCreateBikeBlueprintsByYearRange(token, {
+            brand_id: action.brand_id,
+            model: action.model,
+            year_from: action.year_from,
+            year_to: action.year_to,
           });
           break;
         }

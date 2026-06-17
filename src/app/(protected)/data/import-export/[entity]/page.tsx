@@ -86,7 +86,12 @@ export default function EntityImportExportPage() {
     [entity],
   );
 
-  const columnState = useExportColumns(`export-cols:import-export:${entitySlug}`, allColumns);
+  const selectableColumns = useMemo(
+    () => allColumns.filter((col) => !col.exportOnly),
+    [allColumns],
+  );
+
+  const columnState = useExportColumns(`export-cols:import-export:${entitySlug}`, selectableColumns);
 
   const previewColumns = useMemo(
     () =>
@@ -182,7 +187,7 @@ export default function EntityImportExportPage() {
       {canExportData || canImportData ? (
         <div className="mb-6">
           <ExportColumnPicker
-            allColumns={allColumns}
+            allColumns={selectableColumns}
             orderedKeys={columnState.orderedKeys}
             isVisible={columnState.isVisible}
             onToggle={columnState.toggle}

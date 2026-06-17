@@ -128,11 +128,12 @@ export function ExportColumnPicker({
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
-  const columnByKey = new Map(allColumns.map((col) => [col.key, col]));
+  const selectableColumns = allColumns.filter((col) => !col.exportOnly);
+  const columnByKey = new Map(selectableColumns.map((col) => [col.key, col]));
   const orderedVisible = orderedKeys
     .map((key) => columnByKey.get(key))
     .filter((col): col is ExportColumnDef => Boolean(col));
-  const hiddenColumns = allColumns.filter((col) => !isVisible(col.key));
+  const hiddenColumns = selectableColumns.filter((col) => !isVisible(col.key));
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
@@ -164,7 +165,7 @@ export function ExportColumnPicker({
               <h3 className="text-lg font-semibold text-on-surface">Columns</h3>
               {collapsed ? (
                 <p className="mt-1 text-sm text-on-surface-variant">
-                  {orderedKeys.length} of {allColumns.length} columns selected for export.
+                  {orderedKeys.length} of {selectableColumns.length} columns selected for export.
                 </p>
               ) : (
                 <p className="mt-1 text-sm text-on-surface-variant">
@@ -185,7 +186,7 @@ export function ExportColumnPicker({
         {!collapsed ? (
           <div className="flex items-center gap-3">
             <span className="text-xs font-medium text-on-surface-variant">
-              {orderedKeys.length} of {allColumns.length} selected
+              {orderedKeys.length} of {selectableColumns.length} selected
             </span>
             <button
               type="button"

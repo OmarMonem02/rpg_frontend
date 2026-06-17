@@ -23,6 +23,7 @@ function readFromStorage(
       if (Array.isArray(parsed)) {
         const stored = (parsed as string[]).filter((id) => allowed.has(id));
         const missing = allColumns
+          .filter((col) => !col.exportOnly)
           .map((col) => col.key)
           .filter((id) => !stored.includes(id));
         const merged = [...stored, ...missing];
@@ -43,17 +44,18 @@ export function useExportColumns(
   storageKey: string,
   allColumns: readonly ExportColumnDef[],
 ) {
-  const [orderedKeys, setOrderedKeys] = useState<string[]>(() =>
-    allColumns.map((col) => col.key).filter((key) => {
-      const col = allColumns.find((c) => c.key === key);
-      return col && !col.exportOnly;
-    }),
+  const [orderedKeys, setOrderedKeys] = useState<string[]>(() => defaultOrder(allColumns));
+
+  const allColumnKeys = useMemo(
+    () => allColumns.map((col) => col.key).join(","),
+    [allColumns],
   );
 
   useEffect(() => {
+    if (allColumns.length === 0) return;
     setOrderedKeys(readFromStorage(storageKey, allColumns));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [storageKey]);
+  }, [storageKey, allColumnKeys]);
 
   const persist = useCallback(
     (next: string[]) => {
@@ -121,7 +123,7 @@ export function useExportColumns(
   );
 
   const reset = useCallback(() => {
-    persist(allColumns.map((col) => col.key));
+    persist(defaultOrder(allColumns));
   }, [allColumns, persist]);
 
   const columnsParam = useCallback(
