@@ -7,12 +7,13 @@ import {
   SearchableSelect,
   SurfaceCard,
 } from "@/components/ops-ui";
-import type { BikeBlueprintRecord } from "@/lib/crud-api";
+import type { BikeBlueprintRecord, BulkInventoryPreviewRow } from "@/lib/crud-api";
 import {
   NUMERIC_BULK_EDIT_FIELDS,
   draftHasEnabledFields,
   type BulkEditDraft,
 } from "./types";
+import { BulkEditPreviewPanel } from "./BulkEditPreviewPanel";
 
 type BulkEditConfigureStepProps = {
   draft: BulkEditDraft;
@@ -21,8 +22,12 @@ type BulkEditConfigureStepProps = {
   mixedCurrency: boolean;
   bikeBlueprints: BikeBlueprintRecord[];
   error: string | null;
+  previewRows: BulkInventoryPreviewRow[];
+  previewLoading: boolean;
+  previewError: string | null;
+  applying: boolean;
   onBack: () => void;
-  onNext: () => void;
+  onApply: () => void;
 };
 
 const PRICE_MODES = [
@@ -51,8 +56,12 @@ export function BulkEditConfigureStep({
   mixedCurrency,
   bikeBlueprints,
   error,
+  previewRows,
+  previewLoading,
+  previewError,
+  applying,
   onBack,
-  onNext,
+  onApply,
 }: BulkEditConfigureStepProps) {
   const [blueprintSearch, setBlueprintSearch] = useState("");
 
@@ -393,12 +402,22 @@ export function BulkEditConfigureStep({
 
       {error ? <InlineMessage tone="danger">{error}</InlineMessage> : null}
 
+      <BulkEditPreviewPanel
+        rows={previewRows}
+        loading={previewLoading}
+        error={previewError}
+      />
+
       <div className="flex flex-wrap justify-between gap-3">
-        <ActionButton variant="ghost" onClick={onBack}>
+        <ActionButton variant="ghost" onClick={onBack} disabled={applying}>
           Back
         </ActionButton>
-        <ActionButton tone="primary" onClick={onNext} disabled={!hasEnabled}>
-          Preview changes
+        <ActionButton
+          tone="primary"
+          onClick={onApply}
+          disabled={!hasEnabled || applying || previewLoading || previewRows.length === 0}
+        >
+          {applying ? "Applying…" : "Apply changes"}
         </ActionButton>
       </div>
     </div>

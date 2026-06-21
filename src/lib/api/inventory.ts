@@ -1185,12 +1185,7 @@ export type BulkInventoryPreviewValue =
   | string[]
   | number[];
 
-export type BulkInventoryFilters = {
-  search?: string;
-  brand_id?: number;
-  category_id?: number;
-  currency?: string;
-};
+export type BulkInventoryFilters = CatalogListFilters;
 
 export type BulkInventoryEditPayload = {
   ids?: number[];

@@ -1,14 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { getAuthToken } from "@/lib/auth-session";
 import { fetchAllPages } from "@/lib/crud-api";
-import type { BulkInventoryFilters, BulkInventoryListItem } from "./types";
+import type { CatalogListFilters } from "@/lib/crud-api";
+import type { BulkInventoryListItem } from "./types";
 import type { BulkEditEntityConfig } from "./types";
 
 export function useBulkEditSelection(
   config: BulkEditEntityConfig,
-  filters: BulkInventoryFilters,
+  filters: CatalogListFilters,
 ) {
   const [items, setItems] = useState<BulkInventoryListItem[]>([]);
   const [page, setPage] = useState(1);
@@ -17,6 +18,8 @@ export function useBulkEditSelection(
   const [error, setError] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [selectAllFilteredLoading, setSelectAllFilteredLoading] = useState(false);
+
+  const filterKey = useMemo(() => JSON.stringify(filters), [filters]);
 
   const loadPage = useCallback(async () => {
     try {
@@ -36,7 +39,7 @@ export function useBulkEditSelection(
 
   useEffect(() => {
     setPage(1);
-  }, [filters.search, filters.brand_id, filters.category_id, filters.currency]);
+  }, [filterKey]);
 
   useEffect(() => {
     loadPage();

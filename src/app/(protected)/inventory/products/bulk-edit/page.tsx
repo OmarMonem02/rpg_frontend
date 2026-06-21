@@ -15,6 +15,7 @@ import {
 
 const productsBulkConfig: BulkEditEntityConfig = {
   entity: "products",
+  moduleId: "products",
   eyebrow: "Inventory · Products",
   title: "Bulk edit products",
   subtitle:

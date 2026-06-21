@@ -1,8 +1,6 @@
 "use client";
 
-import Link from "next/link";
 import {
-  ActionButton,
   InlineMessage,
   SurfaceCard,
 } from "@/components/ops-ui";
@@ -14,16 +12,10 @@ import type {
 import { itemStatusLabel } from "@/lib/inventory-item-attributes";
 import { NUMERIC_BULK_EDIT_FIELDS } from "./types";
 
-type BulkEditPreviewStepProps = {
+type BulkEditPreviewPanelProps = {
   rows: BulkInventoryPreviewRow[];
   loading: boolean;
-  applying: boolean;
   error: string | null;
-  listHref: string;
-  successUpdated?: number;
-  onBack: () => void;
-  onConfirm: () => void;
-  onDone?: () => void;
 };
 
 const FIELD_LABELS: Record<string, string> = {
@@ -65,6 +57,7 @@ function blueprintLabels(
   }
   return undefined;
 }
+
 function formatCompatibility(
   universal: boolean | undefined,
   labels: string[] | undefined,
@@ -109,7 +102,6 @@ function formatValue(key: string, value: BulkInventoryPreviewValue | undefined):
 }
 
 function changeTone(
-  key: string,
   before: BulkInventoryPreviewValue | undefined,
   after: BulkInventoryPreviewValue | undefined,
 ): string {
@@ -139,7 +131,12 @@ function displayFieldsForRow(row: BulkInventoryPreviewRow): BulkInventoryPreview
   }
 
   for (const key of raw) {
-    if (!fields.includes(key) && key !== "universal" && key !== "bike_blueprint_ids" && key !== "bike_blueprint_labels") {
+    if (
+      !fields.includes(key) &&
+      key !== "universal" &&
+      key !== "bike_blueprint_ids" &&
+      key !== "bike_blueprint_labels"
+    ) {
       fields.push(key);
     }
   }
@@ -189,56 +186,22 @@ function beforeAfterForField(
   return {
     before,
     after,
-    tone: numericKey ? changeTone(field, row.before[field], row.after[field]) : "text-on-surface",
+    tone: numericKey ? changeTone(row.before[field], row.after[field]) : "text-on-surface",
   };
 }
 
-export function BulkEditPreviewStep({
+export function BulkEditPreviewPanel({
   rows,
   loading,
-  applying,
   error,
-  listHref,
-  successUpdated,
-  onBack,
-  onConfirm,
-}: BulkEditPreviewStepProps) {
-  if (successUpdated !== undefined) {
-    return (
-      <SurfaceCard className="animate-scale-in p-8 text-center">
-        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full border border-primary/20 bg-primary-container">
-          <svg
-            className="h-7 w-7 text-primary"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-          </svg>
-        </div>
-        <h2 className="font-display text-xl font-bold text-on-surface">
-          Bulk edit applied
-        </h2>
-        <p className="mt-2 text-sm text-on-surface-variant">
-          Updated <span className="mono-data font-medium text-on-surface">{successUpdated}</span>{" "}
-          items successfully.
-        </p>
-        <div className="mt-6 flex flex-wrap justify-center gap-3">
-          <Link href={listHref}>
-            <ActionButton tone="primary">Back to list</ActionButton>
-          </Link>
-        </div>
-      </SurfaceCard>
-    );
-  }
-
+}: BulkEditPreviewPanelProps) {
   return (
-    <div className="space-y-4 animate-fade-in">
+    <div className="space-y-3">
       <SurfaceCard className="p-4">
-        <p className="text-sm text-on-surface-variant">
-          Review <span className="mono-data font-medium text-on-surface">{rows.length}</span>{" "}
-          items with changes before applying. Each card shows old and new values per field.
+        <h3 className="font-display text-sm font-semibold text-on-surface">Live preview</h3>
+        <p className="mt-1 text-sm text-on-surface-variant">
+          Updates automatically as you configure changes. Review old and new values per item before
+          applying.
         </p>
       </SurfaceCard>
 
@@ -250,10 +213,14 @@ export function BulkEditPreviewStep({
         </SurfaceCard>
       ) : rows.length === 0 ? (
         <SurfaceCard className="p-8 text-center text-on-surface-variant">
-          No changes would be applied with the current configuration.
+          Enable at least one field with a valid value to see a preview.
         </SurfaceCard>
       ) : (
         <div className="space-y-3">
+          <p className="text-sm text-on-surface-variant">
+            <span className="mono-data font-medium text-on-surface">{rows.length}</span> items
+            will change
+          </p>
           {rows.map((row) => {
             const fields = displayFieldsForRow(row);
             return (
@@ -288,19 +255,6 @@ export function BulkEditPreviewStep({
           })}
         </div>
       )}
-
-      <div className="flex flex-wrap justify-between gap-3">
-        <ActionButton variant="ghost" onClick={onBack} disabled={applying}>
-          Back
-        </ActionButton>
-        <ActionButton
-          tone="primary"
-          onClick={onConfirm}
-          disabled={loading || applying || rows.length === 0}
-        >
-          {applying ? "Applying…" : "Confirm and apply"}
-        </ActionButton>
-      </div>
     </div>
   );
 }

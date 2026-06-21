@@ -1,28 +1,45 @@
 "use client";
 
-import { SUPPORTED_PRICING_CURRENCIES } from "@/lib/currencies";
 import {
   ActionButton,
-  FilterBar,
-  InputGroup,
   InlineMessage,
   PaginationControls,
-  SearchableSelect,
   SurfaceCard,
 } from "@/components/ops-ui";
+import { ActiveFilterChips } from "@/components/inventory/ActiveFilterChips";
+import { InventoryModuleFilters } from "@/components/inventory/InventoryModuleFilters";
+import type { EntityFilters } from "@/hooks/useEntityFilters";
+import { buildActiveFilterChips } from "@/lib/inventory-filter-utils";
+import type { InventoryModuleId } from "@/lib/inventory-filter-config";
 import type { BrandRecord, ProductCategoryRecord, SparePartCategoryRecord } from "@/lib/crud-api";
-import type { BulkInventoryListItem } from "./types";
+import { useMemo } from "react";
+import { BulkEditCatalogTable } from "./BulkEditCatalogTable";
+import type { BulkEditEntity, BulkInventoryListItem } from "./types";
 
-type BulkEditSelectStepProps = {
-  search: string;
+type FilterSetters = {
+  filters: EntityFilters;
   setSearch: (v: string) => void;
-  brandId: string;
-  setBrandId: (v: string) => void;
-  categoryId: string;
-  setCategoryId: (v: string) => void;
-  currency: string;
+  setCategory: (v: number | "") => void;
+  setBrand: (v: number | "") => void;
+  setPriceMin: (v: number | "") => void;
+  setPriceMax: (v: number | "") => void;
   setCurrency: (v: string) => void;
+  setBikeCompatibility: (v: {
+    bike_brand_id?: number;
+    bike_model?: string;
+    bike_year?: number;
+  }) => void;
+  setTags: (v: string[]) => void;
+  setLowStock: (v: boolean) => void;
+  setFilter: <K extends keyof EntityFilters>(key: K, value: EntityFilters[K]) => void;
+  resetFilters: () => void;
+};
+
+type BulkEditSelectStepProps = FilterSetters & {
+  moduleId: InventoryModuleId;
+  entity: BulkEditEntity;
   brands: BrandRecord[];
+  bikeBrands: BrandRecord[];
   categories: (ProductCategoryRecord | SparePartCategoryRecord)[];
   items: BulkInventoryListItem[];
   loading: boolean;
@@ -42,15 +59,22 @@ type BulkEditSelectStepProps = {
 };
 
 export function BulkEditSelectStep({
-  search,
+  moduleId,
+  entity,
+  filters,
   setSearch,
-  brandId,
-  setBrandId,
-  categoryId,
-  setCategoryId,
-  currency,
+  setCategory,
+  setBrand,
+  setPriceMin,
+  setPriceMax,
   setCurrency,
+  setBikeCompatibility,
+  setTags,
+  setLowStock,
+  setFilter,
+  resetFilters,
   brands,
+  bikeBrands,
   categories,
   items,
   loading,
@@ -68,66 +92,74 @@ export function BulkEditSelectStep({
   onClearSelection,
   onNext,
 }: BulkEditSelectStepProps) {
+  const filterChips = useMemo(
+    () =>
+      buildActiveFilterChips(filters, {
+        onClear: (key) => {
+          if (key === "bike_compat") {
+            setBikeCompatibility({});
+            return;
+          }
+          if (key === "price_min" || key === "price_max") {
+            setPriceMin("");
+            setPriceMax("");
+            return;
+          }
+          setFilter(key as keyof typeof filters, undefined);
+        },
+        selectOptions: {
+          categories: categories.map((c) => ({ value: c.id, label: c.name })),
+          brands: brands.map((b) => ({ value: b.id, label: b.name })),
+          bikeBrands: bikeBrands.map((b) => ({ value: b.id, label: b.name })),
+        },
+      }),
+    [
+      filters,
+      categories,
+      brands,
+      bikeBrands,
+      setFilter,
+      setBikeCompatibility,
+      setPriceMin,
+      setPriceMax,
+    ],
+  );
+
   return (
     <div className="space-y-4 animate-fade-in">
-      <SurfaceCard>
-        <FilterBar className="md:grid-cols-12">
-          <InputGroup label="Search" className="md:col-span-3">
-            <input
-              type="text"
-              placeholder="Name or SKU..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="form-input-base py-2 text-sm"
-            />
-          </InputGroup>
-          <InputGroup label="Brand" className="md:col-span-3">
-            <SearchableSelect
-              value={brandId}
-              onChange={setBrandId}
-              placeholder="All brands"
-              options={brands.map((b) => ({
-                value: b.id,
-                label: b.name,
-              }))}
-              className="form-input-base py-2 text-sm"
-            />
-          </InputGroup>
-          <InputGroup label="Category" className="md:col-span-3">
-            <SearchableSelect
-              value={categoryId}
-              onChange={setCategoryId}
-              placeholder="All categories"
-              options={categories.map((c) => ({
-                value: c.id,
-                label: c.name,
-              }))}
-              className="form-input-base py-2 text-sm"
-            />
-          </InputGroup>
-          <InputGroup label="Currency" className="md:col-span-3">
-            <SearchableSelect
-              value={currency}
-              onChange={setCurrency}
-              options={[
-                { value: "all", label: "All currencies" },
-                ...SUPPORTED_PRICING_CURRENCIES.map((code) => ({
-                  value: code,
-                  label: code,
-                })),
-              ]}
-              className="form-input-base py-2 text-sm"
-            />
-          </InputGroup>
-        </FilterBar>
-      </SurfaceCard>
+      <InventoryModuleFilters
+        module={moduleId}
+        filters={filters}
+        bikeBrands={bikeBrands}
+        loading={loading}
+        setters={{
+          setSearch,
+          setCategory,
+          setBrand,
+          setBlueprint: () => {},
+          setSector: () => {},
+          setStatus: () => {},
+          setType: () => {},
+          setPriceMin,
+          setPriceMax,
+          setCurrency,
+          setLowStock,
+          setTags,
+          setBikeCompatibility,
+          setFilter,
+        }}
+        options={{
+          categories: categories.map((c) => ({ value: c.id, label: c.name })),
+          brands: brands.map((b) => ({ value: b.id, label: b.name })),
+        }}
+      />
+
+      <ActiveFilterChips chips={filterChips} onClearAll={resetFilters} />
 
       <SurfaceCard>
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-outline-variant/10 px-4 py-3">
           <div className="flex flex-wrap items-center gap-3">
-            <span className="label-caps">
-              {selectedCount} selected
-            </span>
+            <span className="label-caps">{selectedCount} selected</span>
             <ActionButton variant="ghost" onClick={onTogglePageAll} disabled={items.length === 0}>
               {pageAllSelected ? "Deselect page" : "Select page"}
             </ActionButton>
@@ -155,71 +187,17 @@ export function BulkEditSelectStep({
           </div>
         ) : null}
 
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[640px] text-left text-sm">
-            <thead>
-              <tr className="border-b border-outline-variant/15 bg-surface-container-low">
-                <th className="w-10 px-4 py-3">
-                  <input
-                    type="checkbox"
-                    checked={pageAllSelected && items.length > 0}
-                    onChange={onTogglePageAll}
-                    className="h-4 w-4 rounded border-outline-variant/40 text-primary focus:ring-primary/20"
-                    aria-label="Select all on page"
-                  />
-                </th>
-                <th className="px-4 py-3 font-display text-xs font-bold uppercase tracking-wide text-on-surface-variant">
-                  Item
-                </th>
-                <th className="px-4 py-3 font-display text-xs font-bold uppercase tracking-wide text-on-surface-variant">
-                  SKU
-                </th>
-                <th className="px-4 py-3 font-display text-xs font-bold uppercase tracking-wide text-on-surface-variant">
-                  Currency
-                </th>
-                <th className="px-4 py-3 font-display text-xs font-bold uppercase tracking-wide text-on-surface-variant">
-                  Sale
-                </th>
-                <th className="px-4 py-3 font-display text-xs font-bold uppercase tracking-wide text-on-surface-variant">
-                  Stock
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-on-surface-variant">
-                    Loading items…
-                  </td>
-                </tr>
-              ) : items.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-on-surface-variant">
-                    No items match your filters.
-                  </td>
-                </tr>
-              ) : (
-                items.map((item) => (
-                  <tr key={item.id} className="data-row">
-                    <td className="px-4 py-3">
-                      <input
-                        type="checkbox"
-                        checked={selectedIds.has(item.id)}
-                        onChange={() => onToggleId(item.id)}
-                        className="h-4 w-4 rounded border-outline-variant/40 text-primary focus:ring-primary/20"
-                      />
-                    </td>
-                    <td className="px-4 py-3 font-medium text-on-surface">{item.name}</td>
-                    <td className="px-4 py-3 mono-data text-on-surface-variant">{item.sku}</td>
-                    <td className="px-4 py-3 mono-data">{item.sale_currency}</td>
-                    <td className="px-4 py-3 mono-data">{item.sale_price}</td>
-                    <td className="px-4 py-3 mono-data">{item.stock_quantity}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+        <BulkEditCatalogTable
+          entity={entity}
+          items={items}
+          loading={loading}
+          categories={categories}
+          brands={brands}
+          selectedIds={selectedIds}
+          onToggleId={onToggleId}
+          onTogglePageAll={onTogglePageAll}
+          pageAllSelected={pageAllSelected}
+        />
 
         <div className="border-t border-outline-variant/10 px-4 py-3">
           <PaginationControls

@@ -1,9 +1,11 @@
+import type { CatalogListFilters } from "@/lib/crud-api";
+import type { InventoryModuleId } from "@/lib/inventory-filter-config";
+import type { PaginatedResult } from "@/lib/api/core";
 import type {
   BrandRecord,
   BulkInventoryApplyResult,
   BulkInventoryChanges,
   BulkInventoryEditPayload,
-  BulkInventoryFilters,
   BulkInventoryPreviewResult,
   ItemStatus,
   ProductCategoryRecord,
@@ -13,9 +15,8 @@ import type {
   MaintenancePartCategoryRecord,
   MaintenancePartRecord,
 } from "@/lib/crud-api";
-import type { PaginatedResult } from "@/lib/api/core";
 
-export type { BulkInventoryFilters };
+export type { CatalogListFilters as BulkInventoryFilters };
 
 export type BulkEditEntity = "products" | "spare_parts" | "maintenance_parts";
 
@@ -26,6 +27,7 @@ export type BulkInventoryListItem =
 
 export type BulkEditEntityConfig = {
   entity: BulkEditEntity;
+  moduleId: InventoryModuleId;
   eyebrow: string;
   title: string;
   subtitle: string;
@@ -34,7 +36,7 @@ export type BulkEditEntityConfig = {
   listItems: (
     token: string,
     page: number,
-    filters: BulkInventoryFilters,
+    filters: CatalogListFilters,
   ) => Promise<PaginatedResult<BulkInventoryListItem>>;
   listCategories: (
     token: string,
@@ -106,7 +108,7 @@ export type BulkEditDraft = {
 /** @deprecated Use NUMERIC_BULK_EDIT_FIELDS */
 export const BULK_EDIT_FIELDS = NUMERIC_BULK_EDIT_FIELDS;
 
-export type BulkEditStep = 1 | 2 | 3 | 4;
+export type BulkEditStep = 1 | 2 | 3;
 
 export function emptyBulkEditDraft(): BulkEditDraft {
   return {
@@ -179,16 +181,15 @@ export function draftToChanges(draft: BulkEditDraft): BulkInventoryChanges | nul
   return Object.keys(changes).length > 0 ? changes : null;
 }
 
-export function buildListFilters(state: {
-  search: string;
-  brandId: string;
-  categoryId: string;
-  currency: string;
-}): BulkInventoryFilters {
-  const filters: BulkInventoryFilters = {};
-  if (state.search.trim()) filters.search = state.search.trim();
-  if (state.brandId) filters.brand_id = Number(state.brandId);
-  if (state.categoryId) filters.category_id = Number(state.categoryId);
-  if (state.currency && state.currency !== "all") filters.currency = state.currency;
-  return filters;
+export function getBulkEditCategoryId(
+  item: BulkInventoryListItem,
+  entity: BulkEditEntity,
+): number {
+  if (entity === "products") {
+    return (item as ProductRecord).products_category_id;
+  }
+  if (entity === "spare_parts") {
+    return (item as SparePartRecord).spare_parts_category_id;
+  }
+  return (item as MaintenancePartRecord).maintenance_parts_category_id;
 }
