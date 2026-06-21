@@ -1154,6 +1154,8 @@ export type BulkPriceChangeMode = "set" | "add" | "subtract" | "percent";
 
 export type BulkStockChangeMode = "set" | "add" | "subtract";
 
+export type BulkSetChange<T> = { mode: "set"; value: T };
+
 export type BulkFieldChange =
   | { mode: BulkPriceChangeMode; value: number }
   | { mode: BulkStockChangeMode; value: number };
@@ -1163,7 +1165,25 @@ export type BulkInventoryChanges = {
   cost_price?: BulkFieldChange;
   stock_quantity?: BulkFieldChange;
   low_stock_alarm?: BulkFieldChange;
+  item_status?: BulkSetChange<ItemStatus>;
+  have_commission?: BulkSetChange<boolean>;
+  max_discount_type?: BulkSetChange<"fixed" | "percentage">;
+  max_discount_value?: BulkSetChange<number>;
+  universal?: BulkSetChange<boolean>;
+  bike_blueprint_ids?: BulkSetChange<number[]>;
 };
+
+export type BulkInventoryPreviewFieldKey =
+  | keyof BulkInventoryChanges
+  | "compatibility"
+  | "bike_blueprint_labels";
+
+export type BulkInventoryPreviewValue =
+  | number
+  | boolean
+  | string
+  | string[]
+  | number[];
 
 export type BulkInventoryFilters = {
   search?: string;
@@ -1183,9 +1203,9 @@ export type BulkInventoryPreviewRow = {
   name: string;
   sku: string;
   sale_currency: PricingCurrency;
-  before: Partial<Record<keyof BulkInventoryChanges, number>>;
-  after: Partial<Record<keyof BulkInventoryChanges, number>>;
-  changed_fields: (keyof BulkInventoryChanges)[];
+  before: Partial<Record<BulkInventoryPreviewFieldKey, BulkInventoryPreviewValue>>;
+  after: Partial<Record<BulkInventoryPreviewFieldKey, BulkInventoryPreviewValue>>;
+  changed_fields: BulkInventoryPreviewFieldKey[];
 };
 
 export type BulkInventoryPreviewResult = {
@@ -1197,6 +1217,50 @@ export type BulkInventoryApplyResult = {
   updated: number;
   rows: BulkInventoryPreviewRow[];
 };
+
+const BULK_PREVIEW_FIELD_KEYS: BulkInventoryPreviewFieldKey[] = [
+  "sale_price",
+  "cost_price",
+  "stock_quantity",
+  "low_stock_alarm",
+  "item_status",
+  "have_commission",
+  "max_discount_type",
+  "max_discount_value",
+  "universal",
+  "bike_blueprint_ids",
+  "compatibility",
+  "bike_blueprint_labels",
+];
+
+function normalizeBulkPreviewValue(raw: unknown): BulkInventoryPreviewValue | undefined {
+  if (raw === undefined || raw === null) return undefined;
+  if (typeof raw === "boolean") return raw;
+  if (typeof raw === "number" && Number.isFinite(raw)) return raw;
+  if (typeof raw === "string") return raw;
+  if (Array.isArray(raw)) {
+    if (raw.every((item) => typeof item === "string")) {
+      return raw as string[];
+    }
+    if (raw.every((item) => typeof item === "number" || (typeof item === "string" && item !== ""))) {
+      return raw.map((item) => Number(item));
+    }
+  }
+  return undefined;
+}
+
+function normalizeBulkPreviewFieldMap(
+  raw: Record<string, unknown>,
+): Partial<Record<BulkInventoryPreviewFieldKey, BulkInventoryPreviewValue>> {
+  const result: Partial<Record<BulkInventoryPreviewFieldKey, BulkInventoryPreviewValue>> = {};
+  for (const key of BULK_PREVIEW_FIELD_KEYS) {
+    const value = normalizeBulkPreviewValue(raw[key]);
+    if (value !== undefined) {
+      result[key] = value;
+    }
+  }
+  return result;
+}
 
 function normalizeBulkPreviewRow(raw: unknown): BulkInventoryPreviewRow {
   const record = asRecord(raw);
@@ -1211,24 +1275,10 @@ function normalizeBulkPreviewRow(raw: unknown): BulkInventoryPreviewRow {
     name: toText(record.name),
     sku: toText(record.sku),
     sale_currency: toPricingCurrency(record.sale_currency),
-    before: {
-      sale_price: before.sale_price !== undefined ? toNumber(before.sale_price) : undefined,
-      cost_price: before.cost_price !== undefined ? toNumber(before.cost_price) : undefined,
-      stock_quantity:
-        before.stock_quantity !== undefined ? toNumber(before.stock_quantity) : undefined,
-      low_stock_alarm:
-        before.low_stock_alarm !== undefined ? toNumber(before.low_stock_alarm) : undefined,
-    },
-    after: {
-      sale_price: after.sale_price !== undefined ? toNumber(after.sale_price) : undefined,
-      cost_price: after.cost_price !== undefined ? toNumber(after.cost_price) : undefined,
-      stock_quantity:
-        after.stock_quantity !== undefined ? toNumber(after.stock_quantity) : undefined,
-      low_stock_alarm:
-        after.low_stock_alarm !== undefined ? toNumber(after.low_stock_alarm) : undefined,
-    },
-    changed_fields: changed.filter((f): f is keyof BulkInventoryChanges =>
-      ["sale_price", "cost_price", "stock_quantity", "low_stock_alarm"].includes(f),
+    before: normalizeBulkPreviewFieldMap(before),
+    after: normalizeBulkPreviewFieldMap(after),
+    changed_fields: changed.filter((f): f is BulkInventoryPreviewFieldKey =>
+      BULK_PREVIEW_FIELD_KEYS.includes(f as BulkInventoryPreviewFieldKey),
     ),
   };
 }

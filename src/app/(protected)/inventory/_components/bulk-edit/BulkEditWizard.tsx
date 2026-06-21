@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { getAuthToken } from "@/lib/auth-session";
-import { fetchAllPages } from "@/lib/crud-api";
+import { fetchAllPages, listBikeBlueprints } from "@/lib/crud-api";
 import {
   ActionButton,
   PageHero,
@@ -24,7 +24,7 @@ import {
 } from "./types";
 import type { BulkInventoryEditPayload, BulkInventoryPreviewRow } from "@/lib/crud-api";
 import { useBulkEditSelection } from "./useBulkEditSelection";
-import type { BrandRecord, ProductCategoryRecord, SparePartCategoryRecord } from "@/lib/crud-api";
+import type { BrandRecord, BikeBlueprintRecord, ProductCategoryRecord, SparePartCategoryRecord } from "@/lib/crud-api";
 
 const STEP_LABELS: Record<BulkEditStep, string> = {
   1: "Select items",
@@ -47,6 +47,7 @@ export function BulkEditWizard({ config }: BulkEditWizardProps) {
   const [categories, setCategories] = useState<
     (ProductCategoryRecord | SparePartCategoryRecord)[]
   >([]);
+  const [bikeBlueprints, setBikeBlueprints] = useState<BikeBlueprintRecord[]>([]);
   const [draft, setDraft] = useState<BulkEditDraft>(emptyBulkEditDraft);
   const [configureError, setConfigureError] = useState<string | null>(null);
   const [previewRows, setPreviewRows] = useState<BulkInventoryPreviewRow[]>([]);
@@ -69,7 +70,7 @@ export function BulkEditWizard({ config }: BulkEditWizardProps) {
       try {
         const token = getAuthToken();
         if (!token) return;
-        const [cats, brs] = await Promise.all([
+        const [cats, brs, blueprints] = await Promise.all([
           fetchAllPages((p) => config.listCategories(token, p)),
           fetchAllPages((p) =>
             config.listBrands(token, p).then((r) => ({
@@ -77,9 +78,11 @@ export function BulkEditWizard({ config }: BulkEditWizardProps) {
               items: r.items,
             })),
           ),
+          fetchAllPages((p) => listBikeBlueprints(token, p)),
         ]);
         setCategories(cats);
         setBrands(brs);
+        setBikeBlueprints(blueprints);
       } catch {
         // Non-blocking
       }
@@ -123,7 +126,13 @@ export function BulkEditWizard({ config }: BulkEditWizardProps) {
   const handlePreview = async () => {
     const changes = draftToChanges(draft);
     if (!changes) {
-      setConfigureError("Enable at least one field with a valid value.");
+      if (draft.compatibility.enabled && !draft.compatibility.universal && draft.compatibility.blueprintIds.length === 0) {
+        setConfigureError("Select at least one bike blueprint when compatibility is Specific.");
+      } else if (draft.discount.enabled && draft.discount.value === "") {
+        setConfigureError("Enter a max discount value.");
+      } else {
+        setConfigureError("Enable at least one field with a valid value.");
+      }
       return;
     }
     for (const field of ["sale_price", "cost_price"] as const) {
@@ -246,6 +255,7 @@ export function BulkEditWizard({ config }: BulkEditWizardProps) {
           setDraft={setDraft}
           selectedCount={selection.selectedCount}
           mixedCurrency={mixedCurrency}
+          bikeBlueprints={bikeBlueprints}
           error={configureError}
           onBack={() => setStep(1)}
           onNext={handlePreview}
