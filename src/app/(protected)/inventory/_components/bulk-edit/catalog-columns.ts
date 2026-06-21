@@ -1,3 +1,4 @@
+import type { BulkInventoryPreviewFieldKey } from "@/lib/crud-api";
 import type { TableColumnDef } from "@/hooks/useTableColumns";
 import type { BulkEditEntity } from "./types";
 
@@ -50,4 +51,65 @@ export function getBulkCatalogColumns(_entity: BulkEditEntity): readonly TableCo
 
 export function getBulkCatalogColumnStorageKey(entity: BulkEditEntity): string {
   return `bulk-edit-${entity.replace(/_/g, "-")}-columns`;
+}
+
+/** Catalog column display order for preview changed-columns table */
+export const PREVIEW_CHANGED_COLUMN_ORDER: BulkCatalogColumnId[] = [
+  "stock",
+  "alarm",
+  "cost_price",
+  "sale_price",
+  "status",
+  "commission",
+  "max_discount",
+];
+
+const PREVIEW_FIELD_TO_COLUMN: Partial<Record<BulkInventoryPreviewFieldKey, BulkCatalogColumnId>> = {
+  stock_quantity: "stock",
+  low_stock_alarm: "alarm",
+  sale_price: "sale_price",
+  cost_price: "cost_price",
+  item_status: "status",
+  have_commission: "commission",
+  max_discount_type: "max_discount",
+  max_discount_value: "max_discount",
+};
+
+export function previewFieldToCatalogColumn(
+  field: BulkInventoryPreviewFieldKey,
+): BulkCatalogColumnId | null {
+  return PREVIEW_FIELD_TO_COLUMN[field] ?? null;
+}
+
+export function getCatalogColumnLabel(columnId: BulkCatalogColumnId): string {
+  const match = BASE_CATALOG_COLUMNS.find((col) => col.id === columnId);
+  return match?.label ?? columnId;
+}
+
+export function collectChangedPreviewColumns(
+  changedFields: BulkInventoryPreviewFieldKey[],
+): BulkCatalogColumnId[] {
+  const seen = new Set<BulkCatalogColumnId>();
+  for (const field of changedFields) {
+    const column = previewFieldToCatalogColumn(field);
+    if (column) {
+      seen.add(column);
+    }
+  }
+  return PREVIEW_CHANGED_COLUMN_ORDER.filter((column) => seen.has(column));
+}
+
+export function collectChangedPreviewColumnsFromRows(
+  rows: { changed_fields: BulkInventoryPreviewFieldKey[] }[],
+): BulkCatalogColumnId[] {
+  const seen = new Set<BulkCatalogColumnId>();
+  for (const row of rows) {
+    for (const field of row.changed_fields) {
+      const column = previewFieldToCatalogColumn(field);
+      if (column) {
+        seen.add(column);
+      }
+    }
+  }
+  return PREVIEW_CHANGED_COLUMN_ORDER.filter((column) => seen.has(column));
 }

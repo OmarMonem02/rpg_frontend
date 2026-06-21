@@ -1169,14 +1169,9 @@ export type BulkInventoryChanges = {
   have_commission?: BulkSetChange<boolean>;
   max_discount_type?: BulkSetChange<"fixed" | "percentage">;
   max_discount_value?: BulkSetChange<number>;
-  universal?: BulkSetChange<boolean>;
-  bike_blueprint_ids?: BulkSetChange<number[]>;
 };
 
-export type BulkInventoryPreviewFieldKey =
-  | keyof BulkInventoryChanges
-  | "compatibility"
-  | "bike_blueprint_labels";
+export type BulkInventoryPreviewFieldKey = keyof BulkInventoryChanges;
 
 export type BulkInventoryPreviewValue =
   | number
@@ -1222,10 +1217,6 @@ const BULK_PREVIEW_FIELD_KEYS: BulkInventoryPreviewFieldKey[] = [
   "have_commission",
   "max_discount_type",
   "max_discount_value",
-  "universal",
-  "bike_blueprint_ids",
-  "compatibility",
-  "bike_blueprint_labels",
 ];
 
 function normalizeBulkPreviewValue(raw: unknown): BulkInventoryPreviewValue | undefined {

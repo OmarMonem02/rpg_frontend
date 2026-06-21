@@ -4,12 +4,26 @@ import {
   InlineMessage,
   SurfaceCard,
 } from "@/components/ops-ui";
+import {
+  InventoryListTable,
+  InventoryListTableBody,
+  InventoryListTableHead,
+  InventoryListTableRow,
+  InventoryListTableTd,
+  InventoryListTableTh,
+  InventoryListTableToolbar,
+} from "@/components/inventory/list-table";
 import type {
   BulkInventoryPreviewFieldKey,
   BulkInventoryPreviewRow,
   BulkInventoryPreviewValue,
 } from "@/lib/crud-api";
 import { itemStatusLabel } from "@/lib/inventory-item-attributes";
+import {
+  collectChangedPreviewColumnsFromRows,
+  getCatalogColumnLabel,
+  type BulkCatalogColumnId,
+} from "./catalog-columns";
 import { NUMERIC_BULK_EDIT_FIELDS } from "./types";
 
 type BulkEditPreviewPanelProps = {
@@ -17,57 +31,6 @@ type BulkEditPreviewPanelProps = {
   loading: boolean;
   error: string | null;
 };
-
-const FIELD_LABELS: Record<string, string> = {
-  sale_price: "Sale price",
-  cost_price: "Cost price",
-  stock_quantity: "Stock",
-  low_stock_alarm: "Low stock alarm",
-  item_status: "Item status",
-  have_commission: "Commission",
-  max_discount_type: "Discount type",
-  max_discount_value: "Max discount",
-  compatibility: "Compatibility",
-  universal: "Compatibility",
-  bike_blueprint_ids: "Compatibility",
-};
-
-const PREVIEW_FIELD_ORDER: BulkInventoryPreviewFieldKey[] = [
-  "stock_quantity",
-  "low_stock_alarm",
-  "sale_price",
-  "cost_price",
-  "item_status",
-  "have_commission",
-  "max_discount_type",
-  "max_discount_value",
-  "compatibility",
-];
-
-function fieldLabel(key: string): string {
-  return FIELD_LABELS[key] ?? key;
-}
-
-function blueprintLabels(
-  value: BulkInventoryPreviewValue | undefined,
-): string[] | undefined {
-  if (!Array.isArray(value)) return undefined;
-  if (value.every((item) => typeof item === "string")) {
-    return value;
-  }
-  return undefined;
-}
-
-function formatCompatibility(
-  universal: boolean | undefined,
-  labels: string[] | undefined,
-): string {
-  if (universal) return "Universal";
-  if (labels && labels.length > 0) {
-    return `Specific (${labels.join(", ")})`;
-  }
-  return "Specific (no blueprints)";
-}
 
 function formatDiscount(
   type: string | undefined,
@@ -78,7 +41,7 @@ function formatDiscount(
   return value.toFixed(2);
 }
 
-function formatValue(key: string, value: BulkInventoryPreviewValue | undefined): string {
+function formatFieldValue(key: string, value: BulkInventoryPreviewValue | undefined): string {
   if (value === undefined) return "—";
   if (key === "sale_price" || key === "cost_price" || key === "max_discount_value") {
     return typeof value === "number" ? value.toFixed(2) : String(value);
@@ -88,9 +51,6 @@ function formatValue(key: string, value: BulkInventoryPreviewValue | undefined):
   }
   if (key === "have_commission" && typeof value === "boolean") {
     return value ? "Yes" : "No";
-  }
-  if (key === "max_discount_type" && typeof value === "string") {
-    return value === "percentage" ? "Percentage" : "Fixed amount";
   }
   if (typeof value === "boolean") {
     return value ? "Yes" : "No";
@@ -113,54 +73,34 @@ function changeTone(
   return "text-on-surface";
 }
 
-function displayFieldsForRow(row: BulkInventoryPreviewRow): BulkInventoryPreviewFieldKey[] {
-  const raw = new Set(row.changed_fields);
-  const fields: BulkInventoryPreviewFieldKey[] = [];
-
-  const hasCompatibility =
-    raw.has("compatibility") || raw.has("universal") || raw.has("bike_blueprint_ids");
-  if (hasCompatibility) {
-    fields.push("compatibility");
+function previewFieldsForColumn(
+  column: BulkCatalogColumnId,
+): BulkInventoryPreviewFieldKey[] {
+  switch (column) {
+    case "stock":
+      return ["stock_quantity"];
+    case "alarm":
+      return ["low_stock_alarm"];
+    case "cost_price":
+      return ["cost_price"];
+    case "sale_price":
+      return ["sale_price"];
+    case "status":
+      return ["item_status"];
+    case "commission":
+      return ["have_commission"];
+    case "max_discount":
+      return ["max_discount_type", "max_discount_value"];
+    default:
+      return [];
   }
-
-  for (const key of PREVIEW_FIELD_ORDER) {
-    if (key === "compatibility") continue;
-    if (raw.has(key)) {
-      fields.push(key);
-    }
-  }
-
-  for (const key of raw) {
-    if (
-      !fields.includes(key) &&
-      key !== "universal" &&
-      key !== "bike_blueprint_ids" &&
-      key !== "bike_blueprint_labels"
-    ) {
-      fields.push(key);
-    }
-  }
-
-  return fields;
 }
 
-function beforeAfterForField(
+function beforeAfterForColumn(
   row: BulkInventoryPreviewRow,
-  field: BulkInventoryPreviewFieldKey,
+  column: BulkCatalogColumnId,
 ): { before: string; after: string; tone: string } {
-  if (field === "compatibility") {
-    const before = formatCompatibility(
-      typeof row.before.universal === "boolean" ? row.before.universal : undefined,
-      blueprintLabels(row.before.bike_blueprint_labels),
-    );
-    const after = formatCompatibility(
-      typeof row.after.universal === "boolean" ? row.after.universal : undefined,
-      blueprintLabels(row.after.bike_blueprint_labels),
-    );
-    return { before, after, tone: "text-on-surface" };
-  }
-
-  if (field === "max_discount_value") {
+  if (column === "max_discount") {
     const before = formatDiscount(
       typeof row.before.max_discount_type === "string" ? row.before.max_discount_type : undefined,
       typeof row.before.max_discount_value === "number" ? row.before.max_discount_value : undefined,
@@ -172,16 +112,9 @@ function beforeAfterForField(
     return { before, after, tone: "text-on-surface" };
   }
 
-  if (field === "max_discount_type") {
-    return {
-      before: formatValue(field, row.before[field]),
-      after: formatValue(field, row.after[field]),
-      tone: "text-on-surface",
-    };
-  }
-
-  const before = formatValue(field, row.before[field]);
-  const after = formatValue(field, row.after[field]);
+  const field = previewFieldsForColumn(column)[0];
+  const before = formatFieldValue(field, row.before[field]);
+  const after = formatFieldValue(field, row.after[field]);
   const numericKey = NUMERIC_BULK_EDIT_FIELDS.some((f) => f.key === field);
   return {
     before,
@@ -190,71 +123,97 @@ function beforeAfterForField(
   };
 }
 
+function BeforeAfterCell({
+  before,
+  after,
+  tone,
+}: {
+  before: string;
+  after: string;
+  tone: string;
+}) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span className="mono-data text-xs text-on-surface-variant line-through decoration-on-surface-variant/40">
+        {before}
+      </span>
+      <span className={`mono-data text-sm font-medium ${tone}`}>{after}</span>
+    </div>
+  );
+}
+
 export function BulkEditPreviewPanel({
   rows,
   loading,
   error,
 }: BulkEditPreviewPanelProps) {
+  const changedColumns = collectChangedPreviewColumnsFromRows(rows);
+  const colSpan = 2 + changedColumns.length;
+
   return (
     <div className="space-y-3">
       <SurfaceCard className="p-4">
         <h3 className="font-display text-sm font-semibold text-on-surface">Live preview</h3>
         <p className="mt-1 text-sm text-on-surface-variant">
-          Updates automatically as you configure changes. Review old and new values per item before
-          applying.
+          Catalog-style view showing only columns that will change. Each cell shows the old value
+          above the new value.
         </p>
       </SurfaceCard>
 
       {error ? <InlineMessage tone="danger">{error}</InlineMessage> : null}
 
-      {loading ? (
-        <SurfaceCard className="p-8 text-center text-on-surface-variant">
-          Generating preview…
-        </SurfaceCard>
-      ) : rows.length === 0 ? (
-        <SurfaceCard className="p-8 text-center text-on-surface-variant">
-          Enable at least one field with a valid value to see a preview.
-        </SurfaceCard>
-      ) : (
-        <div className="space-y-3">
-          <p className="text-sm text-on-surface-variant">
-            <span className="mono-data font-medium text-on-surface">{rows.length}</span> items
-            will change
-          </p>
-          {rows.map((row) => {
-            const fields = displayFieldsForRow(row);
-            return (
-              <SurfaceCard key={row.id} className="p-4">
-                <div className="mb-3 border-b border-outline-variant/15 pb-3">
-                  <div className="font-medium text-on-surface">{row.name}</div>
-                  <div className="mono-data text-xs text-on-surface-variant">
-                    {row.sku} · {row.sale_currency}
-                  </div>
-                </div>
-                <dl className="space-y-2">
-                  {fields.map((field) => {
-                    const { before, after, tone } = beforeAfterForField(row, field);
-                    if (field === "max_discount_type" && fields.includes("max_discount_value")) {
-                      return null;
-                    }
-                    return (
-                      <div
-                        key={`${row.id}-${field}`}
-                        className="grid gap-2 text-sm sm:grid-cols-[minmax(8rem,11rem)_1fr_auto_1fr]"
-                      >
-                        <dt className="text-on-surface-variant">{fieldLabel(field)}</dt>
-                        <dd className="mono-data text-on-surface-variant">{before}</dd>
-                        <dd className="text-center text-on-surface-variant">→</dd>
-                        <dd className={`mono-data font-medium ${tone}`}>{after}</dd>
-                      </div>
-                    );
-                  })}
-                </dl>
-              </SurfaceCard>
-            );
-          })}
+      <InventoryListTable>
+        <InventoryListTableToolbar label="Preview changes" count={rows.length} />
+
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[640px] text-left text-sm">
+            <InventoryListTableHead>
+              <tr>
+                <InventoryListTableTh>Name</InventoryListTableTh>
+                <InventoryListTableTh>SKU</InventoryListTableTh>
+                {changedColumns.map((column) => (
+                  <InventoryListTableTh key={column}>
+                    {getCatalogColumnLabel(column)}
+                  </InventoryListTableTh>
+                ))}
+              </tr>
+            </InventoryListTableHead>
+            <InventoryListTableBody>
+              {loading ? (
+                <tr>
+                  <td colSpan={colSpan} className="px-4 py-8 text-center text-on-surface-variant">
+                    Generating preview…
+                  </td>
+                </tr>
+              ) : rows.length === 0 ? (
+                <tr>
+                  <td colSpan={colSpan} className="px-4 py-8 text-center text-on-surface-variant">
+                    Enable at least one field with a valid value to see a preview.
+                  </td>
+                </tr>
+              ) : (
+                rows.map((row) => (
+                  <InventoryListTableRow key={row.id}>
+                    <InventoryListTableTd variant="name">{row.name}</InventoryListTableTd>
+                    <InventoryListTableTd variant="mono">
+                      <div>{row.sku}</div>
+                      <div className="text-xs text-on-surface-variant">{row.sale_currency}</div>
+                    </InventoryListTableTd>
+                    {changedColumns.map((column) => {
+                      const { before, after, tone } = beforeAfterForColumn(row, column);
+                      return (
+                        <InventoryListTableTd key={`${row.id}-${column}`}>
+                          <BeforeAfterCell before={before} after={after} tone={tone} />
+                        </InventoryListTableTd>
+                      );
+                    })}
+                  </InventoryListTableRow>
+                ))
+              )}
+            </InventoryListTableBody>
+          </table>
         </div>
-      )}
+      </InventoryListTable>
     </div>
   );
 }

@@ -1,13 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
 import {
   ActionButton,
   InlineMessage,
   SearchableSelect,
   SurfaceCard,
 } from "@/components/ops-ui";
-import type { BikeBlueprintRecord, BulkInventoryPreviewRow } from "@/lib/crud-api";
+import type { BulkInventoryPreviewRow } from "@/lib/crud-api";
 import {
   NUMERIC_BULK_EDIT_FIELDS,
   draftHasEnabledFields,
@@ -20,7 +19,6 @@ type BulkEditConfigureStepProps = {
   setDraft: React.Dispatch<React.SetStateAction<BulkEditDraft>>;
   selectedCount: number;
   mixedCurrency: boolean;
-  bikeBlueprints: BikeBlueprintRecord[];
   error: string | null;
   previewRows: BulkInventoryPreviewRow[];
   previewLoading: boolean;
@@ -43,18 +41,11 @@ const STOCK_MODES = [
   { value: "subtract", label: "Subtract" },
 ];
 
-function formatBlueprintLabel(bp: BikeBlueprintRecord): string {
-  const brand = bp.brand?.name;
-  const core = `${bp.model} · ${bp.year}`;
-  return brand ? `${brand} — ${core}` : core;
-}
-
 export function BulkEditConfigureStep({
   draft,
   setDraft,
   selectedCount,
   mixedCurrency,
-  bikeBlueprints,
   error,
   previewRows,
   previewLoading,
@@ -63,8 +54,6 @@ export function BulkEditConfigureStep({
   onBack,
   onApply,
 }: BulkEditConfigureStepProps) {
-  const [blueprintSearch, setBlueprintSearch] = useState("");
-
   const updateNumericField = (
     key: (typeof NUMERIC_BULK_EDIT_FIELDS)[number]["key"],
     patch: Partial<BulkEditDraft[typeof key]>,
@@ -73,35 +62,6 @@ export function BulkEditConfigureStep({
       ...prev,
       [key]: { ...prev[key], ...patch },
     }));
-  };
-
-  const filteredBlueprints = useMemo(() => {
-    const query = blueprintSearch.trim().toLowerCase();
-    const selected = new Set(draft.compatibility.blueprintIds);
-    const sorted = [...bikeBlueprints].sort((a, b) =>
-      formatBlueprintLabel(a).localeCompare(formatBlueprintLabel(b)),
-    );
-
-    if (!query) return sorted;
-
-    return sorted.filter(
-      (bp) =>
-        selected.has(bp.id) ||
-        formatBlueprintLabel(bp).toLowerCase().includes(query),
-    );
-  }, [bikeBlueprints, blueprintSearch, draft.compatibility.blueprintIds]);
-
-  const toggleBlueprint = (id: number) => {
-    setDraft((prev) => {
-      const current = prev.compatibility.blueprintIds;
-      const next = current.includes(id)
-        ? current.filter((value) => value !== id)
-        : [...current, id];
-      return {
-        ...prev,
-        compatibility: { ...prev.compatibility, blueprintIds: next },
-      };
-    });
   };
 
   const hasEnabled = draftHasEnabledFields(draft);
@@ -313,86 +273,6 @@ export function BulkEditConfigureStep({
                   placeholder="0"
                 />
               </div>
-            </div>
-          ) : (
-            <p className="text-xs text-on-surface-variant">Not included in this bulk edit.</p>
-          )}
-        </SurfaceCard>
-
-        <SurfaceCard className="p-4 md:col-span-2">
-          <div className="form-section-header !mb-3 !pb-2">
-            <label className="flex cursor-pointer items-center gap-3">
-              <input
-                type="checkbox"
-                checked={draft.compatibility.enabled}
-                onChange={(e) =>
-                  setDraft((prev) => ({
-                    ...prev,
-                    compatibility: { ...prev.compatibility, enabled: e.target.checked },
-                  }))
-                }
-                className="h-4 w-4 rounded border-outline-variant/40 text-primary focus:ring-primary/20"
-              />
-              <span className="font-display text-sm font-semibold text-on-surface">Compatibility</span>
-            </label>
-          </div>
-          {draft.compatibility.enabled ? (
-            <div className="space-y-4">
-              <label className="flex cursor-pointer items-center gap-3">
-                <input
-                  type="checkbox"
-                  checked={draft.compatibility.universal}
-                  onChange={(e) =>
-                    setDraft((prev) => ({
-                      ...prev,
-                      compatibility: {
-                        ...prev.compatibility,
-                        universal: e.target.checked,
-                        blueprintIds: e.target.checked ? [] : prev.compatibility.blueprintIds,
-                      },
-                    }))
-                  }
-                  className="h-4 w-4 rounded border-outline-variant/40 text-primary focus:ring-primary/20"
-                />
-                <span className="text-sm text-on-surface">Universal (applies broadly without blueprint links)</span>
-              </label>
-
-              {!draft.compatibility.universal ? (
-                <div className="space-y-2">
-                  <label className="label-caps block">Compatible bike blueprints</label>
-                  <input
-                    type="search"
-                    value={blueprintSearch}
-                    onChange={(e) => setBlueprintSearch(e.target.value)}
-                    placeholder="Search blueprints…"
-                    className="form-input-base py-2 text-sm"
-                  />
-                  <div className="max-h-56 overflow-y-auto rounded-xl border border-outline-variant/15 bg-surface-container-low p-2">
-                    {filteredBlueprints.length === 0 ? (
-                      <p className="px-2 py-3 text-sm text-on-surface-variant">No blueprints found.</p>
-                    ) : (
-                      <ul className="space-y-1">
-                        {filteredBlueprints.map((bp) => (
-                          <li key={bp.id}>
-                            <label className="flex cursor-pointer items-center gap-3 rounded-lg px-2 py-2 hover:bg-surface-container">
-                              <input
-                                type="checkbox"
-                                checked={draft.compatibility.blueprintIds.includes(bp.id)}
-                                onChange={() => toggleBlueprint(bp.id)}
-                                className="h-4 w-4 rounded border-outline-variant/40 text-primary focus:ring-primary/20"
-                              />
-                              <span className="text-sm text-on-surface">{formatBlueprintLabel(bp)}</span>
-                            </label>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                  <p className="text-xs text-on-surface-variant">
-                    Selected blueprints replace compatibility links on every item in this bulk edit.
-                  </p>
-                </div>
-              ) : null}
             </div>
           ) : (
             <p className="text-xs text-on-surface-variant">Not included in this bulk edit.</p>

@@ -88,12 +88,6 @@ export type DiscountFieldDraft = {
   value: string;
 };
 
-export type CompatibilityFieldDraft = {
-  enabled: boolean;
-  universal: boolean;
-  blueprintIds: number[];
-};
-
 export type BulkEditDraft = {
   sale_price: NumericFieldDraft;
   cost_price: NumericFieldDraft;
@@ -102,7 +96,6 @@ export type BulkEditDraft = {
   item_status: ItemStatusDraft;
   have_commission: ToggleFieldDraft;
   discount: DiscountFieldDraft;
-  compatibility: CompatibilityFieldDraft;
 };
 
 /** @deprecated Use NUMERIC_BULK_EDIT_FIELDS */
@@ -119,7 +112,6 @@ export function emptyBulkEditDraft(): BulkEditDraft {
     item_status: { enabled: false, value: "new" },
     have_commission: { enabled: false, value: true },
     discount: { enabled: false, type: "percentage", value: "" },
-    compatibility: { enabled: false, universal: true, blueprintIds: [] },
   };
 }
 
@@ -130,7 +122,6 @@ export function draftHasEnabledFields(draft: BulkEditDraft): boolean {
   if (draft.item_status.enabled) return true;
   if (draft.have_commission.enabled) return true;
   if (draft.discount.enabled) return true;
-  if (draft.compatibility.enabled) return true;
   return false;
 }
 
@@ -163,19 +154,6 @@ export function draftToChanges(draft: BulkEditDraft): BulkInventoryChanges | nul
     }
     changes.max_discount_type = { mode: "set", value: draft.discount.type };
     changes.max_discount_value = { mode: "set", value: discountValue };
-  }
-
-  if (draft.compatibility.enabled) {
-    changes.universal = { mode: "set", value: draft.compatibility.universal };
-    if (!draft.compatibility.universal) {
-      if (draft.compatibility.blueprintIds.length === 0) {
-        return null;
-      }
-      changes.bike_blueprint_ids = {
-        mode: "set",
-        value: draft.compatibility.blueprintIds,
-      };
-    }
   }
 
   return Object.keys(changes).length > 0 ? changes : null;
