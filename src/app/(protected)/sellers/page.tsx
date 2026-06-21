@@ -47,6 +47,8 @@ function formatSellerApiError(err: ApiError): string {
 
   return parts.join(" ");
 }
+
+type SellerFormState = {
   name: string;
   phone: string;
   products_commission_rate: string;
