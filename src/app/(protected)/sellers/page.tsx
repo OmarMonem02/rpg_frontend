@@ -30,24 +30,6 @@ import {
   SurfaceCard,
 } from "@/components/ops-ui";
 
-function formatSellerApiError(err: ApiError): string {
-  const debug = err.debugPayload;
-  if (!debug || typeof debug !== "object") {
-    return err.message;
-  }
-
-  const record = debug as Record<string, unknown>;
-  const parts = [err.message];
-  if (typeof record.error === "string") {
-    parts.push(`Details: ${record.error}`);
-  }
-  if (record.schema_cache_file === true) {
-    parts.push("Schema cache file detected on server.");
-  }
-
-  return parts.join(" ");
-}
-
 type SellerFormState = {
   name: string;
   phone: string;
@@ -186,7 +168,7 @@ export default function SellersPage() {
       setSummary(response.summary);
     } catch (err) {
       if (err instanceof ApiError) {
-        setError(formatSellerApiError(err));
+        setError(err.message);
       } else {
         setError("Unable to load sellers at the moment.");
       }
@@ -251,7 +233,7 @@ export default function SellersPage() {
       await loadSellers(page);
     } catch (err) {
       if (err instanceof ApiError) {
-        setError(formatSellerApiError(err));
+        setError(err.message);
       } else {
         setError("Unable to save this seller right now.");
       }

@@ -179,58 +179,7 @@ export async function authorizedFetch<T>(
   });
 
   if (!response.ok) {
-    let responseText = "";
-    let debugPayload: unknown = null;
-
-    try {
-      responseText = await response.text();
-      if (responseText) {
-        try {
-          const parsed = JSON.parse(responseText) as Record<string, unknown>;
-          debugPayload = parsed._debug ?? null;
-        } catch {
-          // non-json error body
-        }
-      }
-    } catch {
-      // ignore read errors
-    }
-
-    const replay = responseText
-      ? new Response(responseText, {
-          status: response.status,
-          statusText: response.statusText,
-          headers: response.headers,
-        })
-      : response;
-    const { message, fieldErrors } = await parseApiValidationError(replay);
-
-    // #region agent log
-    fetch("http://127.0.0.1:7409/ingest/a49d7729-7982-4a52-a642-205ab6a7b7ef", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Debug-Session-Id": "6bb7af",
-      },
-      body: JSON.stringify({
-        sessionId: "6bb7af",
-        location: "core.ts:authorizedFetch",
-        message: "API error captured",
-        data: {
-          path,
-          method: init?.method || "GET",
-          status: response.status,
-          message,
-          fieldErrors,
-          debugPayload,
-          responsePreview: responseText.slice(0, 500),
-          apiBase: typeof window !== "undefined" ? window.location.origin : "ssr",
-        },
-        timestamp: Date.now(),
-        hypothesisId: path.includes("/sellers") ? "H5" : "H0",
-      }),
-    }).catch(() => {});
-    // #endregion
+    const { message, fieldErrors } = await parseApiValidationError(response);
 
     if (response.status === 422) {
       console.warn(`[API Validation ${response.status}] ${path} - ${message}`, {
@@ -252,7 +201,7 @@ export async function authorizedFetch<T>(
       }
     }
 
-    throw new ApiError(enhancedMsg, response.status, fieldErrors, debugPayload);
+    throw new ApiError(enhancedMsg, response.status, fieldErrors);
   }
 
   if (response.status === 204) {

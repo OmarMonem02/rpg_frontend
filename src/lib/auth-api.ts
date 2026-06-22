@@ -16,18 +16,15 @@ export type LoginResponse = {
 export class ApiError extends Error {
   status: number;
   fieldErrors?: Record<string, string>;
-  debugPayload?: unknown;
 
   constructor(
     message: string,
     status: number,
     fieldErrors?: Record<string, string>,
-    debugPayload?: unknown,
   ) {
     super(message);
     this.status = status;
     this.fieldErrors = fieldErrors;
-    this.debugPayload = debugPayload;
   }
 }
 
