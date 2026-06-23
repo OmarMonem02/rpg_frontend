@@ -6,6 +6,8 @@ import { useParams, useRouter } from "next/navigation";
 import { getAuthToken } from "@/lib/auth-session";
 import { usePermissions } from "@/components/permission-provider";
 import { deleteSale, getSale, type SaleRecord } from "@/lib/crud-api";
+import { saleLineItemTypeLabel } from "@/lib/api/sales";
+import { SaleAddLineItems } from "@/components/sale-add-line-items";
 import {
   PageShell,
   ActionButton,
@@ -31,7 +33,7 @@ import {
   BanknotesIcon,
   HashtagIcon,
 } from "@heroicons/react/24/outline";
-import { money, labelOf } from "./sale-item-utils";
+import { money } from "./sale-item-utils";
 import { titleCase } from "@/lib/delivery-orders/utils";
 
 function getStatusTone(
@@ -52,6 +54,7 @@ function getItemTypeTone(
   if (t === "spare_parts") return "warning";
   if (t === "bikes") return "success";
   if (t === "maintenance_services") return "danger";
+  if (t === "unstored") return "default";
   return "default";
 }
 
@@ -295,6 +298,9 @@ export default function SaleDetailsPage() {
             label: "Manage Items",
             content: (
               <SurfaceCard className="p-0 overflow-hidden shadow-ambient">
+                {canUpdateSales ? (
+                  <SaleAddLineItems saleId={sale.id} onAdded={loadSale} />
+                ) : null}
                 <div className="p-5 border-b border-outline-variant/10 flex items-center justify-between gap-4 flex-wrap">
                   <div>
                     <h2 className="text-xl font-semibold text-on-surface">
@@ -343,15 +349,29 @@ export default function SaleDetailsPage() {
                             <div className="font-semibold text-on-surface group-hover:text-primary transition-colors">
                               {row.item_name || row.item_label}
                             </div>
-                            <div className="text-xs text-on-surface-variant">
-                              Row ID: {row.id}
-                            </div>
+                            {row.is_unstored && row.custom_description ? (
+                              <div className="text-xs text-on-surface-variant mt-0.5">
+                                {row.custom_description}
+                              </div>
+                            ) : null}
+                            {row.is_unstored && row.cost_price != null ? (
+                              <div className="text-xs text-on-surface-variant mt-0.5">
+                                Cost: EGP {money(row.cost_price)}
+                              </div>
+                            ) : (
+                              <div className="text-xs text-on-surface-variant">
+                                Row ID: {row.id}
+                              </div>
+                            )}
                           </td>
                           <td className="px-6 py-4">
                             <StatusBadge
                               tone={getItemTypeTone(row.sellable_type)}
                             >
-                              {labelOf(row.sellable_type)}
+                              {saleLineItemTypeLabel(
+                                row.sellable_type,
+                                row.unstored_type,
+                              )}
                             </StatusBadge>
                           </td>
                           <td className="px-6 py-4 text-right tabular-nums">

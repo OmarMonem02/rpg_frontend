@@ -48,6 +48,7 @@ export type EntityFilters = {
   total_max?: number;
   item_type?: string;
   delivery_status?: string;
+  has_unstored_items?: boolean;
 };
 
 export type FilterState = EntityFilters & {

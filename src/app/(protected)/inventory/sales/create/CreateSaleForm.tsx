@@ -41,6 +41,9 @@ import {
 import { findExactSkuOrPartNumberMatch } from "@/lib/item-lookup";
 import { CatalogPickerModal } from "@/components/catalog-picker-modal";
 import {
+  createUnstoredCartLineId,
+} from "@/lib/unstored-line-item";
+import {
   CartLineItemsPanel,
   type SaleLineItem,
 } from "@/components/cart-line-items-panel";
@@ -616,6 +619,33 @@ export function CreateSaleForm() {
     [tempItemCounter],
   );
 
+  const hasUnstoredDraft = useMemo(
+    () => cartItems.some((item) => item.is_draft),
+    [cartItems],
+  );
+
+  const handleStartUnstoredDraft = useCallback(() => {
+    const tempId = createUnstoredCartLineId(tempItemCounter);
+    const lineItem: SaleLineItem = {
+      id: tempId,
+      sellable_id: 0,
+      sellable_type: "unstored",
+      is_unstored: true,
+      is_draft: true,
+      custom_name: "",
+      custom_description: "",
+      unstored_type: "product",
+      cost_price: 0,
+      item_name: "New unstored item",
+      selling_price: 0,
+      discount_amount: 0,
+      quantity: 1,
+      currency: "EGP",
+    };
+    setCartItems((prev) => [...prev, lineItem]);
+    setTempItemCounter((prev) => prev + 1);
+  }, [tempItemCounter]);
+
   const addOrIncrementCatalogItem = useCallback(
     (item: ProductRecord | SparePartRecord | MaintenancePartRecord) => {
       const sellableType: "products" | "spare_parts" | "maintenance_parts" =
@@ -900,6 +930,9 @@ export function CreateSaleForm() {
       if (!paymentMethodId) throw new Error("Please select a payment method");
       if (cartItems.length === 0)
         throw new Error("Please add at least one item");
+      if (hasUnstoredDraft) {
+        throw new Error("Finish or cancel the unstored item draft in the cart.");
+      }
       if (hasPendingItemApprovals) {
         throw new Error(
           "Wait for admin approval of item discounts before finalizing.",
@@ -990,13 +1023,30 @@ export function CreateSaleForm() {
           ? { discount_approval_request_id: activeDiscountRequestId }
           : {}),
         is_maintenance: isMaintenance,
-        items: cartItems.map((item) => {
+        items: cartItems
+          .filter((item) => !item.is_draft)
+          .map((item) => {
+          const qty = Number(item.quantity) || 1;
+
+          if (item.is_unstored) {
+            const lineItem: CreateSaleLineItemPayload = {
+              is_unstored: true,
+              custom_name: item.custom_name,
+              custom_description: item.custom_description,
+              unstored_type: item.unstored_type,
+              cost_price: item.cost_price,
+              selling_price: Number(item.selling_price),
+              discount: 0,
+              qty,
+            };
+            return lineItem;
+          }
+
           // ── Currency Normalization ──────────────────────────────────────────
           const rate = egpMultiplierForPricingCurrency(item.currency, {
             usdToEgp: exchangeRate,
             eurToEgp: exchangeRateEur,
           });
-          const qty = Number(item.quantity) || 1;
           const normalizedPrice =
             Math.round(Number(item.selling_price) * rate * 100) / 100;
           const normalizedLineDiscount =
@@ -1206,11 +1256,11 @@ export function CreateSaleForm() {
         {/* Workspace: Cart + Catalogs */}
         <div className="grid grid-cols-1 lg:grid-cols-4 xl:grid-cols-5 gap-6 xl:gap-8 items-start animate-in fade-in slide-in-from-bottom-8 duration-700">
           {/* Quick-add Catalogs Sidebar */}
-          <div className="lg:col-span-1 bg-surface-container-low border border-outline-variant/15 rounded-[1.5rem] p-5 shadow-sm top-6">
+          <div className="lg:col-span-1 bg-surface-container-low border border-outline-variant/15 rounded-[1.5rem] p-2 shadow-sm top-6">
             <h3 className="text-center font-display text-lg font-bold text-on-surface mb-2">
               Add Items
             </h3>
-            <div className="text-center flex flex-col gap-5">
+            <div className="text-center flex flex-col gap-3">
               <button
                 type="button"
                 onClick={() => handleOpenCatalog("products")}
@@ -1285,6 +1335,20 @@ export function CreateSaleForm() {
                 </div>
                 <div className="flex flex-col items-start">
                   <span className="font-semibold text-m">Services</span>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                disabled={hasUnstoredDraft}
+                onClick={handleStartUnstoredDraft}
+                className="group relative flex items-center gap-4 w-full p-2 rounded-xl border-2 border-dashed border-outline-variant/40 bg-surface-container hover:bg-surface-container-high hover:border-primary/30 text-on-surface transition-all overflow-hidden disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-secondary/10 text-secondary group-hover:scale-110 transition-transform">
+                  <PlusIcon className="w-7 h-7" />
+                </div>
+                <div className="flex flex-col items-start">
+                  <span className="font-semibold text-m">Add Unstored Item</span>
                 </div>
               </button>
             </div>

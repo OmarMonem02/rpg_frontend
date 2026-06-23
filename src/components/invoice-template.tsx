@@ -278,12 +278,20 @@ export function InvoiceTemplate({
                                 <span className="returned-tag">RETURNED</span>
                               ) : null}
                             </div>
+                            {item.is_unstored && item.custom_description ? (
+                              <div className="text-xs text-on-surface-variant mt-1 leading-snug">
+                                {item.custom_description}
+                              </div>
+                            ) : null}
                           </td>
                           <td className="td-type" data-label="Type">
                             <span
                               className={`receipt-badge type-badge ${getTypeBadgeClass(item.sellable_type)}`}
                             >
-                              {saleLineItemTypeLabel(item.sellable_type)}
+                              {saleLineItemTypeLabel(
+                                item.sellable_type,
+                                item.unstored_type,
+                              )}
                             </span>
                           </td>
                           <td

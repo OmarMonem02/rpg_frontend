@@ -24,6 +24,7 @@ export type TicketFilters = {
   amount_paid_max?: number;
   tracking_link_sent?: "" | "yes" | "no";
   notes?: string;
+  has_unstored_items?: boolean;
 };
 
 export const TICKET_STATUSES = [
@@ -197,6 +198,13 @@ export function filterTickets(
     if (notesFilter) {
       const notes = (ticket.notes || "").toLowerCase();
       if (!notes.includes(notesFilter)) return false;
+    }
+
+    if (filters.has_unstored_items) {
+      const hasUncat = ticket.tasks?.some((task) =>
+        task.items?.some((item) => item.is_unstored),
+      );
+      if (!hasUncat) return false;
     }
 
     if (filters.opened_from || filters.opened_to) {

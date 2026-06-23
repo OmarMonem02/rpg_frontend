@@ -22,6 +22,7 @@ export function computeCartTotalsBreakdown(
   let itemDiscountTotal = 0;
 
   for (const item of items) {
+    if (item.is_draft) continue;
     const m = egpMultiplierForPricingCurrency(item.currency, {
       usdToEgp: exchangeRate,
       eurToEgp: exchangeRateEur,

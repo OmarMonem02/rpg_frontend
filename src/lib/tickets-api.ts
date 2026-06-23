@@ -2,6 +2,7 @@ import { getApiUrl } from "@/lib/config";
 import { getAuthToken } from "@/lib/auth-session";
 import { ApiError } from "@/lib/auth-api";
 import { asRecord, parseErrorMessage, toNumber, toText } from "@/lib/api/core";
+import { downloadFile } from "@/lib/api/import-export";
 import { toPricingCurrency, type PricingCurrency } from "@/lib/currencies";
 import type { MaxDiscountType } from "@/lib/max-discount";
 
@@ -91,6 +92,11 @@ export type TicketItem = {
   maintenance_part_id?: number;
   maintenance_service_id?: number;
   product_id?: number;
+  is_unstored?: boolean;
+  custom_name?: string;
+  custom_description?: string;
+  unstored_type?: string;
+  cost_price?: number;
   price_snapshot: number;
   discount: number;
   qty: number;
@@ -138,6 +144,15 @@ function normalizeTicketItem(raw: unknown): TicketItem {
     maintenance_part_id: toNumber(record.maintenance_part_id) || undefined,
     maintenance_service_id: toNumber(record.maintenance_service_id) || undefined,
     product_id: toNumber(record.product_id) || undefined,
+    is_unstored:
+      record.is_unstored === true || record.is_unstored === "true",
+    custom_name: toText(record.custom_name) || undefined,
+    custom_description: toText(record.custom_description) || undefined,
+    unstored_type: toText(record.unstored_type) || undefined,
+    cost_price:
+      record.cost_price != null && record.cost_price !== ""
+        ? toNumber(record.cost_price)
+        : undefined,
     price_snapshot: toNumber(record.price_snapshot),
     discount: toNumber(record.discount),
     qty: toNumber(record.qty),
@@ -206,6 +221,7 @@ function normalizeTicket(raw: unknown): Ticket {
 }
 
 export function ticketItemName(item: TicketItem): string {
+  if (item.is_unstored && item.custom_name) return item.custom_name;
   if (item.item_name) return item.item_name;
   if (item.spare_part?.name) return item.spare_part.name;
   if (item.maintenance_part?.name) return item.maintenance_part.name;
@@ -218,6 +234,15 @@ export function ticketItemName(item: TicketItem): string {
 }
 
 export function ticketItemTypeLabel(item: TicketItem): string {
+  if (item.is_unstored) {
+    const map: Record<string, string> = {
+      product: "Product",
+      spare_part: "Spare Part",
+      maintenance_part: "Maintenance Part",
+      maintenance_service: "Maintenance Service",
+    };
+    return map[item.unstored_type ?? ""] ?? "Unstored";
+  }
   if (item.spare_part_id) return "Spare Part";
   if (item.maintenance_part_id) return "Maintenance Part";
   if (item.product_id) return "Product";
@@ -390,6 +415,11 @@ export const ticketsApi = {
       maintenance_part_id?: number;
       maintenance_service_id?: number;
       product_id?: number;
+      is_unstored?: boolean;
+      custom_name?: string;
+      custom_description?: string;
+      unstored_type?: string;
+      cost_price?: number;
       price_snapshot: number;
       discount?: number;
       qty: number;
@@ -533,3 +563,37 @@ export const ticketsApi = {
     return normalizeTicketMessage(res);
   },
 };
+
+export type TicketExportFilters = {
+  status?: string;
+  date_from?: string;
+  date_to?: string;
+  has_unstored_items?: boolean;
+  search?: string;
+};
+
+export async function exportUnstoredTicketItems(
+  filters: TicketExportFilters | undefined,
+  format: "xlsx" | "csv" = "xlsx",
+): Promise<void> {
+  const token = getAuthToken();
+  if (!token) throw new Error("Authentication required");
+
+  const params = new URLSearchParams();
+  params.set("format", format);
+  if (filters?.status) params.set("status", filters.status);
+  if (filters?.date_from) params.set("date_from", filters.date_from);
+  if (filters?.date_to) params.set("date_to", filters.date_to);
+  if (filters?.search) params.set("search", filters.search);
+  if (filters?.has_unstored_items) {
+    params.set("has_unstored_items", "1");
+  }
+
+  const ext = format === "csv" ? "csv" : "xlsx";
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+  await downloadFile(
+    `/tickets/export?${params.toString()}`,
+    token,
+    `unstored_ticket_items_${stamp}.${ext}`,
+  );
+}

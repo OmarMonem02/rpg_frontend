@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { TrashIcon, CheckIcon, ArrowPathIcon, ChevronUpIcon, ChevronDownIcon, PlusIcon } from "@heroicons/react/24/outline";
+import { TrashIcon, CheckIcon, ArrowPathIcon, ChevronUpIcon, ChevronDownIcon, PlusIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { useParams, useRouter } from "next/navigation";
 import { usePermissions } from "@/components/permission-provider";
 import {
@@ -54,6 +54,13 @@ import {
   type MaintenanceServiceRecord,
 } from "@/lib/crud-api";
 import { CatalogPickerModal } from "@/components/catalog-picker-modal";
+import {
+  buildTicketUnstoredPayload,
+  EMPTY_UNSTORED_DRAFT,
+  UNSTORED_ITEM_TYPE_OPTIONS,
+  validateUnstoredDraft,
+  type UnstoredItemDraft,
+} from "@/lib/unstored-line-item";
 import { printInvoiceElement } from "@/lib/pdf-export";
 
 function parseTicketNoteLines(notes: string): string[] {
@@ -229,6 +236,10 @@ export default function TicketDetailsPage() {
   const [pickerCatalogType, setPickerCatalogType] = useState<
     "spare_parts" | "maintenance_parts" | "maintenance_services" | "products" | null
   >(null);
+  const [unstoredDraftTaskId, setUnstoredDraftTaskId] = useState<number | null>(null);
+  const [unstoredDraft, setUnstoredDraft] =
+    useState<UnstoredItemDraft | null>(null);
+  const [unstoredDraftError, setUnstoredDraftError] = useState<string | null>(null);
 
   const openCatalogPicker = (
     taskId: number,
@@ -241,6 +252,40 @@ export default function TicketDetailsPage() {
   const closeCatalogPicker = () => {
     setPickerCatalogType(null);
     setActiveTaskId(null);
+  };
+
+  const handleAddUnstoredToTask = async (
+    taskId: number,
+    draft: UnstoredItemDraft,
+  ) => {
+    if (ticket?.status !== "in_progress") {
+      setError("Start work before adding items to this ticket.");
+      return;
+    }
+
+    const validationError = validateUnstoredDraft(draft);
+    if (validationError) {
+      setUnstoredDraftError(validationError);
+      return;
+    }
+
+    try {
+      setIsProcessing(true);
+      setError("");
+      await ticketsApi.addItemToTask(
+        Number(id),
+        taskId,
+        buildTicketUnstoredPayload(draft),
+      );
+      setUnstoredDraftTaskId(null);
+      setUnstoredDraft(null);
+      setUnstoredDraftError(null);
+      await fetchTicket();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to Add Unstored Item");
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   // Close ticket payment state
@@ -825,13 +870,20 @@ export default function TicketDetailsPage() {
       task.items?.map((item) => ({
         id: item.id,
         sale_id: ticketData.id,
-        sellable_type: (item.spare_part_id
-          ? "spare_parts"
-          : item.maintenance_part_id
-            ? "maintenance_parts"
-          : item.product_id
-            ? "products"
-            : "maintenance_services") as "spare_parts" | "maintenance_parts" | "products" | "maintenance_services",
+        sellable_type: (item.is_unstored
+          ? "unstored"
+          : item.spare_part_id
+            ? "spare_parts"
+            : item.maintenance_part_id
+              ? "maintenance_parts"
+              : item.product_id
+                ? "products"
+                : "maintenance_services") as
+          | "spare_parts"
+          | "maintenance_parts"
+          | "products"
+          | "maintenance_services"
+          | "unstored",
         sellable_id:
           item.spare_part_id ??
           item.maintenance_part_id ??
@@ -845,6 +897,9 @@ export default function TicketDetailsPage() {
         remaining_qty: item.qty,
         item_label: ticketItemName(item),
         item_name: ticketItemName(item),
+        is_unstored: item.is_unstored,
+        custom_description: item.custom_description,
+        unstored_type: item.unstored_type,
       })) ?? [],
     ) ?? [];
 
@@ -1260,7 +1315,7 @@ export default function TicketDetailsPage() {
                             size="sm" 
                             className="border-0 rounded-lg"
                             onClick={() => openCatalogPicker(task.id, "spare_parts")}
-                            disabled={!canEditItems}
+                            disabled={!canEditItems || unstoredDraftTaskId !== null}
                           >
                             + Spare Part
                           </ActionButton>
@@ -1270,7 +1325,7 @@ export default function TicketDetailsPage() {
                             size="sm" 
                             className="border-0 rounded-lg"
                             onClick={() => openCatalogPicker(task.id, "maintenance_parts")}
-                            disabled={!canEditItems}
+                            disabled={!canEditItems || unstoredDraftTaskId !== null}
                           >
                             + Maint. Part
                           </ActionButton>
@@ -1280,7 +1335,7 @@ export default function TicketDetailsPage() {
                             size="sm" 
                             className="border-0 rounded-lg"
                             onClick={() => openCatalogPicker(task.id, "products")}
-                            disabled={!canEditItems}
+                            disabled={!canEditItems || unstoredDraftTaskId !== null}
                           >
                             + Product
                           </ActionButton>
@@ -1290,9 +1345,27 @@ export default function TicketDetailsPage() {
                             size="sm" 
                             className="border-0 rounded-lg"
                             onClick={() => openCatalogPicker(task.id, "maintenance_services")}
-                            disabled={!canEditItems}
+                            disabled={!canEditItems || unstoredDraftTaskId !== null}
                           >
                             + Service
+                          </ActionButton>
+                          <div className="w-px h-4 bg-outline-variant/20 mx-1" />
+                          <ActionButton
+                            variant="ghost"
+                            size="sm"
+                            className="border-0 rounded-lg"
+                            onClick={() => {
+                              setUnstoredDraftTaskId(task.id);
+                              setUnstoredDraft({ ...EMPTY_UNSTORED_DRAFT });
+                              setUnstoredDraftError(null);
+                            }}
+                            disabled={
+                              !canEditItems ||
+                              (unstoredDraftTaskId !== null &&
+                                unstoredDraftTaskId !== task.id)
+                            }
+                          >
+                            Add Unstored Item
                           </ActionButton>
                         </div>
                         <ActionButton 
@@ -1354,9 +1427,160 @@ export default function TicketDetailsPage() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-outline-variant/5">
+                        {unstoredDraftTaskId === task.id && unstoredDraft ? (
+                          <tr className="bg-primary/3">
+                            <td className="px-4 py-3 align-top">
+                              <div className="flex flex-col gap-2 min-w-[200px]">
+                                <input
+                                  value={unstoredDraft.custom_name}
+                                  onChange={(e) =>
+                                    setUnstoredDraft((prev) =>
+                                      prev ? { ...prev, custom_name: e.target.value } : prev,
+                                    )
+                                  }
+                                  placeholder="Name *"
+                                  className="form-input-base w-full py-1.5 text-sm"
+                                />
+                                <textarea
+                                  value={unstoredDraft.custom_description}
+                                  onChange={(e) =>
+                                    setUnstoredDraft((prev) =>
+                                      prev
+                                        ? { ...prev, custom_description: e.target.value }
+                                        : prev,
+                                    )
+                                  }
+                                  rows={2}
+                                  placeholder="Description *"
+                                  className="form-input-base w-full py-1.5 text-sm"
+                                />
+                                <input
+                                  type="number"
+                                  min={0}
+                                  step="0.01"
+                                  value={unstoredDraft.cost_price}
+                                  onChange={(e) =>
+                                    setUnstoredDraft((prev) =>
+                                      prev
+                                        ? { ...prev, cost_price: Number(e.target.value) }
+                                        : prev,
+                                    )
+                                  }
+                                  placeholder="Cost (EGP) *"
+                                  className="form-input-base mono-data w-full py-1.5 text-sm"
+                                />
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 align-top">
+                              <select
+                                value={unstoredDraft.unstored_type}
+                                onChange={(e) =>
+                                  setUnstoredDraft((prev) =>
+                                    prev
+                                      ? {
+                                          ...prev,
+                                          unstored_type:
+                                            e.target.value as UnstoredItemDraft["unstored_type"],
+                                        }
+                                      : prev,
+                                  )
+                                }
+                                className="form-input-base w-full min-w-[9rem] py-1.5 text-xs"
+                              >
+                                {UNSTORED_ITEM_TYPE_OPTIONS.map((opt) => (
+                                  <option key={opt.value} value={opt.value}>
+                                    {opt.label}
+                                  </option>
+                                ))}
+                              </select>
+                            </td>
+                            <td className="px-4 py-3 align-top">
+                              <input
+                                type="number"
+                                min={0}
+                                step="0.01"
+                                value={unstoredDraft.sale_price}
+                                onChange={(e) =>
+                                  setUnstoredDraft((prev) =>
+                                    prev
+                                      ? { ...prev, sale_price: Number(e.target.value) }
+                                      : prev,
+                                  )
+                                }
+                                className="form-input-base mono-data w-24 py-1.5 text-right text-sm"
+                              />
+                            </td>
+                            <td className="px-4 py-3 align-top">
+                              <input
+                                type="number"
+                                min={1}
+                                step={1}
+                                value={unstoredDraft.qty}
+                                onChange={(e) =>
+                                  setUnstoredDraft((prev) =>
+                                    prev ? { ...prev, qty: Number(e.target.value) } : prev,
+                                  )
+                                }
+                                className="form-input-base mono-data w-16 py-1.5 text-right text-sm"
+                              />
+                            </td>
+                            <td className="px-4 py-3 align-top text-on-surface-variant/40">—</td>
+                            <td className="px-4 py-3 align-top font-bold">—</td>
+                            {isEditable && (
+                              <td className="px-4 py-3 align-top text-right">
+                                <div className="flex items-center justify-end gap-1.5">
+                                  <button
+                                    type="button"
+                                    disabled={isProcessing}
+                                    onClick={() => {
+                                      if (!unstoredDraft) return;
+                                      void handleAddUnstoredToTask(task.id, unstoredDraft);
+                                    }}
+                                    className="rounded-lg p-1.5 text-on-success-container transition-colors hover:bg-success/10 disabled:opacity-50"
+                                    title="Add line"
+                                    aria-label="Add line"
+                                  >
+                                    <CheckIcon className="h-5 w-5" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={isProcessing}
+                                    onClick={() => {
+                                      setUnstoredDraftTaskId(null);
+                                      setUnstoredDraft(null);
+                                      setUnstoredDraftError(null);
+                                    }}
+                                    className="rounded-lg p-1.5 text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface"
+                                    title="Cancel"
+                                    aria-label="Cancel"
+                                  >
+                                    <XMarkIcon className="h-5 w-5" />
+                                  </button>
+                                </div>
+                                {unstoredDraftError ? (
+                                  <p className="mt-2 text-xs font-medium text-error text-right">
+                                    {unstoredDraftError}
+                                  </p>
+                                ) : null}
+                              </td>
+                            )}
+                          </tr>
+                        ) : null}
                         {task.items?.map((item) => (
                           <tr key={item.id} className="hover:bg-surface-container-lowest transition-colors">
-                            <td className="px-4 py-3 font-medium text-on-surface">{ticketItemName(item)}</td>
+                            <td className="px-4 py-3 font-medium text-on-surface">
+                              <div>{ticketItemName(item)}</div>
+                              {item.is_unstored && item.custom_description ? (
+                                <div className="text-xs text-on-surface-variant mt-0.5">
+                                  {item.custom_description}
+                                </div>
+                              ) : null}
+                              {item.is_unstored && item.cost_price != null ? (
+                                <div className="text-xs text-on-surface-variant mt-0.5">
+                                  Cost: {formatEgp(item.cost_price)}
+                                </div>
+                              ) : null}
+                            </td>
                             <td className="px-4 py-3 font-medium text-on-surface">{ticketItemTypeLabel(item)}</td>
                             <td className="px-4 py-3">
                               {formatEgp(
@@ -1377,7 +1601,9 @@ export default function TicketDetailsPage() {
                               )}
                             </td>
                           <td className="px-4 py-3">
-                            {canEditLineDiscount ? (
+                            {item.is_unstored ? (
+                              <span className="text-on-surface-variant/40">—</span>
+                            ) : canEditLineDiscount ? (
                               <TicketLineItemDiscountCell
                                 key={`${item.id}-${item.discount}-${pendingItemDiscountRequestByItemId[item.id] ?? 0}`}
                                 item={item}
@@ -1405,6 +1631,8 @@ export default function TicketDetailsPage() {
                                   )
                                 }
                               />
+                            ) : item.is_unstored ? (
+                              <span className="text-on-surface-variant/40">—</span>
                             ) : (
                               <span className="text-error">
                                 -{formatEgp(
@@ -1428,9 +1656,10 @@ export default function TicketDetailsPage() {
                           )}
                         </tr>
                       ))}
-                      {(!task.items || task.items.length === 0) && (
+                      {(!task.items || task.items.length === 0) &&
+                        unstoredDraftTaskId !== task.id && (
                         <tr>
-                          <td colSpan={6} className="px-4 py-8 text-center text-on-surface-variant italic">
+                          <td colSpan={isEditable ? 7 : 6} className="px-4 py-8 text-center text-on-surface-variant italic">
                             No items in this task.
                           </td>
                         </tr>

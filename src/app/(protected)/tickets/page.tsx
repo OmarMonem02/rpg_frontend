@@ -38,7 +38,7 @@ import {
   TRACKING_LINK_FILTERS,
   type TicketFilters,
 } from "@/lib/ticket-filters";
-import { ticketsApi, type Ticket } from "@/lib/tickets-api";
+import { ticketsApi, exportUnstoredTicketItems, type Ticket } from "@/lib/tickets-api";
 import { CreateTicketModal } from "./CreateTicketModal";
 
 type TicketSort =
@@ -144,6 +144,7 @@ export default function TicketsPage() {
   const [sortBy, setSortBy] = useState<TicketSort>("newest");
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState<TicketFilters>(EMPTY_FILTERS);
+  const [exporting, setExporting] = useState(false);
 
   const filterOptions = useMemo(
     () => buildTicketFilterOptions(tickets),
@@ -342,6 +343,13 @@ export default function TicketsPage() {
         onClear: () => updateFilter("amount_paid_max", undefined),
       });
     }
+    if (filters.has_unstored_items) {
+      chips.push({
+        key: "has_unstored_items",
+        label: "Has unstored items",
+        onClear: () => updateFilter("has_unstored_items", undefined),
+      });
+    }
 
     return chips;
   }, [filterOptions.bikes, filterOptions.customers, filters, updateFilter]);
@@ -386,6 +394,27 @@ export default function TicketsPage() {
       setError(err instanceof Error ? err.message : "Failed to delete ticket");
     } finally {
       setDeletingId(null);
+    }
+  };
+
+  const handleExportUnstored = async () => {
+    try {
+      setExporting(true);
+      setError("");
+      await exportUnstoredTicketItems(
+        {
+          status: filters.status || undefined,
+          date_from: filters.opened_from || undefined,
+          date_to: filters.opened_to || undefined,
+          search: filters.search || undefined,
+          has_unstored_items: filters.has_unstored_items || true,
+        },
+        "xlsx",
+      );
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Export failed");
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -472,11 +501,22 @@ export default function TicketsPage() {
                 aria-label="Filter by customer"
               />
             </InputGroup>
-            <div className="flex items-end md:col-span-3">
+            <div className="flex items-end md:col-span-3 gap-2">
+              {filters.has_unstored_items ? (
+                <ActionButton
+                  type="button"
+                  variant="outline"
+                  className="flex-1"
+                  disabled={exporting}
+                  onClick={() => void handleExportUnstored()}
+                >
+                  {exporting ? "Exporting…" : "Export unstored"}
+                </ActionButton>
+              ) : null}
               <ActionButton
                 type="button"
                 variant="outline"
-                className="w-full"
+                className={filters.has_unstored_items ? "flex-1" : "w-full"}
                 onClick={() => setShowFilters((value) => !value)}
               >
                 <FunnelIcon className="h-4 w-4" />
@@ -769,6 +809,22 @@ export default function TicketsPage() {
                     }
                     className="form-input-base mono-data"
                   />
+                </InputGroup>
+                <InputGroup label="Unstored items" className="md:col-span-2">
+                  <label className="flex items-center gap-2 rounded-xl border border-outline-variant/20 bg-surface px-3 py-2.5 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(filters.has_unstored_items)}
+                      onChange={(event) =>
+                        updateFilter(
+                          "has_unstored_items",
+                          event.target.checked ? true : undefined,
+                        )
+                      }
+                      className="h-4 w-4 rounded border-outline-variant/40"
+                    />
+                    Has unstored items only
+                  </label>
                 </InputGroup>
               </div>
             </SurfaceCard>

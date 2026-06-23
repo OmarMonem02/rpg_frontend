@@ -137,6 +137,7 @@ export const MODULE_FILTER_FIELDS: Record<InventoryModuleId, FilterFieldDef[]> =
     { id: "customer_name", label: "Customer", type: "text", apiKey: "customer_name", section: "more", placeholder: "Customer name" },
     { id: "payment_method_id", label: "Payment Method", type: "select", apiKey: "payment_method_id", section: "more" },
     { id: "is_maintenance", label: "Maintenance Sale", type: "toggle", apiKey: "is_maintenance", section: "more" },
+    { id: "has_unstored_items", label: "Has Unstored Items", type: "toggle", apiKey: "has_unstored_items", section: "more" },
     { id: "total", label: "Total", type: "numberRange", apiKeyMin: "total_min", apiKeyMax: "total_max", section: "more" },
   ],
   delivery_orders: [

@@ -106,7 +106,13 @@ export async function deletePaymentMethod(
 export type SaleLineItemRecord = {
   id: number;
   sale_id: number;
-  sellable_type: "products" | "spare_parts" | "maintenance_parts" | "bikes" | "maintenance_services";
+  sellable_type:
+    | "products"
+    | "spare_parts"
+    | "maintenance_parts"
+    | "bikes"
+    | "maintenance_services"
+    | "unstored";
   sellable_id: number;
   selling_price: number;
   discount_amount: number;
@@ -115,6 +121,11 @@ export type SaleLineItemRecord = {
   remaining_qty: number;
   item_label?: string;
   item_name?: string;
+  is_unstored?: boolean;
+  custom_name?: string;
+  custom_description?: string;
+  unstored_type?: string;
+  cost_price?: number;
   commission_base?: number;
   commission_amount?: number;
   created_at?: string;
@@ -152,6 +163,11 @@ export type CreateSaleLineItemPayload = {
   maintenance_part_id?: number;
   bike_for_sale_id?: number;
   maintenance_service_id?: number;
+  is_unstored?: boolean;
+  custom_name?: string;
+  custom_description?: string;
+  unstored_type?: string;
+  cost_price?: number;
   selling_price: number;
   discount?: number;
   discount_approval_request_id?: number;
@@ -195,6 +211,7 @@ export type SaleListFilters = {
   total_min?: number;
   total_max?: number;
   item_type?: "product" | "spare_part" | "maintenance_part" | "maintenance_service" | "bike";
+  has_unstored_items?: boolean;
   user_id?: number;
   sort?: SaleListSort;
   per_page?: number;
@@ -217,17 +234,29 @@ const API_ITEM_TYPE_TO_SELLABLE: Record<
   bikes: "bikes",
   maintenance_service: "maintenance_services",
   maintenance_services: "maintenance_services",
+  unstored: "unstored",
 };
 
 export function saleLineItemTypeLabel(
   type: SaleLineItemRecord["sellable_type"] | string,
+  unstoredType?: string | null,
 ): string {
+  if (type === "unstored" && unstoredType) {
+    const map: Record<string, string> = {
+      product: "Product",
+      spare_part: "Spare Part",
+      maintenance_part: "Maintenance Part",
+      maintenance_service: "Maintenance Service",
+    };
+    return map[unstoredType] ?? "Unstored";
+  }
   const labels: Record<SaleLineItemRecord["sellable_type"], string> = {
     products: "Product",
     spare_parts: "Spare Part",
     maintenance_parts: "Maintenance Part",
     bikes: "Bike",
     maintenance_services: "Service",
+    unstored: "Unstored",
   };
   const normalized = resolveLineItemSellableType(asRecord({ sellable_type: type }));
   return labels[normalized] ?? "Item";
@@ -252,6 +281,9 @@ function resolveLineItemSellableType(
   if (toNumber(record.maintenance_part_id) > 0) return "maintenance_parts";
   if (toNumber(record.bike_for_sale_id) > 0) return "bikes";
   if (toNumber(record.maintenance_service_id) > 0) return "maintenance_services";
+  if (record.is_unstored === true || record.is_unstored === "true") {
+    return "unstored";
+  }
 
   return "products";
 }
@@ -281,7 +313,18 @@ function resolveLineItemSellableId(
 
 /** Strips known type prefixes the backend prepends to item_label (e.g. "product ", "spare part "). */
 export function stripItemTypePrefix(label: string): string {
-  const prefixes = ["maintenance service ", "maintenance part ", "spare part ", "product ", "bike "];
+  const prefixes = [
+    "unstored maintenance service ",
+    "unstored maintenance part ",
+    "unstored spare part ",
+    "unstored product ",
+    "maintenance service ",
+    "maintenance part ",
+    "spare part ",
+    "product ",
+    "bike ",
+    "unstored ",
+  ];
   for (const prefix of prefixes) {
     if (label.toLowerCase().startsWith(prefix)) {
       return label.slice(prefix.length);
@@ -296,6 +339,9 @@ export function normalizeSaleLineItem(raw: unknown): SaleLineItemRecord {
   const returned = toNumber(record.returned_qty || 0);
   const rawLabel = toText(record.item_label) || undefined;
   const sellableType = resolveLineItemSellableType(record);
+  const isUnstored =
+    record.is_unstored === true || record.is_unstored === "true";
+  const customName = toText(record.custom_name) || undefined;
   return {
     id: toNumber(record.id),
     sale_id: toNumber(record.sale_id),
@@ -307,7 +353,19 @@ export function normalizeSaleLineItem(raw: unknown): SaleLineItemRecord {
     returned_qty: returned,
     remaining_qty: toNumber(record.remaining_qty ?? Math.max(0, qty - returned)),
     item_label: rawLabel,
-    item_name: rawLabel ? stripItemTypePrefix(rawLabel) : undefined,
+    item_name: isUnstored
+      ? customName
+      : rawLabel
+        ? stripItemTypePrefix(rawLabel)
+        : customName,
+    is_unstored: isUnstored,
+    custom_name: customName,
+    custom_description: toText(record.custom_description) || undefined,
+    unstored_type: toText(record.unstored_type) || undefined,
+    cost_price:
+      record.cost_price != null && record.cost_price !== ""
+        ? toNumber(record.cost_price)
+        : undefined,
     commission_base: toNumber(record.commission_base || 0),
     commission_amount: toNumber(record.commission_amount || 0),
     created_at: toText(record.created_at) || undefined,
@@ -389,6 +447,7 @@ export async function listSales(
     total_min: filters?.total_min,
     total_max: filters?.total_max,
     item_type: filters?.item_type,
+    has_unstored_items: filters?.has_unstored_items,
     user_id: filters?.user_id,
     sort: filters?.sort,
     per_page: filters?.per_page,
@@ -424,6 +483,7 @@ export function buildSalesExportQuery(
     total_min: filters?.total_min,
     total_max: filters?.total_max,
     item_type: filters?.item_type,
+    has_unstored_items: filters?.has_unstored_items,
     user_id: filters?.user_id,
     sort: filters?.sort,
     remote_only: filters?.remote_only,
@@ -443,7 +503,9 @@ export async function exportSales(
   const columnsQuery = columns ? `&columns=${encodeURIComponent(columns)}` : "";
   const ext = format === "csv" ? "csv" : "xlsx";
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-  const filename = `sales_export_${stamp}.${ext}`;
+  const filename = filters?.has_unstored_items
+    ? `unstored_sale_items_${stamp}.${ext}`
+    : `sales_export_${stamp}.${ext}`;
   await downloadFile(`/sales/export?${qs}${columnsQuery}`, token, filename);
 }
 

@@ -50,6 +50,12 @@ export function SaleLineItemDiscountCell({
   onClearStoredRequest,
   onApprovalStateChange,
 }: SaleLineItemDiscountCellProps) {
+  const catalogItem = item.catalogItem;
+  const isDiscountable =
+    Boolean(catalogItem) &&
+    !item.is_unstored &&
+    item.sellable_type !== "unstored";
+
   const rowId = item.id || item.sellable_id;
   const qty = Math.max(1, item.quantity);
   const unitDiscount = item.discount_amount / qty;
@@ -105,10 +111,10 @@ export function SaleLineItemDiscountCell({
             quantity: qty,
             currency: "EGP",
             catalog_max_discount_type:
-              item.catalogItem.max_discount_type ?? null,
+              catalogItem?.max_discount_type ?? null,
             catalog_max_discount_value:
-              item.catalogItem.max_discount_value ?? null,
-            cost_price: getItemCostPrice(item.catalogItem),
+              catalogItem?.max_discount_value ?? null,
+            cost_price: catalogItem ? getItemCostPrice(catalogItem) : null,
           },
           sale_context: saleContext,
         },
@@ -214,6 +220,10 @@ export function SaleLineItemDiscountCell({
     unitDiscount,
   ]);
 
+  if (!isDiscountable || !catalogItem) {
+    return null;
+  }
+
   return (
     <ItemInlineDiscountEditor
       mode="sale"
@@ -222,9 +232,9 @@ export function SaleLineItemDiscountCell({
       quantity={qty}
       currency={item.currency}
       unitDiscount={unitDiscount}
-      catalogMaxDiscountType={item.catalogItem.max_discount_type}
-      catalogMaxDiscountValue={item.catalogItem.max_discount_value}
-      costPrice={getItemCostPrice(item.catalogItem)}
+      catalogMaxDiscountType={catalogItem.max_discount_type}
+      catalogMaxDiscountValue={catalogItem.max_discount_value}
+      costPrice={getItemCostPrice(catalogItem)}
       exchangeRates={exchangeRates}
       approval={approval}
       hasStoredApproval={Boolean(item.discount_approval_request_id)}

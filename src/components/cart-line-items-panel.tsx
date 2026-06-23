@@ -11,7 +11,12 @@ import {
   BikeRecord,
   MaintenanceServiceRecord,
 } from "@/lib/crud-api";
-import { formatCatalogItemAttributes } from "@/lib/inventory-item-attributes";
+import {
+  UNSTORED_ITEM_TYPE_OPTIONS,
+  unstoredTypeLabel,
+  validateUnstoredDraft,
+  type UnstoredItemType,
+} from "@/lib/unstored-line-item";
 import { EmptyState } from "@/components/ops-ui";
 import {
   computeCartTotalsBreakdown,
@@ -26,7 +31,8 @@ export type SaleLineItem = {
     | "spare_parts"
     | "maintenance_parts"
     | "bikes"
-    | "maintenance_services";
+    | "maintenance_services"
+    | "unstored";
   item_name: string;
   selling_price: number;
   discount_amount: number;
@@ -34,7 +40,13 @@ export type SaleLineItem = {
   discount_approval_request_pending?: boolean;
   quantity: number;
   currency: PricingCurrency;
-  catalogItem:
+  is_unstored?: boolean;
+  custom_name?: string;
+  custom_description?: string;
+  unstored_type?: UnstoredItemType;
+  cost_price?: number;
+  is_draft?: boolean;
+  catalogItem?:
     | ProductRecord
     | SparePartRecord
     | MaintenancePartRecord
@@ -74,10 +86,22 @@ export function CartLineItemsPanel({
   exchangeRateEur = 0,
 }: CartLineItemsPanelProps) {
   const [editingRowId, setEditingRowId] = useState<string | number | null>(null);
+  const [editError, setEditError] = useState<string | null>(null);
   const [editValues, setEditValues] = useState<{
     qty: number;
     price: number;
-  }>({ qty: 1, price: 0 });
+    custom_name: string;
+    custom_description: string;
+    unstored_type: UnstoredItemType;
+    cost_price: number;
+  }>({
+    qty: 1,
+    price: 0,
+    custom_name: "",
+    custom_description: "",
+    unstored_type: "product",
+    cost_price: 0,
+  });
   const exchangeRates = {
     usdToEgp: exchangeRate,
     eurToEgp: exchangeRateEur,
@@ -91,6 +115,7 @@ export function CartLineItemsPanel({
   }, [items, onPendingItemApprovalsChange]);
 
   const getMaxQty = (item: SaleLineItem): number | undefined => {
+    if (item.is_unstored || item.sellable_type === "unstored") return undefined;
     if (item.sellable_type === "bikes" || item.sellable_type === "maintenance_services") return 1;
     // Products + spare parts come from inventory and have stock_quantity
     if (
@@ -113,23 +138,83 @@ export function CartLineItemsPanel({
     return typeof max === "number" ? Math.min(clampedMin, max) : clampedMin;
   };
 
+  useEffect(() => {
+    const draft = items.find((line) => line.is_draft);
+    if (!draft) return;
+    const rowId = draft.id || draft.sellable_id;
+    if (editingRowId === rowId) return;
+    const qty = normalizeQty(draft, draft.quantity);
+    setEditingRowId(rowId);
+    setEditError(null);
+    setEditValues({
+      qty,
+      price: draft.selling_price,
+      custom_name: draft.custom_name ?? "",
+      custom_description: draft.custom_description ?? "",
+      unstored_type: draft.unstored_type ?? "product",
+      cost_price: draft.cost_price ?? 0,
+    });
+  }, [items, editingRowId]);
+
   const handleEditClick = (item: SaleLineItem) => {
     const qty = normalizeQty(item, item.quantity);
     setEditingRowId(item.id || item.sellable_id);
+    setEditError(null);
     setEditValues({
       qty,
       price: item.selling_price,
+      custom_name: item.custom_name ?? "",
+      custom_description: item.custom_description ?? "",
+      unstored_type: item.unstored_type ?? "product",
+      cost_price: item.cost_price ?? 0,
     });
   };
 
   const handleSaveEdit = (itemId: string | number) => {
     const item = items.find((i) => (i.id || i.sellable_id) === itemId);
-    const qty = item ? normalizeQty(item, editValues.qty) : Math.max(1, Math.trunc(editValues.qty || 0));
+    if (!item) return;
+
+    if (item.is_unstored || item.sellable_type === "unstored") {
+      const validationError = validateUnstoredDraft({
+        custom_name: editValues.custom_name,
+        custom_description: editValues.custom_description,
+        unstored_type: editValues.unstored_type,
+        qty: editValues.qty,
+        cost_price: editValues.cost_price,
+        sale_price: editValues.price,
+      });
+      if (validationError) {
+        setEditError(validationError);
+        return;
+      }
+
+      const qty = normalizeQty(item, editValues.qty);
+      const customName = editValues.custom_name.trim();
+      onUpdateItem(itemId, {
+        custom_name: customName,
+        custom_description: editValues.custom_description.trim(),
+        unstored_type: editValues.unstored_type,
+        cost_price: Number(editValues.cost_price),
+        item_name: customName,
+        selling_price: Number(editValues.price),
+        quantity: qty,
+        discount_amount: 0,
+        discount_approval_request_id: undefined,
+        discount_approval_request_pending: undefined,
+        is_draft: false,
+      });
+      setEditingRowId(null);
+      setEditError(null);
+      return;
+    }
+
+    const qty = normalizeQty(item, editValues.qty);
     onUpdateItem(itemId, {
       quantity: qty,
       selling_price: editValues.price,
     });
     setEditingRowId(null);
+    setEditError(null);
   };
 
   const handleDiscountApply = (
@@ -168,8 +253,15 @@ export function CartLineItemsPanel({
     });
   };
 
-  const handleCancelEdit = () => {
+  const handleCancelEdit = (itemId?: string | number) => {
+    const item = itemId
+      ? items.find((i) => (i.id || i.sellable_id) === itemId)
+      : undefined;
+    if (item?.is_draft && itemId != null) {
+      onDeleteItem(itemId);
+    }
     setEditingRowId(null);
+    setEditError(null);
   };
 
   // ─── Currency Normalization ────────────────────────────────────────────────
@@ -263,13 +355,20 @@ export function CartLineItemsPanel({
               <tbody className="divide-y divide-outline-variant/10">
                 {items.map((item, index) => {
                   const rowId = item.id || item.sellable_id;
-                  const isEditing = editingRowId === rowId;
+                  const isUnstored =
+                    item.is_unstored || item.sellable_type === "unstored";
+                  const isEditing = editingRowId === rowId || item.is_draft === true;
                   const maxQty = getMaxQty(item);
                   const isStockLimited =
                     item.sellable_type === "products" ||
                     item.sellable_type === "spare_parts" ||
                     item.sellable_type === "maintenance_parts";
                   const isOutOfStock = isStockLimited && typeof maxQty === "number" && maxQty === 0;
+                  const draftLineSubtotal = isUnstored && isEditing
+                    ? Math.round(
+                        (editValues.qty * Number(editValues.price || 0)) * 100,
+                      ) / 100
+                    : calculateLineSubtotal(item);
                   return (
                     <tr
                       key={index}
@@ -277,28 +376,125 @@ export function CartLineItemsPanel({
                     >
                       {/* Item Name */}
                       <td className="px-5 py-4">
-                        <p className="font-semibold text-on-surface">{item.item_name}</p>
-                        <p className="mono-data mt-0.5 text-xs font-medium text-on-surface-variant/70">
-                          ID: {item.sellable_id}
-                        </p>
+                        {isUnstored && isEditing ? (
+                          <div className="flex flex-col gap-2 min-w-[200px]">
+                            <input
+                              value={editValues.custom_name}
+                              onChange={(e) =>
+                                setEditValues((v) => ({
+                                  ...v,
+                                  custom_name: e.target.value,
+                                }))
+                              }
+                              placeholder="Name *"
+                              className="form-input-base w-full py-1.5 text-sm"
+                            />
+                            <textarea
+                              value={editValues.custom_description}
+                              onChange={(e) =>
+                                setEditValues((v) => ({
+                                  ...v,
+                                  custom_description: e.target.value,
+                                }))
+                              }
+                              rows={2}
+                              placeholder="Description *"
+                              className="form-input-base w-full py-1.5 text-sm"
+                            />
+                            <input
+                              type="number"
+                              min={0}
+                              step="0.01"
+                              value={editValues.cost_price}
+                              onChange={(e) =>
+                                setEditValues((v) => ({
+                                  ...v,
+                                  cost_price: Number(e.target.value),
+                                }))
+                              }
+                              placeholder="Cost (EGP) *"
+                              className="form-input-base mono-data w-full py-1.5 text-sm"
+                            />
+                          </div>
+                        ) : (
+                          <>
+                            <p className="font-semibold text-on-surface">{item.item_name}</p>
+                            {item.is_unstored && item.custom_description ? (
+                              <p className="mt-0.5 text-xs text-on-surface-variant">
+                                {item.custom_description}
+                              </p>
+                            ) : null}
+                            {item.is_unstored && item.cost_price != null ? (
+                              <p className="mono-data mt-0.5 text-xs font-medium text-on-surface-variant/70">
+                                Cost: {formatEgp(item.cost_price)}
+                              </p>
+                            ) : (
+                              !item.is_unstored && (
+                                <p className="mono-data mt-0.5 text-xs font-medium text-on-surface-variant/70">
+                                  ID: {item.sellable_id}
+                                </p>
+                              )
+                            )}
+                          </>
+                        )}
                       </td>
 
                       {/* Item Type */}
                       <td className="px-5 py-4 text-center">
-                        <span className="form-chip rounded-lg bg-primary/8 text-primary border-primary/15 font-mono-data text-caption">
-                          {item.sellable_type === "products" && "PRODUCT"}
-                          {item.sellable_type === "spare_parts" && "SPARE PART"}
-                          {item.sellable_type === "maintenance_parts" && "MAINT. PART"}
-                          {item.sellable_type === "bikes" && "BIKE"}
-                          {item.sellable_type === "maintenance_services" && "SERVICE"}
-                        </span>
+                        {isUnstored && isEditing ? (
+                          <select
+                            value={editValues.unstored_type}
+                            onChange={(e) =>
+                              setEditValues((v) => ({
+                                ...v,
+                                unstored_type: e.target
+                                  .value as UnstoredItemType,
+                              }))
+                            }
+                            className="form-input-base w-full min-w-[9rem] py-1.5 text-xs"
+                          >
+                            {UNSTORED_ITEM_TYPE_OPTIONS.map((opt) => (
+                              <option key={opt.value} value={opt.value}>
+                                {opt.label}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <span className="form-chip rounded-lg bg-primary/8 text-primary border-primary/15 font-mono-data text-caption">
+                            {item.is_unstored
+                              ? unstoredTypeLabel(item.unstored_type).toUpperCase()
+                              : null}
+                            {!item.is_unstored && item.sellable_type === "products" && "PRODUCT"}
+                            {!item.is_unstored && item.sellable_type === "spare_parts" && "SPARE PART"}
+                            {!item.is_unstored && item.sellable_type === "maintenance_parts" && "MAINT. PART"}
+                            {!item.is_unstored && item.sellable_type === "bikes" && "BIKE"}
+                            {!item.is_unstored && item.sellable_type === "maintenance_services" && "SERVICE"}
+                          </span>
+                        )}
                       </td>
 
                       {/* Price */}
                       <td className="px-5 py-4 text-right">
-                        <p className="mono-data font-semibold text-on-surface">
-                          {formatEgp(getDisplayPriceEgp(item))}
-                        </p>
+                        {isUnstored && isEditing ? (
+                          <input
+                            type="number"
+                            min={0}
+                            step="0.01"
+                            value={editValues.price}
+                            onChange={(e) =>
+                              setEditValues((v) => ({
+                                ...v,
+                                price: Number(e.target.value),
+                              }))
+                            }
+                            className="form-input-base mono-data w-24 py-1.5 text-right text-sm"
+                            aria-label="Sale price (EGP)"
+                          />
+                        ) : (
+                          <p className="mono-data font-semibold text-on-surface">
+                            {formatEgp(getDisplayPriceEgp(item))}
+                          </p>
+                        )}
                       </td>
 
                       {/* Quantity */}
@@ -364,7 +560,9 @@ export function CartLineItemsPanel({
 
                       {/* Discount */}
                       <td className="px-5 py-4 text-right">
-                        {isEditing ? (
+                        {isUnstored ? (
+                          <span className="text-on-surface-variant/40">—</span>
+                        ) : isEditing ? (
                           <SaleLineItemDiscountCell
                             item={{
                               ...item,
@@ -392,8 +590,11 @@ export function CartLineItemsPanel({
                       {/* Subtotal — always EGP */}
                       <td className="px-5 py-4 text-right">
                         <p className="mono-data font-bold text-primary">
-                          {formatEgp(calculateLineSubtotal(item))}
+                          {formatEgp(draftLineSubtotal)}
                         </p>
+                        {isEditing && editError ? (
+                          <p className="mt-1 text-xs font-medium text-error">{editError}</p>
+                        ) : null}
                       </td>
 
                       {/* Actions */}
@@ -416,7 +617,7 @@ export function CartLineItemsPanel({
                             </button>
                             <button
                               type="button"
-                              onClick={handleCancelEdit}
+                              onClick={() => handleCancelEdit(rowId)}
                               className="rounded-lg p-1.5 text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface"
                               title="Cancel"
                               aria-label="Cancel editing"
@@ -426,15 +627,17 @@ export function CartLineItemsPanel({
                           </div>
                         ) : (
                           <div className="flex items-center justify-center gap-1.5 opacity-60 transition-opacity group-hover:opacity-100">
-                            <button
-                              type="button"
-                              onClick={() => handleEditClick(item)}
-                              className="flex h-8 w-8 items-center justify-center rounded-lg bg-surface-container-lowest text-on-surface-variant shadow-sm ring-1 ring-inset ring-outline-variant/20 transition-all hover:bg-surface-container-low hover:text-on-surface"
-                              title="Edit Row"
-                              aria-label="Edit row"
-                            >
-                              <PencilSquareIcon className="h-4 w-4" />
-                            </button>
+                            {!item.is_draft ? (
+                              <button
+                                type="button"
+                                onClick={() => handleEditClick(item)}
+                                className="flex h-8 w-8 items-center justify-center rounded-lg bg-surface-container-lowest text-on-surface-variant shadow-sm ring-1 ring-inset ring-outline-variant/20 transition-all hover:bg-surface-container-low hover:text-on-surface"
+                                title="Edit Row"
+                                aria-label="Edit row"
+                              >
+                                <PencilSquareIcon className="h-4 w-4" />
+                              </button>
+                            ) : null}
                             <button
                               type="button"
                               onClick={() => onDeleteItem(rowId)}

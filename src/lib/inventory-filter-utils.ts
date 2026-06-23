@@ -201,6 +201,13 @@ export function buildActiveFilterChips(
       onClear: () => onClear("is_maintenance"),
     });
   }
+  if (filters.has_unstored_items) {
+    chips.push({
+      key: "has_unstored_items",
+      label: "Has unstored items",
+      onClear: () => onClear("has_unstored_items"),
+    });
+  }
   if (filters.date_from || filters.date_to) {
     chips.push({
       key: "date",
@@ -257,6 +264,7 @@ export function countActiveFilters(filters: EntityFilters): number {
   if (filters.customer_name) n++;
   if (filters.payment_method_id) n++;
   if (filters.is_maintenance) n++;
+  if (filters.has_unstored_items) n++;
   if (filters.date_from || filters.date_to) n++;
   if (filters.total_min !== undefined || filters.total_max !== undefined) n++;
   if (filters.stock_alert_level && filters.stock_alert_level !== "all") n++;
