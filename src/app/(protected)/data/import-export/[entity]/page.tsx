@@ -187,6 +187,8 @@ export default function EntityImportExportPage() {
       {canExportData || canImportData ? (
         <div className="mb-6">
           <ExportColumnPicker
+            collapsible
+            defaultCollapsed
             allColumns={selectableColumns}
             orderedKeys={columnState.orderedKeys}
             isVisible={columnState.isVisible}

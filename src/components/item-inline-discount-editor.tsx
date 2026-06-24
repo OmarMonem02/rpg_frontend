@@ -31,6 +31,7 @@ export type ItemInlineDiscountEditorProps = {
   catalogMaxDiscountType?: string;
   catalogMaxDiscountValue?: number;
   costPrice?: number | null;
+  costCurrency?: PricingCurrency;
   exchangeRates?: ExchangeRates;
   approval: ItemDiscountApproval;
   onApply: (unitDiscount: number, approvalRequestId?: number) => void;
@@ -54,6 +55,7 @@ export function ItemInlineDiscountEditor({
   catalogMaxDiscountType,
   catalogMaxDiscountValue,
   costPrice = null,
+  costCurrency = "EGP",
   exchangeRates = { usdToEgp: 1, eurToEgp: 1 },
   approval,
   onApply,
@@ -112,6 +114,7 @@ export function ItemInlineDiscountEditor({
         costPrice,
         rates: exchangeRates,
         currency,
+        costCurrency,
         unitDiscount: resolvedUnitDiscount,
       })
     : [];

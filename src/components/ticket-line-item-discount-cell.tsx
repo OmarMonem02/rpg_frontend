@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef } from "react";
 import { ItemInlineDiscountEditor } from "@/components/item-inline-discount-editor";
 import { useItemDiscountApproval } from "@/hooks/use-item-discount-approval";
-import { getItemCostPrice } from "@/lib/item-discount-display";
+import { getItemCostPrice, getItemCostCurrency } from "@/lib/item-discount-display";
 import { buildItemApprovalSnapshot } from "@/lib/item-discount-approval-snapshot";
 import {
   createTicketItemDiscountApprovalRequest,
@@ -37,6 +37,12 @@ function readCostPrice(item: TicketItem): number | null {
   const catalog =
     item.product ?? item.spare_part ?? item.maintenance_service ?? null;
   return getItemCostPrice(catalog as { cost_price?: number } | null);
+}
+
+function readCostCurrency(item: TicketItem): PricingCurrency {
+  const catalog =
+    item.product ?? item.spare_part ?? item.maintenance_service ?? null;
+  return getItemCostCurrency(catalog);
 }
 
 export function TicketLineItemDiscountCell({
@@ -117,6 +123,7 @@ export function TicketLineItemDiscountCell({
             catalog_max_discount_type: catalog.max_discount_type || null,
             catalog_max_discount_value: catalog.max_discount_value,
             cost_price: readCostPrice(item),
+            cost_currency: readCostCurrency(item),
             ticket_id: ticketId,
             task_id: taskId,
             ticket_item_id: item.id,
@@ -211,6 +218,7 @@ export function TicketLineItemDiscountCell({
       catalogMaxDiscountType={catalog.max_discount_type}
       catalogMaxDiscountValue={catalog.max_discount_value}
       costPrice={readCostPrice(item)}
+      costCurrency={readCostCurrency(item)}
       exchangeRates={rates}
       approval={approval}
       hasStoredApproval={Boolean(storedRequestId)}

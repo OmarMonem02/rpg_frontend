@@ -1,6 +1,8 @@
 import {
+  convertToEGP,
   egpMultiplierForPricingCurrency,
   formatEgp,
+  toPricingCurrency,
   type ExchangeRates,
   type PricingCurrency,
 } from "@/lib/currencies";
@@ -21,39 +23,57 @@ export function getItemCostPrice(
   return Number.isFinite(cost) && cost > 0 ? cost : null;
 }
 
-export function calculateProfitMargin(
+export function getItemCostCurrency(catalogItem: unknown): PricingCurrency {
+  if (!catalogItem || typeof catalogItem !== "object") return "EGP";
+  return toPricingCurrency(
+    (catalogItem as { cost_currency?: string }).cost_currency,
+  );
+}
+
+export function calculateProfitMarginInEgp(
   unitPrice: number,
-  costPrice: number | null,
+  unitCurrency: PricingCurrency,
+  costPrice: number,
+  costCurrency: PricingCurrency,
+  rates: ExchangeRates,
   unitDiscount = 0,
 ): { amount: number; percent: number } | null {
-  if (costPrice == null || unitPrice <= 0) return null;
+  if (unitPrice <= 0 || costPrice <= 0) return null;
 
-  const netUnit = Math.max(0, unitPrice - unitDiscount);
-  if (netUnit <= 0) return null;
+  const unitPriceEgp = convertToEGP(unitPrice, unitCurrency, rates);
+  const costPriceEgp = convertToEGP(costPrice, costCurrency, rates);
+  const discountEgp = convertToEGP(unitDiscount, unitCurrency, rates);
+  const netUnitEgp = Math.max(0, unitPriceEgp - discountEgp);
 
-  const amount = netUnit - costPrice;
-  const percent = (amount / netUnit) * 100;
+  if (netUnitEgp <= 0) return null;
 
-  return {
-    amount: Math.round(amount * 100) / 100,
-    percent: Math.round(percent * 10) / 10,
-  };
+  const amount = Math.round((netUnitEgp - costPriceEgp) * 100) / 100;
+  const percent = Math.round((amount / netUnitEgp) * 1000) / 10;
+
+  return { amount, percent };
 }
 
 export function formatProfitMarginHint(
   unitPrice: number,
   costPrice: number | null,
   rates: ExchangeRates,
-  currency: PricingCurrency = "EGP",
+  unitCurrency: PricingCurrency = "EGP",
+  costCurrency: PricingCurrency = "EGP",
   unitDiscount = 0,
 ): string | null {
-  const margin = calculateProfitMargin(unitPrice, costPrice, unitDiscount);
+  if (costPrice == null) return null;
+
+  const margin = calculateProfitMarginInEgp(
+    unitPrice,
+    unitCurrency,
+    costPrice,
+    costCurrency,
+    rates,
+    unitDiscount,
+  );
   if (!margin) return null;
 
-  const multiplier = egpMultiplierForPricingCurrency(currency, rates);
-  const amountEgp = margin.amount * multiplier;
-
-  return `Margin: ${formatEgp(amountEgp)} (${margin.percent}%)`;
+  return `Margin: ${formatEgp(margin.amount)} (${margin.percent}%)`;
 }
 
 export function formatCatalogMaxHint(
@@ -86,6 +106,7 @@ export function formatItemDiscountMarginHints(params: {
   costPrice: number | null;
   rates: ExchangeRates;
   currency?: PricingCurrency;
+  costCurrency?: PricingCurrency;
   unitDiscount?: number;
 }): string[] {
   const {
@@ -94,6 +115,7 @@ export function formatItemDiscountMarginHints(params: {
     costPrice,
     rates,
     currency = "EGP",
+    costCurrency = "EGP",
     unitDiscount = 0,
   } = params;
 
@@ -106,6 +128,7 @@ export function formatItemDiscountMarginHints(params: {
     costPrice,
     rates,
     currency,
+    costCurrency,
     unitDiscount,
   );
   if (marginHint) {

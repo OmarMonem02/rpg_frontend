@@ -14,6 +14,7 @@ import { createSaleDiscountApprovalRequest } from "@/lib/api/approval-requests";
 import { getSettings } from "@/lib/api/settings";
 import { egpMultiplierForPricingCurrency, toPricingCurrency } from "@/lib/currencies";
 import { REFRESH_ALL_DATA_EVENT } from "@/components/refetch-all-data-button";
+import { usePermissions } from "@/components/permission-provider";
 import {
   createSale,
   listCustomers,
@@ -22,6 +23,8 @@ import {
   listProducts,
   listSpareParts,
   createCustomer,
+  createSeller,
+  createPaymentMethod,
   listCustomerAddresses,
   createCustomerAddress,
   formatCustomerAddressLabel,
@@ -29,6 +32,7 @@ import {
   type CustomerRecord,
   type CustomerAddressRecord,
   type SellerRecord,
+  type SellerCommissionRates,
   type PaymentMethodRecord,
   type ProductRecord,
   type SparePartRecord,
@@ -293,8 +297,58 @@ type CatalogType =
   | "bikes"
   | "maintenance_services";
 
+const SELLER_COMMISSION_FIELDS: Array<{
+  name: keyof SellerCommissionRates;
+  label: string;
+}> = [
+  { name: "products_commission_rate", label: "Products Commission Rate" },
+  { name: "spare_parts_commission_rate", label: "Spare Parts Commission Rate" },
+  {
+    name: "maintenance_parts_commission_rate",
+    label: "Maintenance Parts Commission Rate",
+  },
+  {
+    name: "bikes_for_sale_commission_rate",
+    label: "Bikes for Sale Commission Rate",
+  },
+  {
+    name: "maintenance_services_commission_rate",
+    label: "Maintenance Services Commission Rate",
+  },
+];
+
+function parseCommissionRate(value: unknown, label: string): number {
+  const num = Number(value);
+  if (!Number.isFinite(num) || num < 0) {
+    throw new Error(`${label} must be a number greater than or equal to 0`);
+  }
+  return num;
+}
+
+function QuickCreateHeaderAction({
+  onClick,
+  label = "New",
+}: {
+  onClick: () => void;
+  label?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex items-center gap-1 rounded-md px-2 py-1 label-capsr text-primary transition-colors hover:bg-primary/10 hover:text-primary/80"
+    >
+      <PlusIcon className="h-3 w-3" aria-hidden />
+      {label}
+    </button>
+  );
+}
+
 export function CreateSaleForm() {
   const router = useRouter();
+  const permissions = usePermissions();
+  const canCreateSellers = permissions.canCreate("sellers");
+  const canCreatePaymentMethods = permissions.canCreate("payment-methods");
   const [customers, setCustomers] = useState<CustomerRecord[]>([]);
   const [sellers, setSellers] = useState<SellerRecord[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethodRecord[]>(
@@ -328,6 +382,8 @@ export function CreateSaleForm() {
 
   // Quick Customer state
   const [customerModalOpen, setCustomerModalOpen] = useState(false);
+  const [sellerModalOpen, setSellerModalOpen] = useState(false);
+  const [paymentMethodModalOpen, setPaymentMethodModalOpen] = useState(false);
 
   // Customer addresses (Online / Delivery)
   const [customerAddresses, setCustomerAddresses] = useState<
@@ -442,6 +498,49 @@ export function CreateSaleForm() {
     [],
   );
 
+  const sellerFields: FieldConfig[] = useMemo(
+    () => [
+      {
+        name: "name",
+        label: "Seller Name",
+        type: "text",
+        required: true,
+        span: 2,
+        placeholder: "e.g. Ahmed Hassan",
+      },
+      {
+        name: "phone",
+        label: "Phone Number",
+        type: "text",
+        required: true,
+        placeholder: "e.g. +20 123 456 7890",
+      },
+      ...SELLER_COMMISSION_FIELDS.map(({ name, label }) => ({
+        name,
+        label,
+        type: "number" as const,
+        required: true,
+        min: 0,
+        placeholder: "0",
+      })),
+    ],
+    [],
+  );
+
+  const paymentMethodFields: FieldConfig[] = useMemo(
+    () => [
+      {
+        name: "name",
+        label: "Payment Method Name",
+        type: "text",
+        required: true,
+        span: 2,
+        placeholder: "e.g., Cash, Visa, Instapay, Check",
+      },
+    ],
+    [],
+  );
+
   // Catalog picker state
   const [pickerOpen, setPickerOpen] = useState(false);
   const [activeCatalog, setActiveCatalog] = useState<CatalogType | null>(null);
@@ -457,8 +556,8 @@ export function CreateSaleForm() {
         const [customersRes, sellersRes, paymentRes, settingsRes] =
           await Promise.all([
             listCustomers(token, 1),
-            listSellers(token, 1),
-            listPaymentMethods(token, 1),
+            listSellers(token, 1, { per_page: 100 }),
+            listPaymentMethods(token, { page: 1, per_page: 100 }),
             getSettings(token),
           ]);
 
@@ -1182,6 +1281,77 @@ export function CreateSaleForm() {
     }
   };
 
+  const handleCreateSeller = async (data: Record<string, unknown>) => {
+    try {
+      const token = getAuthToken();
+      if (!token) throw new Error("Authentication required");
+      if (!canCreateSellers) {
+        throw new Error("You do not have permission to create sellers.");
+      }
+
+      const name = String(data.name ?? "").trim();
+      const phone = String(data.phone ?? "").trim();
+      if (!name) throw new Error("Seller name is required");
+      if (!phone) throw new Error("Phone number is required");
+
+      const payload = {
+        name,
+        phone,
+        products_commission_rate: parseCommissionRate(
+          data.products_commission_rate,
+          "Products commission rate",
+        ),
+        spare_parts_commission_rate: parseCommissionRate(
+          data.spare_parts_commission_rate,
+          "Spare parts commission rate",
+        ),
+        maintenance_parts_commission_rate: parseCommissionRate(
+          data.maintenance_parts_commission_rate,
+          "Maintenance parts commission rate",
+        ),
+        bikes_for_sale_commission_rate: parseCommissionRate(
+          data.bikes_for_sale_commission_rate,
+          "Bikes for sale commission rate",
+        ),
+        maintenance_services_commission_rate: parseCommissionRate(
+          data.maintenance_services_commission_rate,
+          "Maintenance services commission rate",
+        ),
+      };
+
+      const newSeller = await createSeller(token, payload);
+      setSellers((prev) => [...prev, newSeller]);
+      setSellerId(newSeller.id);
+      setSellerModalOpen(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to create seller");
+      throw err;
+    }
+  };
+
+  const handleCreatePaymentMethod = async (data: Record<string, unknown>) => {
+    try {
+      const token = getAuthToken();
+      if (!token) throw new Error("Authentication required");
+      if (!canCreatePaymentMethods) {
+        throw new Error("You do not have permission to create payment methods.");
+      }
+
+      const name = String(data.name ?? "").trim();
+      if (!name) throw new Error("Payment method name is required");
+
+      const newMethod = await createPaymentMethod(token, { name });
+      setPaymentMethods((prev) => [...prev, newMethod]);
+      setPaymentMethodId(newMethod.id);
+      setPaymentMethodModalOpen(false);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to create payment method",
+      );
+      throw err;
+    }
+  };
+
   const selectedCustomer = useMemo(
     () => customers.find((c) => c.id === customerId) ?? null,
     [customers, customerId],
@@ -1445,14 +1615,9 @@ export function CreateSaleForm() {
                     : customer.name,
                 }))}
                 headerAction={
-                  <button
-                    type="button"
+                  <QuickCreateHeaderAction
                     onClick={() => setCustomerModalOpen(true)}
-                    className="flex items-center gap-1 rounded-md px-2 py-1 label-capsr text-primary transition-colors hover:bg-primary/10 hover:text-primary/80"
-                  >
-                    <PlusIcon className="h-3 w-3" aria-hidden />
-                    New
-                  </button>
+                  />
                 }
               />
 
@@ -1470,6 +1635,13 @@ export function CreateSaleForm() {
                   value: seller.id,
                   label: seller.name,
                 }))}
+                headerAction={
+                  canCreateSellers ? (
+                    <QuickCreateHeaderAction
+                      onClick={() => setSellerModalOpen(true)}
+                    />
+                  ) : undefined
+                }
               />
 
               <FormSelect
@@ -1486,6 +1658,13 @@ export function CreateSaleForm() {
                   value: method.id,
                   label: method.name,
                 }))}
+                headerAction={
+                  canCreatePaymentMethods ? (
+                    <QuickCreateHeaderAction
+                      onClick={() => setPaymentMethodModalOpen(true)}
+                    />
+                  ) : undefined
+                }
               />
 
               {selectedCustomer ? (
@@ -1821,6 +2000,29 @@ export function CreateSaleForm() {
         onSubmit={handleCreateAddress}
         submitLabel="Save address"
         heroLabel="New Address"
+      />
+
+      <EntityDrawer
+        isOpen={sellerModalOpen}
+        onClose={() => setSellerModalOpen(false)}
+        title="Quick Seller Registration"
+        description="Create a seller profile without leaving the sales flow."
+        fields={sellerFields}
+        onSubmit={handleCreateSeller}
+        submitLabel="Create & Select"
+        heroLabel="New Seller"
+        width="lg"
+      />
+
+      <EntityDrawer
+        isOpen={paymentMethodModalOpen}
+        onClose={() => setPaymentMethodModalOpen(false)}
+        title="Add Payment Method"
+        description="Create a payment method without leaving the sales flow."
+        fields={paymentMethodFields}
+        onSubmit={handleCreatePaymentMethod}
+        submitLabel="Create & Select"
+        heroLabel="New Payment Method"
       />
 
     </PageShell>

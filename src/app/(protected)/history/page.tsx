@@ -353,6 +353,8 @@ function HistoryPageContent() {
       {historyExportColumns.length > 0 ? (
         <div className="mb-6">
           <ExportColumnPicker
+            collapsible
+            defaultCollapsed
             allColumns={historyExportColumns}
             orderedKeys={historyColumnState.orderedKeys}
             isVisible={historyColumnState.isVisible}

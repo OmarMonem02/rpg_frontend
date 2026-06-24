@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef } from "react";
 import { ItemInlineDiscountEditor } from "@/components/item-inline-discount-editor";
 import type { SaleLineItem } from "@/components/cart-line-items-panel";
 import { useItemDiscountApproval } from "@/hooks/use-item-discount-approval";
-import { getItemCostPrice } from "@/lib/item-discount-display";
+import { getItemCostPrice, getItemCostCurrency } from "@/lib/item-discount-display";
 import { buildItemApprovalSnapshot } from "@/lib/item-discount-approval-snapshot";
 import {
   createSaleItemDiscountApprovalRequest,
@@ -115,6 +115,9 @@ export function SaleLineItemDiscountCell({
             catalog_max_discount_value:
               catalogItem?.max_discount_value ?? null,
             cost_price: catalogItem ? getItemCostPrice(catalogItem) : null,
+            cost_currency: catalogItem
+              ? getItemCostCurrency(catalogItem)
+              : "EGP",
           },
           sale_context: saleContext,
         },
@@ -235,6 +238,7 @@ export function SaleLineItemDiscountCell({
       catalogMaxDiscountType={catalogItem.max_discount_type}
       catalogMaxDiscountValue={catalogItem.max_discount_value}
       costPrice={getItemCostPrice(catalogItem)}
+      costCurrency={getItemCostCurrency(catalogItem)}
       exchangeRates={exchangeRates}
       approval={approval}
       hasStoredApproval={Boolean(item.discount_approval_request_id)}

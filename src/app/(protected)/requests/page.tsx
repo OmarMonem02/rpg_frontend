@@ -13,6 +13,13 @@ import {
 import { ApiError } from "@/lib/auth-api";
 import { getAuthToken } from "@/lib/auth-session";
 import {
+  formatEgp,
+  toPricingCurrency,
+  type ExchangeRates,
+} from "@/lib/currencies";
+import { calculateProfitMarginInEgp } from "@/lib/item-discount-display";
+import { getSettings } from "@/lib/api/settings";
+import {
   resolveDiscountAmount,
   type DiscountInputType,
 } from "@/lib/discount-input";
@@ -121,6 +128,7 @@ function requestTypeLabel(type: string) {
 
 function formatItemContextMarginHints(
   request: ApprovalRequestRecord,
+  rates: ExchangeRates,
 ): string[] {
   const ctx = request.payload.item_context;
   if (!ctx) return [];
@@ -139,11 +147,18 @@ function formatItemContextMarginHints(
   const costPrice = ctx.cost_price != null ? Number(ctx.cost_price) : 0;
   const unitPrice = Number(ctx.unit_price) || 0;
   if (costPrice > 0 && unitPrice > 0) {
-    const marginAmount = unitPrice - costPrice;
-    const marginPercent = (marginAmount / unitPrice) * 100;
-    hints.push(
-      `Profit margin: ${formatMoney(marginAmount)} EGP (${marginPercent.toFixed(1)}%)`,
+    const margin = calculateProfitMarginInEgp(
+      unitPrice,
+      toPricingCurrency(ctx.currency),
+      costPrice,
+      toPricingCurrency(ctx.cost_currency),
+      rates,
     );
+    if (margin) {
+      hints.push(
+        `Profit margin: ${formatEgp(margin.amount)} (${margin.percent}%)`,
+      );
+    }
   }
 
   return hints;
@@ -319,6 +334,25 @@ export default function RequestsPage() {
   const [confirmAction, setConfirmAction] = useState<
     "approve" | "reject" | null
   >(null);
+  const [exchangeRates, setExchangeRates] = useState<ExchangeRates>({
+    usdToEgp: 0,
+    eurToEgp: 0,
+  });
+
+  const loadExchangeRates = useCallback(async () => {
+    const token = getAuthToken();
+    if (!token) return;
+
+    try {
+      const settings = await getSettings(token);
+      setExchangeRates({
+        usdToEgp: settings.exchange_rate ?? 0,
+        eurToEgp: settings.exchange_rate_eur ?? 0,
+      });
+    } catch {
+      // Margin hints fall back to 1:1 when rates are unavailable.
+    }
+  }, []);
 
   const loadPendingCount = useCallback(async () => {
     const token = getAuthToken();
@@ -422,6 +456,10 @@ export default function RequestsPage() {
   }, [loadRequests]);
 
   useEffect(() => {
+    void loadExchangeRates();
+  }, [loadExchangeRates]);
+
+  useEffect(() => {
     if (selectedId == null) {
       setSelectedRequest(null);
       return;
@@ -437,6 +475,11 @@ export default function RequestsPage() {
       selectedRequest.cart_subtotal,
     );
   }, [approveDraft, approveDraftType, selectedRequest]);
+
+  const selectedItemMarginHints = useMemo(() => {
+    if (!selectedRequest) return [];
+    return formatItemContextMarginHints(selectedRequest, exchangeRates);
+  }, [exchangeRates, selectedRequest]);
 
   const handleApprove = async () => {
     if (!selectedRequest) return;
@@ -816,13 +859,13 @@ export default function RequestsPage() {
                 </div>
               </div>
 
-              {formatItemContextMarginHints(selectedRequest).length > 0 ? (
+              {selectedItemMarginHints.length > 0 ? (
                 <div className="rounded-2xl border border-outline-variant/20 bg-surface-container-low p-4">
                   <p className="label-caps text-on-surface-variant">
                     Item margin context
                   </p>
                   <ul className="mt-2 space-y-1 text-sm text-on-surface">
-                    {formatItemContextMarginHints(selectedRequest).map((hint) => (
+                    {selectedItemMarginHints.map((hint) => (
                       <li key={hint}>{hint}</li>
                     ))}
                   </ul>

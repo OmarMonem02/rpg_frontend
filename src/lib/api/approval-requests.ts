@@ -71,6 +71,7 @@ export type ApprovalRequestItemContext = {
   catalog_max_discount_type?: string | null;
   catalog_max_discount_value?: number | null;
   cost_price?: number | null;
+  cost_currency?: string | null;
   ticket_id?: number | null;
   task_id?: number | null;
   ticket_item_id?: number | null;
@@ -323,6 +324,9 @@ function mapApprovalRequest(raw: unknown): ApprovalRequestRecord {
               itemContext.cost_price != null
                 ? toNumber(itemContext.cost_price)
                 : null,
+            cost_currency: itemContext.cost_currency
+              ? toText(itemContext.cost_currency)
+              : null,
             ticket_id:
               itemContext.ticket_id != null
                 ? toNumber(itemContext.ticket_id)

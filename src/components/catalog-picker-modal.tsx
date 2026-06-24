@@ -1,6 +1,14 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import {
+  useEffect,
+  useState,
+  useCallback,
+  useMemo,
+  useRef,
+  type RefObject,
+  memo,
+} from "react";
 import { createPortal } from "react-dom";
 import { getAuthToken } from "@/lib/auth-session";
 import {
@@ -35,7 +43,7 @@ import {
   type PricingCurrency,
 } from "@/lib/currencies";
 import { useExchangeRates } from "@/hooks/useExchangeRates";
-import { useEntityFilters } from "@/hooks/useEntityFilters";
+import { useEntityFilters, type EntityFilters } from "@/hooks/useEntityFilters";
 import { ActionButton, StatusBadge } from "@/components/ops-ui";
 import { InventoryModuleFilters } from "@/components/inventory/InventoryModuleFilters";
 import { InventoryItemThumbnail } from "@/components/inventory/list-table";
@@ -45,7 +53,8 @@ import { StockBadge } from "@/components/inventory/stock-badge";
 import {
   XMarkIcon,
   FunnelIcon,
-  ChevronDownIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
   MagnifyingGlassIcon,
 } from "@heroicons/react/24/outline";
 
@@ -71,6 +80,464 @@ interface CatalogPickerModalProps {
   selectedIds?: number[];
   blueprintId?: number;
 }
+
+type CatalogPickerFilterSetters = {
+  setSearch: (v: string) => void;
+  setCategory: (v: number | "") => void;
+  setBrand: (v: number | "") => void;
+  setBlueprint: (v: number | "") => void;
+  setSector: (v: number | "") => void;
+  setStatus: (v: string) => void;
+  setType: (v: string) => void;
+  setPriceMin: (v: number | "") => void;
+  setPriceMax: (v: number | "") => void;
+  setCurrency: (v: string) => void;
+  setLowStock: (v: boolean) => void;
+  setTags: (v: string[]) => void;
+  setBikeCompatibility: (v: {
+    bike_brand_id?: number;
+    bike_model?: string;
+    bike_year?: number;
+  }) => void;
+  setFilter: <K extends keyof EntityFilters>(
+    key: K,
+    value: EntityFilters[K],
+  ) => void;
+};
+
+/**
+ * Memoized filters panel component to prevent unnecessary re-renders
+ * when catalog items update without filter changes
+ */
+const CatalogPickerFiltersPanel = memo(function CatalogPickerFiltersPanel({
+  activeFilterCount,
+  moduleId,
+  filters,
+  filterOptions,
+  bikeBrands,
+  loading,
+  onClose,
+  onClearAll,
+  setters,
+  closeButtonRef,
+  showBackButton = false,
+}: {
+  activeFilterCount: number;
+  moduleId: InventoryModuleId;
+  filters: EntityFilters;
+  filterOptions: ModuleFilterOptions;
+  bikeBrands: BrandRecord[];
+  loading: boolean;
+  onClose: () => void;
+  onClearAll: () => void;
+  setters: CatalogPickerFilterSetters;
+  closeButtonRef?: RefObject<HTMLButtonElement | null>;
+  showBackButton?: boolean;
+}) {
+  return (
+    <>
+      <div className="relative flex shrink-0 items-center justify-between gap-3 border-b border-outline-variant/15 bg-surface-container-low px-4 py-4 sm:px-5">
+        <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent" />
+        <div className="flex min-w-0 items-center gap-3">
+          {showBackButton ? (
+            <button
+              ref={closeButtonRef}
+              type="button"
+              onClick={onClose}
+              aria-label="Back to catalog"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            >
+              <ChevronLeftIcon className="h-6 w-6" />
+            </button>
+          ) : (
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary ring-1 ring-inset ring-primary/12">
+              <FunnelIcon className="h-4 w-4" aria-hidden />
+            </span>
+          )}
+          <div className="min-w-0">
+            <h3 className="font-display text-lg font-bold tracking-tight text-on-surface">
+              Refine results
+            </h3>
+            <p className="text-xs font-medium text-on-surface-variant">
+              {activeFilterCount > 0
+                ? `${activeFilterCount} active filter${activeFilterCount === 1 ? "" : "s"}`
+                : "Narrow the catalog list"}
+            </p>
+          </div>
+        </div>
+        <button
+          ref={showBackButton ? undefined : closeButtonRef}
+          type="button"
+          onClick={onClose}
+          aria-label="Close filters"
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+        >
+          <XMarkIcon className="h-5 w-5" />
+        </button>
+      </div>
+
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain scroll-smooth px-4 py-4 [scrollbar-gutter:stable] sm:px-5 sm:py-5">
+        <div className="rounded-2xl border border-outline-variant/10 bg-surface-container-lowest/35 p-4 sm:p-5">
+          <InventoryModuleFilters
+            module={moduleId}
+            filters={filters}
+            setters={setters}
+            options={filterOptions}
+            bikeBrands={bikeBrands}
+            loading={loading}
+            layout="panel"
+            sections={["primary", "advanced", "more"]}
+          />
+        </div>
+      </div>
+
+      <div className="flex shrink-0 items-center justify-between gap-3 border-t border-outline-variant/15 bg-surface-container-low px-4 py-4 sm:px-5">
+        {activeFilterCount > 0 ? (
+          <ActionButton variant="ghost" size="sm" onClick={onClearAll}>
+            Clear all
+          </ActionButton>
+        ) : (
+          <span />
+        )}
+        <ActionButton
+          tone="primary"
+          variant="filled"
+          size="sm"
+          onClick={onClose}
+          className="shadow-sm"
+        >
+          Show results
+        </ActionButton>
+      </div>
+    </>
+  );
+});
+
+/**
+ * Memoized catalog item row component for optimal rendering performance
+ * Prevents re-renders of individual items when catalog updates
+ */
+interface CatalogItemRowProps {
+  item: CatalogItem;
+  index: number;
+  isSelected: boolean;
+  catalogType: CatalogType;
+  onToggle: (id: number) => void;
+  getItemName: (item: CatalogItem) => string;
+  getItemPrice: (item: CatalogItem) => number;
+  getItemCurrency: (item: CatalogItem) => PricingCurrency;
+  rates: any; // ExchangeRates type from useExchangeRates hook
+  brands: BrandRecord[];
+  productCategories: ProductCategoryRecord[];
+  sparePartCategories: SparePartCategoryRecord[];
+  maintenancePartCategories: MaintenancePartCategoryRecord[];
+  sectors: MaintenanceServiceSectorRecord[];
+  blueprints: BikeBlueprintRecord[];
+}
+
+const CatalogItemRow = memo(function CatalogItemRow({
+  item,
+  index,
+  isSelected,
+  catalogType,
+  onToggle,
+  getItemName,
+  getItemPrice,
+  getItemCurrency,
+  rates,
+  brands,
+  productCategories,
+  sparePartCategories,
+  maintenancePartCategories,
+  sectors,
+  blueprints,
+}: CatalogItemRowProps) {
+  const isUniversalSparePart =
+    catalogType === "spare_parts" &&
+    "universal" in item &&
+    item.universal === true;
+
+  const getBikeStatusTone = (
+    status: string,
+  ): "default" | "primary" | "success" | "warning" | "danger" => {
+    const toneMap: Record<
+      string,
+      "default" | "primary" | "success" | "warning" | "danger"
+    > = {
+      available: "success",
+      sold: "default",
+      maintenance: "warning",
+      reserved: "primary",
+    };
+    return toneMap[status.toLowerCase()] ?? "default";
+  };
+
+  const getBikeStatusLabel = (status: string): string => {
+    const labels: Record<string, string> = {
+      available: "Available",
+      sold: "Sold",
+      maintenance: "Under Maintenance",
+      reserved: "Reserved",
+    };
+    return labels[status.toLowerCase()] ?? status;
+  };
+
+  return (
+    <label
+      key={item.id}
+      style={{ animationDelay: `${Math.min(index, 10) * 30}ms` }}
+      className={`group relative block w-full min-w-0 cursor-pointer rounded-2xl border p-3 transition-all duration-150 animate-fade-in active:scale-[0.98] focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-primary ${
+        isSelected
+          ? "bg-primary/6 border-primary ring-2 ring-primary shadow-sm"
+          : isUniversalSparePart
+            ? "border-outline-variant/15 border-primary/15 bg-primary-container/15 hover:border-primary/45 hover:bg-primary-container/50 hover:shadow-sm"
+            : "border-outline-variant/15 bg-surface-container-lowest hover:border-primary/30 hover:bg-primary/4 hover:shadow-sm"
+      }`}
+    >
+      <div className="flex items-center gap-4 w-full">
+        {/* Checkbox */}
+        <div className="shrink-0 flex items-center justify-center w-6 h-6 rounded border-2 border-outline-variant group-hover:border-primary transition-colors bg-surface-container-lowest relative">
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={() => onToggle(item.id)}
+            className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+            aria-label={`Select ${getItemName(item)}`}
+          />
+          {isSelected && (
+            <svg
+              className="w-4 h-4 text-primary pointer-events-none"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              aria-hidden
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={3}
+                d="M5 13l4 4L19 7"
+              />
+            </svg>
+          )}
+        </div>
+        <div
+          className="shrink-0"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <InventoryItemThumbnail
+            image={"image" in item ? item.image : undefined}
+            images={"images" in item ? item.images : undefined}
+            name={getItemName(item)}
+          />
+        </div>
+        {/* Content */}
+        <div className="flex-1 min-w-0 pr-4">
+          <h4 className="font-semibold text-sm text-on-surface truncate">
+            {getItemName(item)}
+          </h4>
+          {catalogType === "products" &&
+            "products_category_id" in item && (
+              <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1">
+                <span className="mono-data inline-flex items-center text-xs font-medium text-on-surface-variant">
+                  <span className="label-caps mr-1 text-on-surface-variant/60">
+                    SKU
+                  </span>{" "}
+                  {item.sku}
+                </span>
+                {item.brand_id ? (
+                  <span className="inline-flex items-center text-xs font-medium text-on-surface-variant">
+                    <span className="label-caps mr-1 text-on-surface-variant/60">
+                      Brand
+                    </span>{" "}
+                    {brands.find((b) => b.id === item.brand_id)
+                      ?.name ?? item.brand_id}
+                  </span>
+                ) : null}
+                {item.products_category_id ? (
+                  <span className="inline-flex items-center text-xs font-medium text-on-surface-variant">
+                    <span className="label-caps mr-1 text-on-surface-variant/60">
+                      Category
+                    </span>{" "}
+                    {productCategories.find(
+                      (c) => c.id === item.products_category_id,
+                    )?.name ?? item.products_category_id}
+                  </span>
+                ) : null}
+                <StockBadge
+                  stock_quantity={item.stock_quantity}
+                  low_stock_alarm={item.low_stock_alarm}
+                />
+              </div>
+            )}
+
+          {catalogType === "spare_parts" &&
+            "spare_parts_category_id" in item && (
+              <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1">
+                <span className="mono-data inline-flex items-center text-xs font-medium text-on-surface-variant">
+                  <span className="label-caps mr-1 text-on-surface-variant/60">
+                    SKU
+                  </span>{" "}
+                  {item.sku}
+                </span>
+                {item.part_number ? (
+                  <span className="mono-data inline-flex items-center text-xs font-medium text-on-surface-variant">
+                    <span className="label-caps mr-1 text-on-surface-variant/60">
+                      Part#
+                    </span>{" "}
+                    {item.part_number}
+                  </span>
+                ) : null}
+                {formatCatalogItemAttributes(item) ? (
+                  <span className="inline-flex items-center text-xs font-medium text-on-surface-variant">
+                    {formatCatalogItemAttributes(item)}
+                  </span>
+                ) : null}
+                {"item_status" in item ? (
+                  <ItemStatusBadge status={item.item_status} />
+                ) : null}
+                <span className="mono-data inline-flex items-center text-xs font-medium text-on-surface-variant">
+                  <span className="label-caps mr-1 text-on-surface-variant/60">
+                    Universal
+                  </span>{" "}
+                  {item.universal ? "Yes" : "No"}
+                </span>
+                {item.brand_id ? (
+                  <span className="inline-flex items-center text-xs font-medium text-on-surface-variant">
+                    <span className="label-caps mr-1 text-on-surface-variant/60">
+                      Brand
+                    </span>{" "}
+                    {brands.find((b) => b.id === item.brand_id)
+                      ?.name ?? item.brand_id}
+                  </span>
+                ) : null}
+                <StockBadge
+                  stock_quantity={item.stock_quantity}
+                  low_stock_alarm={item.low_stock_alarm}
+                />
+              </div>
+            )}
+
+          {catalogType === "maintenance_parts" &&
+            "maintenance_parts_category_id" in item && (
+              <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1">
+                <span className="mono-data inline-flex items-center text-xs font-medium text-on-surface-variant">
+                  <span className="label-caps mr-1 text-on-surface-variant/60">
+                    SKU
+                  </span>{" "}
+                  {item.sku}
+                </span>
+                {item.part_number ? (
+                  <span className="mono-data inline-flex items-center text-xs font-medium text-on-surface-variant">
+                    <span className="label-caps mr-1 text-on-surface-variant/60">
+                      Part#
+                    </span>{" "}
+                    {item.part_number}
+                  </span>
+                ) : null}
+                {formatCatalogItemAttributes(item) ? (
+                  <span className="inline-flex items-center text-xs font-medium text-on-surface-variant">
+                    {formatCatalogItemAttributes(item)}
+                  </span>
+                ) : null}
+                {"item_status" in item ? (
+                  <ItemStatusBadge status={item.item_status} />
+                ) : null}
+                <span className="mono-data inline-flex items-center text-xs font-medium text-on-surface-variant">
+                  <span className="label-caps mr-1 text-on-surface-variant/60">
+                    Universal
+                  </span>{" "}
+                  {item.universal ? "Yes" : "No"}
+                </span>
+                {item.brand_id ? (
+                  <span className="inline-flex items-center text-xs font-medium text-on-surface-variant">
+                    <span className="label-caps mr-1 text-on-surface-variant/60">
+                      Brand
+                    </span>{" "}
+                    {brands.find((b) => b.id === item.brand_id)
+                      ?.name ?? item.brand_id}
+                  </span>
+                ) : null}
+                <StockBadge
+                  stock_quantity={item.stock_quantity}
+                  low_stock_alarm={item.low_stock_alarm}
+                />
+              </div>
+            )}
+
+          {catalogType === "bikes" && "bike_blueprint_id" in item && (
+            <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1">
+              {item.vin ? (
+                <span className="mono-data inline-flex items-center text-xs font-medium text-on-surface-variant">
+                  <span className="label-caps mr-1 text-on-surface-variant/60">
+                    VIN
+                  </span>{" "}
+                  {item.vin}
+                </span>
+              ) : null}
+              <span className="mono-data inline-flex items-center text-xs font-medium text-on-surface-variant">
+                <span className="label-caps mr-1 text-on-surface-variant/60">
+                  Mileage
+                </span>{" "}
+                {item.mileage.toLocaleString()} km
+              </span>
+              {item.status ? (
+                <StatusBadge tone={getBikeStatusTone(item.status)}>
+                  {getBikeStatusLabel(item.status)}
+                </StatusBadge>
+              ) : null}
+            </div>
+          )}
+
+          {catalogType === "maintenance_services" &&
+            "service_price" in item && (
+              <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1">
+                {item.maintenance_service_sector_id ? (
+                  <span className="inline-flex items-center text-xs font-medium text-on-surface-variant">
+                    <span className="label-caps mr-1 text-on-surface-variant/60">
+                      Sector
+                    </span>{" "}
+                    {sectors.find(
+                      (s) =>
+                        s.id ===
+                        item.maintenance_service_sector_id,
+                    )?.name ?? item.maintenance_service_sector_id}
+                  </span>
+                ) : null}
+                {item.max_discount_value > 0 ? (
+                  <span className="mono-data inline-flex items-center text-xs font-medium text-on-surface-variant">
+                    <span className="label-caps mr-1 text-on-surface-variant/60">
+                      Max disc.
+                    </span>{" "}
+                    {item.max_discount_type === "percentage"
+                      ? `${item.max_discount_value}%`
+                      : formatCatalogPriceInEGP(
+                          item.max_discount_value,
+                          toPricingCurrency(item.sale_currency),
+                          rates,
+                        )}
+                  </span>
+                ) : null}
+              </div>
+            )}
+        </div>
+
+        {/* Price Tag */}
+        <div className="shrink-0 flex flex-col items-end justify-center w-auto mt-0 pt-0 border-0">
+          <div className="bg-surface-container-highest/20 px-3 py-1.5 rounded-lg border border-outline-variant/10">
+            <p className="mono-data text-primary font-bold text-base">
+              {formatCatalogPriceInEGP(
+                getItemPrice(item),
+                getItemCurrency(item),
+                rates,
+              )}
+            </p>
+          </div>
+        </div>
+      </div>
+    </label>
+  );
+});
 
 export function CatalogPickerModal({
   isOpen,
@@ -110,9 +577,11 @@ export function CatalogPickerModal({
   const [error, setError] = useState<string | null>(null);
   const [totalPages, setTotalPages] = useState(1);
   const [mounted, setMounted] = useState(false);
-  const [filtersExpanded, setFiltersExpanded] = useState(false);
+  const [filtersDrawerOpen, setFiltersDrawerOpen] = useState(false);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const filtersCloseButtonRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
+  const compoundContainerRef = useRef<HTMLDivElement>(null);
 
   const [brands, setBrands] = useState<BrandRecord[]>([]);
   const [bikeBrands, setBikeBrands] = useState<BrandRecord[]>([]);
@@ -183,6 +652,41 @@ export function CatalogPickerModal({
   const clearAllFilters = useCallback(() => {
     resetFilters();
   }, [resetFilters]);
+
+  const filterSetters = useMemo(
+    (): CatalogPickerFilterSetters => ({
+      setSearch,
+      setCategory,
+      setBrand,
+      setBlueprint,
+      setSector,
+      setStatus,
+      setType,
+      setPriceMin,
+      setPriceMax,
+      setCurrency,
+      setLowStock,
+      setTags,
+      setBikeCompatibility,
+      setFilter,
+    }),
+    [
+      setSearch,
+      setCategory,
+      setBrand,
+      setBlueprint,
+      setSector,
+      setStatus,
+      setType,
+      setPriceMin,
+      setPriceMax,
+      setCurrency,
+      setLowStock,
+      setTags,
+      setBikeCompatibility,
+      setFilter,
+    ],
+  );
 
   // Load filter options (brands, categories, sectors)
   const loadFilterOptions = useCallback(async () => {
@@ -337,7 +841,7 @@ export function CatalogPickerModal({
     if (isOpen) {
       setSelectedItemIds(new Set(selectedIds));
       setPage(1);
-      setFiltersExpanded(false);
+      setFiltersDrawerOpen(false);
     } else {
       setSelectedItemIds(new Set());
     }
@@ -381,13 +885,22 @@ export function CatalogPickerModal({
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.stopPropagation();
-        onClose();
+        if (filtersDrawerOpen) {
+          setFiltersDrawerOpen(false);
+        } else {
+          onClose();
+        }
         return;
       }
 
-      if (event.key === "Tab" && dialogRef.current) {
+      if (event.key === "Tab") {
+        const trapRoot = filtersDrawerOpen
+          ? compoundContainerRef.current
+          : dialogRef.current;
+        if (!trapRoot) return;
+
         const focusables = Array.from(
-          dialogRef.current.querySelectorAll<HTMLElement>(
+          trapRoot.querySelectorAll<HTMLElement>(
             'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
           ),
         ).filter((el) => el.offsetParent !== null);
@@ -396,7 +909,7 @@ export function CatalogPickerModal({
         const first = focusables[0];
         const last = focusables[focusables.length - 1];
         const active = document.activeElement as HTMLElement | null;
-        const insideDialog = active && dialogRef.current.contains(active);
+        const insideDialog = active && trapRoot.contains(active);
 
         if (event.shiftKey) {
           if (!insideDialog || active === first) {
@@ -423,7 +936,17 @@ export function CatalogPickerModal({
       document.body.style.overflow = previousOverflow;
       window.clearTimeout(focusTimer);
     };
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, filtersDrawerOpen]);
+
+  useEffect(() => {
+    if (!isOpen || !filtersDrawerOpen) return;
+
+    const focusTimer = window.setTimeout(() => {
+      filtersCloseButtonRef.current?.focus();
+    }, 0);
+
+    return () => window.clearTimeout(focusTimer);
+  }, [isOpen, filtersDrawerOpen]);
 
   if (!isOpen || !mounted) return null;
 
@@ -457,33 +980,22 @@ export function CatalogPickerModal({
     return `Item #${(item as { id: number }).id}`;
   };
 
-  const getBikeStatusTone = (
-    status: string,
-  ): "default" | "primary" | "success" | "warning" | "danger" => {
-    const toneMap: Record<
-      string,
-      "default" | "primary" | "success" | "warning" | "danger"
-    > = {
-      available: "success",
-      sold: "default",
-      maintenance: "warning",
-      reserved: "primary",
-    };
-    return toneMap[status.toLowerCase()] ?? "default";
-  };
-
-  const getBikeStatusLabel = (status: string): string => {
-    const labels: Record<string, string> = {
-      available: "Available",
-      sold: "Sold",
-      maintenance: "Under Maintenance",
-      reserved: "Reserved",
-    };
-    return labels[status.toLowerCase()] ?? status;
-  };
-
   const allVisibleSelected =
     items.length > 0 && items.every((item) => selectedItemIds.has(item.id));
+
+  const catalogShellClassName = [
+    "form-modal-shell relative flex h-full max-h-[100dvh] min-h-0 w-full min-w-0 shrink-0",
+    "animate-in slide-in-from-right-8 flex-col overflow-hidden",
+    "border-l border-outline-variant/15 bg-surface shadow-ambient",
+    filtersDrawerOpen
+      ? "sm:flex-1 sm:w-auto sm:min-w-[14rem]"
+      : "sm:shrink-0 sm:w-[min(100vw,42rem)] md:w-[min(100vw,48rem)] lg:w-[min(100vw,56rem)] xl:w-[min(100vw,64rem)] 2xl:w-[min(100vw,72rem)]",
+  ].join(" ");
+
+  const compoundShellClassName = [
+    "relative flex h-full max-h-[100dvh] min-h-0 w-full max-w-[100vw] flex-row-reverse items-stretch",
+    filtersDrawerOpen ? "" : "sm:w-max",
+  ].join(" ");
 
   return createPortal(
     <div className="form-modal-overlay fixed inset-0 z-[100] flex items-stretch justify-end transition-opacity">
@@ -495,14 +1007,15 @@ export function CatalogPickerModal({
         className="absolute inset-0 bg-black/40"
       />
 
-      {/* Right Sidebar Drawer */}
-      <div
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Catalog picker"
-        className="form-modal-shell relative flex h-full max-h-[100dvh] min-h-0 w-full max-w-[820px] animate-in slide-in-from-right-8 flex-col overflow-hidden border-l border-outline-variant/15 bg-surface shadow-ambient sm:max-w-[860px] lg:max-w-[940px]"
-      >
+      <div ref={compoundContainerRef} className={compoundShellClassName}>
+        {/* Catalog picker — right-anchored primary drawer */}
+        <div
+          ref={dialogRef}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Catalog picker"
+          className={catalogShellClassName}
+        >
         {/* Header */}
         <div className="relative border-b border-outline-variant/15 bg-surface-container-low px-4 sm:px-6 py-4 sm:py-5 flex items-start sm:items-center justify-between shrink-0">
           <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent" />
@@ -549,16 +1062,17 @@ export function CatalogPickerModal({
           </button>
         </div>
 
-        {/* Filters — disclosure; facet panel scrolls independently */}
+        {/* Filters — opens extended panel beside catalog (mobile: in-drawer overlay) */}
         <div className="relative z-10 shrink-0 border-b border-outline-variant/10 bg-surface shadow-sm">
           <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/15 to-transparent" />
           <div className="flex flex-wrap items-stretch gap-2 px-4 py-2.5 sm:px-6 sm:py-3">
             <button
               type="button"
               id="catalog-picker-filters-toggle"
-              aria-expanded={filtersExpanded}
-              aria-controls="catalog-picker-filters-panel"
-              onClick={() => setFiltersExpanded((v) => !v)}
+              aria-haspopup="dialog"
+              aria-expanded={filtersDrawerOpen}
+              aria-controls="catalog-picker-filters-drawer"
+              onClick={() => setFiltersDrawerOpen(true)}
               className="flex min-h-[44px] min-w-0 flex-1 items-center gap-3 rounded-xl border border-outline-variant/15 bg-surface-container-lowest/60 px-3 py-2 text-left shadow-sm transition-[border-color,background-color] hover:border-primary/35 hover:bg-primary/[0.05] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
             >
               <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary ring-1 ring-inset ring-primary/12">
@@ -569,11 +1083,9 @@ export function CatalogPickerModal({
                   Refine results
                 </span>
                 <span className="mt-0.5 line-clamp-2 text-caption leading-snug text-on-surface-variant sm:text-xs">
-                  {filtersExpanded
-                    ? "Filters below scroll separately from the catalog list."
-                    : activeFilterCount > 0
-                      ? `${activeFilterCount} filter${activeFilterCount === 1 ? "" : "s"} active — expand to edit`
-                      : "Collapsed — expand for search, facets, and currency"}
+                  {activeFilterCount > 0
+                    ? `${activeFilterCount} filter${activeFilterCount === 1 ? "" : "s"} active — tap to edit`
+                    : "Opens filter panel beside the catalog"}
                 </span>
               </span>
               {activeFilterCount > 0 ? (
@@ -581,8 +1093,8 @@ export function CatalogPickerModal({
                   {activeFilterCount}
                 </span>
               ) : null}
-              <ChevronDownIcon
-                className={`h-5 w-5 shrink-0 text-on-surface-variant transition-transform duration-200 ease-out ${filtersExpanded ? "rotate-180" : ""}`}
+              <ChevronRightIcon
+                className="h-5 w-5 shrink-0 text-on-surface-variant"
                 aria-hidden
               />
             </button>
@@ -596,43 +1108,6 @@ export function CatalogPickerModal({
               </button>
             ) : null}
           </div>
-
-          {filtersExpanded ? (
-            <div
-              id="catalog-picker-filters-panel"
-              role="region"
-              aria-labelledby="catalog-picker-filters-toggle"
-              className="max-h-[min(50vh,26rem)] overflow-y-auto overscroll-y-contain scroll-smooth border-t border-outline-variant/10 px-4 py-3 [scrollbar-gutter:stable] sm:max-h-[min(56vh,32rem)] sm:px-6 sm:py-4"
-            >
-              <div className="rounded-2xl border border-outline-variant/10 bg-surface-container-lowest/35 p-4 sm:p-5">
-                <InventoryModuleFilters
-                  module={moduleId}
-                  filters={filters}
-                  setters={{
-                    setSearch,
-                    setCategory,
-                    setBrand,
-                    setBlueprint,
-                    setSector,
-                    setStatus,
-                    setType,
-                    setPriceMin,
-                    setPriceMax,
-                    setCurrency,
-                    setLowStock,
-                    setTags,
-                    setBikeCompatibility,
-                    setFilter,
-                  }}
-                  options={filterOptions}
-                  bikeBrands={bikeBrands}
-                  loading={loading}
-                  layout="panel"
-                  sections={["primary", "advanced", "more"]}
-                />
-              </div>
-            </div>
-          ) : null}
         </div>
 
         {/* Results context bar */}
@@ -718,266 +1193,26 @@ export function CatalogPickerModal({
             </div>
           ) : (
             <div className="grid w-full grid-cols-1 gap-2 p-4 pb-6">
-              {items.map((item, index) => {
-                const isSelected = selectedItemIds.has(item.id);
-                const isUniversalSparePart =
-                  catalogType === "spare_parts" &&
-                  "universal" in item &&
-                  item.universal === true;
-                return (
-                  <label
-                    key={item.id}
-                    style={{ animationDelay: `${Math.min(index, 10) * 30}ms` }}
-                    className={`group relative block w-full min-w-0 cursor-pointer rounded-2xl border p-3 transition-all duration-150 animate-fade-in active:scale-[0.98] focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-primary ${
-                      isSelected
-                        ? "bg-primary/6 border-primary ring-2 ring-primary shadow-sm"
-                        : isUniversalSparePart
-                          ? "border-outline-variant/15 border-primary/15 bg-primary-container/15 hover:border-primary/45 hover:bg-primary-container/50 hover:shadow-sm"
-                          : "border-outline-variant/15 bg-surface-container-lowest hover:border-primary/30 hover:bg-primary/4 hover:shadow-sm"
-                    }`}
-                  >
-                    <div className="flex items-center gap-4 w-full">
-                      {/* Checkbox */}
-                      <div className="shrink-0 flex items-center justify-center w-6 h-6 rounded border-2 border-outline-variant group-hover:border-primary transition-colors bg-surface-container-lowest relative">
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={() => handleToggleItem(item.id)}
-                          className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-                        />
-                        {isSelected && (
-                          <svg
-                            className="w-4 h-4 text-primary pointer-events-none"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={3}
-                              d="M5 13l4 4L19 7"
-                            />
-                          </svg>
-                        )}
-                      </div>
-                      <div
-                        className="shrink-0"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <InventoryItemThumbnail
-                          image={"image" in item ? item.image : undefined}
-                          images={"images" in item ? item.images : undefined}
-                          name={getItemName(item)}
-                        />
-                      </div>
-                      {/* Content */}
-                      <div className="flex-1 min-w-0 pr-4">
-                        <h4 className="font-semibold text-sm text-on-surface truncate">
-                          {getItemName(item)}
-                        </h4>
-                        {catalogType === "products" &&
-                          "products_category_id" in item && (
-                            <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1">
-                              <span className="mono-data inline-flex items-center text-xs font-medium text-on-surface-variant">
-                                <span className="label-caps mr-1 text-on-surface-variant/60">
-                                  SKU
-                                </span>{" "}
-                                {item.sku}
-                              </span>
-                              {item.brand_id ? (
-                                <span className="inline-flex items-center text-xs font-medium text-on-surface-variant">
-                                  <span className="label-caps mr-1 text-on-surface-variant/60">
-                                    Brand
-                                  </span>{" "}
-                                  {brands.find((b) => b.id === item.brand_id)
-                                    ?.name ?? item.brand_id}
-                                </span>
-                              ) : null}
-                              {item.products_category_id ? (
-                                <span className="inline-flex items-center text-xs font-medium text-on-surface-variant">
-                                  <span className="label-caps mr-1 text-on-surface-variant/60">
-                                    Category
-                                  </span>{" "}
-                                  {productCategories.find(
-                                    (c) => c.id === item.products_category_id,
-                                  )?.name ?? item.products_category_id}
-                                </span>
-                              ) : null}
-                              <StockBadge
-                                stock_quantity={item.stock_quantity}
-                                low_stock_alarm={item.low_stock_alarm}
-                              />
-                            </div>
-                          )}
-
-                        {catalogType === "spare_parts" &&
-                          "spare_parts_category_id" in item && (
-                            <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1">
-                              <span className="mono-data inline-flex items-center text-xs font-medium text-on-surface-variant">
-                                <span className="label-caps mr-1 text-on-surface-variant/60">
-                                  SKU
-                                </span>{" "}
-                                {item.sku}
-                              </span>
-                              {item.part_number ? (
-                                <span className="mono-data inline-flex items-center text-xs font-medium text-on-surface-variant">
-                                  <span className="label-caps mr-1 text-on-surface-variant/60">
-                                    Part#
-                                  </span>{" "}
-                                  {item.part_number}
-                                </span>
-                              ) : null}
-                              {formatCatalogItemAttributes(item) ? (
-                                <span className="inline-flex items-center text-xs font-medium text-on-surface-variant">
-                                  {formatCatalogItemAttributes(item)}
-                                </span>
-                              ) : null}
-                              {"item_status" in item ? (
-                                <ItemStatusBadge status={item.item_status} />
-                              ) : null}
-                              <span className="mono-data inline-flex items-center text-xs font-medium text-on-surface-variant">
-                                <span className="label-caps mr-1 text-on-surface-variant/60">
-                                  Universal
-                                </span>{" "}
-                                {item.universal ? "Yes" : "No"}
-                              </span>
-                              {item.brand_id ? (
-                                <span className="inline-flex items-center text-xs font-medium text-on-surface-variant">
-                                  <span className="label-caps mr-1 text-on-surface-variant/60">
-                                    Brand
-                                  </span>{" "}
-                                  {brands.find((b) => b.id === item.brand_id)
-                                    ?.name ?? item.brand_id}
-                                </span>
-                              ) : null}
-                              <StockBadge
-                                stock_quantity={item.stock_quantity}
-                                low_stock_alarm={item.low_stock_alarm}
-                              />
-                            </div>
-                          )}
-
-                        {catalogType === "maintenance_parts" &&
-                          "maintenance_parts_category_id" in item && (
-                            <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1">
-                              <span className="mono-data inline-flex items-center text-xs font-medium text-on-surface-variant">
-                                <span className="label-caps mr-1 text-on-surface-variant/60">
-                                  SKU
-                                </span>{" "}
-                                {item.sku}
-                              </span>
-                              {item.part_number ? (
-                                <span className="mono-data inline-flex items-center text-xs font-medium text-on-surface-variant">
-                                  <span className="label-caps mr-1 text-on-surface-variant/60">
-                                    Part#
-                                  </span>{" "}
-                                  {item.part_number}
-                                </span>
-                              ) : null}
-                              {formatCatalogItemAttributes(item) ? (
-                                <span className="inline-flex items-center text-xs font-medium text-on-surface-variant">
-                                  {formatCatalogItemAttributes(item)}
-                                </span>
-                              ) : null}
-                              {"item_status" in item ? (
-                                <ItemStatusBadge status={item.item_status} />
-                              ) : null}
-                              <span className="mono-data inline-flex items-center text-xs font-medium text-on-surface-variant">
-                                <span className="label-caps mr-1 text-on-surface-variant/60">
-                                  Universal
-                                </span>{" "}
-                                {item.universal ? "Yes" : "No"}
-                              </span>
-                              {item.brand_id ? (
-                                <span className="inline-flex items-center text-xs font-medium text-on-surface-variant">
-                                  <span className="label-caps mr-1 text-on-surface-variant/60">
-                                    Brand
-                                  </span>{" "}
-                                  {brands.find((b) => b.id === item.brand_id)
-                                    ?.name ?? item.brand_id}
-                                </span>
-                              ) : null}
-                              <StockBadge
-                                stock_quantity={item.stock_quantity}
-                                low_stock_alarm={item.low_stock_alarm}
-                              />
-                            </div>
-                          )}
-
-                        {catalogType === "bikes" && "bike_blueprint_id" in item && (
-                          <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1">
-                            {item.vin ? (
-                              <span className="mono-data inline-flex items-center text-xs font-medium text-on-surface-variant">
-                                <span className="label-caps mr-1 text-on-surface-variant/60">
-                                  VIN
-                                </span>{" "}
-                                {item.vin}
-                              </span>
-                            ) : null}
-                            <span className="mono-data inline-flex items-center text-xs font-medium text-on-surface-variant">
-                              <span className="label-caps mr-1 text-on-surface-variant/60">
-                                Mileage
-                              </span>{" "}
-                              {item.mileage.toLocaleString()} km
-                            </span>
-                            {item.status ? (
-                              <StatusBadge tone={getBikeStatusTone(item.status)}>
-                                {getBikeStatusLabel(item.status)}
-                              </StatusBadge>
-                            ) : null}
-                          </div>
-                        )}
-
-                        {catalogType === "maintenance_services" &&
-                          "service_price" in item && (
-                            <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1">
-                              {item.maintenance_service_sector_id ? (
-                                <span className="inline-flex items-center text-xs font-medium text-on-surface-variant">
-                                  <span className="label-caps mr-1 text-on-surface-variant/60">
-                                    Sector
-                                  </span>{" "}
-                                  {sectors.find(
-                                    (s) =>
-                                      s.id ===
-                                      item.maintenance_service_sector_id,
-                                  )?.name ?? item.maintenance_service_sector_id}
-                                </span>
-                              ) : null}
-                              {item.max_discount_value > 0 ? (
-                                <span className="mono-data inline-flex items-center text-xs font-medium text-on-surface-variant">
-                                  <span className="label-caps mr-1 text-on-surface-variant/60">
-                                    Max disc.
-                                  </span>{" "}
-                                  {item.max_discount_type === "percentage"
-                                    ? `${item.max_discount_value}%`
-                                    : formatCatalogPriceInEGP(
-                                        item.max_discount_value,
-                                        toPricingCurrency(item.sale_currency),
-                                        rates,
-                                      )}
-                                </span>
-                              ) : null}
-                            </div>
-                          )}
-                      </div>
-
-                      {/* Price Tag */}
-                      <div className="shrink-0 flex flex-col items-end justify-center w-auto mt-0 pt-0 border-0">
-                        <div className="bg-surface-container-highest/20 px-3 py-1.5 rounded-lg border border-outline-variant/10">
-                          <p className="mono-data text-primary font-bold text-base">
-                            {formatCatalogPriceInEGP(
-                              getItemPrice(item),
-                              getItemCurrency(item),
-                              rates,
-                            )}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </label>
-                );
-              })}
+              {items.map((item, index) => (
+                <CatalogItemRow
+                  key={item.id}
+                  item={item}
+                  index={index}
+                  isSelected={selectedItemIds.has(item.id)}
+                  catalogType={catalogType}
+                  onToggle={handleToggleItem}
+                  getItemName={getItemName}
+                  getItemPrice={getItemPrice}
+                  getItemCurrency={getItemCurrency}
+                  rates={rates}
+                  brands={brands}
+                  productCategories={productCategories}
+                  sparePartCategories={sparePartCategories}
+                  maintenancePartCategories={maintenancePartCategories}
+                  sectors={sectors}
+                  blueprints={blueprints}
+                />
+              ))}
             </div>
           )}
         </div>
@@ -1051,6 +1286,64 @@ export function CatalogPickerModal({
             </ActionButton>
           </div>
         </div>
+
+        {/* Mobile filters overlay — inside catalog shell */}
+        {filtersDrawerOpen ? (
+          <div className="absolute inset-0 z-40 flex md:hidden">
+            <button
+              type="button"
+              aria-label="Close filters panel"
+              className="absolute inset-0 bg-on-surface/20 backdrop-blur-[1px]"
+              onClick={() => setFiltersDrawerOpen(false)}
+            />
+            <aside
+              id="catalog-picker-filters-drawer-mobile"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="catalog-picker-filters-toggle"
+              className="relative flex h-full w-[min(88vw,26rem)] max-w-full flex-col border-r border-outline-variant/15 bg-surface-container-lowest shadow-ambient animate-in slide-in-from-left duration-300"
+            >
+              <CatalogPickerFiltersPanel
+                activeFilterCount={activeFilterCount}
+                moduleId={moduleId}
+                filters={filters}
+                filterOptions={filterOptions}
+                bikeBrands={bikeBrands}
+                loading={loading}
+                onClose={() => setFiltersDrawerOpen(false)}
+                onClearAll={clearAllFilters}
+                setters={filterSetters}
+                closeButtonRef={filtersCloseButtonRef}
+                showBackButton
+              />
+            </aside>
+          </div>
+        ) : null}
+        </div>
+
+        {/* Desktop filters panel — sibling to the left of catalog */}
+        {filtersDrawerOpen ? (
+          <aside
+            id="catalog-picker-filters-drawer"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="catalog-picker-filters-toggle"
+            className="form-modal-shell hidden h-full max-h-[100dvh] min-h-0 shrink-0 animate-in slide-in-from-right duration-300 flex-col overflow-hidden border-l border-outline-variant/15 bg-surface-container-lowest shadow-ambient md:flex md:w-[min(38vw,26rem)] lg:w-[28rem] xl:w-[45rem]"
+          >
+            <CatalogPickerFiltersPanel
+              activeFilterCount={activeFilterCount}
+              moduleId={moduleId}
+              filters={filters}
+              filterOptions={filterOptions}
+              bikeBrands={bikeBrands}
+              loading={loading}
+              onClose={() => setFiltersDrawerOpen(false)}
+              onClearAll={clearAllFilters}
+              setters={filterSetters}
+              closeButtonRef={filtersCloseButtonRef}
+            />
+          </aside>
+        ) : null}
       </div>
     </div>,
     document.body,

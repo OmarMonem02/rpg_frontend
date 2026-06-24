@@ -589,6 +589,7 @@ export const EntityForm = forwardRef<EntityFormHandle, EntityFormProps>(
     if (isStackedLayout && contentSections.length === 0) return null;
 
     const isModalStyleChrome = variant === "modal" || variant === "drawer";
+    const isDrawerEmbedded = isStackedLayout && !title;
 
     const renderSectionFields = (sectionFields: FieldConfig[]) =>
       sectionFields.map((field, idx) => {
@@ -1012,8 +1013,9 @@ export const EntityForm = forwardRef<EntityFormHandle, EntityFormProps>(
       );
     };
 
-    const shellClassName =
-      variant === "drawer"
+    const shellClassName = isDrawerEmbedded
+      ? "flex min-h-0 flex-1 w-full min-w-0 flex-col overflow-hidden"
+      : variant === "drawer"
         ? "form-modal-shell flex min-h-0 flex-1 w-full flex-col overflow-hidden border rounded-2xl border-outline-variant/15 bg-surface-container-lowest"
         : isModalStyleChrome
           ? "form-modal-shell h-[94vh] max-h-[94vh] w-full flex flex-col overflow-hidden"
@@ -1025,12 +1027,15 @@ export const EntityForm = forwardRef<EntityFormHandle, EntityFormProps>(
         : "rounded-[2rem] border border-outline-variant/15 bg-surface-container-low p-4 shadow-sm md:p-6 lg:p-8";
 
     const contentClassName =
-      isModalStyleChrome ? "min-h-0 flex-1 overflow-y-auto" : "min-w-0 flex-1";
+      isDrawerEmbedded || isModalStyleChrome
+        ? "min-h-0 flex-1 overflow-y-auto overscroll-y-contain scroll-smooth [-webkit-overflow-scrolling:touch]"
+        : "min-w-0 flex-1";
 
     const pagePaddingX = "px-4 md:px-6 lg:px-8";
 
-    const footerClassName =
-      isModalStyleChrome
+    const footerClassName = isDrawerEmbedded
+      ? `shrink-0 flex flex-col gap-4 border-t border-outline-variant/10 bg-surface-container-lowest py-4 md:flex-row md:items-center md:justify-between ${pagePaddingX}`
+      : isModalStyleChrome
         ? "sticky bottom-0 z-20 flex flex-col gap-4 border-t border-outline-variant/10 bg-surface-container-lowest/90 px-5 py-4 backdrop-blur-sm md:flex-row md:items-center md:justify-between"
         : `sticky bottom-0 z-20 mt-6 flex flex-col gap-4 border-t border-outline-variant/10 bg-surface-container-lowest/90 py-4 backdrop-blur-sm md:flex-row md:items-center md:justify-between ${pagePaddingX}`;
 
@@ -1196,7 +1201,7 @@ export const EntityForm = forwardRef<EntityFormHandle, EntityFormProps>(
                 }`}
             >
               {contentSections.length > 1 ? (
-                <aside className="mb-2 lg:sticky lg:top-6 lg:mb-0 lg:max-h-[calc(100vh-8rem)] lg:overflow-y-auto lg:rounded-[1.25rem] lg:border lg:border-outline-variant/10 lg:bg-surface-container-lowest/60 lg:p-3">
+                <aside className={`mb-2 lg:sticky lg:top-6 lg:mb-0 lg:rounded-[1.25rem] lg:border lg:border-outline-variant/10 lg:bg-surface-container-lowest/60 lg:p-3 ${isDrawerEmbedded ? "" : "lg:max-h-[calc(100vh-8rem)] lg:overflow-y-auto"}`}>
                   <p className="label-caps mb-3 hidden px-1 text-on-surface-variant/70 lg:block">
                     Sections
                   </p>
