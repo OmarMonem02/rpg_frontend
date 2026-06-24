@@ -24,7 +24,7 @@ function useIsMounted() {
 // ─── Dropdown positioning (mirrors searchable-select.tsx) ────────────────────
 
 const PANEL_GAP = 4;
-const PANEL_MAX_HEIGHT = 320;
+const PANEL_MAX_HEIGHT = 450;
 
 type PanelPosition = {
   left: number;
@@ -43,9 +43,12 @@ function measurePanelPosition(trigger: HTMLElement): PanelPosition {
     PANEL_MAX_HEIGHT,
     Math.max(120, openUp ? spaceAbove : spaceBelow),
   );
+  const width = Math.max(rect.width, 250);
+  let left = rect.right - width;
+  left = Math.max(PANEL_GAP, Math.min(left, window.innerWidth - width - PANEL_GAP));
   return {
-    left: rect.left,
-    width: Math.max(rect.width, 200),
+    left,
+    width,
     top: openUp ? undefined : rect.bottom + PANEL_GAP,
     bottom: openUp ? window.innerHeight - rect.top + PANEL_GAP : undefined,
     maxHeight,
@@ -59,6 +62,7 @@ type ColumnPickerProps<T extends string> = {
   visible: Set<T>;
   onToggle: (id: T) => void;
   onReset: () => void;
+  onHideOptional: () => void;
 };
 
 export function ColumnPicker<T extends string>({
@@ -66,6 +70,7 @@ export function ColumnPicker<T extends string>({
   visible,
   onToggle,
   onReset,
+  onHideOptional,
 }: ColumnPickerProps<T>) {
   const mounted = useIsMounted();
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -134,6 +139,8 @@ export function ColumnPicker<T extends string>({
   const visibleCount = columns.filter((c) => visible.has(c.id)).length;
   const totalOptional = columns.filter((c) => !c.required).length;
   const allVisible = visibleCount === columns.length;
+  const hasOptionalVisible = columns.some((c) => !c.required && visible.has(c.id));
+  const showFooter = !allVisible || hasOptionalVisible;
 
   const panel =
     open && position ? (
@@ -210,17 +217,26 @@ export function ColumnPicker<T extends string>({
         </ul>
 
         {/* Footer */}
-        {!allVisible && (
-          <div className="border-t border-outline-variant/10 px-3 py-2">
-            <button
-              type="button"
-              onClick={() => {
-                onReset();
-              }}
-              className="text-xs font-medium text-primary transition-colors hover:text-primary/80"
-            >
-              Show all {totalOptional} columns
-            </button>
+        {showFooter && (
+          <div className="flex items-center gap-3 border-t border-outline-variant/10 px-3 py-2">
+            {hasOptionalVisible && (
+              <button
+                type="button"
+                onClick={onHideOptional}
+                className="text-xs font-medium text-primary transition-colors hover:text-primary/80"
+              >
+                Hide all {totalOptional} columns
+              </button>
+            )}
+            {!allVisible && (
+              <button
+                type="button"
+                onClick={onReset}
+                className="text-xs font-medium text-primary transition-colors hover:text-primary/80"
+              >
+                Show all {totalOptional} columns
+              </button>
+            )}
           </div>
         )}
       </div>

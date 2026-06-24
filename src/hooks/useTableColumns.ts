@@ -39,6 +39,7 @@ export function useTableColumns<T extends string>(
   visible: Set<T>;
   toggle: (id: T) => void;
   reset: () => void;
+  hideOptional: () => void;
   isVisible: (id: T) => boolean;
 } {
   const [visible, setVisible] = useState<Set<T>>(() => new Set(allColumns.map((c) => c.id)));
@@ -81,7 +82,15 @@ export function useTableColumns<T extends string>(
     persist(next);
   }, [allColumns, persist]);
 
+  const hideOptional = useCallback(() => {
+    const next = new Set<T>();
+    for (const col of allColumns) {
+      if (col.required) next.add(col.id);
+    }
+    persist(next);
+  }, [allColumns, persist]);
+
   const isVisible = useCallback((id: T) => visible.has(id), [visible]);
 
-  return { visible, toggle, reset, isVisible };
+  return { visible, toggle, reset, hideOptional, isVisible };
 }

@@ -126,7 +126,7 @@ export default function MaintenanceServicesPage() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const { isVisible, toggle: toggleColumn, reset: resetColumns, visible: visibleColumns } = useTableColumns(
+  const { isVisible, toggle: toggleColumn, reset: resetColumns, hideOptional: hideOptionalColumns, visible: visibleColumns } = useTableColumns(
     "table-cols:services-catalog",
     SERVICES_COLUMNS,
   );
@@ -427,6 +427,7 @@ export default function MaintenanceServicesPage() {
               visible={visibleColumns}
               onToggle={toggleColumn}
               onReset={resetColumns}
+              onHideOptional={hideOptionalColumns}
             />
           </InventoryListTableToolbar>
           <InventoryListTableScroll>

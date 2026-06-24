@@ -80,7 +80,7 @@ export function BulkEditCatalogTable({
 }: BulkEditCatalogTableProps) {
   const { rates } = useExchangeRates();
   const columns = getBulkCatalogColumns(entity);
-  const { isVisible, toggle, reset, visible } = useTableColumns(
+  const { isVisible, toggle, reset, hideOptional, visible } = useTableColumns(
     getBulkCatalogColumnStorageKey(entity),
     columns,
   );
@@ -93,6 +93,7 @@ export function BulkEditCatalogTable({
           visible={visible}
           onToggle={toggle}
           onReset={reset}
+          onHideOptional={hideOptional}
         />
       </InventoryListTableToolbar>
 

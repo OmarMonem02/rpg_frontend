@@ -204,7 +204,7 @@ export default function SparePartsPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const { isVisible, toggle: toggleColumn, reset: resetColumns, visible: visibleColumns } = useTableColumns(
+  const { isVisible, toggle: toggleColumn, reset: resetColumns, hideOptional: hideOptionalColumns, visible: visibleColumns } = useTableColumns(
     "table-cols:spare-parts-catalog",
     SPARE_PARTS_COLUMNS,
   );
@@ -512,6 +512,7 @@ export default function SparePartsPage() {
               visible={visibleColumns}
               onToggle={toggleColumn}
               onReset={resetColumns}
+              onHideOptional={hideOptionalColumns}
             />
           </InventoryListTableToolbar>
           <InventoryListTableScroll>

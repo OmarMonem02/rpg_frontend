@@ -211,7 +211,7 @@ export default function ProductsPage() {
   const canDeleteProductCategories =
     permissions.canDelete("product-categories");
 
-  const { isVisible, toggle: toggleColumn, reset: resetColumns, visible: visibleColumns } = useTableColumns(
+  const { isVisible, toggle: toggleColumn, reset: resetColumns, hideOptional: hideOptionalColumns, visible: visibleColumns } = useTableColumns(
     "table-cols:products-catalog",
     PRODUCTS_COLUMNS,
   );
@@ -531,6 +531,7 @@ export default function ProductsPage() {
               visible={visibleColumns}
               onToggle={toggleColumn}
               onReset={resetColumns}
+              onHideOptional={hideOptionalColumns}
             />
           </InventoryListTableToolbar>
           <InventoryListTableScroll>

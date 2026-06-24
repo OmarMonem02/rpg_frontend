@@ -147,7 +147,7 @@ export default function BikesPage() {
     logFilters,
   } = useEntityFilters();
 
-  const { isVisible, toggle: toggleColumn, reset: resetColumns, visible: visibleColumns } = useTableColumns(
+  const { isVisible, toggle: toggleColumn, reset: resetColumns, hideOptional: hideOptionalColumns, visible: visibleColumns } = useTableColumns(
     "table-cols:bikes-catalog",
     BIKES_COLUMNS,
   );
@@ -401,6 +401,7 @@ export default function BikesPage() {
                 visible={visibleColumns}
                 onToggle={toggleColumn}
                 onReset={resetColumns}
+                onHideOptional={hideOptionalColumns}
               />
             </InventoryListTableToolbar>
             <InventoryListTableScroll>
