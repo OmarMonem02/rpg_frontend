@@ -23,6 +23,7 @@ import {
   labelOf,
   money,
 } from "@/app/(protected)/inventory/sales/[id]/sale-item-utils";
+import { lineNetAmount } from "@/lib/sale-line-pricing";
 import {
   ActionButton,
   PageHero,
@@ -336,12 +337,7 @@ export default function DeliveryOrderDetailPage() {
                             EGP {money(row.selling_price)}
                           </td>
                           <td className="px-6 py-4 text-right font-semibold text-primary tabular-nums">
-                            EGP{" "}
-                            {money(
-                              row.remaining_qty * row.selling_price -
-                                (row.discount_amount / row.quantity) *
-                                  row.remaining_qty,
-                            )}
+                            EGP {money(lineNetAmount(row))}
                           </td>
                         </tr>
                       ))}

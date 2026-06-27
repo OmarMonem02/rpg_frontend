@@ -1,6 +1,11 @@
 "use client";
 
 import { SaleRecord, saleLineItemTypeLabel, resolveSaleAddress } from "@/lib/crud-api";
+import {
+  computeSaleTotalsBreakdown,
+  lineDiscountTotal,
+  lineNetAmount,
+} from "@/lib/sale-line-pricing";
 
 export type InvoiceTemplateProps = {
   sale: SaleRecord;
@@ -69,13 +74,15 @@ export function InvoiceTemplate({
     referenceLabel ?? (isMaintenance ? "Ticket #" : "Invoice #");
   const saleAddress = resolveSaleAddress(sale);
 
-  const itemsSubtotal =
-    sale.line_items?.reduce(
-      (sum, item) => sum + item.remaining_qty * item.selling_price,
-      0,
-    ) || 0;
-  const shippingFee = sale.shipping_fee || 0;
-  const saleDiscount = sale.sale_discount || 0;
+  const totals = computeSaleTotalsBreakdown(sale);
+  const {
+    grossSubtotal: itemsSubtotal,
+    lineDiscountTotal: lineItemDiscounts,
+    netSubtotal,
+    shipping: shippingFee,
+    saleDiscount,
+    units: totalUnits,
+  } = totals;
   const netTotal = sale.total || 0;
   const amountPaid = sale.amount_paid ?? 0;
   const remainingBalance = Math.max(0, netTotal - amountPaid);
@@ -86,15 +93,7 @@ export function InvoiceTemplate({
 
   const activeLineItems =
     sale.line_items?.filter((item) => item.remaining_qty > 0) ?? [];
-  const totalUnits = activeLineItems.reduce(
-    (sum, item) => sum + item.remaining_qty,
-    0,
-  );
-  const lineItemDiscounts = activeLineItems.reduce(
-    (sum, item) =>
-      sum + (item.discount_amount / item.quantity) * item.remaining_qty,
-    0,
-  );
+  const showNetSubtotal = lineItemDiscounts > 0;
 
   const dateObj = sale.created_at ? new Date(sale.created_at) : new Date();
   const formattedDate = dateObj.toLocaleDateString("en-US", {
@@ -246,14 +245,10 @@ export function InvoiceTemplate({
                     </tr>
                   ) : (
                     sale.line_items.map((item, index) => {
-                      const lineAmount =
-                        item.remaining_qty * item.selling_price -
-                        (item.discount_amount / item.quantity) *
-                          item.remaining_qty;
+                      const lineAmount = lineNetAmount(item);
                       const lineDiscount =
                         item.discount_amount > 0 && item.remaining_qty > 0
-                          ? (item.discount_amount / item.quantity) *
-                            item.remaining_qty
+                          ? lineDiscountTotal(item)
                           : 0;
 
                       return (
@@ -353,6 +348,13 @@ export function InvoiceTemplate({
                     <span className="amt mono-data">
                       {formatEgpDeduction(lineItemDiscounts)}
                     </span>
+                  </div>
+                ) : null}
+
+                {showNetSubtotal ? (
+                  <div className="trow">
+                    <span className="lbl">Net subtotal</span>
+                    <span className="amt mono-data">{formatEgp(netSubtotal)}</span>
                   </div>
                 ) : null}
 

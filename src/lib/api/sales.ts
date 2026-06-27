@@ -342,13 +342,19 @@ export function normalizeSaleLineItem(raw: unknown): SaleLineItemRecord {
   const isUnstored =
     record.is_unstored === true || record.is_unstored === "true";
   const customName = toText(record.custom_name) || undefined;
+  const safeQty = Math.max(1, qty);
+  const explicitLineDiscount = record.discount_amount;
+  const discountAmount =
+    explicitLineDiscount != null && explicitLineDiscount !== ""
+      ? toNumber(explicitLineDiscount)
+      : toNumber(record.discount || 0) * safeQty;
   return {
     id: toNumber(record.id),
     sale_id: toNumber(record.sale_id),
     sellable_type: sellableType,
     sellable_id: resolveLineItemSellableId(record, sellableType),
     selling_price: toNumber(record.selling_price || record.sale_price || 0),
-    discount_amount: toNumber(record.discount_amount || record.discount || 0),
+    discount_amount: discountAmount,
     quantity: qty,
     returned_qty: returned,
     remaining_qty: toNumber(record.remaining_qty ?? Math.max(0, qty - returned)),

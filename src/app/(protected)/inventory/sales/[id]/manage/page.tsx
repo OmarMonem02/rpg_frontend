@@ -41,6 +41,7 @@ import {
   type CatalogType,
   type PendingExchangeItem,
 } from "../sale-item-utils";
+import { lineNetAmountForQty } from "@/lib/sale-line-pricing";
 
 function getItemTypeTone(
   type: string,
@@ -134,10 +135,7 @@ export default function ManageSaleItemsPage() {
 
   const refundValue = useMemo(() => {
     if (!selectedRow) return 0;
-    return (
-      qty * selectedRow.selling_price -
-      (selectedRow.discount_amount / selectedRow.quantity) * qty
-    );
+    return lineNetAmountForQty(selectedRow, qty);
   }, [selectedRow, qty]);
 
   const handlePickedItems = (picked: CatalogItem[]) => {

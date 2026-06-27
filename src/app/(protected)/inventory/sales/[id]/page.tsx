@@ -7,7 +7,6 @@ import { getAuthToken } from "@/lib/auth-session";
 import { usePermissions } from "@/components/permission-provider";
 import { deleteSale, getSale, type SaleRecord } from "@/lib/crud-api";
 import { saleLineItemTypeLabel } from "@/lib/api/sales";
-import { SaleAddLineItems } from "@/components/sale-add-line-items";
 import {
   PageShell,
   ActionButton,
@@ -34,6 +33,11 @@ import {
   HashtagIcon,
 } from "@heroicons/react/24/outline";
 import { money } from "./sale-item-utils";
+import {
+  computeSaleTotalsBreakdown,
+  lineDiscountTotal,
+  lineNetAmount,
+} from "@/lib/sale-line-pricing";
 import { titleCase } from "@/lib/delivery-orders/utils";
 
 function getStatusTone(
@@ -98,17 +102,8 @@ export default function SaleDetailsPage() {
 
   const items = useMemo(() => sale?.line_items ?? [], [sale?.line_items]);
   const totals = useMemo(
-    () => ({
-      units: items.reduce((sum, item) => sum + item.remaining_qty, 0),
-      subtotal: items.reduce(
-        (sum, item) =>
-          sum +
-          item.remaining_qty * item.selling_price -
-          (item.discount_amount / item.quantity) * item.remaining_qty,
-        0,
-      ),
-    }),
-    [items],
+    () => (sale ? computeSaleTotalsBreakdown(sale) : null),
+    [sale],
   );
 
   const handleDelete = async () => {
@@ -277,7 +272,11 @@ export default function SaleDetailsPage() {
           label="Total Amount"
           value={`EGP ${money(sale.total || 0)}`}
           tone="primary"
-          hint={`${totals.units} units | Sub: EGP ${money(totals.subtotal)}`}
+          hint={
+            totals
+              ? `${totals.units} units | Sub: EGP ${money(totals.netSubtotal)}`
+              : undefined
+          }
         />
         <StatCard
           label="Order Type"
@@ -298,9 +297,6 @@ export default function SaleDetailsPage() {
             label: "Manage Items",
             content: (
               <SurfaceCard className="p-0 overflow-hidden shadow-ambient">
-                {canUpdateSales ? (
-                  <SaleAddLineItems saleId={sale.id} onAdded={loadSale} />
-                ) : null}
                 <div className="p-5 border-b border-outline-variant/10 flex items-center justify-between gap-4 flex-wrap">
                   <div>
                     <h2 className="text-xl font-semibold text-on-surface">
@@ -384,15 +380,10 @@ export default function SaleDetailsPage() {
                             {`EGP ${money(row.selling_price)}`}
                           </td>
                           <td className="px-6 py-4 text-right tabular-nums text-error/70">
-                            {`EGP ${money((row.discount_amount / row.quantity) * row.remaining_qty)}`}
+                            {`EGP ${money(lineDiscountTotal(row))}`}
                           </td>
                           <td className="px-6 py-4 text-right font-bold text-primary tabular-nums">
-                            EGP{" "}
-                            {money(
-                              row.remaining_qty * row.selling_price -
-                                (row.discount_amount / row.quantity) *
-                                  row.remaining_qty,
-                            )}
+                            EGP {money(lineNetAmount(row))}
                           </td>
                           <td className="px-6 py-4">
                             <div className="flex justify-end gap-2">
