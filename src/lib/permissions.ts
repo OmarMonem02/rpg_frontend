@@ -17,7 +17,8 @@ export type PagePath =
   | "maintenance-part-categories"
   | "bike-blueprints"
   | "sellers"
-  | "reporting";
+  | "reporting"
+  | "machines";
 
 export type ActionType =
   | "create"
@@ -83,6 +84,7 @@ export const ALL_PAGE_PATHS: PagePath[] = [
   "bike-blueprints",
   "sellers",
   "reporting",
+  "machines",
 ];
 
 export const ALL_ACTIONS: ActionType[] = [
@@ -229,6 +231,13 @@ const FALLBACK_PAGE_DEFINITIONS: PermissionPageDefinition[] = [
     description: "View reports and manage the expense ledger.",
     actions: ["create", "read", "display", "update", "delete"],
   },
+  {
+    key: "machines",
+    label: "Assets",
+    group: "reporting",
+    description: "Track fixed assets and related invoices or contracts.",
+    actions: ["create", "read", "display", "update", "delete"],
+  },
 ];
 
 export const FALLBACK_PERMISSION_METADATA: PermissionMetadata = {
@@ -267,6 +276,7 @@ const DEFAULT_ROUTE_BY_PAGE: Record<PagePath, string> = {
   "bike-blueprints": "/data/bike-blueprints",
   sellers: "/sellers",
   reporting: "/reporting",
+  machines: "/reporting/assets",
 };
 
 const ROUTE_PERMISSION_RULES: Array<{
@@ -324,6 +334,10 @@ const ROUTE_PERMISSION_RULES: Array<{
   {
     pattern: /^\/data\/bike-blueprints(?:\/|$)/,
     permission: { page: "bike-blueprints", action: "read" },
+  },
+  {
+    pattern: /^\/reporting\/assets(?:\/|$)/,
+    permission: { page: "machines", action: "read" },
   },
   {
     pattern: /^\/reporting(?:\/|$)/,

@@ -16,7 +16,7 @@ import {
   type ExpensesReport,
   type ReportingCurrency,
 } from "@/lib/api/reporting";
-import { SUPPORTED_PRICING_CURRENCIES } from "@/lib/currencies";
+import { REPORTING_CURRENCY } from "@/lib/currencies";
 import {
   EmptyFinanceState,
   EXPENSE_CATEGORY_OPTIONS,
@@ -27,7 +27,9 @@ import {
   formatDate,
   formatMoney,
   getExpenseCategoryLabel,
+  reportingStatTone,
 } from "@/components/reporting/finance-utils";
+import { ReportingExportActions } from "@/components/reporting/ReportingExportActions";
 import {
   ActionButton,
   InlineMessage,
@@ -73,7 +75,6 @@ const initialFormState: ExpenseFormState = {
 export default function ExpensesPage() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
-  const [currency, setCurrency] = useState<ReportingCurrency | "">("");
   const [paymentStatus, setPaymentStatus] = useState<ExpensePaymentStatus | "">(
     "",
   );
@@ -90,6 +91,7 @@ export default function ExpensesPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -104,7 +106,6 @@ export default function ExpensesPage() {
         const filters = {
           date_from: dateFrom || undefined,
           date_to: dateTo || undefined,
-          currency,
           payment_status: paymentStatus,
           category,
         };
@@ -136,7 +137,7 @@ export default function ExpensesPage() {
     return () => {
       active = false;
     };
-  }, [dateFrom, dateTo, currency, paymentStatus, category, page]);
+  }, [dateFrom, dateTo, paymentStatus, category, page]);
 
   function syncForm(expense: ExpenseRecord | null) {
     if (!expense) {
@@ -172,7 +173,6 @@ export default function ExpensesPage() {
     const filters = {
       date_from: dateFrom || undefined,
       date_to: dateTo || undefined,
-      currency,
       payment_status: paymentStatus,
       category,
     };
@@ -211,7 +211,7 @@ export default function ExpensesPage() {
         image_public_id: uploadedImage.public_id || undefined,
         category: form.category,
         amount: Number(form.amount),
-        currency: form.currency,
+        currency: REPORTING_CURRENCY,
         payment_status: form.payment_status,
         incurred_on: form.incurred_on,
         due_date: form.due_date || undefined,
@@ -260,10 +260,7 @@ export default function ExpensesPage() {
     }
   }
 
-  const summaryRows = SUPPORTED_PRICING_CURRENCIES.map((code) => ({
-    code,
-    total: summary?.summary[code as ReportingCurrency]?.total ?? 0,
-  }));
+  const egpTotal = summary?.summary[REPORTING_CURRENCY]?.total ?? 0;
 
   const unpaidCount = expenses.filter(
     (expense) => expense.payment_status === "unpaid",
@@ -278,25 +275,38 @@ export default function ExpensesPage() {
         title="Expenses Ledger"
         description="Capture manual operating expenses, mark what is still unpaid, and let every update flow directly into the P&L and balance sheet views."
         active="expenses"
+        actions={
+          <ReportingExportActions
+            reportType="expenses"
+            filters={{
+              date_from: dateFrom || undefined,
+              date_to: dateTo || undefined,
+              payment_status: paymentStatus,
+              category,
+            }}
+            disabled={loading}
+            onError={setExportError}
+          />
+        }
       />
 
       {error ? <InlineMessage tone="danger">{error}</InlineMessage> : null}
+      {exportError ? (
+        <InlineMessage tone="danger">{exportError}</InlineMessage>
+      ) : null}
       <div>
         <StatGrid>
-          {summaryRows.map((item) => (
-            <StatCard
-              key={item.code}
-              label={`${item.code} Expenses`}
-              value={formatMoney(item.total, item.code)}
-              hint="Live total for the current expense filters."
-              tone="primary"
-            />
-          ))}
+          <StatCard
+            label="EGP Expenses"
+            value={formatMoney(egpTotal, REPORTING_CURRENCY)}
+            hint="Live total for the current expense filters."
+            tone={reportingStatTone("Operating Expenses", egpTotal)}
+          />
           <StatCard
             label="Visible Unpaid"
             value={`${unpaidCount}`}
             hint="Unpaid entries on the current page of results."
-            tone="warning"
+            tone="default"
           />
           <StatCard
             label="Visible Paid"
@@ -391,23 +401,6 @@ export default function ExpensesPage() {
                   }))
                 }
                 className="form-input-base [&::-webkit-inner-spin-button]:appearance-none"
-              />
-            </InputGroup>
-
-            <InputGroup label="Currency">
-              <SearchableSelect
-                value={form.currency}
-                onChange={(value) =>
-                  setForm((current) => ({
-                    ...current,
-                    currency: value as ReportingCurrency,
-                  }))
-                }
-                options={SUPPORTED_PRICING_CURRENCIES.map((code) => ({
-                  value: code,
-                  label: code,
-                }))}
-                className="form-input-base"
               />
             </InputGroup>
 
@@ -508,7 +501,7 @@ export default function ExpensesPage() {
           <SurfaceCard className="shadow-ambient">
             <FinanceSectionTitle
               title="Filter expenses"
-              description="Narrow the ledger by time, currency, payment state, or category when reconciling a specific period."
+              description="Narrow the ledger by time, payment state, or category when reconciling a specific period."
             />
 
             <div className="mt-5 grid gap-4 md:grid-cols-2">
@@ -531,23 +524,6 @@ export default function ExpensesPage() {
                     setPage(1);
                     setDateTo(event.target.value);
                   }}
-                  className="form-input-base"
-                />
-              </InputGroup>
-              <InputGroup label="Currency">
-                <SearchableSelect
-                  value={currency}
-                  onChange={(value) => {
-                    setPage(1);
-                    setCurrency(value as ReportingCurrency | "");
-                  }}
-                  options={[
-                    { value: "", label: "All currencies" },
-                    ...SUPPORTED_PRICING_CURRENCIES.map((code) => ({
-                      value: code,
-                      label: code,
-                    })),
-                  ]}
                   className="form-input-base"
                 />
               </InputGroup>

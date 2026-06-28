@@ -203,6 +203,9 @@ export function ActionButton({
   size?: "sm" | "md" | "lg";
   href?: string;
   className?: string;
+  target?: React.HTMLAttributeAnchorTarget;
+  rel?: string;
+  download?: string | boolean;
 }) {
   const sizeClasses = {
     sm: "px-3 py-1.5 text-xs",
@@ -228,6 +231,21 @@ export function ActionButton({
     .trim();
 
   if (href) {
+    const isExternal =
+      href.startsWith("http://") || href.startsWith("https://");
+
+    if (isExternal) {
+      return (
+        <a
+          href={href}
+          className={sharedClassName}
+          {...(props as React.AnchorHTMLAttributes<HTMLAnchorElement>)}
+        >
+          {children}
+        </a>
+      );
+    }
+
     return (
       <Link href={href} className={sharedClassName}>
         {children}

@@ -5,6 +5,9 @@ export const SUPPORTED_PRICING_CURRENCIES = ["EGP", "USD", "EUR"] as const;
 
 export type PricingCurrency = (typeof SUPPORTED_PRICING_CURRENCIES)[number];
 
+/** Financial reporting is locked to EGP across all statement pages. */
+export const REPORTING_CURRENCY = "EGP" as const satisfies PricingCurrency;
+
 export const CURRENCY_SELECT_OPTIONS: ReadonlyArray<{
   value: PricingCurrency;
   label: string;

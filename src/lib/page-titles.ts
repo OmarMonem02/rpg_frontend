@@ -92,6 +92,7 @@ const ROUTE_TITLE_PATTERNS: ReadonlyArray<{
   { pattern: /^\/data\/product-categories$/, title: "Product Categories" },
   { pattern: /^\/reporting\/annual$/, title: "Annual Reporting" },
   { pattern: /^\/reporting\/expenses$/, title: "Expenses" },
+  { pattern: /^\/reporting\/assets$/, title: "Assets" },
   { pattern: /^\/reporting\/balance-sheet$/, title: "Balance Sheet" },
   { pattern: /^\/reporting\/profit-loss$/, title: "Profit & Loss" },
 ];

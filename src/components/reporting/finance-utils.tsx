@@ -16,7 +16,7 @@ import type {
   ExpensePaymentStatus,
   ReportingCurrency,
 } from "@/lib/api/reporting";
-import { SUPPORTED_PRICING_CURRENCIES } from "@/lib/currencies";
+import { REPORTING_CURRENCY } from "@/lib/currencies";
 
 const financeNavItems = [
   { href: "/reporting", label: "Overview", key: "overview" },
@@ -32,6 +32,7 @@ const financeNavItems = [
   },
   { href: "/reporting/annual", label: "Annual Statement", key: "annual" },
   { href: "/reporting/expenses", label: "Expenses", key: "expenses" },
+  { href: "/reporting/assets", label: "Assets", key: "assets" },
 ] as const;
 
 export const EXPENSE_CATEGORY_OPTIONS: Array<{
@@ -75,18 +76,65 @@ export function metricToneClass(value: number): string {
   return "text-neutral-metric";
 }
 
+type StatTone = "default" | "primary" | "success" | "warning" | "danger";
+
+const COST_LABELS = new Set([
+  "cogs",
+  "operating expenses",
+  "liabilities",
+  "expense pressure",
+  "total expenses",
+  "annual margin",
+]);
+
+export function reportingStatTone(
+  label: string,
+  value: number,
+): StatTone {
+  const normalized = label.trim().toLowerCase();
+
+  if (
+    normalized.includes("net profit") ||
+    normalized.includes("gross profit") ||
+    normalized.includes("equity") ||
+    normalized.includes("margin")
+  ) {
+    return value >= 0 ? "success" : "danger";
+  }
+
+  if (normalized.includes("revenue")) {
+    return "success";
+  }
+
+  if (
+    COST_LABELS.has(normalized) ||
+    normalized.includes("expense") ||
+    normalized.includes("cogs") ||
+    normalized.includes("liabilit")
+  ) {
+    return "danger";
+  }
+
+  return "default";
+}
+
 export function FinanceHero({
   title,
   active,
+  actions,
 }: {
   title: string;
   description: string;
-  active: "overview" | "profit-loss" | "balance-sheet" | "annual" | "expenses";
+  active: "overview" | "profit-loss" | "balance-sheet" | "annual" | "expenses" | "assets";
+  actions?: React.ReactNode;
 }) {
   return (
     <section className="animate-fade-in overflow-hidden rounded-[1.75rem] border border-outline-variant/15 bg-surface-container-low shadow-ambient">
       <div className="flex flex-col gap-6 p-5 md:p-7">
-        <h1 className="text-display-lg text-on-surface">{title}</h1>
+        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+          <h1 className="text-display-lg text-on-surface">{title}</h1>
+          {actions ? <div className="flex flex-wrap gap-2">{actions}</div> : null}
+        </div>
 
         <nav
           aria-label="Finance reporting"
@@ -116,34 +164,27 @@ export function FinanceHero({
 export function FinanceFilterBar({
   dateFrom,
   dateTo,
-  currency,
   onDateFromChange,
   onDateToChange,
-  onCurrencyChange,
   extra,
 }: {
   dateFrom: string;
   dateTo: string;
-  currency: string;
   onDateFromChange: (value: string) => void;
   onDateToChange: (value: string) => void;
-  onCurrencyChange: (value: string) => void;
   extra?: React.ReactNode;
 }) {
   return (
     <FilterBar>
-      <div className="md:col-span-12  flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <div className="md:col-span-12 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="label-caps">
-            Statement Filters
-          </p>
+          <p className="label-caps">Statement Filters</p>
           <p className="mt-1 text-sm text-on-surface-variant">
-            Narrow the reporting window without changing the currency-separation
-            rule.
+            All amounts are reported in {REPORTING_CURRENCY}.
           </p>
         </div>
       </div>
-      <InputGroup label="From" className="md:col-span-3">
+      <InputGroup label="From" className="md:col-span-4">
         <input
           aria-label="From"
           type="date"
@@ -153,7 +194,7 @@ export function FinanceFilterBar({
           className="form-input-base"
         />
       </InputGroup>
-      <InputGroup label="To" className="md:col-span-3">
+      <InputGroup label="To" className="md:col-span-4">
         <input
           type="date"
           value={dateTo}
@@ -163,22 +204,7 @@ export function FinanceFilterBar({
           className="form-input-base"
         />
       </InputGroup>
-      <InputGroup label="Currency" className="md:col-span-3">
-        <SearchableSelect
-          searchable={false}
-          value={currency}
-          onChange={onCurrencyChange}
-          options={[
-            { value: "", label: "All currencies" },
-            ...SUPPORTED_PRICING_CURRENCIES.map((code) => ({
-              value: code,
-              label: code,
-            })),
-          ]}
-          className="form-input-base"
-        />
-      </InputGroup>
-      <div className="md:col-span-3">{extra}</div>
+      <div className="md:col-span-4">{extra}</div>
     </FilterBar>
   );
 }
@@ -207,9 +233,9 @@ export function FinanceSectionTitle({
   );
 }
 
-export function CurrencyChip({ currency }: { currency: string }) {
+export function CurrencyChip({ currency = REPORTING_CURRENCY }: { currency?: string }) {
   return (
-    <span className="label-caps inline-flex items-center rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-primary">
+    <span className="label-caps inline-flex items-center rounded-full border border-outline-variant/20 bg-surface-container px-3 py-1 text-on-surface-variant">
       {currency}
     </span>
   );
@@ -373,32 +399,3 @@ export function EmptyFinanceState({
   );
 }
 
-export function CurrencySelector({
-  value,
-  onChange,
-  label = "Currency",
-}: {
-  value: string;
-  onChange: (value: ReportingCurrency | "") => void;
-  label?: string;
-}) {
-  return (
-    <InputGroup label={label}>
-      <SearchableSelect
-        searchable={false}
-        value={value}
-        onChange={(nextValue) =>
-          onChange(nextValue as ReportingCurrency | "")
-        }
-        options={[
-          { value: "", label: "All currencies" },
-          ...SUPPORTED_PRICING_CURRENCIES.map((code) => ({
-            value: code,
-            label: code,
-          })),
-        ]}
-        className="form-input-base"
-      />
-    </InputGroup>
-  );
-}

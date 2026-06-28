@@ -2,6 +2,68 @@
 const UNSUPPORTED_COLOR_PATTERN =
   /\b(?:color|color-mix|oklch|oklab|lab|lch)\(/i;
 
+const COLOR_PROPS = [
+  "color",
+  "background-color",
+  "border-top-color",
+  "border-right-color",
+  "border-bottom-color",
+  "border-left-color",
+  "outline-color",
+  "text-decoration-color",
+  "column-rule-color",
+] as const;
+
+const LAYOUT_PROPS = [
+  "display",
+  "flex-direction",
+  "flex-wrap",
+  "align-items",
+  "justify-content",
+  "align-content",
+  "gap",
+  "grid-template-columns",
+  "grid-column",
+  "grid-row",
+  "padding-top",
+  "padding-right",
+  "padding-bottom",
+  "padding-left",
+  "margin-top",
+  "margin-right",
+  "margin-bottom",
+  "margin-left",
+  "width",
+  "max-width",
+  "min-width",
+  "height",
+  "min-height",
+  "font-size",
+  "font-weight",
+  "font-family",
+  "line-height",
+  "text-align",
+  "text-transform",
+  "letter-spacing",
+  "white-space",
+  "vertical-align",
+  "border-top-width",
+  "border-right-width",
+  "border-bottom-width",
+  "border-left-width",
+  "border-top-style",
+  "border-right-style",
+  "border-bottom-style",
+  "border-left-style",
+  "border-radius",
+  "overflow",
+  "overflow-x",
+  "overflow-y",
+  "table-layout",
+  "border-collapse",
+  "border-spacing",
+] as const;
+
 /** A4 portrait dimensions (ISO 216) */
 export const A4_WIDTH_MM = 210;
 export const A4_HEIGHT_MM = 297;
@@ -15,6 +77,100 @@ function waitForLayout(): Promise<void> {
       requestAnimationFrame(() => resolve());
     });
   });
+}
+
+function applySafeComputedStyles(
+  el: HTMLElement,
+  computed: CSSStyleDeclaration,
+): void {
+  el.style.setProperty("box-shadow", "none", "important");
+  el.style.setProperty("text-shadow", "none", "important");
+  el.style.setProperty("background-image", "none", "important");
+  el.style.setProperty("filter", "none", "important");
+  el.style.setProperty("backdrop-filter", "none", "important");
+
+  for (const prop of COLOR_PROPS) {
+    const value = computed.getPropertyValue(prop);
+    if (
+      !value ||
+      value === "transparent" ||
+      value === "rgba(0, 0, 0, 0)" ||
+      UNSUPPORTED_COLOR_PATTERN.test(value)
+    ) {
+      continue;
+    }
+    el.style.setProperty(prop, value);
+  }
+
+  const backgroundColor = computed.backgroundColor;
+  if (
+    backgroundColor &&
+    backgroundColor !== "transparent" &&
+    backgroundColor !== "rgba(0, 0, 0, 0)" &&
+    !UNSUPPORTED_COLOR_PATTERN.test(backgroundColor)
+  ) {
+    el.style.backgroundColor = backgroundColor;
+  }
+
+  for (const prop of LAYOUT_PROPS) {
+    const value = computed.getPropertyValue(prop);
+    if (value) {
+      el.style.setProperty(prop, value);
+    }
+  }
+}
+
+/**
+ * Copies resolved rgb/hex styles from the live DOM onto the clone so html2canvas
+ * does not need to parse Tailwind stylesheets that contain oklab/oklch.
+ */
+function copyComputedStylesToInline(
+  originalRoot: HTMLElement,
+  clonedRoot: HTMLElement,
+  sourceWindow: Window,
+): void {
+  const originalNodes = [
+    originalRoot,
+    ...originalRoot.querySelectorAll<HTMLElement>("*"),
+  ];
+  const clonedNodes = [
+    clonedRoot,
+    ...clonedRoot.querySelectorAll<HTMLElement>("*"),
+  ];
+
+  if (originalNodes.length === clonedNodes.length) {
+    for (let i = 0; i < originalNodes.length; i += 1) {
+      applySafeComputedStyles(
+        clonedNodes[i],
+        sourceWindow.getComputedStyle(originalNodes[i]),
+      );
+    }
+    return;
+  }
+
+  const cloneView = clonedRoot.ownerDocument.defaultView;
+  if (!cloneView) return;
+
+  for (const cloned of clonedNodes) {
+    applySafeComputedStyles(cloned, cloneView.getComputedStyle(cloned));
+  }
+}
+
+function stripStylesheets(doc: Document): void {
+  doc
+    .querySelectorAll('link[rel="stylesheet"], style')
+    .forEach((node) => node.remove());
+}
+
+function prepareCloneForHtml2Canvas(
+  doc: Document,
+  originalRoot: HTMLElement,
+  clonedRoot: HTMLElement,
+  sourceWindow: Window,
+): void {
+  copyComputedStylesToInline(originalRoot, clonedRoot, sourceWindow);
+  stripStylesheets(doc);
+  normalizeColorsForHtml2Canvas(doc, clonedRoot);
 }
 
 /**
@@ -61,6 +217,9 @@ export function normalizeColorsForHtml2Canvas(
       el.style.opacity = "1";
     }
 
+    el.style.setProperty("box-shadow", "none", "important");
+    el.style.setProperty("text-shadow", "none", "important");
+
     for (let i = el.style.length - 1; i >= 0; i--) {
       const prop = el.style.item(i);
       const value = el.style.getPropertyValue(prop);
@@ -89,7 +248,7 @@ export async function exportHtmlElementToPdf(
   filename: string,
 ): Promise<void> {
   const previousWidth = element.style.width;
-  element.classList.add("pdf-export");
+  element.classList.add("pdf-export", "pdf-capture-safe");
   element.style.width = "210mm";
 
   try {
@@ -111,7 +270,7 @@ export async function exportHtmlElementToPdf(
       width: A4_WIDTH_PX,
       windowWidth: A4_WIDTH_PX,
       onclone: (doc, clonedElement) => {
-        normalizeColorsForHtml2Canvas(doc, clonedElement);
+        prepareCloneForHtml2Canvas(doc, element, clonedElement, window);
       },
     });
 
@@ -144,7 +303,7 @@ export async function exportHtmlElementToPdf(
 
     pdf.save(filename);
   } finally {
-    element.classList.remove("pdf-export");
+    element.classList.remove("pdf-export", "pdf-capture-safe");
     element.style.width = previousWidth;
   }
 }

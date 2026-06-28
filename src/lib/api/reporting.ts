@@ -3,7 +3,7 @@
 import { ApiError } from "@/lib/auth-api";
 import { getApiUrl } from "@/lib/config";
 import type { PricingCurrency } from "@/lib/currencies";
-import { SUPPORTED_PRICING_CURRENCIES, toPricingCurrency } from "@/lib/currencies";
+import { REPORTING_CURRENCY, toPricingCurrency } from "@/lib/currencies";
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -226,7 +226,7 @@ function buildQuery(filters: ReportingFilters = {}): string {
   if (filters.date_from) query.append("date_from", filters.date_from);
   if (filters.date_to) query.append("date_to", filters.date_to);
   if (filters.year) query.append("year", String(filters.year));
-  if (filters.currency) query.append("currency", filters.currency);
+  query.append("currency", REPORTING_CURRENCY);
   if (filters.payment_status) query.append("payment_status", filters.payment_status);
   if (filters.category) query.append("category", filters.category);
 
@@ -343,11 +343,9 @@ export async function getProfitLossReport(
   const currencies = asRecord(record.currencies);
 
   const result: ProfitLossReport = { filters, currencies: {} };
-  for (const code of SUPPORTED_PRICING_CURRENCIES) {
-    const raw = currencies[code];
-    if (raw) {
-      result.currencies[code as ReportingCurrency] = normalizeProfitLoss(raw);
-    }
+  const raw = currencies[REPORTING_CURRENCY];
+  if (raw) {
+    result.currencies[REPORTING_CURRENCY] = normalizeProfitLoss(raw);
   }
 
   return result;
@@ -362,11 +360,9 @@ export async function getBalanceSheetReport(
   const currencies = asRecord(record.currencies);
 
   const result: BalanceSheetReport = { filters, currencies: {} };
-  for (const code of SUPPORTED_PRICING_CURRENCIES) {
-    const raw = currencies[code];
-    if (raw) {
-      result.currencies[code as ReportingCurrency] = normalizeBalanceSheet(raw);
-    }
+  const raw = currencies[REPORTING_CURRENCY];
+  if (raw) {
+    result.currencies[REPORTING_CURRENCY] = normalizeBalanceSheet(raw);
   }
 
   return result;
@@ -386,10 +382,10 @@ export async function getAnnualSummaryReport(
     currencies: {},
   };
 
-  for (const code of SUPPORTED_PRICING_CURRENCIES) {
+  for (const code of [REPORTING_CURRENCY] as const) {
     const raw = currencies[code];
     if (raw) {
-      result.currencies[code as ReportingCurrency] = normalizeAnnualSummary(raw);
+      result.currencies[code] = normalizeAnnualSummary(raw);
     }
   }
 
@@ -405,15 +401,13 @@ export async function getExpensesReport(
   const rawSummary = asRecord(record.summary);
 
   const summary: ExpensesReport["summary"] = {};
-  for (const code of SUPPORTED_PRICING_CURRENCIES) {
-    const entry = rawSummary[code];
-    if (entry) {
-      const r = asRecord(entry);
-      summary[code as ReportingCurrency] = {
-        total: toNumber(r.total),
-        categories: normalizeNumericMap(r.categories),
-      };
-    }
+  const entry = rawSummary[REPORTING_CURRENCY];
+  if (entry) {
+    const r = asRecord(entry);
+    summary[REPORTING_CURRENCY] = {
+      total: toNumber(r.total),
+      categories: normalizeNumericMap(r.categories),
+    };
   }
 
   return {
@@ -434,7 +428,7 @@ export async function listExpenses(
   if (filters.page) query.append("page", String(filters.page));
   if (filters.date_from) query.append("date_from", filters.date_from);
   if (filters.date_to) query.append("date_to", filters.date_to);
-  if (filters.currency) query.append("currency", filters.currency);
+  query.append("currency", REPORTING_CURRENCY);
   if (filters.payment_status) query.append("payment_status", filters.payment_status);
   if (filters.category) query.append("category", filters.category);
   const suffix = query.toString() ? `?${query.toString()}` : "";
@@ -478,4 +472,34 @@ export async function updateExpense(
 
 export async function deleteExpense(token: string, id: number): Promise<void> {
   await authorizedFetch<void>(`/expenses/${id}`, token, { method: "DELETE" });
+}
+
+export type ReportingExportType =
+  | "overview"
+  | "profit-loss"
+  | "balance-sheet"
+  | "annual-summary"
+  | "expenses";
+
+const REPORTING_EXPORT_PATHS: Record<ReportingExportType, string> = {
+  overview: "/reporting/overview/export",
+  "profit-loss": "/reporting/profit-loss/export",
+  "balance-sheet": "/reporting/balance-sheet/export",
+  "annual-summary": "/reporting/annual-summary/export",
+  expenses: "/reporting/expenses/export",
+};
+
+export async function exportReportingReport(
+  token: string,
+  type: ReportingExportType,
+  format: "xlsx" | "csv",
+  filters: ReportingFilters = {},
+): Promise<void> {
+  const { downloadFile } = await import("@/lib/api/import-export");
+  const query = buildQuery(filters);
+  const separator = query.includes("?") ? "&" : "?";
+  const path = `${REPORTING_EXPORT_PATHS[type]}${query}${separator}format=${format}`;
+  const extension = format === "csv" ? "csv" : "xlsx";
+  const filename = `${type}-${new Date().toISOString().slice(0, 10)}.${extension}`;
+  await downloadFile(path, token, filename);
 }

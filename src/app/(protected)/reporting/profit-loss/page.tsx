@@ -3,7 +3,11 @@
 import { useEffect, useState } from "react";
 import { ApiError } from "@/lib/auth-api";
 import { getAuthToken } from "@/lib/auth-session";
-import { getProfitLossReport, type ProfitLossReport, type ReportingCurrency, type ProfitLossCurrencySection } from "@/lib/api/reporting";
+import {
+  getProfitLossReport,
+  type ProfitLossReport,
+} from "@/lib/api/reporting";
+import { REPORTING_CURRENCY } from "@/lib/currencies";
 import {
   BreakdownList,
   EmptyFinanceState,
@@ -12,16 +16,18 @@ import {
   FinanceLoadingCard,
   FinanceSectionTitle,
   MoneyStatGrid,
+  reportingStatTone,
 } from "@/components/reporting/finance-utils";
 import { InlineMessage, PageShell } from "@/components/ops-ui";
+import { ReportingExportActions } from "@/components/reporting/ReportingExportActions";
 
 export default function ProfitLossPage() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
-  const [currency, setCurrency] = useState<ReportingCurrency | "">("");
   const [report, setReport] = useState<ProfitLossReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -34,7 +40,6 @@ export default function ProfitLossPage() {
         const result = await getProfitLossReport(token, {
           date_from: dateFrom || undefined,
           date_to: dateTo || undefined,
-          currency,
         });
 
         if (!active) return;
@@ -42,7 +47,11 @@ export default function ProfitLossPage() {
         setError(null);
       } catch (err) {
         if (!active) return;
-        setError(err instanceof ApiError || err instanceof Error ? err.message : "Failed to load profit and loss.");
+        setError(
+          err instanceof ApiError || err instanceof Error
+            ? err.message
+            : "Failed to load profit and loss.",
+        );
       } finally {
         if (active) setLoading(false);
       }
@@ -52,33 +61,44 @@ export default function ProfitLossPage() {
     return () => {
       active = false;
     };
-  }, [dateFrom, dateTo, currency]);
+  }, [dateFrom, dateTo]);
 
-  const currencySections = Object.entries(report?.currencies ?? {}).filter(
-    (entry): entry is [string, ProfitLossCurrencySection] => entry[1] !== undefined
-  );
+  const section = report?.currencies[REPORTING_CURRENCY];
+  const currency = REPORTING_CURRENCY;
 
   return (
     <PageShell>
       <FinanceHero
         title="Profit & Loss Statement"
-        description="Read recognized revenue, cost of goods sold, gross profit, manual operating expenses, and net profit without mixing currencies or open sales into realized earnings."
+        description=""
         active="profit-loss"
+        actions={
+          <ReportingExportActions
+            reportType="profit-loss"
+            filters={{
+              date_from: dateFrom || undefined,
+              date_to: dateTo || undefined,
+            }}
+            disabled={loading || !section}
+            onError={setExportError}
+          />
+        }
       />
       <FinanceFilterBar
         dateFrom={dateFrom}
         dateTo={dateTo}
-        currency={currency}
         onDateFromChange={setDateFrom}
         onDateToChange={setDateTo}
-        onCurrencyChange={(value) => setCurrency(value as ReportingCurrency | "")}
       />
 
       {error ? <InlineMessage tone="danger">{error}</InlineMessage> : null}
+      {exportError ? (
+        <InlineMessage tone="danger">{exportError}</InlineMessage>
+      ) : null}
 
       {loading ? (
         <FinanceLoadingCard label="Calculating recognized earnings and operating pressure" />
-      ) : currencySections.length === 0 ? (
+      ) : !section ? (
         <EmptyFinanceState
           title="No recognized earnings in this filter window"
           description="Completed sales are required for recognized revenue. Try widening the date range or switch to the expenses page to add operating costs first."
@@ -86,45 +106,73 @@ export default function ProfitLossPage() {
           actionHref="/reporting/expenses"
         />
       ) : (
-        <>
+        <section className="space-y-4">
+          <FinanceSectionTitle
+            title="EGP profit snapshot"
+            description="Recognized revenue excludes partial and pending sales, while operating expenses come from the manual expense ledger."
+          />
 
-          {currencySections.map(([code, section]) => (
-            <section key={code} className="space-y-4">
-              <FinanceSectionTitle
-                title={`${code} profit snapshot`}
-                description="Recognized revenue excludes partial and pending sales, while operating expenses come from the manual expense ledger."
-              />
+          <MoneyStatGrid
+            items={[
+              {
+                label: "Revenue",
+                value: section.revenue,
+                currency,
+                tone: reportingStatTone("Revenue", section.revenue),
+                hint: "Recognized sales only.",
+              },
+              {
+                label: "COGS",
+                value: section.cogs,
+                currency,
+                tone: reportingStatTone("COGS", section.cogs),
+                hint: "Current item cost basis.",
+              },
+              {
+                label: "Gross Profit",
+                value: section.gross_profit,
+                currency,
+                tone: reportingStatTone("Gross Profit", section.gross_profit),
+                hint: "Revenue minus cost of goods sold.",
+              },
+              {
+                label: "Operating Expenses",
+                value: section.operating_expenses,
+                currency,
+                tone: reportingStatTone(
+                  "Operating Expenses",
+                  section.operating_expenses,
+                ),
+                hint: "Manual expense ledger total.",
+              },
+              {
+                label: "Net Profit",
+                value: section.net_profit,
+                currency,
+                tone: reportingStatTone("Net Profit", section.net_profit),
+                hint: "Gross profit after expenses.",
+              },
+            ]}
+          />
 
-              <MoneyStatGrid
-                items={[
-                  { label: "Revenue", value: section.revenue, currency: code, tone: "primary", hint: "Recognized sales only." },
-                  { label: "COGS", value: section.cogs, currency: code, tone: "warning", hint: "Current item cost basis." },
-                  { label: "Gross Profit", value: section.gross_profit, currency: code, tone: "success", hint: "Revenue minus cost of goods sold." },
-                  { label: "Operating Expenses", value: section.operating_expenses, currency: code, tone: "danger", hint: "Manual expense ledger total." },
-                  { label: "Net Profit", value: section.net_profit, currency: code, tone: section.net_profit >= 0 ? "success" : "danger", hint: "Gross profit after expenses." },
-                ]}
-              />
-
-              <div className="grid gap-4 xl:grid-cols-3">
-                <BreakdownList
-                  title="Revenue by Sale Type"
-                  values={section.revenue_by_type}
-                  currency={code}
-                />
-                <BreakdownList
-                  title="Revenue by Channel"
-                  values={section.revenue_by_channel}
-                  currency={code}
-                />
-                <BreakdownList
-                  title="Expense Categories"
-                  values={section.expense_categories}
-                  currency={code}
-                />
-              </div>
-            </section>
-          ))}
-        </>
+          <div className="grid gap-4 xl:grid-cols-3">
+            <BreakdownList
+              title="Revenue by Sale Type"
+              values={section.revenue_by_type}
+              currency={currency}
+            />
+            <BreakdownList
+              title="Revenue by Channel"
+              values={section.revenue_by_channel}
+              currency={currency}
+            />
+            <BreakdownList
+              title="Expense Categories"
+              values={section.expense_categories}
+              currency={currency}
+            />
+          </div>
+        </section>
       )}
     </PageShell>
   );
