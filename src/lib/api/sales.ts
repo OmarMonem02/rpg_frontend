@@ -132,6 +132,48 @@ export type SaleLineItemRecord = {
   created_at?: string;
 };
 
+export type SaleAdjustmentUser = {
+  id: number;
+  name: string;
+  email?: string;
+};
+
+export type SaleAuditItemSnapshot = {
+  id: number;
+  item_label?: string;
+  selling_price?: number;
+  discount?: number;
+  qty?: number;
+  returned_qty?: number;
+  status?: string;
+};
+
+export type SaleAuditSnapshot = {
+  id?: number;
+  total?: number;
+  discount?: number;
+  status?: string;
+  items?: SaleAuditItemSnapshot[];
+};
+
+export type SaleAdjustmentRecord = {
+  id: number;
+  sale_id: number;
+  user_id: number;
+  action_type: string;
+  summary: string;
+  before_snapshot: SaleAuditSnapshot | null;
+  after_snapshot: SaleAuditSnapshot | null;
+  amount_delta: number;
+  refund_amount: number;
+  extra_amount_due: number;
+  notes?: string | null;
+  meta?: Record<string, unknown> | null;
+  user?: SaleAdjustmentUser | null;
+  created_at?: string;
+  updated_at?: string;
+};
+
 export type SaleRecord = {
   id: number;
   customer_id: number;
@@ -151,6 +193,7 @@ export type SaleRecord = {
   commission_base?: number;
   commission_amount?: number;
   line_items?: SaleLineItemRecord[];
+  adjustments?: SaleAdjustmentRecord[];
   created_at?: string;
   updated_at?: string;
   customer?: CustomerRecord;
@@ -411,9 +454,82 @@ export function normalizeSaleLineItem(raw: unknown): SaleLineItemRecord {
   };
 }
 
+function normalizeSaleAdjustmentUser(raw: unknown): SaleAdjustmentUser | null {
+  if (!raw || typeof raw !== "object") return null;
+  const record = asRecord(raw);
+  const id = toNumber(record.id);
+  if (id <= 0) return null;
+  return {
+    id,
+    name: toText(record.name) || "Unknown user",
+    email: toText(record.email) || undefined,
+  };
+}
+
+function normalizeSaleAuditItemSnapshot(raw: unknown): SaleAuditItemSnapshot | null {
+  if (!raw || typeof raw !== "object") return null;
+  const record = asRecord(raw);
+  const id = toNumber(record.id);
+  if (id <= 0) return null;
+  return {
+    id,
+    item_label: toText(record.item_label) || undefined,
+    selling_price:
+      record.selling_price != null ? toNumber(record.selling_price) : undefined,
+    discount: record.discount != null ? toNumber(record.discount) : undefined,
+    qty: record.qty != null ? toNumber(record.qty) : undefined,
+    returned_qty:
+      record.returned_qty != null ? toNumber(record.returned_qty) : undefined,
+    status: toText(record.status) || undefined,
+  };
+}
+
+function normalizeSaleAuditSnapshot(raw: unknown): SaleAuditSnapshot | null {
+  if (!raw || typeof raw !== "object") return null;
+  const record = asRecord(raw);
+  const itemsRaw = pickArray(record, ["items"]);
+  return {
+    id: toNumber(record.id) || undefined,
+    total: record.total != null ? toNumber(record.total) : undefined,
+    discount: record.discount != null ? toNumber(record.discount) : undefined,
+    status: toText(record.status) || undefined,
+    items: itemsRaw
+      .map(normalizeSaleAuditItemSnapshot)
+      .filter((item): item is SaleAuditItemSnapshot => item !== null),
+  };
+}
+
+function normalizeSaleAdjustment(raw: unknown): SaleAdjustmentRecord | null {
+  const record = asRecord(raw);
+  const id = toNumber(record.id);
+  if (id <= 0) return null;
+
+  return {
+    id,
+    sale_id: toNumber(record.sale_id),
+    user_id: toNumber(record.user_id),
+    action_type: toText(record.action_type) || "update",
+    summary: toText(record.summary),
+    before_snapshot: normalizeSaleAuditSnapshot(record.before_snapshot),
+    after_snapshot: normalizeSaleAuditSnapshot(record.after_snapshot),
+    amount_delta: toNumber(record.amount_delta || 0),
+    refund_amount: toNumber(record.refund_amount || 0),
+    extra_amount_due: toNumber(record.extra_amount_due || 0),
+    notes: toText(record.notes) || null,
+    meta:
+      record.meta && typeof record.meta === "object"
+        ? (record.meta as Record<string, unknown>)
+        : null,
+    user: normalizeSaleAdjustmentUser(record.user),
+    created_at: toText(record.created_at) || undefined,
+    updated_at: toText(record.updated_at) || undefined,
+  };
+}
+
 export function normalizeSale(raw: unknown): SaleRecord {
   const record = asRecord(raw);
   const lineItemsRaw = pickArray(record, ["line_items", "items"]);
+  const adjustmentsRaw = pickArray(record, ["adjustments"]);
   const paymentMethod = asRecord(record.payment_method);
   const camelPaymentMethod = asRecord(record.paymentMethod);
   return {
@@ -442,6 +558,9 @@ export function normalizeSale(raw: unknown): SaleRecord {
     commission_base: toNumber(record.commission_base || 0),
     commission_amount: toNumber(record.commission_amount || 0),
     line_items: lineItemsRaw.map(normalizeSaleLineItem),
+    adjustments: adjustmentsRaw
+      .map(normalizeSaleAdjustment)
+      .filter((item): item is SaleAdjustmentRecord => item !== null),
     created_at: toText(record.created_at) || undefined,
     updated_at: toText(record.updated_at) || undefined,
     customer: record.customer ? normalizeCustomer(record.customer) : undefined,

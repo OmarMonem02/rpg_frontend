@@ -226,7 +226,28 @@ export async function listHistory(
   };
 }
 
-export async function exportHistoryCsv(
+export async function listSaleHistory(
+  token: string,
+  saleId: number,
+  page = 1,
+  perPage = 50,
+): Promise<PaginatedResult<HistoryRecord>> {
+  const query = buildQuery({ page, per_page: perPage });
+  const payload = await authorizedFetch<unknown>(
+    `/sales/${saleId}/history?${query}`,
+    token,
+  );
+  const rows = pickArray(payload, ["data"]);
+  const meta = parsePagination(payload);
+
+  return {
+    items: rows
+      .map(normalizeHistoryRecord)
+      .filter((item): item is HistoryRecord => item !== null),
+    currentPage: meta.current_page ?? 1,
+    lastPage: meta.last_page ?? 1,
+  };
+}
   token: string,
   filters?: HistoryFilters,
   columns?: string,
