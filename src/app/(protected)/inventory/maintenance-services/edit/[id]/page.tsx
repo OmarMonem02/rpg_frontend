@@ -5,6 +5,7 @@ import { getAuthToken } from "@/lib/auth-session";
 import { getMaintenanceService, type MaintenanceServiceRecord } from "@/lib/crud-api";
 import { ServiceForm } from "../../ServiceForm";
 import { PageShell } from "@/components/ops-ui";
+import { usePageTitle } from "@/components/page-title-provider";
 
 interface EditServicePageProps {
   params: Promise<{ id: string }>;
@@ -15,6 +16,8 @@ export default function EditServicePage({ params }: EditServicePageProps) {
   const [service, setService] = useState<MaintenanceServiceRecord | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  usePageTitle(service ? `Edit ${service.name}` : null);
 
   useEffect(() => {
     const loadService = async () => {

@@ -41,6 +41,7 @@ import {
   PrinterIcon,
   ShoppingBagIcon,
 } from "@heroicons/react/24/outline";
+import { usePageTitle } from "@/components/page-title-provider";
 
 function getItemTypeTone(
   type: string,
@@ -69,6 +70,8 @@ export default function DeliveryOrderDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const [activeTab, setActiveTab] = useState("fulfillment");
+
+  usePageTitle(sale ? `Delivery INV-${sale.id}` : null);
 
   const loadSale = useCallback(async () => {
     try {

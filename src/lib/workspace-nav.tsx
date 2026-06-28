@@ -428,14 +428,14 @@ export const defaultWorkspaceNavSections: SidebarNavSection[] = [
         icon: <TransactionsIcon className="h-5 w-5" />,
       },
       {
-        href: "/inventory/delivery-orders",
-        label: "Delivery Orders",
-        icon: <TruckIcon className="h-5 w-5" />,
-      },
-      {
         href: "/inventory/sales/create",
         label: "Create Sale",
         icon: <CreateIcon className="h-5 w-5" />,
+      },
+      {
+        href: "/inventory/delivery-orders",
+        label: "Delivery Orders",
+        icon: <TruckIcon className="h-5 w-5" />,
       },
       {
         href: "/customers",
@@ -457,21 +457,6 @@ export const defaultWorkspaceNavSections: SidebarNavSection[] = [
   {
     title: "Inventory",
     items: [
-      {
-        href: "/inventory/alarms",
-        label: "Alarms",
-        icon: <AlarmIcon className="h-5 w-5" />,
-      },
-      {
-        href: "/inventory/item-lookup",
-        label: "Item Lookup",
-        icon: <SearchIcon className="h-5 w-5" />,
-      },
-      {
-        href: "/inventory/count",
-        label: "Inventory Count",
-        icon: <StocktakeIcon className="h-5 w-5" />,
-      },
       {
         href: "/inventory/spare-parts",
         label: "Spare Parts",
@@ -497,6 +482,27 @@ export const defaultWorkspaceNavSections: SidebarNavSection[] = [
         href: "/inventory/maintenance-services",
         label: "Maintenance Services",
         icon: <MaintenanceIcon className="h-5 w-5" />,
+      },
+
+    ],
+  },
+  {
+    title: "Inventory Operations",
+    items: [
+      {
+        href: "/inventory/item-lookup",
+        label: "Item Lookup",
+        icon: <SearchIcon className="h-5 w-5" />,
+      },
+      {
+        href: "/inventory/count",
+        label: "Inventory Count",
+        icon: <StocktakeIcon className="h-5 w-5" />,
+      },
+      {
+        href: "/inventory/alarms",
+        label: "Alarms",
+        icon: <AlarmIcon className="h-5 w-5" />,
       },
     ],
   },
@@ -534,19 +540,14 @@ export const defaultWorkspaceNavSections: SidebarNavSection[] = [
     title: "Admin",
     items: [
       {
-        href: "/requests",
-        label: "Requests",
-        icon: <RequestsIcon className="h-5 w-5" />,
-      },
-      {
         href: "/users",
         label: "Users",
         icon: <UsersIcon className="h-5 w-5" />,
       },
       {
-        href: "/history",
-        label: "History",
-        icon: <HistoryIcon className="h-5 w-5" />,
+        href: "/requests",
+        label: "Requests",
+        icon: <RequestsIcon className="h-5 w-5" />,
       },
       {
         href: "/sellers",
@@ -554,14 +555,19 @@ export const defaultWorkspaceNavSections: SidebarNavSection[] = [
         icon: <SellerIcon className="h-5 w-5" />,
       },
       {
-        href: "/data/payment-methods",
-        label: "Payments",
-        icon: <PaymentsIcon className="h-5 w-5" />,
-      },
-      {
         href: "/reporting",
         label: "Reporting",
         icon: <ReportingIcon className="h-5 w-5" />,
+      },
+      {
+        href: "/history",
+        label: "History",
+        icon: <HistoryIcon className="h-5 w-5" />,
+      },
+      {
+        href: "/data/payment-methods",
+        label: "Payments",
+        icon: <PaymentsIcon className="h-5 w-5" />,
       },
     ],
   },

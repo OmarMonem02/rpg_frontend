@@ -23,6 +23,7 @@ import {
   type PermissionMatrix,
   type PermissionMetadata,
 } from "@/lib/permissions";
+import { usePageTitle } from "@/components/page-title-provider";
 
 function countDataPages(matrix: PermissionMatrix | undefined) {
   if (!matrix) return 0;
@@ -61,6 +62,8 @@ export default function UserPermissionsPage() {
   const [saveErrorStatus, setSaveErrorStatus] = useState<number | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [success, setSuccess] = useState<string | null>(null);
+
+  usePageTitle(user ? `${user.name} Permissions` : null);
 
   const loadUser = useCallback(async () => {
     try {

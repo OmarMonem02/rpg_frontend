@@ -24,6 +24,7 @@ import {
   EmptyState,
 } from "@/components/ops-ui";
 import type { SaleRecord } from "@/lib/api/sales";
+import { usePageTitle } from "@/components/page-title-provider";
 
 function formatMoney(n: number) {
   return n.toLocaleString(undefined, {
@@ -89,6 +90,11 @@ function CustomerWorkspaceContent() {
     permissions.canCreate("maintenance") || permissions.canCreate("sales");
   const canSales = permissions.canReadPage("sales");
   const canTickets = permissions.canReadPage("maintenance");
+
+  usePageTitle(
+    workspace?.customer.name ??
+      (customerId > 0 ? `Customer #${customerId}` : null),
+  );
 
   const load = useCallback(async () => {
     if (!customerId) return;

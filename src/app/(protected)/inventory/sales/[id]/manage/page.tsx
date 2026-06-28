@@ -46,6 +46,8 @@ import {
   getSaleLineItemRowClassName,
   SaleLineItemReturnBadge,
 } from "@/components/sale-line-item-return-badge";
+import { usePageTitle } from "@/components/page-title-provider";
+import { formatSaleNumber } from "@/lib/page-titles";
 
 function getItemTypeTone(
   type: string,
@@ -84,6 +86,12 @@ export default function ManageSaleItemsPage() {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [exchangeRate, setExchangeRate] = useState(0);
   const [exchangeRateEur, setExchangeRateEur] = useState(0);
+
+  usePageTitle(
+    saleId > 0
+      ? `Manage ${formatSaleNumber(saleId)}`
+      : null,
+  );
 
   const loadSale = useCallback(async () => {
     try {

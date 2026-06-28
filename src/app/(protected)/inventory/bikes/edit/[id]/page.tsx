@@ -6,6 +6,7 @@ import { getAuthToken } from "@/lib/auth-session";
 import { getBike, type BikeRecord } from "@/lib/crud-api";
 import { PageShell } from "@/components/ops-ui";
 import { BikeForm } from "../../BikeForm";
+import { usePageTitle } from "@/components/page-title-provider";
 
 export default function EditBikePage() {
   const params = useParams();
@@ -13,6 +14,8 @@ export default function EditBikePage() {
   const [bike, setBike] = useState<BikeRecord | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  usePageTitle(bike?.vin ? `Edit Bike ${bike.vin}` : null);
 
   useEffect(() => {
     const loadBike = async () => {

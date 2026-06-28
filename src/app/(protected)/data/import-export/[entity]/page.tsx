@@ -13,6 +13,7 @@ import { ExportPanel } from "@/components/import-export/ExportPanel";
 import { ImportPanel } from "@/components/import-export/ImportPanel";
 import { ExportColumnPicker } from "@/components/export/ExportColumnPicker";
 import { useExportColumns } from "@/hooks/useExportColumns";
+import { usePageTitle } from "@/components/page-title-provider";
 
 export default function EntityImportExportPage() {
   const params = useParams();
@@ -25,6 +26,8 @@ export default function EntityImportExportPage() {
   const [entity, setEntity] = useState<ImportExportEntity | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  usePageTitle(entity ? entity.label : null);
 
   useEffect(() => {
     const loadEntity = async () => {

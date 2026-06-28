@@ -6,6 +6,7 @@ import { getAuthToken } from "@/lib/auth-session";
 import { getProduct, type ProductRecord } from "@/lib/crud-api";
 import { PageShell } from "@/components/ops-ui";
 import { ProductForm } from "../../ProductForm";
+import { usePageTitle } from "@/components/page-title-provider";
 
 export default function EditProductPage() {
   const params = useParams();
@@ -13,6 +14,8 @@ export default function EditProductPage() {
   const [product, setProduct] = useState<ProductRecord | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  usePageTitle(product ? `Edit ${product.name}` : null);
 
   useEffect(() => {
     const loadProduct = async () => {

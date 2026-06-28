@@ -45,6 +45,8 @@ import {
   SaleLineItemReturnBadge,
 } from "@/components/sale-line-item-return-badge";
 import { titleCase } from "@/lib/delivery-orders/utils";
+import { usePageTitle } from "@/components/page-title-provider";
+import { formatSaleNumber } from "@/lib/page-titles";
 
 function getStatusTone(
   status: string,
@@ -86,6 +88,8 @@ export default function SaleDetailsPage() {
   const [busy, setBusy] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [activeTab, setActiveTab] = useState("items");
+
+  usePageTitle(sale ? formatSaleNumber(sale.id) : null);
 
   const loadSale = useCallback(async () => {
     try {

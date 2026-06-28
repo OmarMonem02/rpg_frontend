@@ -6,6 +6,7 @@ import { getAuthToken } from "@/lib/auth-session";
 import { getSparePart, type SparePartRecord } from "@/lib/crud-api";
 import { PageShell } from "@/components/ops-ui";
 import { SparePartForm } from "../../SparePartForm";
+import { usePageTitle } from "@/components/page-title-provider";
 
 export default function EditSparePartPage() {
   const params = useParams();
@@ -13,6 +14,8 @@ export default function EditSparePartPage() {
   const [part, setPart] = useState<SparePartRecord | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  usePageTitle(part ? `Edit ${part.name}` : null);
 
   useEffect(() => {
     const loadPart = async () => {

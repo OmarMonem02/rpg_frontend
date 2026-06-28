@@ -34,6 +34,7 @@ import {
 } from "@/lib/tickets-api";
 import { useExchangeRates } from "@/hooks/useExchangeRates";
 import { getAuthUser } from "@/lib/auth-session";
+import { usePageTitle } from "@/components/page-title-provider";
 import { convertToEGP, formatEgp, toPricingCurrency } from "@/lib/currencies";
 import { clampTicketItemDiscount } from "@/lib/ticket-item-discount";
 import {
@@ -210,6 +211,8 @@ export default function TicketDetailsPage() {
     useState<Record<number, number>>(() =>
       readTicketPendingItemDiscountRequests(Number(id)),
     );
+
+  usePageTitle(ticket ? `Ticket #${ticket.id}` : null);
 
   // Task Management State
   const [isAddTaskModalOpen, setIsAddTaskModalOpen] = useState(false);

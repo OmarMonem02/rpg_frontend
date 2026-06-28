@@ -6,6 +6,7 @@ import { getAuthToken } from "@/lib/auth-session";
 import { getMaintenancePart, type MaintenancePartRecord } from "@/lib/crud-api";
 import { PageShell } from "@/components/ops-ui";
 import { MaintenancePartForm } from "../../MaintenancePartForm";
+import { usePageTitle } from "@/components/page-title-provider";
 
 export default function EditMaintenancePartPage() {
   const params = useParams();
@@ -13,6 +14,8 @@ export default function EditMaintenancePartPage() {
   const [part, setPart] = useState<MaintenancePartRecord | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  usePageTitle(part ? `Edit ${part.name}` : null);
 
   useEffect(() => {
     const loadPart = async () => {

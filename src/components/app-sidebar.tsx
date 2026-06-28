@@ -225,7 +225,7 @@ export function AppSidebar({
 
               {section.title ? (
                 !isCollapsed ? (
-                  <p className="label-caps py-0.5 pl-1">
+                  <p className="label-caps-sidebar py-0.5 pl-1">
                     {section.title}
                   </p>
                 ) : sectionIndex > 0 ? (

@@ -6,6 +6,7 @@ import { getAuthToken } from "@/lib/auth-session";
 import { getBikeBlueprint, type BikeBlueprintRecord } from "@/lib/crud-api";
 import { PageShell, PageHero } from "@/components/ops-ui";
 import { BlueprintForm } from "../../BlueprintForm";
+import { usePageTitle } from "@/components/page-title-provider";
 
 export default function EditBlueprintPage() {
   const params = useParams();
@@ -13,6 +14,10 @@ export default function EditBlueprintPage() {
   const [blueprint, setBlueprint] = useState<BikeBlueprintRecord | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  usePageTitle(
+    blueprint ? `Edit ${blueprint.model} (${blueprint.year})` : null,
+  );
 
   useEffect(() => {
     const loadBlueprint = async () => {
