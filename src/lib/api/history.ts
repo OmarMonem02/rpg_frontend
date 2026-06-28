@@ -248,6 +248,8 @@ export async function listSaleHistory(
     lastPage: meta.last_page ?? 1,
   };
 }
+
+export async function exportHistoryCsv(
   token: string,
   filters?: HistoryFilters,
   columns?: string,
