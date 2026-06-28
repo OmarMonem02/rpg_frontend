@@ -113,6 +113,7 @@ function buildApiParams(
   if (!cleaned.have_commission) delete cleaned.have_commission;
   if (!cleaned.low_stock) delete cleaned.low_stock;
   if (!cleaned.is_maintenance) delete cleaned.is_maintenance;
+  if (!cleaned.has_unstored_items) delete cleaned.has_unstored_items;
 
   if (module === "sales" || module === "delivery_orders") {
     if (filters.sale_type) {

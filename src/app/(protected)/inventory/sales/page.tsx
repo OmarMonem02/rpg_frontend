@@ -17,6 +17,7 @@ import {
   type PaymentMethodRecord,
   type SaleListFilters,
   type SaleRecord,
+  type SalesExportScope,
 } from "@/lib/crud-api";
 import { InventoryModuleFilters } from "@/components/inventory/InventoryModuleFilters";
 import { ActiveFilterChips } from "@/components/inventory/ActiveFilterChips";
@@ -58,6 +59,32 @@ import {
 } from "@/lib/sale-line-pricing";
 
 type SaleSort = "newest" | "oldest" | "highest" | "lowest";
+
+const SALES_EXPORT_SCOPE_STORAGE_KEY = "export-scope:sales";
+
+const SALES_EXPORT_SCOPE_OPTIONS: Array<{
+  value: SalesExportScope;
+  label: string;
+}> = [
+  { value: "sales", label: "Sale records" },
+  { value: "items", label: "Sold items" },
+  { value: "both", label: "Both sheets (Excel)" },
+];
+
+function readStoredExportScope(): SalesExportScope {
+  if (typeof window === "undefined") return "sales";
+
+  try {
+    const stored = window.localStorage.getItem(SALES_EXPORT_SCOPE_STORAGE_KEY);
+    if (stored === "sales" || stored === "items" || stored === "both") {
+      return stored;
+    }
+  } catch {
+    // ignore
+  }
+
+  return "sales";
+}
 
 const SALES_FILTER_OPTIONS: ModuleFilterOptions = {
   deliveryStatuses: [
@@ -139,9 +166,19 @@ function SalesPageContent() {
   const [salesExportColumns, setSalesExportColumns] = useState(
     () => [] as ReturnType<typeof toExportColumnDefs>,
   );
+  const [saleItemsExportColumns, setSaleItemsExportColumns] = useState(
+    () => [] as ReturnType<typeof toExportColumnDefs>,
+  );
+  const [exportScope, setExportScope] = useState<SalesExportScope>(() =>
+    readStoredExportScope(),
+  );
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethodRecord[]>([]);
 
   const salesColumnState = useExportColumns("export-cols:sales", salesExportColumns);
+  const saleItemsColumnState = useExportColumns(
+    "export-cols:sale-items",
+    saleItemsExportColumns,
+  );
 
   useEffect(() => {
     const loadColumns = async () => {
@@ -150,6 +187,7 @@ function SalesPageContent() {
         if (!token) return;
         const catalog = await fetchExportColumnCatalog(token);
         setSalesExportColumns(toExportColumnDefs(catalog.sales.columns));
+        setSaleItemsExportColumns(toExportColumnDefs(catalog.sale_items.columns));
       } catch {
         // Keep empty defaults until catalog loads.
       }
@@ -308,6 +346,15 @@ function SalesPageContent() {
     [getModuleApiParams, sellerFilterId, sortBy],
   );
 
+  const handleExportScopeChange = useCallback((scope: SalesExportScope) => {
+    setExportScope(scope);
+    try {
+      window.localStorage.setItem(SALES_EXPORT_SCOPE_STORAGE_KEY, scope);
+    } catch {
+      // ignore
+    }
+  }, []);
+
   const handleExportSales = useCallback(
     async (format: "xlsx" | "csv") => {
       try {
@@ -315,14 +362,24 @@ function SalesPageContent() {
         setError(null);
         const token = getAuthToken();
         if (!token) throw new Error("Authentication required");
-        await exportSales(token, exportFilters, format, salesColumnState.columnsParam());
+        await exportSales(token, exportFilters, format, {
+          scope: exportScope,
+          columns:
+            exportScope === "items"
+              ? undefined
+              : salesColumnState.columnsParam(),
+          itemColumns:
+            exportScope === "sales"
+              ? undefined
+              : saleItemsColumnState.columnsParam(),
+        });
       } catch (err) {
         setError(err instanceof Error ? err.message : "Export failed");
       } finally {
         setExportingFormat(null);
       }
     },
-    [exportFilters, salesColumnState],
+    [exportFilters, exportScope, salesColumnState, saleItemsColumnState],
   );
 
   function resetOperationsFilters() {
@@ -357,11 +414,29 @@ function SalesPageContent() {
               {permissions.canExport("sales") ? (
                 <div
                   className="flex flex-wrap items-center gap-2 rounded-2xl border border-outline-variant/15 bg-surface-container-lowest/80 p-1.5 shadow-inner"
-                  title="Downloads all sales matching your current filters (up to 50,000 rows). Pagination does not limit the export."
+                  title="Downloads sales matching your current filters (up to 50,000 rows per sheet). Pagination does not limit the export."
                 >
                   <span className="label-caps hidden px-2 text-on-surface-variant sm:inline">
                     Export
                   </span>
+                  <label className="sr-only" htmlFor="sales-export-scope">
+                    Export scope
+                  </label>
+                  <select
+                    id="sales-export-scope"
+                    value={exportScope}
+                    disabled={!!exportingFormat}
+                    onChange={(event) =>
+                      handleExportScopeChange(event.target.value as SalesExportScope)
+                    }
+                    className="h-9 min-w-[9.5rem] rounded-xl border border-outline-variant/20 bg-surface-container-lowest px-2.5 text-sm text-on-surface outline-none transition focus:border-primary"
+                  >
+                    {SALES_EXPORT_SCOPE_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
                   <ActionButton
                     type="button"
                     tone="default"
@@ -383,7 +458,12 @@ function SalesPageContent() {
                     tone="default"
                     variant="outline"
                     size="sm"
-                    disabled={!!exportingFormat}
+                    disabled={!!exportingFormat || exportScope === "both"}
+                    title={
+                      exportScope === "both"
+                        ? "Combined export is available as Excel only."
+                        : undefined
+                    }
                     onClick={() => void handleExportSales("csv")}
                     className="gap-1.5"
                   >
@@ -424,18 +504,51 @@ function SalesPageContent() {
           ) : null
         }
       />
-      {permissions.canExport("sales") && salesExportColumns.length > 0 ? (
-        <div className="mb-6">
-          <ExportColumnPicker
-            allColumns={salesExportColumns}
-            orderedKeys={salesColumnState.orderedKeys}
-            isVisible={salesColumnState.isVisible}
-            onToggle={salesColumnState.toggle}
-            onMove={salesColumnState.move}
-            onReset={salesColumnState.reset}
-            collapsible
-            defaultCollapsed
-          />
+      {permissions.canExport("sales") &&
+      (exportScope === "sales"
+        ? salesExportColumns.length > 0
+        : exportScope === "items"
+          ? saleItemsExportColumns.length > 0
+          : salesExportColumns.length > 0 || saleItemsExportColumns.length > 0) ? (
+        <div className="mb-6 space-y-4">
+          {exportScope !== "items" && salesExportColumns.length > 0 ? (
+            <div>
+              {exportScope === "both" ? (
+                <p className="mb-2 text-sm font-medium text-on-surface">
+                  Sales sheet columns
+                </p>
+              ) : null}
+              <ExportColumnPicker
+                allColumns={salesExportColumns}
+                orderedKeys={salesColumnState.orderedKeys}
+                isVisible={salesColumnState.isVisible}
+                onToggle={salesColumnState.toggle}
+                onMove={salesColumnState.move}
+                onReset={salesColumnState.reset}
+                collapsible
+                defaultCollapsed
+              />
+            </div>
+          ) : null}
+          {exportScope !== "sales" && saleItemsExportColumns.length > 0 ? (
+            <div>
+              {exportScope === "both" ? (
+                <p className="mb-2 text-sm font-medium text-on-surface">
+                  Sold items sheet columns
+                </p>
+              ) : null}
+              <ExportColumnPicker
+                allColumns={saleItemsExportColumns}
+                orderedKeys={saleItemsColumnState.orderedKeys}
+                isVisible={saleItemsColumnState.isVisible}
+                onToggle={saleItemsColumnState.toggle}
+                onMove={saleItemsColumnState.move}
+                onReset={saleItemsColumnState.reset}
+                collapsible
+                defaultCollapsed
+              />
+            </div>
+          ) : null}
         </div>
       ) : null}
       {sellerFilterId ? (
@@ -545,7 +658,7 @@ function SalesPageContent() {
                 Operations filters
               </p>
               <p className="mt-1 text-sm text-on-surface-variant">
-                Narrow the queue by date, delivery, channel, item type, and total amount.
+                Narrow the queue by date, delivery, channel, item type, unstored items, and total amount.
               </p>
             </div>
             <div className="flex flex-wrap gap-2">

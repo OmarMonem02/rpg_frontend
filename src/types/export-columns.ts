@@ -13,6 +13,7 @@ export type ExportColumnContext = {
 export type ExportColumnCatalog = {
   import_export: Record<string, ExportColumnContext>;
   sales: ExportColumnContext;
+  sale_items: ExportColumnContext;
   stocktake: ExportColumnContext;
   history: ExportColumnContext;
 };

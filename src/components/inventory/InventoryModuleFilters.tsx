@@ -516,6 +516,26 @@ export function InventoryModuleFilters({
             </button>
           </div>
         );
+      case "has_unstored_items":
+        return (
+          <div key={fieldId} className="flex items-end md:col-span-4">
+            <button
+              type="button"
+              role="switch"
+              aria-checked={filters.has_unstored_items === true}
+              onClick={() =>
+                setters.setFilter("has_unstored_items", !filters.has_unstored_items)
+              }
+              className={`inline-flex w-full items-center justify-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold transition-all ${
+                filters.has_unstored_items
+                  ? "border-primary/40 bg-primary/10"
+                  : "border-outline-variant/15 bg-surface-container-lowest"
+              }`}
+            >
+              Has unstored items
+            </button>
+          </div>
+        );
       case "total":
         return (
           <InputGroup key={fieldId} label="Total" className="md:col-span-4">

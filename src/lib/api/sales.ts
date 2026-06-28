@@ -240,6 +240,14 @@ export type UpdateSalePayload = Partial<
 
 export type SaleListSort = "newest" | "oldest" | "highest" | "lowest";
 
+export type SalesExportScope = "sales" | "items" | "both";
+
+export type SalesExportOptions = {
+  scope?: SalesExportScope;
+  columns?: string;
+  itemColumns?: string;
+};
+
 export type SaleListFilters = {
   search?: string;
   customer_id?: number;
@@ -625,6 +633,7 @@ export async function listSales(
 export function buildSalesExportQuery(
   filters: SaleListFilters | undefined,
   format: "xlsx" | "csv",
+  options: SalesExportOptions = {},
 ): string {
   const query = buildQuery({
     search: filters?.search,
@@ -645,26 +654,51 @@ export function buildSalesExportQuery(
     user_id: filters?.user_id,
     sort: filters?.sort,
     remote_only: filters?.remote_only,
+    export_scope: options.scope ?? "sales",
     format,
   });
 
   return query.toString();
 }
 
+function salesExportFilename(
+  scope: SalesExportScope,
+  format: "xlsx" | "csv",
+): string {
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const ext = format === "csv" ? "csv" : "xlsx";
+
+  if (scope === "items") {
+    return `sold_items_export_${stamp}.${ext}`;
+  }
+
+  if (scope === "both") {
+    return `sales_workbook_${stamp}.xlsx`;
+  }
+
+  return `sales_export_${stamp}.${ext}`;
+}
+
 export async function exportSales(
   token: string,
   filters: SaleListFilters | undefined,
   format: "xlsx" | "csv",
-  columns?: string,
+  options: SalesExportOptions = {},
 ): Promise<void> {
-  const qs = buildSalesExportQuery(filters, format);
-  const columnsQuery = columns ? `&columns=${encodeURIComponent(columns)}` : "";
-  const ext = format === "csv" ? "csv" : "xlsx";
-  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-  const filename = filters?.has_unstored_items
-    ? `unstored_sale_items_${stamp}.${ext}`
-    : `sales_export_${stamp}.${ext}`;
-  await downloadFile(`/sales/export?${qs}${columnsQuery}`, token, filename);
+  const scope = options.scope ?? "sales";
+  const qs = buildSalesExportQuery(filters, format, options);
+  const columnsQuery = options.columns
+    ? `&columns=${encodeURIComponent(options.columns)}`
+    : "";
+  const itemColumnsQuery = options.itemColumns
+    ? `&item_columns=${encodeURIComponent(options.itemColumns)}`
+    : "";
+  const filename = salesExportFilename(scope, format);
+  await downloadFile(
+    `/sales/export?${qs}${columnsQuery}${itemColumnsQuery}`,
+    token,
+    filename,
+  );
 }
 
 export async function getSale(token: string, id: number): Promise<SaleRecord> {
