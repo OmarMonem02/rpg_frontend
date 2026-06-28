@@ -12,7 +12,7 @@ import {
   type KeyboardEvent,
 } from "react";
 import { createPortal } from "react-dom";
-import { ChevronDownIcon, MagnifyingGlassIcon } from "@heroicons/react/24/outline";
+import { ChevronDownIcon } from "@heroicons/react/24/outline";
 
 export type SearchableSelectOption = {
   value: string | number;
@@ -352,10 +352,7 @@ export function SearchableSelect({
       {searchable ? (
         <div className="border-b border-outline-variant/15 p-2">
           <div className="relative">
-            <MagnifyingGlassIcon
-              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-on-surface-variant"
-              aria-hidden
-            />
+
             <input
               ref={searchRef}
               type="search"

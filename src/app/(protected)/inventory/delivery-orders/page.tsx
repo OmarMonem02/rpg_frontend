@@ -51,7 +51,6 @@ import {
   ChevronDownIcon,
   ClockIcon,
   FunnelIcon,
-  MagnifyingGlassIcon,
   PlusIcon,
   TruckIcon,
 } from "@heroicons/react/24/outline";
@@ -287,7 +286,6 @@ export default function DeliveryOrdersPage() {
       <FilterBar className="shadow-sm">
         <InputGroup label="Search orders" className="md:col-span-5 xl:col-span-6">
           <div className="relative">
-            <MagnifyingGlassIcon className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-on-surface-variant" />
             <input
               type="text"
               placeholder="Order #, customer, phone, or item"

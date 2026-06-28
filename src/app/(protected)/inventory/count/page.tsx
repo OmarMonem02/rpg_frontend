@@ -4,7 +4,6 @@ import type { FormEvent, KeyboardEvent } from "react";
 import { useState, useEffect, useCallback } from "react";
 import {
   ArrowDownTrayIcon,
-  MagnifyingGlassIcon,
   PlusIcon,
   QrCodeIcon,
   XMarkIcon,
@@ -26,7 +25,6 @@ import {
   StatGrid,
 } from "@/components/ops-ui";
 import { CatalogPickerModal } from "@/components/catalog-picker-modal";
-import type { ProductRecord, SparePartRecord } from "@/lib/crud-api";
 import { formatSessionSavedAt } from "@/lib/stocktake-session";
 import type { CountListTab } from "@/lib/stocktake";
 import {
@@ -631,10 +629,6 @@ export default function InventoryCountPage() {
               <FilterBar className="md:grid-cols-12">
                 <InputGroup label="Search by name" className="md:col-span-4">
                   <div className="relative">
-                    <MagnifyingGlassIcon
-                      className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-on-surface-variant/70"
-                      aria-hidden
-                    />
                     <input
                       type="text"
                       value={listSearch}

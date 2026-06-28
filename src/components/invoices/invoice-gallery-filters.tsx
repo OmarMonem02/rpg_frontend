@@ -3,7 +3,6 @@
 import {
   CalendarDaysIcon,
   FunnelIcon,
-  MagnifyingGlassIcon,
 } from "@heroicons/react/24/outline";
 import { ActionButton, InputGroup } from "@/components/ops-ui";
 import {
@@ -96,13 +95,9 @@ export function InvoiceGalleryFiltersPanel({
 
         <InputGroup label="Search">
           <div className="relative">
-            <MagnifyingGlassIcon
-              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-on-surface-variant"
-              aria-hidden="true"
-            />
             <input
               type="search"
-              className="form-input-base pl-9"
+              className="form-input-base pl-9 "
               placeholder="Invoice #, customer, phone…"
               value={filters.search ?? ""}
               onChange={(event) =>

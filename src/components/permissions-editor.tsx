@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ArrowPathIcon,
   CheckIcon,
-  MagnifyingGlassIcon,
   ShieldCheckIcon,
   XMarkIcon,
 } from "@heroicons/react/24/outline";
@@ -294,7 +293,6 @@ export function PermissionsEditor({
           <label className="space-y-2">
             <span className="label-caps">Find permissions</span>
             <div className="flex items-center rounded-xl border border-outline-variant/25 bg-surface px-3 py-2 focus-within:border-primary">
-              <MagnifyingGlassIcon className="mr-2 h-5 w-5 text-on-surface-variant" />
               <input
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
