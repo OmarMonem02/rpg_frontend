@@ -288,7 +288,7 @@ export default function DeliveryOrdersPage() {
           <div className="relative">
             <input
               type="text"
-              placeholder="Order #, customer, phone, or item"
+              placeholder="#42 for order ID, or customer, phone, or item"
               value={filters.search || ""}
               onChange={(event) => setSearch(event.target.value)}
               className="form-input-base pl-10"

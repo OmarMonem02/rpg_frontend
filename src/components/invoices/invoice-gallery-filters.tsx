@@ -98,7 +98,7 @@ export function InvoiceGalleryFiltersPanel({
             <input
               type="search"
               className="form-input-base pl-9 "
-              placeholder="Invoice #, customer, phone…"
+              placeholder="#42 for invoice ID, or customer, phone…"
               value={filters.search ?? ""}
               onChange={(event) =>
                 onChange({ search: event.target.value.trim() || undefined })

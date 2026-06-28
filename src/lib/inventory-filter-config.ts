@@ -128,7 +128,7 @@ export const MODULE_FILTER_FIELDS: Record<InventoryModuleId, FilterFieldDef[]> =
     { id: "have_commission", label: "Has Commission", type: "toggle", apiKey: "have_commission", section: "more" },
   ],
   sales: [
-    { id: "search", label: "Search", type: "search", apiKey: "search", section: "primary", placeholder: "Invoice #, customer…" },
+    { id: "search", label: "Search", type: "search", apiKey: "search", section: "primary", placeholder: "#42 for invoice ID, or customer…" },
     { id: "date", label: "Date Range", type: "dateRange", apiKeyMin: "date_from", apiKeyMax: "date_to", section: "primary" },
     { id: "delivery_status", label: "Delivery", type: "select", apiKey: "delivery_status", section: "more" },
     { id: "sale_type", label: "Channel", type: "select", apiKey: "sale_type", section: "more" },

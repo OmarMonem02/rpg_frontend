@@ -465,7 +465,7 @@ function SalesPageContent() {
           <div className="relative">
             <input
               type="text"
-              placeholder="Sale #, customer, phone, seller, item, SKU or VIN"
+              placeholder="#42 for invoice ID, or customer, phone, seller, item, SKU or VIN"
               value={filters.search || ""}
               onChange={(event) => setSearch(event.target.value)}
               className="form-input-base pl-10"
