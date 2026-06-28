@@ -24,6 +24,7 @@ const ROUTE_TITLE_PATTERNS: ReadonlyArray<{
   title: string;
 }> = [
   { pattern: /^\/login$/, title: "Login" },
+  { pattern: /^\/invoices$/, title: "Invoice Gallery" },
   { pattern: /^\/inventory\/sales\/[^/]+\/manage$/, title: "Manage Sale" },
   { pattern: /^\/inventory\/sales\/[^/]+\/return$/, title: "Return Sale" },
   { pattern: /^\/inventory\/sales\/[^/]+\/exchange$/, title: "Exchange Sale" },

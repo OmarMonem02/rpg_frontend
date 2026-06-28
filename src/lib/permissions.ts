@@ -330,6 +330,10 @@ const ROUTE_PERMISSION_RULES: Array<{
     permission: { page: "reporting", action: "read" },
   },
   {
+    pattern: /^\/invoices(?:\/|$)/,
+    permission: { page: "sales", action: "read" },
+  },
+  {
     pattern: /^\/inventory\/sales\/create(?:\/|$)/,
     permission: { page: "sales", action: "create" },
   },
@@ -707,6 +711,13 @@ export function canAccessRoute(
 ): boolean {
   const normalizedPath = normalizePathname(pathname);
   if (/^\/customers(?:\/|$)/.test(normalizedPath)) {
+    return (
+      canAccessPageUi(permissions, "sales") ||
+      canAccessPageUi(permissions, "maintenance")
+    );
+  }
+
+  if (/^\/invoices(?:\/|$)/.test(normalizedPath)) {
     return (
       canAccessPageUi(permissions, "sales") ||
       canAccessPageUi(permissions, "maintenance")

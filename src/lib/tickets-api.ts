@@ -1,7 +1,7 @@
 import { getApiUrl } from "@/lib/config";
 import { getAuthToken } from "@/lib/auth-session";
 import { ApiError } from "@/lib/auth-api";
-import { asRecord, parseErrorMessage, toNumber, toText } from "@/lib/api/core";
+import { asRecord, parseErrorMessage, toNumber, toText, buildQuery, parsePagination, pickArray, type PaginatedResult } from "@/lib/api/core";
 import { downloadFile } from "@/lib/api/import-export";
 import { toPricingCurrency, type PricingCurrency } from "@/lib/currencies";
 import type { MaxDiscountType } from "@/lib/max-discount";
@@ -338,6 +338,47 @@ export function normalizeTicketMessage(raw: unknown): TicketMessage {
   };
 }
 
+export type TicketExportFilters = {
+  status?: string;
+  customer_id?: number;
+  date_from?: string;
+  date_to?: string;
+  has_unstored_items?: boolean;
+  search?: string;
+  sort?: "newest" | "oldest";
+  per_page?: number;
+};
+
+export type TicketListFilters = TicketExportFilters;
+
+export async function listTickets(
+  page: number,
+  filters?: TicketListFilters,
+): Promise<PaginatedResult<Ticket>> {
+  const query = buildQuery({
+    page,
+    status: filters?.status,
+    customer_id: filters?.customer_id,
+    date_from: filters?.date_from,
+    date_to: filters?.date_to,
+    has_unstored_items: filters?.has_unstored_items,
+    search: filters?.search,
+    sort: filters?.sort,
+    per_page: filters?.per_page,
+  });
+
+  const payload = await authorizedFetch<unknown>(`/tickets?${query}`);
+  const rows = pickArray(payload, ["data"]);
+  const meta = parsePagination(payload);
+
+  return {
+    items: rows.map((row) => normalizeTicket(row)).filter((item) => item.id > 0),
+    currentPage: meta.current_page ?? 1,
+    lastPage: meta.last_page ?? 1,
+    total: meta.total,
+  };
+}
+
 export const ticketsApi = {
   searchCustomers: async (search: string) => {
     const res = await authorizedFetch<{ data: Customer[] }>(`/customers?search=${encodeURIComponent(search)}`);
@@ -371,8 +412,18 @@ export const ticketsApi = {
     return res;
   },
   getTickets: async () => {
-    const res = await authorizedFetch<{ data: Ticket[] }>(`/tickets`);
-    return res.data;
+    const all: Ticket[] = [];
+    let page = 1;
+    let lastPage = 1;
+
+    do {
+      const result = await listTickets(page, { per_page: 100 });
+      all.push(...result.items);
+      lastPage = result.lastPage;
+      page += 1;
+    } while (page <= lastPage);
+
+    return all;
   },
   getTicket: async (ticketId: number) => {
     const res = await authorizedFetch<unknown>(`/tickets/${ticketId}`);
@@ -562,14 +613,6 @@ export const ticketsApi = {
     });
     return normalizeTicketMessage(res);
   },
-};
-
-export type TicketExportFilters = {
-  status?: string;
-  date_from?: string;
-  date_to?: string;
-  has_unstored_items?: boolean;
-  search?: string;
 };
 
 export async function exportUnstoredTicketItems(

@@ -5,6 +5,7 @@ import {
   ArrowPathIcon,
   ChevronDownIcon,
   FunnelIcon,
+  PhotoIcon,
   TrashIcon,
   XMarkIcon,
 } from "@heroicons/react/24/outline";
@@ -435,9 +436,22 @@ export default function TicketsPage() {
         eyebrow="Operations"
         title="Maintenance Dashboard"
         actions={
-          <ActionButton tone="primary" onClick={() => setIsCreateOpen(true)} className="px-8">
-            + Create Ticket
-          </ActionButton>
+          <div className="flex flex-wrap items-center gap-2">
+            {permissions.canReadPage("maintenance") ? (
+              <ActionButton
+                tone="default"
+                variant="outline"
+                href="/invoices?source=tickets"
+                className="gap-2"
+              >
+                <PhotoIcon className="h-5 w-5" aria-hidden="true" />
+                Invoice Gallery
+              </ActionButton>
+            ) : null}
+            <ActionButton tone="primary" onClick={() => setIsCreateOpen(true)} className="px-8">
+              + Create Ticket
+            </ActionButton>
+          </div>
         }
       />
 

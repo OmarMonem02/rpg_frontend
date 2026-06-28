@@ -46,6 +46,7 @@ import {
   EyeIcon,
   FunnelIcon,
   PlusIcon,
+  PhotoIcon,
   ShoppingBagIcon,
   TrashIcon,
   TruckIcon,
@@ -394,6 +395,18 @@ function SalesPageContent() {
                     CSV
                   </ActionButton>
                 </div>
+              ) : null}
+              {permissions.canReadPage("sales") ? (
+                <ActionButton
+                  tone="default"
+                  variant="outline"
+                  href="/invoices?source=sales"
+                  className="gap-2"
+                >
+                  <PhotoIcon className="h-5 w-5 flex-shrink-0" />
+                  <span className="hidden sm:inline">Invoice Gallery</span>
+                  <span className="sm:hidden">Invoices</span>
+                </ActionButton>
               ) : null}
               {permissions.canCreate("sales") ? (
                 <ActionButton
