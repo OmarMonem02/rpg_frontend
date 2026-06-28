@@ -9,12 +9,16 @@ function defaultOrder(allColumns: readonly ExportColumnDef[]): string[] {
     .map((col) => col.key);
 }
 
+function selectableKeys(allColumns: readonly ExportColumnDef[]): string[] {
+  return allColumns.filter((col) => !col.exportOnly).map((col) => col.key);
+}
+
 function readFromStorage(
   key: string,
   allColumns: readonly ExportColumnDef[],
 ): string[] {
-  const allowed = new Set(allColumns.map((col) => col.key));
-  const required = allColumns.filter((col) => col.required).map((col) => col.key);
+  const allowed = new Set(selectableKeys(allColumns));
+  const required = allColumns.filter((col) => col.required && !col.exportOnly).map((col) => col.key);
 
   try {
     const raw = window.localStorage.getItem(key);
@@ -22,10 +26,7 @@ function readFromStorage(
       const parsed: unknown = JSON.parse(raw);
       if (Array.isArray(parsed)) {
         const stored = (parsed as string[]).filter((id) => allowed.has(id));
-        const missing = allColumns
-          .filter((col) => !col.exportOnly)
-          .map((col) => col.key)
-          .filter((id) => !stored.includes(id));
+        const missing = selectableKeys(allColumns).filter((id) => !stored.includes(id));
         const merged = [...stored, ...missing];
         for (const req of required) {
           if (!merged.includes(req)) merged.push(req);
@@ -128,12 +129,18 @@ export function useExportColumns(
 
   const columnsParam = useCallback(
     (options?: { excludeExportOnly?: boolean }) => {
+      const exportOnlyKeys = allColumns.filter((col) => col.exportOnly).map((col) => col.key);
+
       const keys = options?.excludeExportOnly
         ? orderedKeys.filter((key) => !columnByKey.get(key)?.exportOnly)
-        : orderedKeys;
+        : [
+            ...exportOnlyKeys,
+            ...orderedKeys.filter((key) => !exportOnlyKeys.includes(key)),
+          ];
+
       return keys.length > 0 ? keys.join(",") : undefined;
     },
-    [orderedKeys, columnByKey],
+    [allColumns, orderedKeys, columnByKey],
   );
 
   const hiddenRequiredCount = useMemo(

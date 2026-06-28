@@ -3,6 +3,7 @@ export type ExportColumnDef = {
   label: string;
   required?: boolean;
   exportOnly?: boolean;
+  export_only?: boolean;
 };
 
 export type ExportColumnContext = {

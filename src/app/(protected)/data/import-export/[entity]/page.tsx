@@ -55,7 +55,7 @@ export default function EntityImportExportPage() {
                 description: match.columns.find((c) => c.key === col.key)?.description ?? "",
                 accepted_values: match.columns.find((c) => c.key === col.key)?.accepted_values ?? [],
                 reference: match.columns.find((c) => c.key === col.key)?.reference ?? null,
-                export_only: col.exportOnly,
+                export_only: col.export_only ?? col.exportOnly,
               })),
             });
           } else {
@@ -94,7 +94,7 @@ export default function EntityImportExportPage() {
     [allColumns],
   );
 
-  const columnState = useExportColumns(`export-cols:import-export:${entitySlug}`, selectableColumns);
+  const columnState = useExportColumns(`export-cols:import-export:${entitySlug}`, allColumns);
 
   const previewColumns = useMemo(
     () =>
