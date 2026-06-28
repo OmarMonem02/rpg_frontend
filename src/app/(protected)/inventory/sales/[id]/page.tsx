@@ -3,17 +3,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { getAuthToken, getAuthUser } from "@/lib/auth-session";
+import { getAuthToken } from "@/lib/auth-session";
 import { usePermissions } from "@/components/permission-provider";
 import { deleteSale, getSale, type SaleRecord } from "@/lib/crud-api";
 import { saleLineItemTypeLabel } from "@/lib/api/sales";
-import { listSaleHistory, type HistoryRecord } from "@/lib/api/history";
-import { ApiError } from "@/lib/auth-api";
-import {
-  mergeSaleChangeRows,
-  rowsFromAdjustments,
-  rowsFromAuditHistory,
-} from "@/lib/sale-change-rows";
+import { rowsFromAdjustments } from "@/lib/sale-change-rows";
 import { SaleChangesTable } from "@/components/sale-changes-table";
 import {
   PageShell,
@@ -89,7 +83,6 @@ export default function SaleDetailsPage() {
   const canViewCustomerWorkspace =
     permissions.canReadPage("sales") ||
     permissions.canReadPage("maintenance");
-  const isAdmin = getAuthUser()?.role === "admin";
 
   const [sale, setSale] = useState<SaleRecord | null>(null);
   const [loading, setLoading] = useState(true);
@@ -97,12 +90,6 @@ export default function SaleDetailsPage() {
   const [busy, setBusy] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [activeTab, setActiveTab] = useState("items");
-  const [auditRecords, setAuditRecords] = useState<HistoryRecord[]>([]);
-  const [auditLoading, setAuditLoading] = useState(false);
-  const [auditLoadingMore, setAuditLoadingMore] = useState(false);
-  const [auditPage, setAuditPage] = useState(1);
-  const [auditLastPage, setAuditLastPage] = useState(1);
-  const [auditError, setAuditError] = useState<string | null>(null);
 
   usePageTitle(sale ? formatSaleNumber(sale.id) : null);
 
@@ -125,61 +112,10 @@ export default function SaleDetailsPage() {
     loadSale();
   }, [loadSale]);
 
-  const loadAuditHistory = useCallback(
-    async (page = 1, append = false) => {
-      if (!isAdmin || !saleId) return;
-
-      try {
-        const token = getAuthToken();
-        if (!token) return;
-
-        if (append) {
-          setAuditLoadingMore(true);
-        } else {
-          setAuditLoading(true);
-        }
-
-        const result = await listSaleHistory(token, saleId, page);
-        setAuditRecords((current) =>
-          append ? [...current, ...result.items] : result.items,
-        );
-        setAuditPage(result.currentPage);
-        setAuditLastPage(result.lastPage);
-        setAuditError(null);
-      } catch (err) {
-        if (err instanceof ApiError && err.status === 403) {
-          return;
-        }
-        setAuditError(
-          err instanceof Error ? err.message : "Failed to load audit history",
-        );
-      } finally {
-        setAuditLoading(false);
-        setAuditLoadingMore(false);
-      }
-    },
-    [isAdmin, saleId],
-  );
-
-  useEffect(() => {
-    if (!sale || !isAdmin) {
-      setAuditRecords([]);
-      setAuditPage(1);
-      setAuditLastPage(1);
-      return;
-    }
-
-    void loadAuditHistory(1, false);
-  }, [sale?.id, isAdmin, loadAuditHistory]);
-
   const items = useMemo(() => sale?.line_items ?? [], [sale?.line_items]);
   const changeRows = useMemo(
-    () =>
-      mergeSaleChangeRows(
-        rowsFromAdjustments(sale?.adjustments),
-        rowsFromAuditHistory(auditRecords),
-      ),
-    [sale?.adjustments, auditRecords],
+    () => rowsFromAdjustments(sale?.adjustments),
+    [sale?.adjustments],
   );
   const totals = useMemo(
     () => (sale ? computeSaleTotalsBreakdown(sale) : null),
@@ -535,19 +471,7 @@ export default function SaleDetailsPage() {
         ]}
       />
 
-      <SaleChangesTable
-        rows={changeRows}
-        loading={auditLoading && isAdmin && changeRows.length === 0}
-        error={auditError}
-        isAdmin={isAdmin}
-        hasMore={isAdmin && auditPage < auditLastPage}
-        loadingMore={auditLoadingMore}
-        onLoadMore={
-          isAdmin
-            ? () => void loadAuditHistory(auditPage + 1, true)
-            : undefined
-        }
-      />
+      <SaleChangesTable rows={changeRows} />
     </PageShell>
   );
 }

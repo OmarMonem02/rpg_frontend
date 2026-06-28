@@ -1,13 +1,10 @@
-import type { HistoryRecord } from "@/lib/api/history";
 import type {
   SaleAdjustmentRecord,
   SaleAuditItemSnapshot,
-  SaleAuditSnapshot,
 } from "@/lib/api/sales";
 
 export type SaleChangeRow = {
   id: string;
-  source: "activity" | "audit";
   who: string;
   when: string;
   what: string;
@@ -17,43 +14,21 @@ export type SaleChangeRow = {
 
 const EMPTY = "—";
 
+/** Only user-facing sale actions shown in the changes table. */
+const DISPLAYED_ACTION_TYPES = new Set([
+  "item_returned",
+  "item_exchanged",
+]);
+
 const ACTION_LABELS: Record<string, string> = {
-  created: "Sale created",
-  sale_updated: "Sale updated",
-  item_added: "Item added",
-  item_updated: "Item updated",
-  item_removed: "Item removed",
-  item_returned: "Item returned",
-  item_exchanged: "Item exchanged",
-  sale_deleted: "Sale deleted",
-};
-
-const SALE_FIELD_LABELS: Record<string, string> = {
-  total: "Total",
-  discount: "Discount",
-  status: "Status",
-};
-
-const ITEM_FIELD_LABELS: Record<string, string> = {
-  qty: "Quantity",
-  returned_qty: "Returned qty",
-  status: "Status",
-  selling_price: "Selling price",
-  discount: "Discount",
+  item_returned: "Return",
+  item_exchanged: "Exchange",
 };
 
 function formatValue(value: unknown): string {
   if (value == null || value === "") return EMPTY;
   if (typeof value === "number") {
     return Number.isInteger(value) ? String(value) : value.toFixed(2);
-  }
-  if (typeof value === "boolean") return value ? "Yes" : "No";
-  if (typeof value === "object") {
-    try {
-      return JSON.stringify(value);
-    } catch {
-      return String(value);
-    }
   }
   return String(value);
 }
@@ -67,232 +42,181 @@ function resolveWho(
   return "System";
 }
 
-function actionLabel(actionType: string): string {
-  return ACTION_LABELS[actionType] ?? actionType.replace(/_/g, " ");
-}
-
 function itemLabel(item: SaleAuditItemSnapshot): string {
   return item.item_label?.trim() || `Item #${item.id}`;
 }
 
-function pushSaleFieldRows(
-  rows: SaleChangeRow[],
+function findItemSnapshot(
   adjustment: SaleAdjustmentRecord,
-  before: SaleAuditSnapshot | null,
-  after: SaleAuditSnapshot | null,
-): void {
-  const who = resolveWho(adjustment.user, adjustment.user_id);
-  const when = adjustment.created_at ?? "";
-  const prefix = actionLabel(adjustment.action_type);
+  snapshot: "before_snapshot" | "after_snapshot",
+): SaleAuditItemSnapshot | undefined {
+  const saleItemId = toSaleItemId(adjustment.meta);
+  if (!saleItemId) return undefined;
 
-  for (const field of ["total", "discount", "status"] as const) {
-    const oldValue = before?.[field];
-    const newValue = after?.[field];
-    if (oldValue === newValue) continue;
-    if (oldValue === undefined && newValue === undefined) continue;
-
-    rows.push({
-      id: `activity-${adjustment.id}-sale-${field}`,
-      source: "activity",
-      who,
-      when,
-      what: `${prefix} · ${SALE_FIELD_LABELS[field]}`,
-      from: formatValue(oldValue),
-      to: formatValue(newValue),
-    });
-  }
+  return adjustment[snapshot]?.items?.find((item) => item.id === saleItemId);
 }
 
-function pushItemFieldRows(
-  rows: SaleChangeRow[],
-  adjustment: SaleAdjustmentRecord,
-  item: SaleAuditItemSnapshot,
-  beforeItem: SaleAuditItemSnapshot | undefined,
-  afterItem: SaleAuditItemSnapshot | undefined,
-  context: string,
-): void {
+function toSaleItemId(meta: SaleAdjustmentRecord["meta"]): number | null {
+  if (!meta || typeof meta !== "object") return null;
+  const raw = meta.sale_item_id;
+  const id = typeof raw === "number" ? raw : Number(raw);
+  return Number.isFinite(id) && id > 0 ? id : null;
+}
+
+function remainingQty(item: SaleAuditItemSnapshot): number {
+  const qty = item.qty ?? 0;
+  const returned = item.returned_qty ?? 0;
+  return Math.max(0, qty - returned);
+}
+
+function formatItemState(item: SaleAuditItemSnapshot): string {
+  const parts = [
+    itemLabel(item),
+    `Sold ${formatValue(item.qty)}`,
+    `Returned ${formatValue(item.returned_qty)}`,
+    `Remaining ${formatValue(remainingQty(item))}`,
+  ];
+  if (item.status) parts.push(formatValue(item.status));
+  return parts.join(" · ");
+}
+
+function formatMoney(amount: number): string | null {
+  if (!amount || amount <= 0) return null;
+  return `EGP ${amount.toFixed(2)}`;
+}
+
+function rowFromReturn(adjustment: SaleAdjustmentRecord): SaleChangeRow {
   const who = resolveWho(adjustment.user, adjustment.user_id);
   const when = adjustment.created_at ?? "";
-  const label = itemLabel(item);
+  const beforeItem = findItemSnapshot(adjustment, "before_snapshot");
+  const afterItem = findItemSnapshot(adjustment, "after_snapshot");
+  const returnedQty =
+    typeof adjustment.meta?.returned_qty === "number"
+      ? adjustment.meta.returned_qty
+      : Number(adjustment.meta?.returned_qty) || null;
 
-  for (const field of [
-    "qty",
-    "returned_qty",
-    "status",
-    "selling_price",
-    "discount",
-  ] as const) {
-    const oldValue = beforeItem?.[field];
-    const newValue = afterItem?.[field];
-    if (oldValue === newValue) continue;
-    if (oldValue === undefined && newValue === undefined) continue;
+  const itemName = afterItem
+    ? itemLabel(afterItem)
+    : beforeItem
+      ? itemLabel(beforeItem)
+      : "Item";
 
-    rows.push({
-      id: `activity-${adjustment.id}-item-${item.id}-${field}`,
-      source: "activity",
-      who,
-      when,
-      what: `${context} · ${label} · ${ITEM_FIELD_LABELS[field]}`,
-      from: formatValue(oldValue),
-      to: formatValue(newValue),
-    });
+  const from = beforeItem
+    ? formatItemState(beforeItem)
+    : EMPTY;
+
+  const toParts: string[] = [];
+  if (afterItem) {
+    toParts.push(formatItemState(afterItem));
+  } else if (returnedQty) {
+    toParts.push(`Returned ${returnedQty} × ${itemName}`);
+  } else {
+    toParts.push(adjustment.summary.trim() || "Return processed");
   }
+
+  const refund = formatMoney(adjustment.refund_amount);
+  if (refund) toParts.push(`Refund ${refund}`);
+
+  return {
+    id: `return-${adjustment.id}`,
+    who,
+    when,
+    what: `${ACTION_LABELS.item_returned} · ${itemName}${
+      returnedQty ? ` (${returnedQty} unit${returnedQty === 1 ? "" : "s"})` : ""
+    }`,
+    from,
+    to: toParts.join(" · "),
+  };
+}
+
+function rowFromExchange(adjustment: SaleAdjustmentRecord): SaleChangeRow {
+  const who = resolveWho(adjustment.user, adjustment.user_id);
+  const when = adjustment.created_at ?? "";
+  const beforeItem = findItemSnapshot(adjustment, "before_snapshot");
+  const afterItem = findItemSnapshot(adjustment, "after_snapshot");
+  const exchangeQty =
+    typeof adjustment.meta?.exchange_qty === "number"
+      ? adjustment.meta.exchange_qty
+      : Number(adjustment.meta?.exchange_qty) || null;
+  const replacementsAdded =
+    typeof adjustment.meta?.replacements_added === "number"
+      ? adjustment.meta.replacements_added
+      : Number(adjustment.meta?.replacements_added) || 0;
+
+  const itemName = beforeItem
+    ? itemLabel(beforeItem)
+    : afterItem
+      ? itemLabel(afterItem)
+      : "Item";
+
+  const from = beforeItem
+    ? `${formatItemState(beforeItem)}${
+        exchangeQty ? ` · Exchanged ${exchangeQty}` : ""
+      }`
+    : exchangeQty
+      ? `${itemName} · Exchanged ${exchangeQty}`
+      : EMPTY;
+
+  const toParts: string[] = [];
+  if (replacementsAdded > 0) {
+    toParts.push(
+      `${replacementsAdded} replacement${replacementsAdded === 1 ? "" : "s"} added`,
+    );
+  }
+  if (afterItem) {
+    toParts.push(formatItemState(afterItem));
+  }
+
+  const refund = formatMoney(adjustment.refund_amount);
+  const extraDue = formatMoney(adjustment.extra_amount_due);
+  if (refund) toParts.push(`Customer refund ${refund}`);
+  if (extraDue) toParts.push(`Customer pays ${extraDue}`);
+
+  if (toParts.length === 0) {
+    toParts.push(adjustment.summary.trim() || "Exchange processed");
+  }
+
+  return {
+    id: `exchange-${adjustment.id}`,
+    who,
+    when,
+    what: `${ACTION_LABELS.item_exchanged} · ${itemName}${
+      exchangeQty ? ` (${exchangeQty} unit${exchangeQty === 1 ? "" : "s"})` : ""
+    }`,
+    from,
+    to: toParts.join(" · "),
+  };
 }
 
 function rowsFromAdjustment(adjustment: SaleAdjustmentRecord): SaleChangeRow[] {
-  const who = resolveWho(adjustment.user, adjustment.user_id);
-  const when = adjustment.created_at ?? "";
-  const before = adjustment.before_snapshot;
-  const after = adjustment.after_snapshot;
-  const rows: SaleChangeRow[] = [];
-  const action = adjustment.action_type;
-
-  if (action === "created") {
-    const itemCount = after?.items?.length ?? 0;
-    rows.push({
-      id: `activity-${adjustment.id}-created`,
-      source: "activity",
-      who,
-      when,
-      what: actionLabel(action),
-      from: EMPTY,
-      to: `Total ${formatValue(after?.total)} · ${itemCount} item(s)`,
-    });
-    return rows;
+  if (!DISPLAYED_ACTION_TYPES.has(adjustment.action_type)) {
+    return [];
   }
 
-  if (action === "sale_deleted") {
-    rows.push({
-      id: `activity-${adjustment.id}-deleted`,
-      source: "activity",
-      who,
-      when,
-      what: actionLabel(action),
-      from: `Total ${formatValue(before?.total)} · ${before?.items?.length ?? 0} item(s)`,
-      to: EMPTY,
-    });
-    return rows;
+  if (adjustment.action_type === "item_returned") {
+    return [rowFromReturn(adjustment)];
   }
 
-  pushSaleFieldRows(rows, adjustment, before, after);
-
-  const beforeItems = new Map(
-    (before?.items ?? []).map((item) => [item.id, item]),
-  );
-  const afterItems = new Map(
-    (after?.items ?? []).map((item) => [item.id, item]),
-  );
-  const allItemIds = new Set([...beforeItems.keys(), ...afterItems.keys()]);
-
-  for (const itemId of allItemIds) {
-    const beforeItem = beforeItems.get(itemId);
-    const afterItem = afterItems.get(itemId);
-
-    if (!beforeItem && afterItem) {
-      rows.push({
-        id: `activity-${adjustment.id}-added-${itemId}`,
-        source: "activity",
-        who,
-        when,
-        what: `${actionLabel("item_added")} · ${itemLabel(afterItem)}`,
-        from: EMPTY,
-        to: `Qty ${formatValue(afterItem.qty)} · ${formatValue(afterItem.status)}`,
-      });
-      continue;
-    }
-
-    if (beforeItem && !afterItem) {
-      rows.push({
-        id: `activity-${adjustment.id}-removed-${itemId}`,
-        source: "activity",
-        who,
-        when,
-        what: `${actionLabel("item_removed")} · ${itemLabel(beforeItem)}`,
-        from: `Qty ${formatValue(beforeItem.qty)} · ${formatValue(beforeItem.status)}`,
-        to: EMPTY,
-      });
-      continue;
-    }
-
-    if (beforeItem && afterItem) {
-      pushItemFieldRows(
-        rows,
-        adjustment,
-        afterItem,
-        beforeItem,
-        afterItem,
-        actionLabel(action),
-      );
-    }
+  if (adjustment.action_type === "item_exchanged") {
+    return [rowFromExchange(adjustment)];
   }
 
-  if (rows.length === 0) {
-    rows.push({
-      id: `activity-${adjustment.id}-summary`,
-      source: "activity",
-      who,
-      when,
-      what: adjustment.summary.trim() || actionLabel(action),
-      from: EMPTY,
-      to: EMPTY,
-    });
-  }
-
-  return rows;
-}
-
-function rowsFromHistoryRecord(record: HistoryRecord): SaleChangeRow[] {
-  const who = resolveWho(record.user);
-  const when = record.created_at;
-  const entityPrefix = record.entity_label?.trim() || "Record";
-
-  if (record.changes.length === 0) {
-    return [
-      {
-        id: `audit-${record.id}-summary`,
-        source: "audit",
-        who,
-        when,
-        what: `${entityPrefix} · ${record.action}`,
-        from: record.summary[0] ?? EMPTY,
-        to: EMPTY,
-      },
-    ];
-  }
-
-  return record.changes.map((change, index) => ({
-    id: `audit-${record.id}-${change.field}-${index}`,
-    source: "audit" as const,
-    who,
-    when,
-    what: `${entityPrefix} · ${change.label}`,
-    from: change.before || EMPTY,
-    to: change.after || EMPTY,
-  }));
+  return [];
 }
 
 export function rowsFromAdjustments(
   adjustments: SaleAdjustmentRecord[] | undefined,
 ): SaleChangeRow[] {
   if (!adjustments?.length) return [];
-  return adjustments.flatMap(rowsFromAdjustment);
-}
 
-export function rowsFromAuditHistory(records: HistoryRecord[]): SaleChangeRow[] {
-  if (!records.length) return [];
-  return records.flatMap(rowsFromHistoryRecord);
-}
-
-export function mergeSaleChangeRows(
-  activityRows: SaleChangeRow[],
-  auditRows: SaleChangeRow[],
-): SaleChangeRow[] {
-  return [...activityRows, ...auditRows].sort((a, b) => {
-    const aTime = new Date(a.when).getTime();
-    const bTime = new Date(b.when).getTime();
-    if (Number.isNaN(aTime) && Number.isNaN(bTime)) return 0;
-    if (Number.isNaN(aTime)) return 1;
-    if (Number.isNaN(bTime)) return -1;
-    return bTime - aTime;
-  });
+  return adjustments
+    .flatMap(rowsFromAdjustment)
+    .sort((a, b) => {
+      const aTime = new Date(a.when).getTime();
+      const bTime = new Date(b.when).getTime();
+      if (Number.isNaN(aTime) && Number.isNaN(bTime)) return 0;
+      if (Number.isNaN(aTime)) return 1;
+      if (Number.isNaN(bTime)) return -1;
+      return bTime - aTime;
+    });
 }
