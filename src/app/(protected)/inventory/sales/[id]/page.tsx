@@ -37,7 +37,13 @@ import {
   computeSaleTotalsBreakdown,
   lineDiscountTotal,
   lineNetAmount,
+  resolveDisplayTotal,
+  isLineItemReturnable,
 } from "@/lib/sale-line-pricing";
+import {
+  getSaleLineItemRowClassName,
+  SaleLineItemReturnBadge,
+} from "@/components/sale-line-item-return-badge";
 import { titleCase } from "@/lib/delivery-orders/utils";
 
 function getStatusTone(
@@ -270,11 +276,11 @@ export default function SaleDetailsPage() {
         />
         <StatCard
           label="Total Amount"
-          value={`EGP ${money(sale.total || 0)}`}
+          value={`EGP ${money(totals ? resolveDisplayTotal(sale) : sale.total || 0)}`}
           tone="primary"
           hint={
             totals
-              ? `${totals.units} units | Sub: EGP ${money(totals.netSubtotal)}`
+              ? `${totals.units} units | Lines: EGP ${money(totals.netSubtotal)}`
               : undefined
           }
         />
@@ -336,14 +342,21 @@ export default function SaleDetailsPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-outline-variant/10">
-                      {items.map((row) => (
+                      {items.map((row) => {
+                        const rowClassName = getSaleLineItemRowClassName(row);
+                        const returnable = isLineItemReturnable(row);
+
+                        return (
                         <tr
                           key={row.id}
-                          className="hover:bg-surface-container-lowest transition-colors group"
+                          className={`hover:bg-surface-container-lowest transition-colors group${rowClassName ? ` ${rowClassName}` : ""}`}
                         >
                           <td className="px-6 py-4">
-                            <div className="font-semibold text-on-surface group-hover:text-primary transition-colors">
+                            <div
+                              className={`font-semibold text-on-surface group-hover:text-primary transition-colors flex flex-wrap items-center gap-2${!returnable ? " line-through decoration-on-surface-variant/50" : ""}`}
+                            >
                               {row.item_name || row.item_label}
+                              <SaleLineItemReturnBadge item={row} />
                             </div>
                             {row.is_unstored && row.custom_description ? (
                               <div className="text-xs text-on-surface-variant mt-0.5">
@@ -375,6 +388,11 @@ export default function SaleDetailsPage() {
                           </td>
                           <td className="px-6 py-4 text-right tabular-nums font-bold text-primary">
                             {row.remaining_qty}
+                            {row.returned_qty > 0 && row.remaining_qty > 0 ? (
+                              <div className="text-xs font-normal text-on-surface-variant">
+                                of {row.quantity}
+                              </div>
+                            ) : null}
                           </td>
                           <td className="px-6 py-4 text-right tabular-nums">
                             {`EGP ${money(row.selling_price)}`}
@@ -387,7 +405,7 @@ export default function SaleDetailsPage() {
                           </td>
                           <td className="px-6 py-4">
                             <div className="flex justify-end gap-2">
-                              {canUpdateSales ? (
+                              {canUpdateSales && returnable ? (
                                 <>
                                   <ActionButton
                                     variant="outline"
@@ -418,7 +436,8 @@ export default function SaleDetailsPage() {
                             </div>
                           </td>
                         </tr>
-                      ))}
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>

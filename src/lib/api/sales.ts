@@ -119,6 +119,7 @@ export type SaleLineItemRecord = {
   quantity: number;
   returned_qty: number;
   remaining_qty: number;
+  status?: "active" | "partially_returned" | "returned" | "exchanged";
   item_label?: string;
   item_name?: string;
   is_unstored?: boolean;
@@ -333,6 +334,32 @@ export function stripItemTypePrefix(label: string): string {
   return label;
 }
 
+function resolveLineItemStatusFromRecord(
+  record: Record<string, unknown>,
+  qty: number,
+  returned: number,
+  remaining: number,
+): SaleLineItemRecord["status"] {
+  const raw = toText(record.status)?.toLowerCase().replace(/-/g, "_");
+  if (
+    raw === "returned" ||
+    raw === "exchanged" ||
+    raw === "partially_returned"
+  ) {
+    return raw;
+  }
+
+  if (remaining <= 0 && returned > 0) {
+    return "returned";
+  }
+
+  if (returned > 0 && remaining > 0) {
+    return "partially_returned";
+  }
+
+  return "active";
+}
+
 export function normalizeSaleLineItem(raw: unknown): SaleLineItemRecord {
   const record = asRecord(raw);
   const qty = toNumber(record.quantity || record.qty || 0);
@@ -358,6 +385,12 @@ export function normalizeSaleLineItem(raw: unknown): SaleLineItemRecord {
     quantity: qty,
     returned_qty: returned,
     remaining_qty: toNumber(record.remaining_qty ?? Math.max(0, qty - returned)),
+    status: resolveLineItemStatusFromRecord(
+      record,
+      qty,
+      returned,
+      toNumber(record.remaining_qty ?? Math.max(0, qty - returned)),
+    ),
     item_label: rawLabel,
     item_name: isUnstored
       ? customName

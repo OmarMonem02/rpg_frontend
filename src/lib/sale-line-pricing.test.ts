@@ -7,6 +7,9 @@ import {
   lineNetAmount,
   lineNetAmountForQty,
   lineUnitDiscount,
+  resolveDisplayTotal,
+  resolveLineItemReturnStatus,
+  saleHasReturns,
 } from "@/lib/sale-line-pricing";
 
 function lineItem(
@@ -15,6 +18,8 @@ function lineItem(
     discount_amount: number;
     quantity: number;
     remaining_qty: number;
+    returned_qty: number;
+    status: "active" | "partially_returned" | "returned" | "exchanged";
   }> = {},
 ) {
   return {
@@ -22,6 +27,8 @@ function lineItem(
     discount_amount: 0,
     quantity: 1,
     remaining_qty: 1,
+    returned_qty: 0,
+    status: "active" as const,
     ...overrides,
   };
 }
@@ -165,5 +172,87 @@ describe("normalizeSaleLineItem discount conversion", () => {
     });
 
     expect(item.discount_amount).toBe(45);
+  });
+
+  it("maps line item status from API and qty fallbacks", () => {
+    const exchanged = normalizeSaleLineItem({
+      id: 2,
+      sale_id: 10,
+      selling_price: 100,
+      discount: 0,
+      qty: 1,
+      returned_qty: 1,
+      remaining_qty: 0,
+      status: "exchanged",
+      item_type: "product",
+      product_id: 5,
+    });
+
+    expect(exchanged.status).toBe("exchanged");
+    expect(resolveLineItemReturnStatus(exchanged)).toBe("exchanged");
+
+    const partial = normalizeSaleLineItem({
+      id: 3,
+      sale_id: 10,
+      selling_price: 100,
+      discount: 0,
+      qty: 4,
+      returned_qty: 2,
+      remaining_qty: 2,
+      item_type: "product",
+      product_id: 5,
+    });
+
+    expect(partial.status).toBe("partially_returned");
+  });
+});
+
+describe("return status and display total helpers", () => {
+  it("resolves return statuses from qty fields", () => {
+    expect(
+      resolveLineItemReturnStatus({
+        status: undefined,
+        quantity: 2,
+        returned_qty: 2,
+        remaining_qty: 0,
+      }),
+    ).toBe("returned");
+
+    expect(
+      resolveLineItemReturnStatus({
+        status: undefined,
+        quantity: 4,
+        returned_qty: 1,
+        remaining_qty: 3,
+      }),
+    ).toBe("partially_returned");
+  });
+
+  it("prefers computed total when API total is stale", () => {
+    const sale = {
+      line_items: [
+        lineItem({
+          selling_price: 200,
+          quantity: 3,
+          remaining_qty: 1,
+        }),
+      ],
+      shipping_fee: 0,
+      sale_discount: 0,
+      total: 600,
+    };
+
+    expect(resolveDisplayTotal(sale)).toBe(200);
+    expect(saleHasReturns(sale)).toBe(false);
+  });
+
+  it("detects sales with returns", () => {
+    expect(
+      saleHasReturns({
+        line_items: [
+          lineItem({ returned_qty: 1, remaining_qty: 0, quantity: 1 }),
+        ],
+      }),
+    ).toBe(true);
   });
 });

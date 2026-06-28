@@ -51,6 +51,10 @@ import {
   TruckIcon,
 } from "@heroicons/react/24/outline";
 import { ExportColumnPicker } from "@/components/export/ExportColumnPicker";
+import {
+  resolveDisplayTotal,
+  saleHasReturns,
+} from "@/lib/sale-line-pricing";
 
 type SaleSort = "newest" | "oldest" | "highest" | "lowest";
 
@@ -651,6 +655,8 @@ function SalesPageContent() {
                   .map((item) => item.item_name || item.item_label)
                   .filter(Boolean)
                   .join(", ") || "No item preview";
+              const displayTotal = resolveDisplayTotal(sale);
+              const hasReturns = saleHasReturns(sale);
 
               return (
                 <SurfaceCard
@@ -689,7 +695,7 @@ function SalesPageContent() {
                         <p className="label-caps">Total amount</p>
                         <p className="mono-data flex items-center gap-1 font-bold text-primary">
                           <CurrencyDollarIcon className="h-4 w-4" />
-                          {formatMoney(toNumber(sale.total) || 0)}
+                          {formatMoney(displayTotal)}
                         </p>
                       </div>
                       <p className="mt-2 line-clamp-2 text-xs text-on-surface-variant">
@@ -697,6 +703,9 @@ function SalesPageContent() {
                       </p>
                     </div>
                     <div className="col-span-2 flex flex-wrap gap-2">
+                      {hasReturns ? (
+                        <StatusBadge tone="warning">Has returns</StatusBadge>
+                      ) : null}
                       <StatusBadge tone={getDeliveryTone(sale.delivery_status)}>
                         <TruckIcon className="mr-1 h-3.5 w-3.5" />
                         {titleCase(sale.delivery_status)}
@@ -751,13 +760,22 @@ function SalesPageContent() {
                     </tr>
                   </thead>
                   <tbody>
-                    {sales.map((sale) => (
+                    {sales.map((sale) => {
+                      const displayTotal = resolveDisplayTotal(sale);
+                      const hasReturns = saleHasReturns(sale);
+
+                      return (
                       <tr key={sale.id} className="data-row group">
                         <td className="px-5 py-4">
                           <div className="flex flex-col gap-1">
                             <span className="mono-data font-bold text-primary">
                               INV-{sale.id}
                             </span>
+                            {hasReturns ? (
+                              <StatusBadge tone="warning" className="mt-1 w-max">
+                                Has returns
+                              </StatusBadge>
+                            ) : null}
                             <span className="mono-data text-xs text-on-surface-variant">
                               {formatDate(sale.created_at)}
                             </span>
@@ -798,7 +816,7 @@ function SalesPageContent() {
                         </td>
                         <td className="px-5 py-4 text-right">
                           <span className="mono-data text-base font-semibold text-on-surface">
-                            {formatMoney(toNumber(sale.total) || 0)}
+                            {formatMoney(displayTotal)}
                           </span>
                         </td>
                         <td className="px-5 py-4 text-center">
@@ -827,7 +845,8 @@ function SalesPageContent() {
                           </div>
                         </td>
                       </tr>
-                    ))}
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

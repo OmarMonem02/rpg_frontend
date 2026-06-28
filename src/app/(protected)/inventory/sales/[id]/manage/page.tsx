@@ -41,7 +41,11 @@ import {
   type CatalogType,
   type PendingExchangeItem,
 } from "../sale-item-utils";
-import { lineNetAmountForQty } from "@/lib/sale-line-pricing";
+import { lineNetAmount, lineNetAmountForQty, isLineItemReturnable } from "@/lib/sale-line-pricing";
+import {
+  getSaleLineItemRowClassName,
+  SaleLineItemReturnBadge,
+} from "@/components/sale-line-item-return-badge";
 
 function getItemTypeTone(
   type: string,
@@ -198,6 +202,7 @@ export default function ManageSaleItemsPage() {
       }
 
       router.push(`/inventory/sales/${sale.id}`);
+      router.refresh();
     } catch (err) {
       setError(
         err instanceof Error ? err.message : `Failed to process ${activeTab}`,
@@ -266,19 +271,25 @@ export default function ManageSaleItemsPage() {
               </p>
             </div>
             <div className="divide-y divide-outline-variant/10">
-              {items.map((item) => (
+              {items.map((item) => {
+                const returnable = isLineItemReturnable(item);
+                const rowClassName = getSaleLineItemRowClassName(item);
+
+                return (
                 <button
                   key={item.id}
                   type="button"
+                  disabled={!returnable}
                   onClick={() => {
+                    if (!returnable) return;
                     setSelectedItemId(item.id);
                     setQty(1);
                   }}
-                  className={`w-full group px-6 py-4 text-left transition-all ${
+                  className={`w-full group px-6 py-4 text-left transition-all disabled:cursor-not-allowed disabled:opacity-60 ${
                     selectedRow?.id === item.id
                       ? "bg-primary/[0.03] ring-1 ring-inset ring-primary/20"
                       : "hover:bg-surface-container-lowest"
-                  }`}
+                  }${rowClassName ? ` ${rowClassName}` : ""}`}
                 >
                   <div className="flex gap-4">
                     <div
@@ -292,35 +303,33 @@ export default function ManageSaleItemsPage() {
                     </div>
                     <div className="flex-1">
                       <div
-                        className={`font-semibold transition-colors ${
+                        className={`font-semibold transition-colors flex flex-wrap items-center gap-2 ${
                           selectedRow?.id === item.id
                             ? "text-primary"
                             : "text-on-surface"
-                        }`}
+                        }${!returnable ? " line-through decoration-on-surface-variant/50" : ""}`}
                       >
                         {item.item_label || `Item #${item.sellable_id}`}
+                        <SaleLineItemReturnBadge item={item} />
                       </div>
                       <div className="mt-1 flex items-center justify-between text-xs text-on-surface-variant">
                         <span>
                           {labelOf(item.sellable_type)} | Sold: {item.quantity}
-                          {item.returned_qty > 0 && (
+                          {item.returned_qty > 0 ? (
                             <span className="ml-2 text-warning font-bold">
-                              (Rem: {item.remaining_qty})
+                              Rem: {item.remaining_qty}
                             </span>
-                          )}
+                          ) : null}
                         </span>
                         <span className="font-bold">
-                          EGP{" "}
-                          {money(
-                            item.quantity * item.selling_price -
-                              item.discount_amount,
-                          )}
+                          EGP {money(lineNetAmount(item))}
                         </span>
                       </div>
                     </div>
                   </div>
                 </button>
-              ))}
+                );
+              })}
             </div>
           </SurfaceCard>
 

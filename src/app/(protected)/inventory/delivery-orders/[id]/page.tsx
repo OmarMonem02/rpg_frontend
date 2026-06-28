@@ -23,7 +23,7 @@ import {
   labelOf,
   money,
 } from "@/app/(protected)/inventory/sales/[id]/sale-item-utils";
-import { lineNetAmount } from "@/lib/sale-line-pricing";
+import { lineNetAmount, resolveDisplayTotal } from "@/lib/sale-line-pricing";
 import {
   ActionButton,
   PageHero,
@@ -256,7 +256,7 @@ export default function DeliveryOrderDetailPage() {
         />
         <StatCard
           label="Order total"
-          value={formatMoney(sale.total || 0)}
+          value={formatMoney(resolveDisplayTotal(sale))}
           tone="primary"
           hint={`${items.length} line items`}
         />

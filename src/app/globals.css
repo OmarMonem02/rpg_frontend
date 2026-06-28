@@ -549,6 +549,10 @@
     opacity: 0.6;
   }
 
+  .invoice-template tr.item-partially-returned {
+    background: color-mix(in srgb, var(--color-warning) 6%, transparent);
+  }
+
   .invoice-template thead th {
     padding: 12px 14px;
     text-align: left;

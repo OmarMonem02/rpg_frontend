@@ -2,7 +2,12 @@ import type { SaleLineItemRecord, SaleRecord } from "@/lib/api/sales";
 
 export type SaleLinePricingItem = Pick<
   SaleLineItemRecord,
-  "selling_price" | "discount_amount" | "quantity" | "remaining_qty"
+  | "selling_price"
+  | "discount_amount"
+  | "quantity"
+  | "remaining_qty"
+  | "returned_qty"
+  | "status"
 >;
 
 export type SaleTotalsBreakdown = {
@@ -105,4 +110,64 @@ export function computeSaleTotalsBreakdown(
     total,
     units,
   };
+}
+
+export type LineItemReturnStatus =
+  | "active"
+  | "partially_returned"
+  | "returned"
+  | "exchanged";
+
+export function resolveLineItemReturnStatus(
+  item: Pick<
+    SaleLineItemRecord,
+    "status" | "quantity" | "returned_qty" | "remaining_qty"
+  >,
+): LineItemReturnStatus {
+  const normalized = item.status?.toLowerCase().replace(/-/g, "_");
+  if (
+    normalized === "returned" ||
+    normalized === "exchanged" ||
+    normalized === "partially_returned"
+  ) {
+    return normalized;
+  }
+
+  if (item.remaining_qty <= 0 && item.returned_qty > 0) {
+    return "returned";
+  }
+
+  if (item.returned_qty > 0 && item.remaining_qty > 0) {
+    return "partially_returned";
+  }
+
+  return "active";
+}
+
+export function isLineItemReturnable(
+  item: Pick<SaleLineItemRecord, "remaining_qty">,
+): boolean {
+  return item.remaining_qty > 0;
+}
+
+export function saleHasReturns(
+  sale: Pick<SaleRecord, "line_items">,
+): boolean {
+  return (sale.line_items ?? []).some((item) => item.returned_qty > 0);
+}
+
+export function resolveDisplayTotal(
+  sale: Pick<
+    SaleRecord,
+    "line_items" | "shipping_fee" | "sale_discount" | "total"
+  >,
+): number {
+  const breakdown = computeSaleTotalsBreakdown(sale);
+  const apiTotal = sale.total || 0;
+
+  if (Math.abs(apiTotal - breakdown.total) > 0.01) {
+    return breakdown.total;
+  }
+
+  return apiTotal;
 }

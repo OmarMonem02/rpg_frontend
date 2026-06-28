@@ -5,7 +5,10 @@ import {
   computeSaleTotalsBreakdown,
   lineDiscountTotal,
   lineNetAmount,
+  resolveDisplayTotal,
+  resolveLineItemReturnStatus,
 } from "@/lib/sale-line-pricing";
+import { saleLineItemReturnTagLabel } from "@/components/sale-line-item-return-badge";
 
 export type InvoiceTemplateProps = {
   sale: SaleRecord;
@@ -83,7 +86,7 @@ export function InvoiceTemplate({
     saleDiscount,
     units: totalUnits,
   } = totals;
-  const netTotal = sale.total || 0;
+  const netTotal = resolveDisplayTotal(sale);
   const amountPaid = sale.amount_paid ?? 0;
   const remainingBalance = Math.max(0, netTotal - amountPaid);
   const hasOutstandingBalance =
@@ -250,14 +253,19 @@ export function InvoiceTemplate({
                         item.discount_amount > 0 && item.remaining_qty > 0
                           ? lineDiscountTotal(item)
                           : 0;
+                      const returnStatus = resolveLineItemReturnStatus(item);
+                      const returnTag = saleLineItemReturnTagLabel(item);
 
                       return (
                         <tr
                           key={item.id}
                           className={
-                            item.remaining_qty === 0
+                            returnStatus === "returned" ||
+                            returnStatus === "exchanged"
                               ? "item-fully-returned"
-                              : undefined
+                              : returnStatus === "partially_returned"
+                                ? "item-partially-returned"
+                                : undefined
                           }
                         >
                           <td
@@ -269,8 +277,8 @@ export function InvoiceTemplate({
                           <td className="td-item" data-label="Item">
                             <div className="iname">
                               {item.item_name || item.item_label}
-                              {item.remaining_qty === 0 ? (
-                                <span className="returned-tag">RETURNED</span>
+                              {returnTag ? (
+                                <span className="returned-tag">{returnTag}</span>
                               ) : null}
                             </div>
                             {item.is_unstored && item.custom_description ? (
