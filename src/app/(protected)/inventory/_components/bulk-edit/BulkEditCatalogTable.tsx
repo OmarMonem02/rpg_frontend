@@ -4,8 +4,10 @@ import {
   InventoryItemThumbnail,
   InventoryListTable,
   InventoryListTableBody,
+  InventoryListTableElement,
   InventoryListTableHead,
   InventoryListTableRow,
+  InventoryListTableScroll,
   InventoryListTableTd,
   InventoryListTableTh,
   InventoryListTableToolbar,
@@ -97,8 +99,8 @@ export function BulkEditCatalogTable({
         />
       </InventoryListTableToolbar>
 
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[960px] text-left text-sm">
+      <InventoryListTableScroll>
+        <InventoryListTableElement minWidth="960px" sortable={false} enabled={!loading && items.length > 0}>
           <InventoryListTableHead>
             <tr>
               {isVisible("select") && (
@@ -273,8 +275,8 @@ export function BulkEditCatalogTable({
               })
             )}
           </InventoryListTableBody>
-        </table>
-      </div>
+        </InventoryListTableElement>
+      </InventoryListTableScroll>
     </InventoryListTable>
   );
 }

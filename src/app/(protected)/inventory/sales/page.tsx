@@ -58,6 +58,7 @@ import {
   saleHasReturns,
 } from "@/lib/sale-line-pricing";
 
+
 type SaleSort = "newest" | "oldest" | "highest" | "lowest";
 
 const SALES_EXPORT_SCOPE_STORAGE_KEY = "export-scope:sales";
@@ -66,10 +67,10 @@ const SALES_EXPORT_SCOPE_OPTIONS: Array<{
   value: SalesExportScope;
   label: string;
 }> = [
-  { value: "sales", label: "Sale records" },
-  { value: "items", label: "Sold items" },
-  { value: "both", label: "Both sheets (Excel)" },
-];
+    { value: "sales", label: "Sale records" },
+    { value: "items", label: "Sold items" },
+    { value: "both", label: "Both sheets (Excel)" },
+  ];
 
 function readStoredExportScope(): SalesExportScope {
   if (typeof window === "undefined") return "sales";
@@ -326,12 +327,12 @@ function SalesPageContent() {
         },
         extraChips: sellerFilterId
           ? [
-              {
-                key: "seller",
-                label: `Seller: ${sellerFilterName || `#${sellerFilterId}`}`,
-                onClear: () => router.push("/inventory/sales"),
-              },
-            ]
+            {
+              key: "seller",
+              label: `Seller: ${sellerFilterName || `#${sellerFilterId}`}`,
+              onClear: () => router.push("/inventory/sales"),
+            },
+          ]
           : [],
       }),
     [filters, filterOptions, router, sellerFilterId, sellerFilterName, setFilter],
@@ -505,11 +506,11 @@ function SalesPageContent() {
         }
       />
       {permissions.canExport("sales") &&
-      (exportScope === "sales"
-        ? salesExportColumns.length > 0
-        : exportScope === "items"
-          ? saleItemsExportColumns.length > 0
-          : salesExportColumns.length > 0 || saleItemsExportColumns.length > 0) ? (
+        (exportScope === "sales"
+          ? salesExportColumns.length > 0
+          : exportScope === "items"
+            ? saleItemsExportColumns.length > 0
+            : salesExportColumns.length > 0 || saleItemsExportColumns.length > 0) ? (
         <div className="mb-6 space-y-4">
           {exportScope !== "items" && salesExportColumns.length > 0 ? (
             <div>
@@ -716,7 +717,7 @@ function SalesPageContent() {
               setLowStock,
               setTags,
               setFilter,
-              setBikeCompatibility: () => {},
+              setBikeCompatibility: () => { },
             }}
             options={filterOptions}
           />
@@ -756,7 +757,7 @@ function SalesPageContent() {
           </div>
         </DataTableCard>
       ) : sales.length === 0 ? (
-        <EmptyState
+      <EmptyState
           title="No Sales Found"
           description="No sales match the current operations view. Adjust filters or create a new sale to start the workflow."
           action={
@@ -771,6 +772,7 @@ function SalesPageContent() {
             ) : undefined
           }
         />
+          
       ) : (
         <div className="space-y-4">
           <div className="grid gap-4 lg:hidden">
@@ -891,92 +893,93 @@ function SalesPageContent() {
                       const hasReturns = saleHasReturns(sale);
 
                       return (
-                      <tr key={sale.id} className="data-row group">
-                        <td className="px-5 py-4">
-                          <div className="flex flex-col gap-1">
-                            <span className="mono-data font-bold text-primary">
-                              INV-{sale.id}
+                        <tr key={sale.id} className="data-row group">
+                          <td className="px-5 py-4">
+                            <div className="flex flex-col gap-1">
+                              <span className="mono-data font-bold text-primary">
+                                INV-{sale.id}
+                              </span>
+                              {hasReturns ? (
+                                <StatusBadge tone="warning" className="mt-1 w-max">
+                                  Has returns
+                                </StatusBadge>
+                              ) : null}
+                              <span className="mono-data text-xs text-on-surface-variant">
+                                {formatDate(sale.created_at)}
+                              </span>
+                              <span className="form-chip text-caption mt-1 w-max rounded-md">
+                                {titleCase(sale.sale_type)}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="px-5 py-4">
+                            <div className="flex flex-col gap-1">
+                              <span className="font-medium text-on-surface">
+                                {sale.customer?.name || `Customer ${sale.customer_id}`}
+                              </span>
+                              <span className="text-xs text-on-surface-variant">
+                                {sale.customer?.phone || "No phone on record"}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="px-5 py-4">
+                            <div className="flex flex-col gap-1">
+                              <span className="text-on-surface">
+                                {sale.seller?.name || (sale.seller_id ? `Seller ${sale.seller_id}` : "Unassigned")}
+                              </span>
+                              <span className="text-xs text-on-surface-variant">
+                                {sale.payment_method_name || "Payment method not set"}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="px-5 py-4 text-center">
+                            <StatusBadge tone={getDeliveryTone(sale.delivery_status)}>
+                              {titleCase(sale.delivery_status)}
+                            </StatusBadge>
+                          </td>
+                          <td className="px-5 py-4 text-center">
+                            <span className="inline-flex h-8 min-w-8 items-center justify-center rounded-full border border-outline-variant/20 bg-surface-container px-2 text-xs font-semibold text-on-surface">
+                              {sale.line_items?.length || 0}
                             </span>
-                            {hasReturns ? (
-                              <StatusBadge tone="warning" className="mt-1 w-max">
-                                Has returns
-                              </StatusBadge>
-                            ) : null}
-                            <span className="mono-data text-xs text-on-surface-variant">
-                              {formatDate(sale.created_at)}
+                          </td>
+                          <td className="px-5 py-4 text-right">
+                            <span className="mono-data text-base font-semibold text-on-surface">
+                              {formatMoney(displayTotal)}
                             </span>
-                            <span className="form-chip text-caption mt-1 w-max rounded-md">
-                              {titleCase(sale.sale_type)}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="px-5 py-4">
-                          <div className="flex flex-col gap-1">
-                            <span className="font-medium text-on-surface">
-                              {sale.customer?.name || `Customer ${sale.customer_id}`}
-                            </span>
-                            <span className="text-xs text-on-surface-variant">
-                              {sale.customer?.phone || "No phone on record"}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="px-5 py-4">
-                          <div className="flex flex-col gap-1">
-                            <span className="text-on-surface">
-                              {sale.seller?.name || (sale.seller_id ? `Seller ${sale.seller_id}` : "Unassigned")}
-                            </span>
-                            <span className="text-xs text-on-surface-variant">
-                              {sale.payment_method_name || "Payment method not set"}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="px-5 py-4 text-center">
-                          <StatusBadge tone={getDeliveryTone(sale.delivery_status)}>
-                            {titleCase(sale.delivery_status)}
-                          </StatusBadge>
-                        </td>
-                        <td className="px-5 py-4 text-center">
-                          <span className="inline-flex h-8 min-w-8 items-center justify-center rounded-full border border-outline-variant/20 bg-surface-container px-2 text-xs font-semibold text-on-surface">
-                            {sale.line_items?.length || 0}
-                          </span>
-                        </td>
-                        <td className="px-5 py-4 text-right">
-                          <span className="mono-data text-base font-semibold text-on-surface">
-                            {formatMoney(displayTotal)}
-                          </span>
-                        </td>
-                        <td className="px-5 py-4 text-center">
-                          <div className="flex justify-center gap-2 opacity-75 transition-opacity group-hover:opacity-100">
-                            <ActionButton
-                              variant="outline"
-                              size="sm"
-                              className="px-3"
-                              onClick={() => router.push(`/inventory/sales/${sale.id}`)}
-                            >
-                              <EyeIcon className="h-4 w-4" />
-                              View
-                            </ActionButton>
-                            {permissions.canDelete("sales") ? (
+                          </td>
+                          <td className="px-5 py-4 text-center">
+                            <div className="flex justify-center gap-2 opacity-75 transition-opacity group-hover:opacity-100">
                               <ActionButton
                                 variant="outline"
-                                tone="danger"
                                 size="sm"
                                 className="px-3"
-                                disabled={deletingId === sale.id}
-                                onClick={() => handleDeleteSale(sale.id)}
+                                onClick={() => router.push(`/inventory/sales/${sale.id}`)}
                               >
-                                <TrashIcon className="h-4 w-4" />
+                                <EyeIcon className="h-4 w-4" />
+                                View
                               </ActionButton>
-                            ) : null}
-                          </div>
-                        </td>
-                      </tr>
+                              {permissions.canDelete("sales") ? (
+                                <ActionButton
+                                  variant="outline"
+                                  tone="danger"
+                                  size="sm"
+                                  className="px-3"
+                                  disabled={deletingId === sale.id}
+                                  onClick={() => handleDeleteSale(sale.id)}
+                                >
+                                  <TrashIcon className="h-4 w-4" />
+                                </ActionButton>
+                              ) : null}
+                            </div>
+                          </td>
+                        </tr>
                       );
                     })}
                   </tbody>
                 </table>
               </div>
             </DataTableCard>
+
           </div>
         </div>
       )}

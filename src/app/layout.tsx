@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { PageTitleProvider } from "@/components/page-title-provider";
 import { fontSans, fontVariables } from "@/lib/fonts";
+import "./nyx.css";
+import "./nyx-catalog.css";
 
 export const metadata: Metadata = {
   title: {

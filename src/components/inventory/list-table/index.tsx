@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
+import { NyxSortableTable } from "@/components/nyx/NyxSortableTable";
 import { DataTableCard } from "@/components/ops-ui";
 import { ImageGalleryModal } from "@/components/inventory/ImageGalleryModal";
 import { ImageHoverPreview } from "@/components/inventory/ImageHoverPreview";
@@ -79,40 +80,38 @@ export function InventoryListTableToolbar({
 }
 
 export function InventoryListTableScroll({ children }: { children: ReactNode }) {
-  return <div className="overflow-x-auto">{children}</div>;
+  return <div className="nyx-catalog" data-theme="light">{children}</div>;
 }
 
 export function InventoryListTableElement({
   children,
   minWidth = "720px",
+  sortable = true,
+  enabled = true,
 }: {
   children: ReactNode;
   minWidth?: string;
+  sortable?: boolean;
+  enabled?: boolean;
 }) {
   return (
-    <table
-      className="w-full text-left text-sm text-on-surface"
-      style={{ minWidth }}
+    <NyxSortableTable
+      minWidth={minWidth}
+      sortable={sortable}
+      enabled={enabled}
+      scoped={false}
     >
       {children}
-    </table>
+    </NyxSortableTable>
   );
 }
 
 export function InventoryListTableHead({ children }: { children: ReactNode }) {
-  return (
-    <thead className="border-b border-outline-variant/20 bg-surface-container-low text-on-surface-variant">
-      {children}
-    </thead>
-  );
+  return <thead>{children}</thead>;
 }
 
 export function InventoryListTableBody({ children }: { children: ReactNode }) {
-  return (
-    <tbody className="divide-y divide-outline-variant/5 bg-surface">
-      {children}
-    </tbody>
-  );
+  return <tbody>{children}</tbody>;
 }
 
 export function InventoryListTableRow({
@@ -146,7 +145,7 @@ export function InventoryListTableTh({
 }) {
   return (
     <th
-      className={`label-caps whitespace-nowrap px-4 py-3.5 md:px-5 ${alignClass[align]} ${className}`.trim()}
+      className={`whitespace-nowrap ${alignClass[align]} ${className}`.trim()}
     >
       {children}
     </th>
@@ -166,7 +165,7 @@ export function InventoryListTableTd({
 }) {
   return (
     <td
-      className={`whitespace-nowrap px-4 py-3.5 md:px-5 ${alignClass[align]} ${tdVariantClass[variant]} ${className}`.trim()}
+      className={`whitespace-nowrap ${alignClass[align]} ${tdVariantClass[variant]} ${className}`.trim()}
     >
       {children}
     </td>
