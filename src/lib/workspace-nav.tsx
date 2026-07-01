@@ -472,7 +472,7 @@ export const defaultWorkspaceNavSections: SidebarNavSection[] = [
         label: "Products",
         icon: <ProductsIcon className="h-5 w-5" />,
       },
-      
+
       {
         href: "/inventory/bikes",
         label: "Bikes",
@@ -529,11 +529,6 @@ export const defaultWorkspaceNavSections: SidebarNavSection[] = [
         label: "Import & Export",
         icon: <ArrowUpDownIcon className="h-5 w-5" />,
       },
-      {
-        href: "/data/system-backup",
-        label: "System Backup",
-        icon: <DatabaseBackupIcon className="h-5 w-5" />,
-      },
     ],
   },
   {
@@ -560,14 +555,24 @@ export const defaultWorkspaceNavSections: SidebarNavSection[] = [
         icon: <ReportingIcon className="h-5 w-5" />,
       },
       {
-        href: "/history",
-        label: "History",
-        icon: <HistoryIcon className="h-5 w-5" />,
-      },
-      {
         href: "/data/payment-methods",
         label: "Payments",
         icon: <PaymentsIcon className="h-5 w-5" />,
+      },
+    ],
+  },
+  {
+    title: "Settings",
+    items: [
+      {
+        href: "/data/system-backup",
+        label: "System Backup",
+        icon: <DatabaseBackupIcon className="h-5 w-5" />,
+      },
+      {
+        href: "/history",
+        label: "History",
+        icon: <HistoryIcon className="h-5 w-5" />,
       },
     ],
   },
